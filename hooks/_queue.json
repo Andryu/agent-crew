@@ -1,0 +1,14 @@
+{
+  "sprint": "sprint-01",
+  "tasks": [
+    {
+      "slug": "example-feature",
+      "title": "サンプル機能（ここを書き換えて使う）",
+      "status": "TODO",
+      "assigned_to": null,
+      "created_at": "",
+      "updated_at": "",
+      "notes": ""
+    }
+  ]
+}
