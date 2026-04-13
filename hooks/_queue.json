@@ -2,13 +2,94 @@
   "sprint": "sprint-01",
   "tasks": [
     {
-      "slug": "example-feature",
-      "title": "サンプル機能（ここを書き換えて使う）",
+      "slug": "api-design",
+      "title": "API設計（エンドポイント定義・データモデル・ADR）",
       "status": "TODO",
-      "assigned_to": null,
-      "created_at": "",
-      "updated_at": "",
-      "notes": ""
+      "assigned_to": "Alex",
+      "created_at": "2026-04-12",
+      "updated_at": "2026-04-12",
+      "notes": "依存なし。最初に着手。"
+    },
+    {
+      "slug": "request-response-spec",
+      "title": "リクエスト/レスポンス仕様策定",
+      "status": "TODO",
+      "assigned_to": "Mina",
+      "created_at": "2026-04-12",
+      "updated_at": "2026-04-12",
+      "notes": "依存: api-design"
+    },
+    {
+      "slug": "project-init",
+      "title": "プロジェクト初期化（go mod, ディレクトリ構成）",
+      "status": "TODO",
+      "assigned_to": "Riku",
+      "created_at": "2026-04-12",
+      "updated_at": "2026-04-12",
+      "notes": "依存: api-design"
+    },
+    {
+      "slug": "inmemory-store",
+      "title": "インメモリストア実装（Bookmark構造体, CRUD操作）",
+      "status": "TODO",
+      "assigned_to": "Riku",
+      "created_at": "2026-04-12",
+      "updated_at": "2026-04-12",
+      "notes": "依存: project-init"
+    },
+    {
+      "slug": "handler-post",
+      "title": "POST /bookmarks ハンドラ実装",
+      "status": "TODO",
+      "assigned_to": "Riku",
+      "created_at": "2026-04-12",
+      "updated_at": "2026-04-12",
+      "notes": "依存: inmemory-store。#6,#7と並列可。"
+    },
+    {
+      "slug": "handler-get",
+      "title": "GET /bookmarks ハンドラ実装（タグフィルタ含む）",
+      "status": "TODO",
+      "assigned_to": "Riku",
+      "created_at": "2026-04-12",
+      "updated_at": "2026-04-12",
+      "notes": "依存: inmemory-store。#5,#7と並列可。"
+    },
+    {
+      "slug": "handler-delete",
+      "title": "DELETE /bookmarks/{id} ハンドラ実装",
+      "status": "TODO",
+      "assigned_to": "Riku",
+      "created_at": "2026-04-12",
+      "updated_at": "2026-04-12",
+      "notes": "依存: inmemory-store。#5,#6と並列可。"
+    },
+    {
+      "slug": "store-unit-test",
+      "title": "ストア層ユニットテスト",
+      "status": "TODO",
+      "assigned_to": "Sora",
+      "created_at": "2026-04-12",
+      "updated_at": "2026-04-12",
+      "notes": "依存: inmemory-store。ハンドラ実装と並列可。"
+    },
+    {
+      "slug": "handler-e2e-test",
+      "title": "ハンドラ層E2Eテスト（httptest）",
+      "status": "TODO",
+      "assigned_to": "Sora",
+      "created_at": "2026-04-12",
+      "updated_at": "2026-04-12",
+      "notes": "依存: handler-post, handler-get, handler-delete"
+    },
+    {
+      "slug": "code-review",
+      "title": "コードレビュー・最終確認",
+      "status": "TODO",
+      "assigned_to": "Sora",
+      "created_at": "2026-04-12",
+      "updated_at": "2026-04-12",
+      "notes": "依存: handler-e2e-test。スプリント最終タスク。"
     }
   ]
 }
