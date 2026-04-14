@@ -135,44 +135,72 @@ docs/
 
 ### キューファイル: `.claude/_queue.json`
 
-### ステータス遷移
+**重要: キューファイルは必ず `scripts/queue.sh` 経由で更新してください。直接 Write してはいけません。**
+アトミック更新・ロック・schema検証・イベント履歴の自動追記が queue.sh で保証されています。
 
-| ステータス | 意味 |
-|-----------|------|
-| `TODO` | 未着手（Yukiがタスク分解時に設定） |
-| `READY_FOR_ALEX` | Alexの作業待ち |
-| `READY_FOR_MINA` | Minaの作業待ち |
-| `READY_FOR_RIKU` | Rikuの作業待ち |
-| `READY_FOR_SORA` | Soraの作業待ち |
-| `IN_PROGRESS` | 誰かが作業中 |
-| `DONE` | 完了 |
-| `BLOCKED` | ブロック中（notes に理由） |
+### 作業開始時
 
-### 作業開始時の手順
+```bash
+scripts/queue.sh start <slug>
+```
 
-1. `.claude/_queue.json` を Read で読む
-2. 指示された slug のタスクを見つける
-3. そのタスクの `status` を `IN_PROGRESS` に更新
-4. `updated_at` を今日の日付（YYYY-MM-DD）に更新
-5. ファイルを Write で保存
+→ タスクを `IN_PROGRESS` に遷移し、`events[]` に start イベントを追記。
 
-### 作業完了時の手順
+### 作業完了時（実装・設計エージェント: Alex / Mina / Riku）
 
-1. `.claude/_queue.json` を Read で読む
-2. 自分のタスクの `status` を `DONE` に更新
-3. `notes` に完了サマリーを1行追記（例: "設計完了。ADR 5件作成"）
-4. **次に動かせるタスクを探して `READY_FOR_[担当]` に更新**
-   - 依存（notes の "依存: xxx"）が全て DONE になっているタスクを見つける
-   - そのタスクの `assigned_to` を見て、`READY_FOR_ALEX` / `READY_FOR_MINA` / `READY_FOR_RIKU` / `READY_FOR_SORA` に設定
-   - 複数同時に動かせる場合は全部更新してOK（並列実行可）
-5. ファイルを Write で保存
+```bash
+# 1. 自分のタスクを DONE にする
+scripts/queue.sh done <slug> <agent> "<完了サマリー1行>"
+
+# 2. 依存解決された次のタスクを READY_FOR_<担当> に解放する
+scripts/queue.sh handoff <next-slug> <next-agent>
+```
+
+`handoff` は**次に動かせるタスク**（依存が全て DONE になったもの）を指定します。複数ある場合は複数回呼びます。ただし**並列実行禁止のため、実際に進めるのは1タスクだけ**です（他はキュー上で READY だけにしておく）。
+
+### 作業完了時（QAエージェント: Sora）
+
+Sora は `done` ではなく `qa` コマンドを使ってください。
+
+```bash
+# 判定結果を記録
+scripts/queue.sh qa <slug> APPROVED "<レビューサマリー>"
+# または
+scripts/queue.sh qa <slug> CHANGES_REQUESTED "<差し戻し理由>"
+```
+
+その後、判定に応じて:
+
+- **APPROVED の場合**: `scripts/queue.sh done <slug> Sora "<サマリー>"`
+- **CHANGES_REQUESTED の場合**: `scripts/queue.sh retry <slug>`（自動でretry_countがインクリメントされ、READY_FOR_RIKU に戻ります。3回超過で自動 BLOCKED）
 
 ### ブロック時
 
-`status` を `BLOCKED` に更新し、`notes` にブロック理由を記載。Yukiへの報告を別途行う。
+```bash
+scripts/queue.sh block <slug> <agent> "<ブロック理由>"
+```
 
-### 注意
+→ `BLOCKED` に遷移。Yukiへの報告は別途。
 
-- キュー更新は**必ず作業の最後に行う**（作業成果物の作成後）
-- 他のタスクのステータスを勝手に書き換えない（自分のタスクと、自分が解放する次タスクのみ）
-- JSON形式が壊れないように Write 前に読み直してから編集する
+### 状態確認
+
+```bash
+scripts/queue.sh show              # 全タスクの要約
+scripts/queue.sh show <slug>       # 特定タスクの詳細（events履歴込み）
+scripts/queue.sh next              # 次に実行可能な READY_FOR_* タスクを1件
+```
+
+### Quality Gate（スプリント完了判定）
+
+スプリントは以下の両方を満たしたときに完了とみなします:
+
+1. 全タスクの `status == "DONE"`
+2. QA対象の全タスクで `qa_result == "APPROVED"`
+
+Yuki は最終報告前に `scripts/queue.sh show` で両方を確認してください。
+
+### リトライルール
+
+- Sora の `qa CHANGES_REQUESTED` → `retry <slug>` で自動的に `READY_FOR_RIKU` へ戻る
+- `retry_count` が `MAX_RETRY`（デフォルト3）を超えたら自動で `BLOCKED` に遷移
+- `BLOCKED` になったタスクはオーナー（人間）の判断待ち

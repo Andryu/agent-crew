@@ -44,6 +44,7 @@ build_agent() {
 }
 
 # pm, engineer-go はvendorを使わないので、共通キュープロトコルだけ追記
+# idempotent: 古いプロトコル以降をstripしてから再追記する
 append_queue_protocol_to_native() {
   local role=$1
   local file="$AGENTS_DIR/${role}.md"
@@ -51,9 +52,20 @@ append_queue_protocol_to_native() {
     echo "  [SKIP] native agent not found: $file"
     return
   fi
+  # 既存プロトコルをstrip（マーカー行以降を削除、末尾の空行と --- も掃除）
   if grep -q "タスクキュー更新プロトコル（全エージェント共通）" "$file"; then
-    echo "  [SKIP] $role already has queue protocol"
-    return
+    awk '/^## タスクキュー更新プロトコル（全エージェント共通）/{exit} {print}' "$file" > "$file.tmp"
+    # 末尾の空行と "---" 区切り線を連続で削除
+    awk '
+      { lines[NR] = $0 }
+      END {
+        last = NR
+        while (last > 0 && (lines[last] == "" || lines[last] == "---")) last--
+        for (i = 1; i <= last; i++) print lines[i]
+      }
+    ' "$file.tmp" > "$file.tmp2"
+    mv "$file.tmp2" "$file"
+    rm -f "$file.tmp"
   fi
   cat "$OVERLAYS_DIR/_queue_protocol.md" >> "$file"
   echo "  [OK] $role: 共通キュープロトコルを追記"
@@ -71,6 +83,31 @@ append_queue_protocol_to_native pm
 append_queue_protocol_to_native engineer-go
 append_queue_protocol_to_native qa
 append_queue_protocol_to_native ux-designer
+
+# preflightチェックを Riku と Sora に追加（環境依存ツールを使うエージェント）
+append_preflight() {
+  local role=$1
+  local file="$AGENTS_DIR/${role}.md"
+  if [[ ! -f "$file" ]]; then return; fi
+  # idempotent
+  if grep -q "環境チェック（preflight）" "$file"; then
+    awk '/^## 環境チェック（preflight）/{exit} {print}' "$file" > "$file.tmp"
+    awk '
+      { lines[NR] = $0 }
+      END {
+        last = NR
+        while (last > 0 && (lines[last] == "" || lines[last] == "---")) last--
+        for (i = 1; i <= last; i++) print lines[i]
+      }
+    ' "$file.tmp" > "$file.tmp2"
+    mv "$file.tmp2" "$file"
+    rm -f "$file.tmp"
+  fi
+  cat "$OVERLAYS_DIR/_preflight.md" >> "$file"
+  echo "  [OK] $role: preflight を追記"
+}
+append_preflight engineer-go
+append_preflight qa
 
 # .claude/agents/ にデプロイ
 if [[ -d "$SCRIPT_DIR/.claude/agents" ]]; then
