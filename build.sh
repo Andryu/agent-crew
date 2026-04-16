@@ -83,6 +83,7 @@ append_queue_protocol_to_native pm
 append_queue_protocol_to_native engineer-go
 append_queue_protocol_to_native qa
 append_queue_protocol_to_native ux-designer
+append_queue_protocol_to_native doc-reviewer
 
 # preflightチェックを Riku と Sora に追加（環境依存ツールを使うエージェント）
 append_preflight() {

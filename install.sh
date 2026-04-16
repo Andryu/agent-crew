@@ -17,7 +17,8 @@ cp "$REPO_DIR/agents/pm.md"  ~/.claude/agents/pm.md
 cp "$REPO_DIR/agents/architect.md"  ~/.claude/agents/architect.md
 cp "$REPO_DIR/agents/ux-designer.md"  ~/.claude/agents/ux-designer.md
 cp "$REPO_DIR/agents/qa.md"  ~/.claude/agents/qa.md
-echo "  → Yuki / Alex / Mina / Sora → ~/.claude/agents/"
+cp "$REPO_DIR/agents/doc-reviewer.md"  ~/.claude/agents/doc-reviewer.md
+echo "  → Yuki / Alex / Mina / Sora / Hana → ~/.claude/agents/"
 
 # Rikuをプロジェクトに配置（スタック別）
 echo "📦 Riku ($STACK) をプロジェクトに配置中..."
