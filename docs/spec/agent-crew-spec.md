@@ -283,6 +283,22 @@ Riku 実装 → Sora レビュー
 
 ---
 
+## 6.3 QA モード（qa_mode）
+
+タスクごとに QA タイミングを制御するフィールド。Yuki がタスク分解時に設定する。
+
+> 注: 本セクションは仕様定義です。`scripts/queue.sh` での `qa_mode` フィールドの自動判定は未実装であり、現状は Yuki がタスク分解時に手動で適用します。
+
+| 値 | 意味 |
+|---|---|
+| `inline` | 実装直後に Sora のレビュータスクを挟む（デフォルト） |
+| `end_of_sprint` | スプリント末にまとめてレビュー |
+| `null`（未設定） | `inline` と同じ扱い（安全側倒し） |
+
+判断基準: リスクの高い変更（API追加・DB変更・認証・外部連携）は `inline`、低リスク（README修正・設定値調整・テスト追加のみ）は `end_of_sprint`。迷ったら `inline`。
+
+---
+
 ## 7. 環境チェック（preflight）
 
 ### 7.1 目的
@@ -357,7 +373,8 @@ agent-crew/
 │   ├── architect.md
 │   ├── ux-designer.md
 │   ├── engineer-go.md
-│   └── qa.md
+│   ├── qa.md
+│   └── doc-reviewer.md
 ├── overlays/                # ビルドの素材
 │   ├── _queue_protocol.md   # 全エージェント共通
 │   ├── _preflight.md        # Riku/Sora 共通
@@ -403,7 +420,7 @@ agent-crew/
 | 項目 | 現状 | 将来案 |
 |---|---|---|
 | 並列実行 | 禁止（直列のみ） | queue.sh のロックで並列も可だが、未検証のため当面は直列 |
-| QAタイミング | スプリント末でまとめて | task単位 `qa_mode: inline\|end-of-sprint` 案あり |
+| QAタイミング | `qa_mode` 仕様策定済み（§6.3）、Yuki が手動適用 | queue.sh での自動判定 |
 | 複数スタック | Go のみ実装済み | Vue / Next 等は overlay 追加で対応予定 |
 | Antigravity サポート | エージェント定義のみ | hook 未対応のため自動化は不可 |
 | マルチプロジェクト | 1ワークツリー前提 | スコープ外 |
