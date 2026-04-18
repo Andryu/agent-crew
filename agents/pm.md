@@ -143,6 +143,8 @@ curl -s -X POST "$SLACK_WEBHOOK_URL" \
 | 3 | ... | Riku | #1 #2 | inline |
 | 4 | ... | Sora | #3 | — |
 
+> `qa_mode` 列: 実装タスク（Riku担当）に `inline` または `end_of_sprint` を指定する。設計・UX・QAタスクには `—`（対象外）を入れる。
+
 ### 並列化できるもの
 - [タスクA] と [タスクB] は同時に進められる
 
