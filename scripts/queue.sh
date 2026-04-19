@@ -150,6 +150,18 @@ cmd_done() {
   atomic_write "$updated"
   release_lock
   echo "OK: $slug → DONE"
+
+  # notes から GitHub Issue 番号を抽出して自動クローズ
+  if command -v gh >/dev/null 2>&1; then
+    local issue_num
+    issue_num=$(jq -r --arg s "$slug" '.tasks[] | select(.slug == $s) | .notes // ""' "$QUEUE_FILE" \
+      | grep -oE '#[0-9]+' | head -1 | tr -d '#')
+    if [[ -n "$issue_num" ]]; then
+      gh issue close "$issue_num" --comment "✅ ${agent}: ${slug} 完了 — ${msg}" 2>/dev/null && \
+        echo "OK: Issue #$issue_num closed" || \
+        echo "WARN: Issue #$issue_num close failed (ignored)" >&2
+    fi
+  fi
 }
 
 # ---------- コマンド: handoff ----------
