@@ -1,0 +1,69 @@
+name: Slack Notify
+
+on:
+  issues:
+    types: [opened, closed]
+  pull_request:
+    types: [opened, closed]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - name: Build and post Slack message
+        if: env.SLACK_WEBHOOK_URL != ''
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+        run: |
+          if [ "$EVENT_NAME" = "issues" ]; then
+            if [ "$EVENT_ACTION" = "opened" ]; then
+              TEXT="📝 Yuki: Issue #${ISSUE_NUMBER} を登録しました — ${ISSUE_TITLE}\n${ISSUE_URL}"
+            elif [ "$EVENT_ACTION" = "closed" ]; then
+              TEXT="✅ Yuki: Issue #${ISSUE_NUMBER} をクローズしました — ${ISSUE_TITLE}\n${ISSUE_URL}"
+            else
+              echo "Unhandled issue action: $EVENT_ACTION — skipping"
+              exit 0
+            fi
+
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            if [ "$EVENT_ACTION" = "opened" ]; then
+              TEXT="🔀 Riku: PR #${PR_NUMBER} を作成しました — ${PR_TITLE}\n${PR_URL}"
+            elif [ "$EVENT_ACTION" = "closed" ]; then
+              if [ "$PR_MERGED" = "true" ]; then
+                TEXT="🎉 Riku: PR #${PR_NUMBER} がマージされました — ${PR_TITLE}\n${PR_URL}"
+              else
+                TEXT="❌ Riku: PR #${PR_NUMBER} がクローズされました — ${PR_TITLE}\n${PR_URL}"
+              fi
+            else
+              echo "Unhandled pull_request action: $EVENT_ACTION — skipping"
+              exit 0
+            fi
+
+          else
+            echo "Unhandled event: $EVENT_NAME — skipping"
+            exit 0
+          fi
+
+          PAYLOAD=$(jq -n --arg text "$(printf '%b' "$TEXT")" '{"text": $text}')
+
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$SLACK_WEBHOOK_URL")
+
+          echo "Slack response: $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Warning: Slack returned HTTP $HTTP_CODE" >&2
+            exit 1
+          fi

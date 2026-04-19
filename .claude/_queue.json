@@ -1,32 +1,183 @@
 {
-  "sprint": "sprint-02",
+  "sprint": "sprint-01-slack",
   "tasks": [
     {
-      "slug": "fix-body-size-limit",
-      "title": "リクエストボディサイズ上限の実装（MAJOR修正）",
+      "slug": "slack-design",
+      "title": "Slack連携: 設計",
       "status": "DONE",
-      "assigned_to": "Riku",
-      "created_at": "2026-04-13",
-      "updated_at": "2026-04-13",
-      "notes": "Soraのレビュー MAJOR指摘: handler/bookmark.go:38-42 で http.MaxBytesReader を導入。413 Payload Too Large でエラー返却。 / 完了: MaxBytesReader(1MB)導入、errors.As で http.MaxBytesError 判定し 413 + 'request body too large (max 1MB)' 返却。"
+      "assigned_to": "Alex",
+      "created_at": "2026-04-18",
+      "updated_at": "2026-04-19",
+      "notes": "GitHub Issue #2",
+      "events": [
+        {
+          "ts": "2026-04-18T23:22:46+0900",
+          "agent": "Alex",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-19T01:26:17+0900",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "Slack連携ADRを作成"
+        }
+      ],
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "Slack連携ADRを作成"
     },
     {
-      "slug": "fix-url-validation",
-      "title": "URL検証を net/url.Parse に置き換え（MINOR修正）",
+      "slug": "slack-env-setup",
+      "title": "Webhook 環境変数の整備",
       "status": "DONE",
       "assigned_to": "Riku",
-      "created_at": "2026-04-13",
-      "updated_at": "2026-04-13",
-      "notes": "依存: fix-body-size-limit。handler/bookmark.go:58 の strings.HasPrefix を url.Parse + Host チェックへ / 完了: url.Parse で Scheme(http/https) と Host の両方を検証。エラーメッセージは仕様どおり据え置き。"
+      "created_at": "2026-04-18",
+      "updated_at": "2026-04-19",
+      "notes": "GitHub Issue #3. 依存: slack-design",
+      "events": [
+        {
+          "ts": "2026-04-19T01:26:23+0900",
+          "agent": "Riku",
+          "action": "handoff",
+          "msg": "next: READY_FOR_RIKU"
+        },
+        {
+          "ts": "2026-04-19T01:26:27+0900",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-19T01:27:26+0900",
+          "agent": "Riku",
+          "action": "done",
+          "msg": ".env.example作成、.gitignore更新、README更新"
+        }
+      ],
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": ".env.example作成、.gitignore更新、README更新"
     },
     {
-      "slug": "re-review",
-      "title": "修正後の再レビュー",
+      "slug": "slack-hook-fix",
+      "title": "subagent_stop.sh の通知をエージェント人格化",
+      "status": "DONE",
+      "assigned_to": "Riku",
+      "created_at": "2026-04-18",
+      "updated_at": "2026-04-19",
+      "notes": "GitHub Issue #4. 依存: slack-design",
+      "events": [
+        {
+          "ts": "2026-04-19T01:26:23+0900",
+          "agent": "Riku",
+          "action": "handoff",
+          "msg": "next: READY_FOR_RIKU"
+        },
+        {
+          "ts": "2026-04-19T01:27:44+0900",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-19T01:30:06+0900",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "subagent_stop.sh の通知をエージェント人格化"
+        },
+        {
+          "ts": "2026-04-19T01:30:28+0900",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "subagent_stop.shの通知をエージェント人格化"
+        }
+      ],
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "subagent_stop.shの通知をエージェント人格化"
+    },
+    {
+      "slug": "slack-actions",
+      "title": "GitHub Actions ワークフロー作成",
+      "status": "DONE",
+      "assigned_to": "Riku",
+      "created_at": "2026-04-18",
+      "updated_at": "2026-04-19",
+      "notes": "GitHub Issue #5. 依存: slack-design",
+      "events": [
+        {
+          "ts": "2026-04-19T01:26:23+0900",
+          "agent": "Riku",
+          "action": "handoff",
+          "msg": "next: READY_FOR_RIKU"
+        },
+        {
+          "ts": "2026-04-19T01:30:28+0900",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-19T01:31:21+0900",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "GitHub Actions slack-notify.yml を作成"
+        },
+        {
+          "ts": "2026-04-19T01:31:58+0900",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "GitHub Actions slack-notify.yml を作成"
+        }
+      ],
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "GitHub Actions slack-notify.yml を作成"
+    },
+    {
+      "slug": "slack-qa",
+      "title": "全通知経路の QA",
       "status": "DONE",
       "assigned_to": "Sora",
-      "created_at": "2026-04-13",
-      "updated_at": "2026-04-13",
-      "notes": "依存: fix-body-size-limit, fix-url-validation。MAJOR が解消されているか静的レビュー。 / 結果: APPROVED。MaxBytesReader(1MB) を io.ReadAll 前に設定、errors.As(&http.MaxBytesError) で 413 返却を確認。URL検証は url.Parse + Scheme(http/https) + Host チェックに置換済み。既存テストのエラーメッセージ文言と一致しリグレッションなし。sprint-02 完了。"
+      "created_at": "2026-04-18",
+      "updated_at": "2026-04-19",
+      "notes": "GitHub Issue #6. 依存: slack-env-setup, slack-hook-fix, slack-actions",
+      "events": [
+        {
+          "ts": "2026-04-19T01:31:58+0900",
+          "agent": "Sora",
+          "action": "handoff",
+          "msg": "next: READY_FOR_SORA"
+        },
+        {
+          "ts": "2026-04-19T01:31:58+0900",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-19T01:33:56+0900",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-19T12:25:30+0900",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: 全チェック通過"
+        },
+        {
+          "ts": "2026-04-19T12:25:30+0900",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "QA APPROVED"
+        }
+      ],
+      "retry_count": 0,
+      "qa_result": "APPROVED",
+      "summary": "QA APPROVED"
     }
   ]
 }

@@ -39,8 +39,35 @@ if [[ -n "$BLOCKED_SLUGS" ]]; then
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
-    MESSAGE="🚧 *agent-crew*: BLOCKED タスクが発生しました"
-    curl -s --max-time 3 --connect-timeout 2 -X POST "$SLACK_WEBHOOK_URL" -H 'Content-type: application/json' -d "{\"text\": \"$MESSAGE\"}" >/dev/null 2>&1
+    first=true
+    while IFS= read -r slug; do
+      [[ -z "$slug" ]] && continue
+      # block イベントから agent と msg を取得
+      block_agent=$(jq -r --arg s "$slug" '
+        .tasks[] | select(.slug == $s)
+        | (.events // [])
+        | map(select(.action == "block"))
+        | last
+        | (.agent // "agent-crew")
+      ' "$QUEUE_FILE")
+      block_msg=$(jq -r --arg s "$slug" '
+        .tasks[] | select(.slug == $s)
+        | (.events // [])
+        | map(select(.action == "block"))
+        | last
+        | (.msg // "reason unknown")
+      ' "$QUEUE_FILE")
+      # 2件目以降はレート制限対応で sleep
+      if [[ "$first" == "true" ]]; then
+        first=false
+      else
+        sleep 1
+      fi
+      MESSAGE="🚧 ${block_agent}: ${slug} がブロックされました — ${block_msg}"
+      curl -s --max-time 3 --connect-timeout 2 -X POST "$SLACK_WEBHOOK_URL" \
+        -H 'Content-type: application/json' \
+        -d "{\"text\": \"$MESSAGE\"}" >/dev/null 2>&1
+    done <<< "$BLOCKED_SLUGS"
   fi
   exit 0
 fi
@@ -72,9 +99,20 @@ if [[ -n "$NEXT" ]]; then
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
+    # 直近の done イベントから完了したエージェント名を取得
+    LAST_AGENT=$(jq -r '
+      .tasks
+      | map(.events // [])
+      | flatten
+      | map(select(.action == "done"))
+      | last
+      | .agent // "Yuki"
+    ' "$QUEUE_FILE")
     AGENT_UPPER=$(echo "$AGENT" | tr '[:lower:]' '[:upper:]')
-    MESSAGE="✅ $TITLE ($SLUG) のフェーズが完了しました / 次: $AGENT_UPPER"
-    curl -s --max-time 3 --connect-timeout 2 -X POST "$SLACK_WEBHOOK_URL" -H 'Content-type: application/json' -d "{\"text\": \"$MESSAGE\"}" >/dev/null 2>&1
+    MESSAGE="✅ ${LAST_AGENT}: ${SLUG} が完了しました / 次: ${AGENT_UPPER}"
+    curl -s --max-time 3 --connect-timeout 2 -X POST "$SLACK_WEBHOOK_URL" \
+      -H 'Content-type: application/json' \
+      -d "{\"text\": \"$MESSAGE\"}" >/dev/null 2>&1
   fi
   exit 0
 fi
@@ -94,8 +132,10 @@ if [[ "$INCOMPLETE" == "0" && "$QA_PENDING" == "0" ]]; then
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
-    MESSAGE="🎉 agent-crew: $SPRINT 完了。全タスクDONE / QA APPROVED"
-    curl -s --max-time 3 --connect-timeout 2 -X POST "$SLACK_WEBHOOK_URL" -H 'Content-type: application/json' -d "{\"text\": \"$MESSAGE\"}" >/dev/null 2>&1
+    MESSAGE="🎉 Yuki: ${SPRINT} 完了。全タスク DONE / QA APPROVED"
+    curl -s --max-time 3 --connect-timeout 2 -X POST "$SLACK_WEBHOOK_URL" \
+      -H 'Content-type: application/json' \
+      -d "{\"text\": \"$MESSAGE\"}" >/dev/null 2>&1
   fi
 fi
 
