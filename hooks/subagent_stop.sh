@@ -12,6 +12,93 @@ set -u
 
 QUEUE_FILE="${QUEUE_FILE:-.claude/_queue.json}"
 
+# ---------- エージェントプロファイル関数 ----------
+
+get_agent_display_name() {
+  case "$1" in
+    Yuki) echo "Yuki (PM)" ;;
+    Alex) echo "Alex (Architect)" ;;
+    Mina) echo "Mina (UX)" ;;
+    Riku) echo "Riku (Dev)" ;;
+    Sora) echo "Sora (QA)" ;;
+    Hana) echo "Hana (Review)" ;;
+    Kai)  echo "Kai (Security)" ;;
+    Tomo) echo "Tomo (DevOps)" ;;
+    Ren)  echo "Ren (Data)" ;;
+    *)    echo "agent-crew" ;;
+  esac
+}
+
+get_agent_icon() {
+  case "$1" in
+    Yuki) echo ":clipboard:" ;;
+    Alex) echo ":building_construction:" ;;
+    Mina) echo ":art:" ;;
+    Riku) echo ":hammer_and_wrench:" ;;
+    Sora) echo ":mag:" ;;
+    Hana) echo ":memo:" ;;
+    Kai)  echo ":shield:" ;;
+    Tomo) echo ":rocket:" ;;
+    Ren)  echo ":bar_chart:" ;;
+    *)    echo ":robot_face:" ;;
+  esac
+}
+
+# slack_notify <agent> <message>
+# SLACK_WEBHOOK_URL が未設定の場合はノーオペレーション
+slack_notify() {
+  local agent="$1" message="$2"
+  [[ -z "${SLACK_WEBHOOK_URL:-}" ]] && return 0
+
+  local display_name icon payload
+  display_name=$(get_agent_display_name "$agent")
+  icon=$(get_agent_icon "$agent")
+
+  payload=$(jq -n \
+    --arg text "$message" \
+    --arg username "$display_name" \
+    --arg icon_emoji "$icon" \
+    '{"text": $text, "username": $username, "icon_emoji": $icon_emoji}')
+
+  curl -s --max-time 3 --connect-timeout 2 -X POST "$SLACK_WEBHOOK_URL" \
+    -H 'Content-type: application/json' \
+    -d "$payload" >/dev/null 2>&1
+}
+
+# build_done_message <agent> <slug> <next_agent>
+build_done_message() {
+  local agent="$1" slug="$2" next_agent="$3"
+  case "$agent" in
+    Yuki)  echo "✅ ${slug} のタスク分解が完了しました。チームに引き渡します。" ;;
+    Alex)  echo "✅ ${slug} の設計が完了しました。${next_agent}に引き継ぎます。" ;;
+    Mina)  echo "✅ ${slug} のデザイン、できました！${next_agent}に渡しますね。" ;;
+    Riku)  echo "✅ ${slug} 実装完了！${next_agent}、レビューよろしく。" ;;
+    Sora)  echo "✅ ${slug} レビュー完了。品質基準を満たしています — APPROVED" ;;
+    Hana)  echo "✅ ${slug} のレビューが完了しました。問題ありません。" ;;
+    Kai)   echo "✅ ${slug} のセキュリティレビュー完了。${next_agent} に引き継ぎます。" ;;
+    Tomo)  echo "✅ ${slug} のインフラ設定が完了しました。${next_agent} に引き継ぎます。" ;;
+    Ren)   echo "✅ ${slug} のデータ設計が完了しました。${next_agent} に引き継ぎます。" ;;
+    *)     echo "✅ ${agent}: ${slug} が完了しました / 次: ${next_agent}" ;;
+  esac
+}
+
+# build_block_message <agent> <slug> <reason>
+build_block_message() {
+  local agent="$1" slug="$2" reason="$3"
+  case "$agent" in
+    Yuki)  echo "🚧 ${slug} がブロックされています。オーナーの判断が必要です — ${reason}" ;;
+    Alex)  echo "🚧 ${slug} の設計がブロックされました — ${reason}" ;;
+    Mina)  echo "🚧 ${slug} のデザインで手が止まっています — ${reason}" ;;
+    Riku)  echo "🚧 ${slug} ブロックされた。詰まってる — ${reason}" ;;
+    Sora)  echo "🚧 ${slug} のQAがブロックされました — ${reason}" ;;
+    Hana)  echo "🚧 ${slug} のレビューがブロックされました — ${reason}" ;;
+    Kai)   echo "🚧 ${slug} のセキュリティレビューがブロックされました — ${reason}" ;;
+    Tomo)  echo "🚧 ${slug} のインフラ作業がブロックされました — ${reason}" ;;
+    Ren)   echo "🚧 ${slug} のデータ設計がブロックされました — ${reason}" ;;
+    *)     echo "🚧 ${agent}: ${slug} がブロックされました — ${reason}" ;;
+  esac
+}
+
 if [[ ! -f "$QUEUE_FILE" ]]; then
   exit 0
 fi
@@ -63,10 +150,8 @@ if [[ -n "$BLOCKED_SLUGS" ]]; then
       else
         sleep 1
       fi
-      MESSAGE="🚧 ${block_agent}: ${slug} がブロックされました — ${block_msg}"
-      curl -s --max-time 3 --connect-timeout 2 -X POST "$SLACK_WEBHOOK_URL" \
-        -H 'Content-type: application/json' \
-        -d "{\"text\": \"$MESSAGE\"}" >/dev/null 2>&1
+      MESSAGE=$(build_block_message "$block_agent" "$slug" "$block_msg")
+      slack_notify "$block_agent" "$MESSAGE"
     done <<< "$BLOCKED_SLUGS"
   fi
   exit 0
@@ -109,10 +194,8 @@ if [[ -n "$NEXT" ]]; then
       | .agent // "Yuki"
     ' "$QUEUE_FILE")
     AGENT_UPPER=$(echo "$AGENT" | tr '[:lower:]' '[:upper:]')
-    MESSAGE="✅ ${LAST_AGENT}: ${SLUG} が完了しました / 次: ${AGENT_UPPER}"
-    curl -s --max-time 3 --connect-timeout 2 -X POST "$SLACK_WEBHOOK_URL" \
-      -H 'Content-type: application/json' \
-      -d "{\"text\": \"$MESSAGE\"}" >/dev/null 2>&1
+    MESSAGE=$(build_done_message "$LAST_AGENT" "$SLUG" "$AGENT_UPPER")
+    slack_notify "$LAST_AGENT" "$MESSAGE"
   fi
   exit 0
 fi
@@ -132,10 +215,23 @@ if [[ "$INCOMPLETE" == "0" && "$QA_PENDING" == "0" ]]; then
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
-    MESSAGE="🎉 Yuki: ${SPRINT} 完了。全タスク DONE / QA APPROVED"
-    curl -s --max-time 3 --connect-timeout 2 -X POST "$SLACK_WEBHOOK_URL" \
-      -H 'Content-type: application/json' \
-      -d "{\"text\": \"$MESSAGE\"}" >/dev/null 2>&1
+    MESSAGE="🎉 ${SPRINT} 完了。全タスク DONE / QA APPROVED"
+    slack_notify "Yuki" "$MESSAGE"
+  fi
+
+  # ---------- スプリント完了時の自動処理 ----------
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  QUEUE_SH="${SCRIPT_DIR}/../scripts/queue.sh"
+
+  if [[ -x "$QUEUE_SH" ]]; then
+    echo ""
+    echo "リトロスペクティブを生成しています..."
+    # リトロスペクティブ集計 + DECISIONS.md 追記
+    "$QUEUE_SH" retro --save --decisions
+    echo ""
+    echo "依存グラフを保存しています..."
+    # Mermaid 依存グラフを保存
+    "$QUEUE_SH" graph --save
   fi
 fi
 
