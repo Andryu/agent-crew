@@ -54,7 +54,19 @@ jobs:
             exit 0
           fi
 
-          PAYLOAD=$(jq -n --arg text "$(printf '%b' "$TEXT")" '{"text": $text}')
+          if [ "$EVENT_NAME" = "issues" ]; then
+            USERNAME="Yuki (PM)"
+            ICON_EMOJI=":clipboard:"
+          else
+            USERNAME="Riku (Dev)"
+            ICON_EMOJI=":hammer_and_wrench:"
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg text "$(printf '%b' "$TEXT")" \
+            --arg username "$USERNAME" \
+            --arg icon_emoji "$ICON_EMOJI" \
+            '{"text": $text, "username": $username, "icon_emoji": $icon_emoji}')
 
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST \

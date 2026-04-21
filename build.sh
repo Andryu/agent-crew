@@ -116,5 +116,63 @@ if [[ -d "$SCRIPT_DIR/.claude/agents" ]]; then
   echo "  [DEPLOY] .claude/agents/ に反映"
 fi
 
+# --- Antigravity ビルド（--target=antigravity が指定された場合のみ）---
+build_antigravity() {
+  local role=$1
+  local src_md="$AGENTS_DIR/${role}.md"
+  local out_dir="$HOME/.gemini/antigravity/skills/${role}"
+  local out_file="$out_dir/SKILL.md"
+
+  if [[ ! -f "$src_md" ]]; then
+    echo "  [SKIP] $role: source not found"
+    return
+  fi
+
+  mkdir -p "$out_dir"
+
+  # Claude Code 向けキュープロトコル・preflight を剥がして本体だけ抽出
+  awk '/^## タスクキュー更新プロトコル（全エージェント共通）/{exit} {print}' "$src_md" > "$out_file.tmp"
+  awk '
+    { lines[NR] = $0 }
+    END {
+      last = NR
+      while (last > 0 && (lines[last] == "" || lines[last] == "---")) last--
+      for (i = 1; i <= last; i++) print lines[i]
+    }
+  ' "$out_file.tmp" > "$out_file"
+  rm -f "$out_file.tmp"
+
+  # Antigravity 向けプロトコルを追記
+  cat "$OVERLAYS_DIR/_queue_protocol_antigravity.md" >> "$out_file"
+  cat "$OVERLAYS_DIR/_slack_notify_antigravity.md" >> "$out_file"
+  echo "  [OK] $role → $out_file"
+}
+
+if [[ "${1:-}" == "--target=antigravity" ]]; then
+  echo ""
+  echo "=== Antigravity ビルド ==="
+  for role in pm architect ux-designer engineer-go qa doc-reviewer; do
+    build_antigravity "$role"
+  done
+
+  # queue.sh を .agent/scripts/ にコピーし QUEUE_FILE デフォルトを書き換え
+  if [[ -f "$SCRIPT_DIR/scripts/queue.sh" ]]; then
+    mkdir -p "$SCRIPT_DIR/.agent/scripts"
+    cp "$SCRIPT_DIR/scripts/queue.sh" "$SCRIPT_DIR/.agent/scripts/queue.sh"
+    chmod +x "$SCRIPT_DIR/.agent/scripts/queue.sh"
+    sed 's|QUEUE_FILE="${QUEUE_FILE:-.claude/_queue.json}"|QUEUE_FILE="${QUEUE_FILE:-.agent/_queue.json}"|' \
+      "$SCRIPT_DIR/.agent/scripts/queue.sh" > "$SCRIPT_DIR/.agent/scripts/queue.sh.tmp"
+    sed 's|QUEUE_LOCK="${QUEUE_LOCK:-.claude/.queue.lock}"|QUEUE_LOCK="${QUEUE_LOCK:-.agent/.queue.lock}"|' \
+      "$SCRIPT_DIR/.agent/scripts/queue.sh.tmp" > "$SCRIPT_DIR/.agent/scripts/queue.sh"
+    rm -f "$SCRIPT_DIR/.agent/scripts/queue.sh.tmp"
+    # 書き換え検証
+    grep -q 'QUEUE_FILE:-.agent/_queue.json' "$SCRIPT_DIR/.agent/scripts/queue.sh" || \
+      echo "WARN: QUEUE_FILE の書き換えが失敗している可能性があります" >&2
+    grep -q 'QUEUE_LOCK:-.agent/.queue.lock' "$SCRIPT_DIR/.agent/scripts/queue.sh" || \
+      echo "WARN: QUEUE_LOCK の書き換えが失敗している可能性があります" >&2
+    echo "  [OK] queue.sh → .agent/scripts/queue.sh (QUEUE_FILE=.agent/_queue.json)"
+  fi
+fi
+
 echo ""
 echo "=== done ==="

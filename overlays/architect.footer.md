@@ -32,7 +32,7 @@ docs/
 
 ### 作成ファイル
 - `docs/adr/[slug]-adr.md`
-- `docs/design/[slug]-design.md`
+- `docs/adr/[slug]-design.md`
 
 ### 主な決定事項
 - [決定1の要約]
