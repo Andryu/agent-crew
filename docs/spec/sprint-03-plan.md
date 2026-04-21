@@ -178,10 +178,8 @@ scripts/queue.sh の flock 対応後に以下を並列化できる：
 
 ---
 
-## 確認事項
+## 決定事項（2026-04-21 オーナー承認済み）
 
-- [ ] タスク1（Issue #34）の調査先に、直接 close/reopen を行う外部ツールや hook が存在するか。もし queue.sh や subagent_stop.sh が Issue API を叩いている箇所があれば削除対象か確認が必要
-- [ ] _lessons.json のストレージ場所: `.claude/` 配下（プロジェクトローカル）か `~/.claude/` 配下（グローバル共有）か方針確認
-- [ ] session_start.sh のトリガーはプロジェクト限定（`.claude/settings.json`）かグローバル（`~/.claude/settings.json`）か
-
-承認したら「Go」と返してください。
+- [x] `_lessons.json` → **グローバル**（`~/.claude/_lessons.json`）。競合対策（ファイルロック or append-only）を設計に含める
+- [x] `session_start.sh` → **プロジェクトローカル**（`.claude/settings.json` で設定）。プロジェクトごとにキュー状態が異なるため
+- [x] Issue #34 調査で不要スクリプト（queue.sh / subagent_stop.sh 等で Issue API を直接叩いている箇所）が見つかった場合 → **削除OK**
