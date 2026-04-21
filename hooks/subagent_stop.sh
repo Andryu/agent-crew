@@ -30,17 +30,19 @@ get_agent_display_name() {
 }
 
 get_agent_icon() {
+  # Slack App 型 Webhook では icon_emoji override が効かないため
+  # メッセージ本文に埋め込む Unicode 絵文字を返す
   case "$1" in
-    Yuki) echo ":clipboard:" ;;
-    Alex) echo ":building_construction:" ;;
-    Mina) echo ":art:" ;;
-    Riku) echo ":hammer_and_wrench:" ;;
-    Sora) echo ":mag:" ;;
-    Hana) echo ":memo:" ;;
-    Kai)  echo ":shield:" ;;
-    Tomo) echo ":rocket:" ;;
-    Ren)  echo ":bar_chart:" ;;
-    *)    echo ":robot_face:" ;;
+    Yuki) echo "📋" ;;
+    Alex) echo "🏗️" ;;
+    Mina) echo "🎨" ;;
+    Riku) echo "🔨" ;;
+    Sora) echo "🔍" ;;
+    Hana) echo "📝" ;;
+    Kai)  echo "🛡️" ;;
+    Tomo) echo "🚀" ;;
+    Ren)  echo "📊" ;;
+    *)    echo "🤖" ;;
   esac
 }
 
@@ -50,15 +52,14 @@ slack_notify() {
   local agent="$1" message="$2"
   [[ -z "${SLACK_WEBHOOK_URL:-}" ]] && return 0
 
-  local display_name icon payload
+  local display_name icon formatted payload
   display_name=$(get_agent_display_name "$agent")
   icon=$(get_agent_icon "$agent")
+  # Slack App 型 Webhook では username/icon_emoji override が効かないため
+  # メッセージ本文にアイコン+名前を埋め込む
+  formatted="${icon} *${display_name}*: ${message}"
 
-  payload=$(jq -n \
-    --arg text "$message" \
-    --arg username "$display_name" \
-    --arg icon_emoji "$icon" \
-    '{"text": $text, "username": $username, "icon_emoji": $icon_emoji}')
+  payload=$(jq -n --arg text "$formatted" '{"text": $text}')
 
   curl -s --max-time 3 --connect-timeout 2 -X POST "$SLACK_WEBHOOK_URL" \
     -H 'Content-type: application/json' \

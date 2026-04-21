@@ -341,7 +341,7 @@ if [ $COMP_GLOBAL_AGENTS -eq 1 ]; then
   for agent_file in pm.md architect.md ux-designer.md qa.md doc-reviewer.md \
                     security.md devops.md data-analyst.md; do
     copy_file \
-      "$REPO_DIR/agents/$agent_file" \
+      "$REPO_DIR/.claude/agents/$agent_file" \
       "$GLOBAL_AGENTS_DIR/$agent_file" \
       "conflict"
   done
@@ -355,9 +355,9 @@ if [ $COMP_RIKU -eq 1 ]; then
   # riku-<STACK>.md を優先し、なければ engineer-<STACK>.md、さらに engineer-go.md へフォールバック
   RIKU_SRC=""
   for candidate in \
-    "$REPO_DIR/agents/riku-${STACK}.md" \
-    "$REPO_DIR/agents/engineer-${STACK}.md" \
-    "$REPO_DIR/agents/engineer-go.md"; do
+    "$REPO_DIR/.claude/agents/riku-${STACK}.md" \
+    "$REPO_DIR/.claude/agents/engineer-${STACK}.md" \
+    "$REPO_DIR/.claude/agents/engineer-go.md"; do
     if [ -f "$candidate" ]; then
       RIKU_SRC="$candidate"
       break
@@ -369,8 +369,8 @@ if [ $COMP_RIKU -eq 1 ]; then
     exit $EXIT_SRC_MISSING
   fi
 
-  if [ "$RIKU_SRC" != "$REPO_DIR/agents/riku-${STACK}.md" ] && \
-     [ "$RIKU_SRC" != "$REPO_DIR/agents/engineer-${STACK}.md" ]; then
+  if [ "$RIKU_SRC" != "$REPO_DIR/.claude/agents/riku-${STACK}.md" ] && \
+     [ "$RIKU_SRC" != "$REPO_DIR/.claude/agents/engineer-${STACK}.md" ]; then
     echo "  注意: riku-${STACK}.md が見つからないため engineer-go.md を使用します"
   fi
 
