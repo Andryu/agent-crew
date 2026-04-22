@@ -4,7 +4,7 @@
     {
       "slug": "fix-sora-dup-design",
       "title": "[#38] Sora重複実行 原因分析・修正設計",
-      "status": "READY_FOR_ALEX",
+      "status": "DONE",
       "assigned_to": "Alex",
       "complexity": "M",
       "risk_level": "high",
@@ -20,15 +20,22 @@
           "agent": "Alex",
           "action": "handoff",
           "msg": "parallel-handoff: READY_FOR_ALEX"
+        },
+        {
+          "ts": "2026-04-22T06:43:29+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "設計完了"
         }
       ],
       "retry_count": 0,
-      "qa_result": null
+      "qa_result": null,
+      "summary": "設計完了"
     },
     {
       "slug": "fix-sora-dup-impl",
       "title": "[#38] subagent_stop.sh / queue.sh 重複防止実装",
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "high",
@@ -40,7 +47,20 @@
       "created_at": "2026-04-22",
       "updated_at": "2026-04-22",
       "notes": "GitHub Issue #38 / fix-sora-dup-design の設計に基づき、queue.sh 側で重複実行防止チェックを実装する（案2）。",
-      "events": [],
+      "events": [
+        {
+          "ts": "2026-04-22T06:43:29+0000",
+          "agent": "Riku",
+          "action": "handoff",
+          "msg": "next: READY_FOR_RIKU"
+        },
+        {
+          "ts": "2026-04-22T06:43:54+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        }
+      ],
       "retry_count": 0,
       "qa_result": null
     },
@@ -66,7 +86,7 @@
     {
       "slug": "riku-self-review-design",
       "title": "[#40] self-reviewチェックリスト設計",
-      "status": "READY_FOR_ALEX",
+      "status": "IN_PROGRESS",
       "assigned_to": "Alex",
       "complexity": "M",
       "risk_level": "medium",
@@ -82,6 +102,12 @@
           "agent": "Alex",
           "action": "handoff",
           "msg": "parallel-handoff: READY_FOR_ALEX"
+        },
+        {
+          "ts": "2026-04-22T06:43:29+0000",
+          "agent": "Alex",
+          "action": "start",
+          "msg": "着手"
         }
       ],
       "retry_count": 0,
