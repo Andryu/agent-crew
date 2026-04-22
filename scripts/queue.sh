@@ -271,6 +271,17 @@ cmd_done() {
   acquire_lock
   require_queue
   require_slug_exists "$slug"
+
+  # 状態ガード: 既に DONE なら重複完了を拒否
+  local current_status
+  current_status=$(jq -r --arg s "$slug" \
+    '.tasks[] | select(.slug == $s) | .status' "$QUEUE_FILE")
+  if [[ "$current_status" == "DONE" ]]; then
+    release_lock
+    echo "ERROR: $slug is already DONE. Duplicate 'done' call detected." >&2
+    exit 15
+  fi
+
   local updated
   updated=$(jq --arg s "$slug" --arg d "$(today)" --arg a "$agent" --arg m "$msg" --arg ts "$(now_iso)" \
     "$normalize_events_filter |

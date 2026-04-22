@@ -35,7 +35,7 @@
     {
       "slug": "fix-sora-dup-impl",
       "title": "[#38] subagent_stop.sh / queue.sh 重複防止実装",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "high",
@@ -59,15 +59,22 @@
           "agent": "Riku",
           "action": "start",
           "msg": "着手"
+        },
+        {
+          "ts": "2026-04-22T06:45:03+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "queue.sh 重複防止ガード実装完了"
         }
       ],
       "retry_count": 0,
-      "qa_result": null
+      "qa_result": null,
+      "summary": "queue.sh 重複防止ガード実装完了"
     },
     {
       "slug": "fix-sora-dup-qa",
       "title": "[#38] 重複防止修正レビュー",
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "assigned_to": "Sora",
       "complexity": "M",
       "risk_level": "high",
@@ -79,14 +86,27 @@
       "created_at": "2026-04-22",
       "updated_at": "2026-04-22",
       "notes": "GitHub Issue #38 / fix-sora-dup-impl の実装レビュー。重複実行が実際に防止されることを確認する。",
-      "events": [],
+      "events": [
+        {
+          "ts": "2026-04-22T06:45:05+0000",
+          "agent": "Sora",
+          "action": "handoff",
+          "msg": "next: READY_FOR_SORA"
+        },
+        {
+          "ts": "2026-04-22T06:45:53+0000",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
+        }
+      ],
       "retry_count": 0,
       "qa_result": null
     },
     {
       "slug": "riku-self-review-design",
       "title": "[#40] self-reviewチェックリスト設計",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "assigned_to": "Alex",
       "complexity": "M",
       "risk_level": "medium",
@@ -108,15 +128,22 @@
           "agent": "Alex",
           "action": "start",
           "msg": "着手"
+        },
+        {
+          "ts": "2026-04-22T06:45:50+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "チェックリスト設計完了"
         }
       ],
       "retry_count": 0,
-      "qa_result": null
+      "qa_result": null,
+      "summary": "チェックリスト設計完了"
     },
     {
       "slug": "riku-self-review-impl",
       "title": "[#40] engineer-*.md への追記",
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "medium",
@@ -128,7 +155,20 @@
       "created_at": "2026-04-22",
       "updated_at": "2026-04-22",
       "notes": "GitHub Issue #40 / riku-self-review-design の設計に基づき、engineer-go.md・engineer-vue.md・engineer-next.md にself-reviewチェックリストを追記する。",
-      "events": [],
+      "events": [
+        {
+          "ts": "2026-04-22T06:45:50+0000",
+          "agent": "Riku",
+          "action": "handoff",
+          "msg": "next: READY_FOR_RIKU"
+        },
+        {
+          "ts": "2026-04-22T06:46:12+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        }
+      ],
       "retry_count": 0,
       "qa_result": null
     },
