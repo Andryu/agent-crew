@@ -74,7 +74,7 @@
     {
       "slug": "fix-sora-dup-qa",
       "title": "[#38] 重複防止修正レビュー",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "M",
       "risk_level": "high",
@@ -98,10 +98,23 @@
           "agent": "Sora",
           "action": "start",
           "msg": "着手"
+        },
+        {
+          "ts": "2026-04-22T06:49:01+0000",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: 全7受け入れ基準合格: cmd_start(exit11/12/13)/cmd_done(exit15)/cmd_qa(exit14)のガードが正常動作、TOCTOU防止のためacquire_lock後にガード配置、全エラーパスでrelease_lock呼出確認、retry→qa正常フロー確認"
+        },
+        {
+          "ts": "2026-04-22T06:49:05+0000",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "QA承認: 重複実行防止ガード全項目合格"
         }
       ],
       "retry_count": 0,
-      "qa_result": null
+      "qa_result": "APPROVED",
+      "summary": "QA承認: 重複実行防止ガード全項目合格"
     },
     {
       "slug": "riku-self-review-design",
