@@ -1,906 +1,129 @@
 {
-  "sprint": "sprint-02",
+  "sprint": "sprint-04",
   "tasks": [
     {
-      "slug": "slack-persona-design",
-      "title": "[Slack] アイコン個別化・人格口調の設計",
-      "status": "DONE",
-      "assigned_to": "Alex",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #29 #30 / branch: feat/slack-persona / subagent_stop.sh・slack-notify.yml の改修方針を ADR または設計メモとして記録する。アイコン個別化（#29）と人格口調反映（#30）を一括で設計する。",
-      "events": [
-        {
-          "ts": "2026-04-20T06:26:01+0900",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T06:45:26+0900",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "設計ドキュメント作成完了"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "設計ドキュメント作成完了"
-    },
-    {
-      "slug": "slack-persona-impl",
-      "title": "[Slack] アイコン個別化・人格口調の実装",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "slack-persona-design"
-      ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #29 #30 / branch: feat/slack-persona / hooks/subagent_stop.sh にエージェント別 username・icon_emoji を追加。通知テンプレートを分離ファイルに切り出し、6エージェント×3パターン（完了・ブロック・差し戻し）の口調を実装する。",
-      "events": [
-        {
-          "ts": "2026-04-20T06:45:44+0900",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T06:47:22+0900",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "subagent_stop.sh + slack-notify.yml 改修完了"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "subagent_stop.sh + slack-notify.yml 改修完了"
-    },
-    {
-      "slug": "slack-persona-qa",
-      "title": "[Slack] アイコン個別化・人格口調の QA",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "slack-persona-impl"
-      ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #29 #30 / branch: feat/slack-persona / 受け入れ基準: 6エージェント全員の username が個別表示、6×3メッセージパターンが異なる口調、既存通知フローが正常動作、フォールバック時エラーなし。",
-      "events": [
-        {
-          "ts": "2026-04-20T06:47:32+0900",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T06:49:26+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 6エージェント全員のプロファイル・口調・フォールバック・bash3.2互換・jq安全構築・既存フロー保全・yml対応すべて確認。MINOR2件（next_agent大文字表示）はスコープ許容範囲。"
-        },
-        {
-          "ts": "2026-04-20T06:49:28+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "APPROVED: 全チェック項目クリア。MINOR2件（next_agentの大文字表示）は動作影響なし。"
-        },
-        {
-          "ts": "2026-04-20T06:49:43+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 全8チェック通過。next_agentの大文字表示はMINOR"
-        },
-        {
-          "ts": "2026-04-20T06:49:46+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QA APPROVED"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "QA APPROVED"
-    },
-    {
-      "slug": "portable-install-design",
-      "title": "[Portability] install.sh 汎用化の設計",
-      "status": "DONE",
+      "slug": "fix-sora-dup-design",
+      "title": "[#38] Sora重複実行 原因分析・修正設計",
+      "status": "READY_FOR_ALEX",
       "assigned_to": "Alex",
       "complexity": "M",
-      "risk_level": "low",
+      "risk_level": "high",
       "parallel_group": null,
       "depends_on": [],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #32 / branch: feat/portable-install / install.sh の引数設計・競合検出フロー・ドライランオプションの仕様を設計する。コピー対象ファイル一覧と選択的インストールの方針も明確化する。",
+      "qa_mode": null,
+      "created_at": "2026-04-22",
+      "updated_at": "2026-04-22",
+      "notes": "GitHub Issue #38 / subagent_stop.sh および queue.sh 側での重複実行防止チェック（案2）の原因分析・修正設計を行う。ADRまたは設計メモに記録する。",
       "events": [
         {
-          "ts": "2026-04-20T06:26:01+0900",
+          "ts": "2026-04-22T05:48:58+0000",
           "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T06:45:28+0900",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "設計ドキュメント作成完了"
+          "action": "handoff",
+          "msg": "parallel-handoff: READY_FOR_ALEX"
         }
       ],
       "retry_count": 0,
-      "qa_result": null,
-      "summary": "設計ドキュメント作成完了"
+      "qa_result": null
     },
     {
-      "slug": "portable-install-impl",
-      "title": "[Portability] install.sh 汎用化の実装 + ドキュメント整備",
-      "status": "DONE",
+      "slug": "fix-sora-dup-impl",
+      "title": "[#38] subagent_stop.sh / queue.sh 重複防止実装",
+      "status": "TODO",
       "assigned_to": "Riku",
       "complexity": "M",
-      "risk_level": "low",
+      "risk_level": "high",
       "parallel_group": null,
       "depends_on": [
-        "portable-install-design"
+        "fix-sora-dup-design"
       ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #32 / branch: feat/portable-install / install.sh にターゲットディレクトリ引数・--dry-run・競合確認プロンプトを実装。docs/ に Getting Started・エージェント一覧・カスタマイズポイントを追記する。",
-      "events": [
-        {
-          "ts": "2026-04-20T06:47:32+0900",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T06:50:01+0900",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "install.sh 完全書き換え完了"
-        }
-      ],
+      "qa_mode": "inline",
+      "created_at": "2026-04-22",
+      "updated_at": "2026-04-22",
+      "notes": "GitHub Issue #38 / fix-sora-dup-design の設計に基づき、queue.sh 側で重複実行防止チェックを実装する（案2）。",
+      "events": [],
       "retry_count": 0,
-      "qa_result": null,
-      "summary": "install.sh 完全書き換え完了"
+      "qa_result": null
     },
     {
-      "slug": "portable-install-qa",
-      "title": "[Portability] install.sh 汎用化の QA",
-      "status": "DONE",
+      "slug": "fix-sora-dup-qa",
+      "title": "[#38] 重複防止修正レビュー",
+      "status": "TODO",
       "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
+      "complexity": "M",
+      "risk_level": "high",
       "parallel_group": null,
       "depends_on": [
-        "portable-install-impl"
+        "fix-sora-dup-impl"
       ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #32 / branch: feat/portable-install / 受け入れ基準: 既存リポジトリを壊さず実行可能、--dry-run で変更ファイル一覧表示、競合時に確認プロンプト表示、Getting Started 手順の完全性確認。別リポジトリへの実動作テストはオーナーが担当。",
-      "events": [
-        {
-          "ts": "2026-04-20T06:50:04+0900",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T06:50:33+0900",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T06:52:01+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 機能・セキュリティ・設計は合格。MINOR: 存在しないTARGET_DIR指定時のエラーメッセージに元のパスが表示されないバグ（軽微）"
-        },
-        {
-          "ts": "2026-04-20T06:52:04+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "install.sh QA完了。全機能テスト通過。MINOR1件のみ（エラーメッセージのパス表示欠落）、CRITICAL/MAJOR指摘ゼロ。APPROVED。"
-        },
-        {
-          "ts": "2026-04-20T06:52:46+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 全テスト通過、MINOR1件修正済み"
-        },
-        {
-          "ts": "2026-04-20T06:52:46+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QA APPROVED"
-        }
-      ],
+      "qa_mode": null,
+      "created_at": "2026-04-22",
+      "updated_at": "2026-04-22",
+      "notes": "GitHub Issue #38 / fix-sora-dup-impl の実装レビュー。重複実行が実際に防止されることを確認する。",
+      "events": [],
       "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "QA APPROVED"
+      "qa_result": null
     },
     {
-      "slug": "phase1-parallel-design",
-      "title": "[Phase 1-A] 並列実行解禁の設計",
-      "status": "DONE",
+      "slug": "riku-self-review-design",
+      "title": "[#40] self-reviewチェックリスト設計",
+      "status": "READY_FOR_ALEX",
       "assigned_to": "Alex",
       "complexity": "M",
       "risk_level": "medium",
       "parallel_group": null,
       "depends_on": [],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #9 / branch: feat/phase1-parallel / _queue.json への parallel_group フィールド追加、Yuki の並列グループ特定ロジック、queue.sh 並列書き込みテスト方針を設計・ADR化する。",
+      "qa_mode": null,
+      "created_at": "2026-04-22",
+      "updated_at": "2026-04-22",
+      "notes": "GitHub Issue #40 / Riku が実装完了後に自己レビューするためのチェックリスト仕様を設計する。engineer-*.md への追記内容・チェック項目・フォーマットを定義する。",
       "events": [
         {
-          "ts": "2026-04-20T06:26:02+0900",
+          "ts": "2026-04-22T05:48:58+0000",
           "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T06:45:29+0900",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "設計ドキュメント作成完了"
+          "action": "handoff",
+          "msg": "parallel-handoff: READY_FOR_ALEX"
         }
       ],
       "retry_count": 0,
-      "qa_result": null,
-      "summary": "設計ドキュメント作成完了"
+      "qa_result": null
     },
     {
-      "slug": "phase1-parallel-impl",
-      "title": "[Phase 1-A] 並列実行解禁の実装",
-      "status": "DONE",
+      "slug": "riku-self-review-impl",
+      "title": "[#40] engineer-*.md への追記",
+      "status": "TODO",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "medium",
       "parallel_group": null,
       "depends_on": [
-        "phase1-parallel-design"
+        "riku-self-review-design"
       ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #9 / branch: feat/phase1-parallel / _queue.json スキーマに parallel_group 追加、queue.sh 並列書き込みテスト追加、pm.md の並列委譲禁止制約を条件付き解禁に書き換える。",
-      "events": [
-        {
-          "ts": "2026-04-20T06:50:29+0900",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T06:58:13+0900",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "queue.sh改修+pm.md改訂+_queue.jsonスキーマ拡張"
-        }
-      ],
+      "qa_mode": "inline",
+      "created_at": "2026-04-22",
+      "updated_at": "2026-04-22",
+      "notes": "GitHub Issue #40 / riku-self-review-design の設計に基づき、engineer-go.md・engineer-vue.md・engineer-next.md にself-reviewチェックリストを追記する。",
+      "events": [],
       "retry_count": 0,
-      "qa_result": null,
-      "summary": "queue.sh改修+pm.md改訂+_queue.jsonスキーマ拡張"
+      "qa_result": null
     },
     {
-      "slug": "phase1-parallel-qa",
-      "title": "[Phase 1-A] 並列実行解禁の QA",
-      "status": "DONE",
+      "slug": "riku-self-review-qa",
+      "title": "[#40] チェックリストレビュー",
+      "status": "TODO",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "medium",
       "parallel_group": null,
       "depends_on": [
-        "phase1-parallel-impl"
+        "riku-self-review-impl"
       ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #9 / branch: feat/phase1-parallel / queue.sh の並列書き込み競合テスト、pm.md の委譲ルール整合性確認、スキーマバリデーション動作確認。",
-      "events": [
-        {
-          "ts": "2026-04-20T06:58:16+0900",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T06:58:44+0900",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T15:21:47+0900",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T15:22:32+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 全10チェック通過。parallel-handoff・スタールロック・depends_onバリデーション・bash3.2互換・JSON妥当性・pm.md4条件・show/next動作すべて確認。MINOR2件（depends_onバリデーション後のlock解放漏れリスク、parallel_groupが全タスクnullのまま）は動作影響軽微。"
-        },
-        {
-          "ts": "2026-04-20T15:22:35+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QA APPROVED: 全チェック通過、CRITICAL/MAJOR指摘ゼロ"
-        },
-        {
-          "ts": "2026-04-20T15:23:22+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 全12チェック通過、MINOR2件は将来改善"
-        },
-        {
-          "ts": "2026-04-20T15:23:22+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QA APPROVED"
-        }
-      ],
+      "qa_mode": null,
+      "created_at": "2026-04-22",
+      "updated_at": "2026-04-22",
+      "notes": "GitHub Issue #40 / riku-self-review-impl の実装レビュー。チェックリストの網羅性・フォーマット・実用性を確認する。",
+      "events": [],
       "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "QA APPROVED"
-    },
-    {
-      "slug": "phase1-multistack-design",
-      "title": "[Phase 1-B] Riku マルチスタック化の設計",
-      "status": "DONE",
-      "assigned_to": "Alex",
-      "complexity": "M",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #10 / branch: feat/phase1-riku-multistack / engineer-vue.md・engineer-next.md のエージェント仕様を設計。Yuki のスタック自動検出ロジック（go.mod / package.json 判定）の方針を定義する。",
-      "events": [
-        {
-          "ts": "2026-04-20T06:58:41+0900",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T15:23:36+0900",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "設計ドキュメント作成完了"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "設計ドキュメント作成完了"
-    },
-    {
-      "slug": "phase1-multistack-impl",
-      "title": "[Phase 1-B] Riku マルチスタック化の実装",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "M",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "phase1-multistack-design"
-      ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #10 / branch: feat/phase1-riku-multistack / agents/engineer-vue.md・agents/engineer-next.md を作成。pm.md にスタック自動検出ロジックを追加。install.sh に vue/next オプションを実装する。",
-      "events": [
-        {
-          "ts": "2026-04-20T15:23:53+0900",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T15:26:50+0900",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "engineer-vue.md, engineer-next.md 新規作成 + pm.md スタック検出追加"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "engineer-vue.md, engineer-next.md 新規作成 + pm.md スタック検出追加"
-    },
-    {
-      "slug": "phase1-multistack-qa",
-      "title": "[Phase 1-B] Riku マルチスタック化の QA",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "phase1-multistack-impl"
-      ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #10 / branch: feat/phase1-riku-multistack / エージェントファイルの内容確認、スタック自動検出ロジックのレビュー、install.sh の vue/next オプション動作確認。",
-      "events": [
-        {
-          "ts": "2026-04-20T15:26:53+0900",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T15:27:42+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: engineer-vue.md / engineer-next.md / pm.md すべて設計仕様に準拠。全チェック項目クリア。"
-        },
-        {
-          "ts": "2026-04-20T15:27:45+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "全チェック項目クリア。APPROVED。"
-        },
-        {
-          "ts": "2026-04-20T15:28:27+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 全14チェック通過、MINOR2件は許容"
-        },
-        {
-          "ts": "2026-04-20T15:28:27+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QA APPROVED"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "QA APPROVED"
-    },
-    {
-      "slug": "phase1-complexity-design",
-      "title": "[Phase 1-C] 複雑度見積もり S/M/L の設計",
-      "status": "DONE",
-      "assigned_to": "Alex",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #11 / branch: feat/phase1-complexity / _queue.json スキーマへの complexity フィールド追加仕様、queue.sh バリデーション更新方針、pm.md スプリント計画フォーマット改訂内容を設計する。Phase 2-D（リトロスペクティブ）との連携インターフェースも定義する。",
-      "events": [
-        {
-          "ts": "2026-04-20T06:58:41+0900",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T15:23:46+0900",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "設計ドキュメント作成完了"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "設計ドキュメント作成完了"
-    },
-    {
-      "slug": "phase1-complexity-impl",
-      "title": "[Phase 1-C] 複雑度見積もり S/M/L の実装",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "phase1-complexity-design"
-      ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #11 / branch: feat/phase1-complexity / _queue.json スキーマに complexity フィールドを追加し queue.sh バリデーションに反映する。pm.md のスプリント計画フォーマットに complexity 列を追加する。",
-      "events": [
-        {
-          "ts": "2026-04-20T15:23:53+0900",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T15:25:32+0900",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "pm.md + queue.sh 改修完了"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "pm.md + queue.sh 改修完了"
-    },
-    {
-      "slug": "phase1-complexity-qa",
-      "title": "[Phase 1-C] 複雑度見積もり S/M/L の QA",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "phase1-complexity-impl"
-      ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #11 / branch: feat/phase1-complexity / queue.sh のバリデーション動作確認（不正値の拒否）、pm.md フォーマット整合性確認。",
-      "events": [
-        {
-          "ts": "2026-04-20T15:25:45+0900",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T15:27:21+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 全10チェック項目クリア。complexity S/M/Lバリデーション(exit 10)・normalize_events_filter・show出力・pm.md設計書準拠を確認。bash 3.2互換・個人名なし。APPROVED。"
-        },
-        {
-          "ts": "2026-04-20T15:27:24+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "complexity S/M/L実装のQA完了。全チェック項目PASS。APPROVED。"
-        },
-        {
-          "ts": "2026-04-20T15:27:55+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 全12チェック通過"
-        },
-        {
-          "ts": "2026-04-20T15:27:55+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QA APPROVED"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "QA APPROVED"
-    },
-    {
-      "slug": "phase2-intelligence-design",
-      "title": "[Phase 2] DECISIONS.md・リスク予測・Mermaid・リトロスペクティブの設計",
-      "status": "DONE",
-      "assigned_to": "Alex",
-      "complexity": "L",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "phase1-complexity-impl"
-      ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #12 #13 #14 #15 / branch: feat/phase2-intelligence / #12 DECISIONS.md 書き込みフォーマット、#13 risk_level フィールド仕様とリスク判定ルール、#14 Mermaid 依存グラフ生成仕様、#15 retro ファイル構造を一括設計する。pm.md・queue.sh・subagent_stop.sh それぞれの改修ポイントを明確化する。",
-      "events": [
-        {
-          "ts": "2026-04-20T15:28:32+0900",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T15:31:32+0900",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "統合設計ドキュメント作成完了"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "統合設計ドキュメント作成完了"
-    },
-    {
-      "slug": "phase2-intelligence-impl",
-      "title": "[Phase 2] DECISIONS.md・リスク予測・Mermaid・リトロスペクティブの実装",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "L",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "phase2-intelligence-design"
-      ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #12 #13 #14 #15 / branch: feat/phase2-intelligence / (1) pm.md にスプリント完了後の DECISIONS.md 書き込みステップと次スプリント開始時の読み込みステップを追加。(2) _queue.json スキーマに risk_level を追加し pm.md にリスク判定ルールと qa_mode 強制ロジックを追記。(3) pm.md のスプリント計画フォーマットに Mermaid グラフセクションと循環依存検出を追加。(4) pm.md の完了報告フォーマットに retro ファイル生成ステップを追加し subagent_stop.sh を更新する。install.sh で docs/DECISIONS.md 初期ファイル生成を追加。",
-      "events": [
-        {
-          "ts": "2026-04-20T15:31:37+0900",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T15:38:16+0900",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "graph/retro/risk_predict実装完了"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "graph/retro/risk_predict実装完了"
-    },
-    {
-      "slug": "phase2-intelligence-qa",
-      "title": "[Phase 2] DECISIONS.md・リスク予測・Mermaid・リトロスペクティブの QA",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "M",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "phase2-intelligence-impl"
-      ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #12 #13 #14 #15 / branch: feat/phase2-intelligence / DECISIONS.md フォーマット検証、risk_level バリデーション動作確認（high 時に qa_mode inline 強制）、Mermaid 出力の構文確認、retro ファイル生成フローのレビュー。",
-      "events": [
-        {
-          "ts": "2026-04-20T15:38:18+0900",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T21:51:27+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: MAJOR1件修正済み、MINOR4件は許容"
-        },
-        {
-          "ts": "2026-04-20T21:51:27+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QA APPROVED"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "QA APPROVED"
-    },
-    {
-      "slug": "phase3-agents-design",
-      "title": "[Phase 3] Kai・Tomo・Ren エージェントの設計",
-      "status": "DONE",
-      "assigned_to": "Alex",
-      "complexity": "L",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "phase1-parallel-impl",
-        "phase2-intelligence-impl"
-      ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #16 #17 #18 / branch: feat/phase3-agents / Kai（セキュリティレビュー）・Tomo（DevOps）・Ren（データ/分析）の役割・トリガー条件・pm.md 委譲ルールへの組み込み方針を設計する。",
-      "events": [
-        {
-          "ts": "2026-04-20T15:38:54+0900",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T21:53:35+0900",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "3エージェント設計完了"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "3エージェント設計完了"
-    },
-    {
-      "slug": "phase3-agents-impl",
-      "title": "[Phase 3] Kai・Tomo・Ren エージェントの実装",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "L",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "phase3-agents-design"
-      ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #16 #17 #18 / branch: feat/phase3-agents / agents/security-reviewer.md・agents/devops.md・agents/data-analyst.md を作成。pm.md の委譲ルールに Kai・Tomo・Ren を追加。install.sh に各エージェントの配置を追加する。",
-      "events": [
-        {
-          "ts": "2026-04-20T21:53:37+0900",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T21:58:21+0900",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "3エージェント新規作成 + 既存ファイル3つ更新"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "3エージェント新規作成 + 既存ファイル3つ更新"
-    },
-    {
-      "slug": "phase3-agents-qa",
-      "title": "[Phase 3] Kai・Tomo・Ren エージェントの QA",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "M",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "phase3-agents-impl"
-      ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #16 #17 #18 / branch: feat/phase3-agents / 各エージェントファイルの内容・役割定義の完全性確認、pm.md 委譲ルールの整合性確認、install.sh への追加確認。",
-      "events": [
-        {
-          "ts": "2026-04-20T21:58:25+0900",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T21:59:02+0900",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T21:59:30+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 3エージェント全ファイル設計準拠・構文OK・個人名なし"
-        },
-        {
-          "ts": "2026-04-20T21:59:30+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "phase3-agents-qa APPROVED — 全チェック項目クリア"
-        },
-        {
-          "ts": "2026-04-20T22:00:11+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 全14チェック通過"
-        },
-        {
-          "ts": "2026-04-20T22:00:11+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QA APPROVED"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "QA APPROVED"
-    },
-    {
-      "slug": "phase4-antigravity-design",
-      "title": "[Phase 4] Antigravity パイプラインパリティの設計",
-      "status": "DONE",
-      "assigned_to": "Alex",
-      "complexity": "M",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-20",
-      "notes": "GitHub Issue #19 / branch: feat/phase4-antigravity / overlays/antigravity/ 配置方針、hook 代替プロンプト指示の設計、install-antigravity.sh の Slack curl フォールバック方針を設計する。",
-      "events": [
-        {
-          "ts": "2026-04-20T21:58:35+0900",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-20T22:02:07+0900",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "Antigravityパリティ設計完了"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "Antigravityパリティ設計完了"
-    },
-    {
-      "slug": "phase4-antigravity-impl",
-      "title": "[Phase 4] Antigravity パイプラインパリティの実装",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "M",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "phase4-antigravity-design"
-      ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-21",
-      "notes": "GitHub Issue #19 / branch: feat/phase4-antigravity / overlays/antigravity/yuki.md に hook 代替プロンプト指示を追加。install-antigravity.sh に Slack 通知フォールバックを追加。README に Antigravity 用セクションを追記する。",
-      "events": [
-        {
-          "ts": "2026-04-20T22:02:10+0900",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-21T07:02:21+0900",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "overlay新規2ファイル + build.sh/install-antigravity.sh/pm.md/README更新"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "overlay新規2ファイル + build.sh/install-antigravity.sh/pm.md/README更新"
-    },
-    {
-      "slug": "phase4-antigravity-qa",
-      "title": "[Phase 4] Antigravity パイプラインパリティの QA",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "phase4-antigravity-impl"
-      ],
-      "created_at": "2026-04-19",
-      "updated_at": "2026-04-21",
-      "notes": "GitHub Issue #19 / branch: feat/phase4-antigravity / overlays/antigravity/yuki.md のプロンプト指示の有効性確認、install-antigravity.sh のフォールバック動作確認、README 記述の正確性確認。",
-      "events": [
-        {
-          "ts": "2026-04-21T07:02:24+0900",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-21T07:04:31+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: MAJOR1件修正済み"
-        },
-        {
-          "ts": "2026-04-21T07:04:31+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QA APPROVED"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "QA APPROVED"
+      "qa_result": null
     }
   ]
 }
