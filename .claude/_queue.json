@@ -195,7 +195,7 @@
     {
       "slug": "riku-self-review-qa",
       "title": "[#40] チェックリストレビュー",
-      "status": "READY_FOR_SORA",
+      "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "medium",
@@ -213,10 +213,29 @@
           "agent": "Sora",
           "action": "handoff",
           "msg": "next: READY_FOR_SORA"
+        },
+        {
+          "ts": "2026-04-22T06:49:56+0000",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-22T06:50:27+0000",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: 3ファイル全て受け入れ基準を満たす。共通12項目と各スタック別4項目が正確な位置に追記されており、見出しレベル・形式も既存DoDと整合。Soraの観点との役割分担も適切。"
+        },
+        {
+          "ts": "2026-04-22T06:50:30+0000",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "QA承認: 3ファイルの自己レビューチェックリスト追記を全受け入れ基準でAPPROVED"
         }
       ],
       "retry_count": 0,
-      "qa_result": null
+      "qa_result": "APPROVED",
+      "summary": "QA承認: 3ファイルの自己レビューチェックリスト追記を全受け入れ基準でAPPROVED"
     }
   ]
 }
