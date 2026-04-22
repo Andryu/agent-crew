@@ -143,7 +143,7 @@
     {
       "slug": "riku-self-review-impl",
       "title": "[#40] engineer-*.md への追記",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "medium",
@@ -167,15 +167,22 @@
           "agent": "Riku",
           "action": "start",
           "msg": "着手"
+        },
+        {
+          "ts": "2026-04-22T06:46:53+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "self-reviewチェックリスト追記完了"
         }
       ],
       "retry_count": 0,
-      "qa_result": null
+      "qa_result": null,
+      "summary": "self-reviewチェックリスト追記完了"
     },
     {
       "slug": "riku-self-review-qa",
       "title": "[#40] チェックリストレビュー",
-      "status": "TODO",
+      "status": "READY_FOR_SORA",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "medium",
@@ -187,7 +194,14 @@
       "created_at": "2026-04-22",
       "updated_at": "2026-04-22",
       "notes": "GitHub Issue #40 / riku-self-review-impl の実装レビュー。チェックリストの網羅性・フォーマット・実用性を確認する。",
-      "events": [],
+      "events": [
+        {
+          "ts": "2026-04-22T06:46:56+0000",
+          "agent": "Sora",
+          "action": "handoff",
+          "msg": "next: READY_FOR_SORA"
+        }
+      ],
       "retry_count": 0,
       "qa_result": null
     }
