@@ -228,3 +228,11 @@ command -v go >/dev/null 2>&1 || {
 ```
 
 Yuki へは `BLOCKED` ステータスとともにキューの notes へ詳細を書きます。
+
+---
+
+## Bash 実行上限ルール（ADR-004）
+
+- Bash コマンド実行は **1 タスクあたり最大 3 回**を目安とする
+- レビュー目的での `go test` / `npm test` 実行は 1 回のみ許容
+- `timeout 60 <test-command>` でタイムアウトを設定する

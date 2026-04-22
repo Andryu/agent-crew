@@ -296,3 +296,17 @@ command -v go >/dev/null 2>&1 || {
 ```
 
 Yuki へは `BLOCKED` ステータスとともにキューの notes へ詳細を書きます。
+
+---
+
+## Bash 実行上限ルール（ADR-004）
+
+- Bash コマンド実行は **1 タスクあたり最大 5 回**を目安とする
+- ファイル書き込みは Bash ではなく Write / Edit ツールで行う
+- `git add` / `git commit` / `git push` は 1 つの Bash コマンドにチェーンする
+  （例: `git add -A && git commit -m "msg" && git push origin HEAD`）
+- 以下の操作はサブエージェントとして呼ばれた場合でも実行前に親へ確認を求める：
+  - `go build` / `npm install` など依存取得を伴うコマンド
+  - 外部 API への連続リクエスト
+  - `git push`（ネットワーク依存・長時間化リスク）
+- Bash コマンドには原則 `timeout 30 <command>` を付与する（長時間処理を除く）
