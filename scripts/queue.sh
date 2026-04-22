@@ -194,6 +194,28 @@ cmd_start() {
   require_queue
   require_slug_exists "$slug"
 
+  # 状態ガード: 既に IN_PROGRESS / DONE / BLOCKED なら重複実行を拒否
+  local current_status
+  current_status=$(jq -r --arg s "$slug" \
+    '.tasks[] | select(.slug == $s) | .status' "$QUEUE_FILE")
+  case "$current_status" in
+    IN_PROGRESS)
+      release_lock
+      echo "ERROR: $slug is already IN_PROGRESS. 'start' is idempotent-safe; skip if already started." >&2
+      exit 11
+      ;;
+    DONE)
+      release_lock
+      echo "ERROR: $slug is already DONE. Cannot re-start a completed task." >&2
+      exit 12
+      ;;
+    BLOCKED)
+      release_lock
+      echo "ERROR: $slug is BLOCKED. Resolve the block before restarting." >&2
+      exit 13
+      ;;
+  esac
+
   # depends_on の全タスクが DONE かチェック
   local unresolved
   unresolved=$(jq -r --arg s "$slug" '
@@ -249,6 +271,17 @@ cmd_done() {
   acquire_lock
   require_queue
   require_slug_exists "$slug"
+
+  # 状態ガード: 既に DONE なら重複完了を拒否
+  local current_status
+  current_status=$(jq -r --arg s "$slug" \
+    '.tasks[] | select(.slug == $s) | .status' "$QUEUE_FILE")
+  if [[ "$current_status" == "DONE" ]]; then
+    release_lock
+    echo "ERROR: $slug is already DONE. Duplicate 'done' call detected." >&2
+    exit 15
+  fi
+
   local updated
   updated=$(jq --arg s "$slug" --arg d "$(today)" --arg a "$agent" --arg m "$msg" --arg ts "$(now_iso)" \
     "$normalize_events_filter |
@@ -382,6 +415,17 @@ cmd_qa() {
   acquire_lock
   require_queue
   require_slug_exists "$slug"
+
+  # 冪等性ガード: qa_result が既に設定済みなら重複送信を拒否
+  local current_qa_result
+  current_qa_result=$(jq -r --arg s "$slug" \
+    '.tasks[] | select(.slug == $s) | .qa_result // "null"' "$QUEUE_FILE")
+  if [[ "$current_qa_result" != "null" ]]; then
+    release_lock
+    echo "ERROR: $slug already has qa_result=$current_qa_result. Use 'retry' to reset before re-QA." >&2
+    exit 14
+  fi
+
   local updated
   updated=$(jq --arg s "$slug" --arg r "$result" --arg m "$msg" --arg ts "$(now_iso)" --arg d "$(today)" \
     "$normalize_events_filter |
