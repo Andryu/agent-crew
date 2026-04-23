@@ -39,7 +39,7 @@ acquire_lock() {
     if [[ -d "$QUEUE_LOCK" ]]; then
       local lock_mtime now age
       lock_mtime=$(stat -f %m "$QUEUE_LOCK" 2>/dev/null || stat -c %Y "$QUEUE_LOCK" 2>/dev/null || echo 0)
-      now=$(date +%s)
+      now=$(date -u +%s)
       age=$((now - lock_mtime))
       if [[ $age -ge $LOCK_STALE_SECS ]]; then
         echo "WARN: stale lock detected (${age}s old), removing $QUEUE_LOCK" >&2
@@ -74,8 +74,8 @@ require_queue() {
   fi
 }
 
-today() { date +%Y-%m-%d; }
-now_iso() { date +"%Y-%m-%dT%H:%M:%S%z"; }
+today() { date -u +%Y-%m-%d; }
+now_iso() { date -u +"%Y-%m-%dT%H:%M:%S+0000"; }
 
 atomic_write() {
   local new_content="$1"
@@ -515,7 +515,7 @@ STALE_THRESHOLD_MIN="${STALE_THRESHOLD_MIN:-60}"
 
 _detect_stale_inline() {
   local now_epoch threshold_secs
-  now_epoch=$(date +%s)
+  now_epoch=$(date -u +%s)
   threshold_secs=$((STALE_THRESHOLD_MIN * 60))
 
   local stale_output
@@ -601,7 +601,8 @@ cmd_detect_stale() {
   done
   _detect_stale_inline
   if [[ "$slack_flag" == true ]]; then
-    echo "WARN: --slack は未実装です（将来スプリントで対応予定）" >&2
+    echo "ERROR: --slack は未実装です（将来スプリントで対応予定）" >&2
+    exit 1
   fi
 }
 
