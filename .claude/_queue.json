@@ -1,9 +1,9 @@
 {
-  "sprint": "sprint-05",
+  "sprint": "sprint-06",
   "tasks": [
     {
-      "slug": "alex-bash-impl",
-      "title": "[#43] Alex に Bash ツールを付与",
+      "slug": "slack-notify-simplify",
+      "title": "[#52] Slack通知をスプリント開始/完了の2つに絞る",
       "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "S",
@@ -13,179 +13,215 @@
       "qa_mode": "inline",
       "created_at": "2026-04-23",
       "updated_at": "2026-04-23",
-      "notes": "architect.md の tools に Bash を追加し、queue.sh 操作ルールを追記する",
+      "notes": "slack-notify.yml無効化 + pm.mdのSlack通知セクションをスプリント開始/完了のみに変更",
       "retry_count": 0,
       "qa_result": null,
       "events": [
         {
-          "ts": "2026-04-23T00:05:18+0900",
+          "ts": "2026-04-23T13:33:44+0900",
           "agent": "Riku",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-23T00:06:03+0900",
+          "ts": "2026-04-23T13:34:55+0900",
           "agent": "Riku",
           "action": "done",
-          "msg": "architect.md に Bash ツール追加 + 使用ルール追記"
+          "msg": "slack-notify.yml無効化 + pm.md通知セクション書き換え"
         }
       ],
-      "summary": "architect.md に Bash ツール追加 + 使用ルール追記"
+      "summary": "slack-notify.yml無効化 + pm.md通知セクション書き換え"
     },
     {
-      "slug": "alex-bash-qa",
-      "title": "[#43] Alex Bash 付与の QA",
+      "slug": "slack-notify-qa",
+      "title": "[#52] Slack通知絞り込みQA",
       "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": null,
       "depends_on": [
-        "alex-bash-impl"
+        "slack-notify-simplify"
       ],
       "qa_mode": null,
       "created_at": "2026-04-23",
       "updated_at": "2026-04-23",
-      "notes": "tools 行の記法確認、ADR-004 整合性、既存内容の破壊がないか確認",
+      "notes": "",
       "retry_count": 0,
       "qa_result": "APPROVED",
       "events": [
         {
-          "ts": "2026-04-23T08:25:28+0900",
+          "ts": "2026-04-23T14:22:27+0900",
           "agent": "Sora",
-          "action": "done",
-          "msg": "architect.md の Bash ツール付与をレビュー。tools行・Bashルールセクション・既存セクション全て正常。APPROVED"
-        }
-      ],
-      "summary": "architect.md の Bash ツール付与をレビュー。tools行・Bashルールセクション・既存セクション全て正常。APPROVED"
-    },
-    {
-      "slug": "token-opt-design",
-      "title": "[#36] トークン最適化ルールの設計",
-      "status": "DONE",
-      "assigned_to": "Alex",
-      "complexity": "M",
-      "risk_level": "medium",
-      "parallel_group": null,
-      "depends_on": [],
-      "qa_mode": null,
-      "created_at": "2026-04-23",
-      "updated_at": "2026-04-23",
-      "notes": "ADR-004 の決定事項を pm.md と各エージェント定義に反映するための変更方針を設計",
-      "retry_count": 0,
-      "qa_result": null,
-      "events": [
-        {
-          "ts": "2026-04-23T08:25:55+0900",
-          "agent": "Alex",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-23T08:29:47+0900",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "トークン最適化反映の設計書を作成"
-        }
-      ],
-      "summary": "トークン最適化反映の設計書を作成"
-    },
-    {
-      "slug": "token-opt-impl",
-      "title": "[#36] トークン最適化ルール反映",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "M",
-      "risk_level": "medium",
-      "parallel_group": null,
-      "depends_on": [
-        "token-opt-design"
-      ],
-      "qa_mode": "inline",
-      "created_at": "2026-04-23",
-      "updated_at": "2026-04-23",
-      "notes": "設計書に基づき pm.md および各エージェント定義にルールを反映",
-      "retry_count": 0,
-      "qa_result": null,
-      "events": [
-        {
-          "ts": "2026-04-23T08:29:58+0900",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-23T08:31:58+0900",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "pm.md・エージェント定義・ADR-004にトークン最適化ルールを反映"
-        }
-      ],
-      "summary": "pm.md・エージェント定義・ADR-004にトークン最適化ルールを反映"
-    },
-    {
-      "slug": "token-opt-qa",
-      "title": "[#36] トークン最適化反映の QA",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "token-opt-impl"
-      ],
-      "qa_mode": null,
-      "created_at": "2026-04-23",
-      "updated_at": "2026-04-23",
-      "notes": "委譲判断フローの ADR-004 整合性、Bash 上限ルールの統一性を確認",
-      "retry_count": 1,
-      "qa_result": "APPROVED",
-      "events": [
-        {
-          "ts": "2026-04-23T08:46:52+0900",
+          "ts": "2026-04-23T14:23:19+0900",
           "agent": "Sora",
           "action": "qa",
-          "msg": "APPROVED: architect.md修正確認（3回上限・自己done/handoff可の記述あり）、全ファイルOK"
+          "msg": "APPROVED: slack-notify.yml は workflow_dispatch のみ、pm.md の Slack通知セクションはスプリント開始/完了の2通知のみに変更済み。レトロ完了通知の残存を指摘するが MINOR 扱い。"
         },
         {
-          "ts": "2026-04-23T08:46:54+0900",
+          "ts": "2026-04-23T14:23:23+0900",
           "agent": "Sora",
           "action": "done",
-          "msg": "再レビューAPPROVED"
+          "msg": "静的レビューのみ（go 未インストール）。CRITICAL/MAJOR 指摘なし。MINOR 1件（レトロ完了通知の残存）。APPROVED。"
         }
       ],
-      "summary": "再レビューAPPROVED"
+      "summary": "静的レビューのみ（go 未インストール）。CRITICAL/MAJOR 指摘なし。MINOR 1件（レトロ完了通知の残存）。APPROVED。"
     },
     {
-      "slug": "session-interrupt-design",
-      "title": "[#39] セッション中断タスク検出機構の設計",
+      "slug": "process-docs-update",
+      "title": "[#49#50#47] PR Test Plan必須化・コミット基準明文化・みゆきち自動起動",
       "status": "DONE",
-      "assigned_to": "Alex",
-      "complexity": "M",
-      "risk_level": "medium",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "low",
       "parallel_group": null,
       "depends_on": [],
-      "qa_mode": null,
+      "qa_mode": "inline",
       "created_at": "2026-04-23",
       "updated_at": "2026-04-23",
-      "notes": "設計のみ。実装は Sprint-06 以降",
+      "notes": "PR テンプレにTest Plan必須チェック追記、pm.mdにコミット自動実行ルール追記、pm.mdにみゆきち自動起動の明文化",
       "retry_count": 0,
       "qa_result": null,
       "events": [
         {
-          "ts": "2026-04-23T08:47:15+0900",
-          "agent": "Alex",
+          "ts": "2026-04-23T14:22:43+0900",
+          "agent": "Riku",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-23T09:15:00+0900",
-          "agent": "Alex",
+          "ts": "2026-04-23T14:30:39+0900",
+          "agent": "Riku",
           "action": "done",
-          "msg": "セッション中断検出機構の設計書を作成"
+          "msg": "PRテンプレにTest Plan追加、pm.mdにコミット自動実行ルール・みゆきち自動起動を明文化、レトロSlack通知を削除"
         }
       ],
-      "summary": "セッション中断検出機構の設計書を作成"
+      "summary": "PRテンプレにTest Plan追加、pm.mdにコミット自動実行ルール・みゆきち自動起動を明文化、レトロSlack通知を削除"
+    },
+    {
+      "slug": "process-docs-qa",
+      "title": "[#49#50#47] プロセスドキュメントQA",
+      "status": "DONE",
+      "assigned_to": "Sora",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": null,
+      "depends_on": [
+        "process-docs-update"
+      ],
+      "qa_mode": null,
+      "created_at": "2026-04-23",
+      "updated_at": "2026-04-23",
+      "notes": "",
+      "retry_count": 0,
+      "qa_result": "APPROVED",
+      "events": [
+        {
+          "ts": "2026-04-23T14:30:43+0900",
+          "agent": "Sora",
+          "action": "handoff",
+          "msg": "next: READY_FOR_SORA"
+        },
+        {
+          "ts": "2026-04-23T14:30:43+0900",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-23T14:32:03+0900",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: PRテンプレTest plan追加・pm.md自動フロー・レトロSlack通知削除、全合格"
+        },
+        {
+          "ts": "2026-04-23T14:32:03+0900",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "APPROVED"
+        }
+      ],
+      "summary": "APPROVED"
+    },
+    {
+      "slug": "session-interrupt-impl",
+      "title": "[#39] セッション中断検出機構の実装",
+      "status": "DONE",
+      "assigned_to": "Riku",
+      "complexity": "M",
+      "risk_level": "medium",
+      "parallel_group": null,
+      "depends_on": [],
+      "qa_mode": "inline",
+      "created_at": "2026-04-23",
+      "updated_at": "2026-04-23",
+      "notes": "設計書 docs/spec/session-interrupt-design.md に基づき queue.sh に detect-stale サブコマンドを追加",
+      "retry_count": 0,
+      "qa_result": null,
+      "events": [
+        {
+          "ts": "2026-04-23T14:31:05+0900",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-23T21:27:39+0900",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "queue.shにdetect-staleサブコマンド追加、show/nextに中断検出を組み込み"
+        }
+      ],
+      "summary": "queue.shにdetect-staleサブコマンド追加、show/nextに中断検出を組み込み"
+    },
+    {
+      "slug": "session-interrupt-qa",
+      "title": "[#39] セッション中断検出QA",
+      "status": "DONE",
+      "assigned_to": "Sora",
+      "complexity": "M",
+      "risk_level": "medium",
+      "parallel_group": null,
+      "depends_on": [
+        "session-interrupt-impl"
+      ],
+      "qa_mode": null,
+      "created_at": "2026-04-23",
+      "updated_at": "2026-04-23",
+      "notes": "",
+      "retry_count": 0,
+      "qa_result": "APPROVED",
+      "events": [
+        {
+          "ts": "2026-04-23T21:27:43+0900",
+          "agent": "Sora",
+          "action": "handoff",
+          "msg": "next: READY_FOR_SORA"
+        },
+        {
+          "ts": "2026-04-23T21:27:43+0900",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-23T21:29:42+0900",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: 設計書5項目と実装が整合。読み取り専用・STDERR出力のみ確認。macOS/GNU dateフォールバック実装済み。不整合タスク警告あり。MINORバグ2件（for+shift誤用、--slack未実装の無音処理）あるが仕様範囲内。テスト: detect-stale/show で正常検出確認。"
+        },
+        {
+          "ts": "2026-04-23T21:29:45+0900",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "QAレビュー完了: APPROVED。detect-stale機能が設計書5項目を満たして正常動作することを確認。"
+        }
+      ],
+      "summary": "QAレビュー完了: APPROVED。detect-stale機能が設計書5項目を満たして正常動作することを確認。"
     }
   ]
 }

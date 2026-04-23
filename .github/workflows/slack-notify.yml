@@ -1,10 +1,9 @@
 name: Slack Notify
 
+# Sprint-06: GitHub Actions経由の自動通知を廃止。
+# スプリント開始/完了の通知はYuki（pm.md）がcurlで直接送信する。
 on:
-  issues:
-    types: [opened, closed]
-  pull_request:
-    types: [opened, closed]
+  workflow_dispatch:
 
 jobs:
   notify:

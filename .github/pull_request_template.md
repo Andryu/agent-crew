@@ -11,8 +11,15 @@ Closes #
 
 -
 
+## Test plan
+<!-- Sora QA等で確認済みの項目は [x] でチェックし、確認手段を括弧書きで併記する -->
+<!-- 例: - [x] APIレスポンスが正しいこと（Sora QA APPROVED） -->
+
+- [ ]
+
 ## チェックリスト
 - [ ] 関連Issueの番号を `Closes #XX` 形式で全件記載した
 - [ ] `gh issue close` などの直接API呼び出しは使用していない（クローズはPRマージで行う）
 - [ ] QA承認済み（Sora の APPROVED を確認した）
 - [ ] ブランチ名が `feat/` または `fix/` で始まっている（mainへの直接コミット禁止）
+- [ ] Test plan の全項目がチェック済みである
