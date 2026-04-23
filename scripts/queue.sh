@@ -15,6 +15,7 @@
 #   queue.sh show [<slug>]                                       # 状態を表示
 #   queue.sh next                                                # 次に実行可能な READY_FOR_* タスク1件
 #   queue.sh graph [--save]                                      # Mermaid依存グラフを出力
+#   queue.sh detect-stale [--threshold <min>]                    # 中断タスク（IN_PROGRESS >= N分）を検出
 #   queue.sh retro [--save] [--decisions]                        # リトロスペクティブ集計
 #
 # 環境変数:
@@ -508,12 +509,109 @@ cmd_retry() {
 }
 
 # ---------- コマンド: show ----------
+# ---------- 中断タスク検出（内部関数） ----------
+# ロック不要・読み取り専用。STDERR に警告を出力。
+STALE_THRESHOLD_MIN="${STALE_THRESHOLD_MIN:-60}"
+
+_detect_stale_inline() {
+  local now_epoch threshold_secs
+  now_epoch=$(date +%s)
+  threshold_secs=$((STALE_THRESHOLD_MIN * 60))
+
+  local stale_output
+  stale_output=$(jq -r --argjson now "$now_epoch" --argjson thr "$threshold_secs" '
+    [.tasks[]
+    | select(.status == "IN_PROGRESS")
+    | . as $task
+    | (.events // [] | map(select(.action == "start")) | last | .ts // null) as $last_start
+    | if $last_start == null then
+        "WARN: STALE TASK DETECTED (不整合)\n  slug:    \($task.slug)\n  status:  IN_PROGRESS\n  agent:   \($task.assigned_to // "unknown")\n  issue:   start イベントなし\n  action:  scripts/queue.sh retry \($task.slug) または手動確認\n"
+      else
+        # macOS date -j を使ってタイムスタンプを epoch に変換
+        # jq 内では epoch 変換が不安定なため、slug と ts を出力して bash 側で処理
+        "\($task.slug)|\($task.assigned_to // "unknown")|\($last_start)"
+      end
+    ] | .[]
+  ' "$QUEUE_FILE" 2>/dev/null || true)
+
+  [[ -z "$stale_output" ]] && return 0
+
+  while IFS= read -r line; do
+    if [[ "$line" == WARN:* ]]; then
+      # 不整合タスク（start イベントなし）— そのまま出力
+      printf '%b\n' "$line" >&2
+    elif [[ "$line" == *"|"* ]]; then
+      # slug|agent|ts 形式 — bash 側で経過時間を計算
+      local slug agent ts start_epoch elapsed_min
+      slug=$(echo "$line" | cut -d'|' -f1)
+      agent=$(echo "$line" | cut -d'|' -f2)
+      ts=$(echo "$line" | cut -d'|' -f3-)
+
+      # タイムスタンプを epoch に変換（macOS 対応）
+      # +0900 形式を処理するため、末尾4桁を取り出して手動調整
+      local ts_clean tz_sign tz_hours tz_offset
+      ts_clean="${ts%[+-]*}"
+      local tz_part="${ts##*T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]}"
+      if [[ "$tz_part" =~ ^([+-])([0-9]{2})([0-9]{2})$ ]]; then
+        tz_sign="${BASH_REMATCH[1]}"
+        tz_hours="${BASH_REMATCH[2]}"
+        local tz_mins="${BASH_REMATCH[3]}"
+        tz_offset=$(( 10#$tz_hours * 3600 + 10#$tz_mins * 60 ))
+        [[ "$tz_sign" == "+" ]] && tz_offset=$((-tz_offset))  # UTC から引く
+      else
+        tz_offset=0
+      fi
+
+      # date -j で UTC 相当の epoch を取得
+      if start_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "$ts_clean" "+%s" 2>/dev/null); then
+        start_epoch=$((start_epoch + tz_offset))
+      else
+        # GNU date フォールバック
+        start_epoch=$(date -d "$ts" "+%s" 2>/dev/null || echo 0)
+      fi
+
+      elapsed_min=$(( (now_epoch - start_epoch) / 60 ))
+
+      if [[ $elapsed_min -ge $STALE_THRESHOLD_MIN ]]; then
+        cat >&2 <<EOM
+WARN: STALE TASK DETECTED
+  slug:    $slug
+  status:  IN_PROGRESS
+  agent:   $agent
+  started: $ts
+  elapsed: ${elapsed_min} min
+  action:  手動リカバリを検討してください (scripts/queue.sh done または scripts/queue.sh retry)
+EOM
+      fi
+    fi
+  done <<< "$stale_output"
+}
+
+# ---------- コマンド: detect-stale ----------
+cmd_detect_stale() {
+  require_queue
+  local slack_flag=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --threshold)  STALE_THRESHOLD_MIN="${2:-60}"; shift 2 ;;
+      --threshold=*) STALE_THRESHOLD_MIN="${1#*=}"; shift ;;
+      --slack)      slack_flag=true; shift ;;
+      *)            shift ;;
+    esac
+  done
+  _detect_stale_inline
+  if [[ "$slack_flag" == true ]]; then
+    echo "WARN: --slack は未実装です（将来スプリントで対応予定）" >&2
+  fi
+}
+
 cmd_show() {
   require_queue
   local slug=${1:-}
   if [[ -n "$slug" ]]; then
     jq --arg s "$slug" '.tasks[] | select(.slug == $s)' "$QUEUE_FILE"
   else
+    _detect_stale_inline
     jq '.tasks | map({slug, status, assigned_to, complexity: (.complexity // null), qa_result: (.qa_result // null), retry_count: (.retry_count // 0)})' "$QUEUE_FILE"
   fi
 }
@@ -522,6 +620,7 @@ cmd_show() {
 # 次に着手可能な READY_FOR_* タスクを1件返す
 cmd_next() {
   require_queue
+  _detect_stale_inline
   jq -r '
     .tasks[]
     | select(.status | startswith("READY_FOR_"))
@@ -903,6 +1002,7 @@ case "$cmd" in
   show)             cmd_show "$@" ;;
   next)             cmd_next "$@" ;;
   graph)            cmd_graph "$@" ;;
+  detect-stale)     cmd_detect_stale "$@" ;;
   retro)            cmd_retro "$@" ;;
   ""|help|-h|--help)
     sed -n '2,28p' "$0"
