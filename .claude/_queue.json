@@ -1,11 +1,11 @@
 {
-  "sprint": "sprint-06",
+  "sprint": "sprint-07",
   "tasks": [
     {
-      "slug": "slack-notify-simplify",
-      "title": "[#52] Slack通知をスプリント開始/完了の2つに絞る",
+      "slug": "bash-quality-fix",
+      "title": "[#39] detect-stale: for+shift修正・--slack未実装フラグ明示・date -u統一",
       "status": "DONE",
-      "assigned_to": "Riku",
+      "assigned_to": null,
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": null,
@@ -13,35 +13,35 @@
       "qa_mode": "inline",
       "created_at": "2026-04-23",
       "updated_at": "2026-04-23",
-      "notes": "slack-notify.yml無効化 + pm.mdのSlack通知セクションをスプリント開始/完了のみに変更",
+      "notes": "Sprint-06 Sora MINOR指摘2件(for+shift誤用・--slack無音処理)とINFO(TZ依存)を修正。getopts/while+case パターンへ変換、--slack未実装時はerror exit、date -u統一",
       "retry_count": 0,
       "qa_result": null,
       "events": [
         {
-          "ts": "2026-04-23T13:33:44+0900",
-          "agent": "Riku",
+          "ts": "2026-04-23T17:27:43+0000",
+          "agent": "system",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-23T13:34:55+0900",
+          "ts": "2026-04-23T17:27:43+0000",
           "agent": "Riku",
           "action": "done",
-          "msg": "slack-notify.yml無効化 + pm.md通知セクション書き換え"
+          "msg": "for+shift修正済み(既にwhile+case)、--slack未実装時exit 1化、date -u統一"
         }
       ],
-      "summary": "slack-notify.yml無効化 + pm.md通知セクション書き換え"
+      "summary": "for+shift修正済み(既にwhile+case)、--slack未実装時exit 1化、date -u統一"
     },
     {
-      "slug": "slack-notify-qa",
-      "title": "[#52] Slack通知絞り込みQA",
+      "slug": "bash-quality-qa",
+      "title": "[#39] detect-stale品質修正 QA",
       "status": "DONE",
-      "assigned_to": "Sora",
+      "assigned_to": null,
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": null,
       "depends_on": [
-        "slack-notify-simplify"
+        "bash-quality-fix"
       ],
       "qa_mode": null,
       "created_at": "2026-04-23",
@@ -51,31 +51,31 @@
       "qa_result": "APPROVED",
       "events": [
         {
-          "ts": "2026-04-23T14:22:27+0900",
-          "agent": "Sora",
+          "ts": "2026-04-23T17:27:47+0000",
+          "agent": "system",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-23T14:23:19+0900",
+          "ts": "2026-04-23T17:27:47+0000",
           "agent": "Sora",
           "action": "qa",
-          "msg": "APPROVED: slack-notify.yml は workflow_dispatch のみ、pm.md の Slack通知セクションはスプリント開始/完了の2通知のみに変更済み。レトロ完了通知の残存を指摘するが MINOR 扱い。"
+          "msg": "APPROVED: detect-stale修正確認: --slack exit 1動作OK、date -u統一OK、while+case維持"
         },
         {
-          "ts": "2026-04-23T14:23:23+0900",
+          "ts": "2026-04-23T17:27:47+0000",
           "agent": "Sora",
           "action": "done",
-          "msg": "静的レビューのみ（go 未インストール）。CRITICAL/MAJOR 指摘なし。MINOR 1件（レトロ完了通知の残存）。APPROVED。"
+          "msg": "QA APPROVED"
         }
       ],
-      "summary": "静的レビューのみ（go 未インストール）。CRITICAL/MAJOR 指摘なし。MINOR 1件（レトロ完了通知の残存）。APPROVED。"
+      "summary": "QA APPROVED"
     },
     {
-      "slug": "process-docs-update",
-      "title": "[#49#50#47] PR Test Plan必須化・コミット基準明文化・みゆきち自動起動",
+      "slug": "subagent-constraint-doc",
+      "title": "[#51] architect.md にサブエージェントBash不可制約を明記",
       "status": "DONE",
-      "assigned_to": "Riku",
+      "assigned_to": null,
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": null,
@@ -83,35 +83,35 @@
       "qa_mode": "inline",
       "created_at": "2026-04-23",
       "updated_at": "2026-04-23",
-      "notes": "PR テンプレにTest Plan必須チェック追記、pm.mdにコミット自動実行ルール追記、pm.mdにみゆきち自動起動の明文化",
+      "notes": "Sprint-05 retro T-3の未実施課題。architect.mdに『サブエージェントコンテキストではBash不可』セクションを追加し、Yuki代行フローも明文化する",
       "retry_count": 0,
       "qa_result": null,
       "events": [
         {
-          "ts": "2026-04-23T14:22:43+0900",
-          "agent": "Riku",
+          "ts": "2026-04-23T17:27:53+0000",
+          "agent": "system",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-23T14:30:39+0900",
-          "agent": "Riku",
+          "ts": "2026-04-23T17:27:53+0000",
+          "agent": "Alex",
           "action": "done",
-          "msg": "PRテンプレにTest Plan追加、pm.mdにコミット自動実行ルール・みゆきち自動起動を明文化、レトロSlack通知を削除"
+          "msg": "architect.mdにサブエージェントBash不可制約セクション追加"
         }
       ],
-      "summary": "PRテンプレにTest Plan追加、pm.mdにコミット自動実行ルール・みゆきち自動起動を明文化、レトロSlack通知を削除"
+      "summary": "architect.mdにサブエージェントBash不可制約セクション追加"
     },
     {
-      "slug": "process-docs-qa",
-      "title": "[#49#50#47] プロセスドキュメントQA",
+      "slug": "subagent-constraint-qa",
+      "title": "[#51] サブエージェント制約ドキュメント QA",
       "status": "DONE",
-      "assigned_to": "Sora",
+      "assigned_to": null,
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": null,
       "depends_on": [
-        "process-docs-update"
+        "subagent-constraint-doc"
       ],
       "qa_mode": null,
       "created_at": "2026-04-23",
@@ -121,107 +121,56 @@
       "qa_result": "APPROVED",
       "events": [
         {
-          "ts": "2026-04-23T14:30:43+0900",
-          "agent": "Sora",
-          "action": "handoff",
-          "msg": "next: READY_FOR_SORA"
-        },
-        {
-          "ts": "2026-04-23T14:30:43+0900",
-          "agent": "Sora",
+          "ts": "2026-04-23T18:10:10+0000",
+          "agent": "system",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-23T14:32:03+0900",
+          "ts": "2026-04-23T18:10:10+0000",
           "agent": "Sora",
           "action": "qa",
-          "msg": "APPROVED: PRテンプレTest plan追加・pm.md自動フロー・レトロSlack通知削除、全合格"
+          "msg": "APPROVED: architect.mdサブエージェント制約セクション記載確認OK"
         },
         {
-          "ts": "2026-04-23T14:32:03+0900",
+          "ts": "2026-04-23T18:10:10+0000",
           "agent": "Sora",
           "action": "done",
-          "msg": "APPROVED"
+          "msg": "QA APPROVED"
         }
       ],
-      "summary": "APPROVED"
+      "summary": "QA APPROVED"
     },
     {
-      "slug": "session-interrupt-impl",
-      "title": "[#39] セッション中断検出機構の実装",
+      "slug": "signals-jsonl-design",
+      "title": "[#23] _signals.jsonl 設計書の作成",
       "status": "DONE",
-      "assigned_to": "Riku",
+      "assigned_to": null,
       "complexity": "M",
-      "risk_level": "medium",
+      "risk_level": "low",
       "parallel_group": null,
       "depends_on": [],
       "qa_mode": "inline",
       "created_at": "2026-04-23",
       "updated_at": "2026-04-23",
-      "notes": "設計書 docs/spec/session-interrupt-design.md に基づき queue.sh に detect-stale サブコマンドを追加",
+      "notes": "phase-2知性強化の第一歩。スキーマ定義・記録タイミング・将来の自己改善ループへの接続方針をdocs/spec/signals-jsonl-design.mdに作成。スコープ: Phase-1(スキーマ定義)のみ",
       "retry_count": 0,
       "qa_result": null,
       "events": [
         {
-          "ts": "2026-04-23T14:31:05+0900",
-          "agent": "Riku",
+          "ts": "2026-04-23T18:10:13+0000",
+          "agent": "system",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-23T21:27:39+0900",
-          "agent": "Riku",
+          "ts": "2026-04-23T18:10:13+0000",
+          "agent": "Alex",
           "action": "done",
-          "msg": "queue.shにdetect-staleサブコマンド追加、show/nextに中断検出を組み込み"
+          "msg": "_signals.jsonl設計書作成完了(Phase-1スキーマ定義)"
         }
       ],
-      "summary": "queue.shにdetect-staleサブコマンド追加、show/nextに中断検出を組み込み"
-    },
-    {
-      "slug": "session-interrupt-qa",
-      "title": "[#39] セッション中断検出QA",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "M",
-      "risk_level": "medium",
-      "parallel_group": null,
-      "depends_on": [
-        "session-interrupt-impl"
-      ],
-      "qa_mode": null,
-      "created_at": "2026-04-23",
-      "updated_at": "2026-04-23",
-      "notes": "",
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "events": [
-        {
-          "ts": "2026-04-23T21:27:43+0900",
-          "agent": "Sora",
-          "action": "handoff",
-          "msg": "next: READY_FOR_SORA"
-        },
-        {
-          "ts": "2026-04-23T21:27:43+0900",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-23T21:29:42+0900",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 設計書5項目と実装が整合。読み取り専用・STDERR出力のみ確認。macOS/GNU dateフォールバック実装済み。不整合タスク警告あり。MINORバグ2件（for+shift誤用、--slack未実装の無音処理）あるが仕様範囲内。テスト: detect-stale/show で正常検出確認。"
-        },
-        {
-          "ts": "2026-04-23T21:29:45+0900",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QAレビュー完了: APPROVED。detect-stale機能が設計書5項目を満たして正常動作することを確認。"
-        }
-      ],
-      "summary": "QAレビュー完了: APPROVED。detect-stale機能が設計書5項目を満たして正常動作することを確認。"
+      "summary": "_signals.jsonl設計書作成完了(Phase-1スキーマ定義)"
     }
   ]
 }
