@@ -1,241 +1,191 @@
 {
-  "sprint": "sprint-04",
+  "sprint": "sprint-05",
   "tasks": [
     {
-      "slug": "fix-sora-dup-design",
-      "title": "[#38] Sora重複実行 原因分析・修正設計",
-      "status": "DONE",
-      "assigned_to": "Alex",
-      "complexity": "M",
-      "risk_level": "high",
-      "parallel_group": null,
-      "depends_on": [],
-      "qa_mode": null,
-      "created_at": "2026-04-22",
-      "updated_at": "2026-04-22",
-      "notes": "GitHub Issue #38 / subagent_stop.sh および queue.sh 側での重複実行防止チェック（案2）の原因分析・修正設計を行う。ADRまたは設計メモに記録する。",
-      "events": [
-        {
-          "ts": "2026-04-22T05:48:58+0000",
-          "agent": "Alex",
-          "action": "handoff",
-          "msg": "parallel-handoff: READY_FOR_ALEX"
-        },
-        {
-          "ts": "2026-04-22T06:43:29+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "設計完了"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "設計完了"
-    },
-    {
-      "slug": "fix-sora-dup-impl",
-      "title": "[#38] subagent_stop.sh / queue.sh 重複防止実装",
+      "slug": "alex-bash-impl",
+      "title": "[#43] Alex に Bash ツールを付与",
       "status": "DONE",
       "assigned_to": "Riku",
-      "complexity": "M",
-      "risk_level": "high",
-      "parallel_group": null,
-      "depends_on": [
-        "fix-sora-dup-design"
-      ],
-      "qa_mode": "inline",
-      "created_at": "2026-04-22",
-      "updated_at": "2026-04-22",
-      "notes": "GitHub Issue #38 / fix-sora-dup-design の設計に基づき、queue.sh 側で重複実行防止チェックを実装する（案2）。",
-      "events": [
-        {
-          "ts": "2026-04-22T06:43:29+0000",
-          "agent": "Riku",
-          "action": "handoff",
-          "msg": "next: READY_FOR_RIKU"
-        },
-        {
-          "ts": "2026-04-22T06:43:54+0000",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-22T06:45:03+0000",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "queue.sh 重複防止ガード実装完了"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "queue.sh 重複防止ガード実装完了"
-    },
-    {
-      "slug": "fix-sora-dup-qa",
-      "title": "[#38] 重複防止修正レビュー",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "M",
-      "risk_level": "high",
-      "parallel_group": null,
-      "depends_on": [
-        "fix-sora-dup-impl"
-      ],
-      "qa_mode": null,
-      "created_at": "2026-04-22",
-      "updated_at": "2026-04-22",
-      "notes": "GitHub Issue #38 / fix-sora-dup-impl の実装レビュー。重複実行が実際に防止されることを確認する。",
-      "events": [
-        {
-          "ts": "2026-04-22T06:45:05+0000",
-          "agent": "Sora",
-          "action": "handoff",
-          "msg": "next: READY_FOR_SORA"
-        },
-        {
-          "ts": "2026-04-22T06:45:53+0000",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-22T06:49:01+0000",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 全7受け入れ基準合格: cmd_start(exit11/12/13)/cmd_done(exit15)/cmd_qa(exit14)のガードが正常動作、TOCTOU防止のためacquire_lock後にガード配置、全エラーパスでrelease_lock呼出確認、retry→qa正常フロー確認"
-        },
-        {
-          "ts": "2026-04-22T06:49:05+0000",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QA承認: 重複実行防止ガード全項目合格"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "QA承認: 重複実行防止ガード全項目合格"
-    },
-    {
-      "slug": "riku-self-review-design",
-      "title": "[#40] self-reviewチェックリスト設計",
-      "status": "DONE",
-      "assigned_to": "Alex",
-      "complexity": "M",
-      "risk_level": "medium",
+      "complexity": "S",
+      "risk_level": "low",
       "parallel_group": null,
       "depends_on": [],
-      "qa_mode": null,
-      "created_at": "2026-04-22",
-      "updated_at": "2026-04-22",
-      "notes": "GitHub Issue #40 / Riku が実装完了後に自己レビューするためのチェックリスト仕様を設計する。engineer-*.md への追記内容・チェック項目・フォーマットを定義する。",
-      "events": [
-        {
-          "ts": "2026-04-22T05:48:58+0000",
-          "agent": "Alex",
-          "action": "handoff",
-          "msg": "parallel-handoff: READY_FOR_ALEX"
-        },
-        {
-          "ts": "2026-04-22T06:43:29+0000",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-22T06:45:50+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "チェックリスト設計完了"
-        }
-      ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "チェックリスト設計完了"
-    },
-    {
-      "slug": "riku-self-review-impl",
-      "title": "[#40] engineer-*.md への追記",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "M",
-      "risk_level": "medium",
-      "parallel_group": null,
-      "depends_on": [
-        "riku-self-review-design"
-      ],
       "qa_mode": "inline",
-      "created_at": "2026-04-22",
-      "updated_at": "2026-04-22",
-      "notes": "GitHub Issue #40 / riku-self-review-design の設計に基づき、engineer-go.md・engineer-vue.md・engineer-next.md にself-reviewチェックリストを追記する。",
+      "created_at": "2026-04-23",
+      "updated_at": "2026-04-23",
+      "notes": "architect.md の tools に Bash を追加し、queue.sh 操作ルールを追記する",
+      "retry_count": 0,
+      "qa_result": null,
       "events": [
         {
-          "ts": "2026-04-22T06:45:50+0000",
-          "agent": "Riku",
-          "action": "handoff",
-          "msg": "next: READY_FOR_RIKU"
-        },
-        {
-          "ts": "2026-04-22T06:46:12+0000",
+          "ts": "2026-04-23T00:05:18+0900",
           "agent": "Riku",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-22T06:46:53+0000",
+          "ts": "2026-04-23T00:06:03+0900",
           "agent": "Riku",
           "action": "done",
-          "msg": "self-reviewチェックリスト追記完了"
+          "msg": "architect.md に Bash ツール追加 + 使用ルール追記"
         }
       ],
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "self-reviewチェックリスト追記完了"
+      "summary": "architect.md に Bash ツール追加 + 使用ルール追記"
     },
     {
-      "slug": "riku-self-review-qa",
-      "title": "[#40] チェックリストレビュー",
+      "slug": "alex-bash-qa",
+      "title": "[#43] Alex Bash 付与の QA",
       "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
-      "risk_level": "medium",
+      "risk_level": "low",
       "parallel_group": null,
       "depends_on": [
-        "riku-self-review-impl"
+        "alex-bash-impl"
       ],
       "qa_mode": null,
-      "created_at": "2026-04-22",
-      "updated_at": "2026-04-22",
-      "notes": "GitHub Issue #40 / riku-self-review-impl の実装レビュー。チェックリストの網羅性・フォーマット・実用性を確認する。",
+      "created_at": "2026-04-23",
+      "updated_at": "2026-04-23",
+      "notes": "tools 行の記法確認、ADR-004 整合性、既存内容の破壊がないか確認",
+      "retry_count": 0,
+      "qa_result": "APPROVED",
       "events": [
         {
-          "ts": "2026-04-22T06:46:56+0000",
+          "ts": "2026-04-23T08:25:28+0900",
           "agent": "Sora",
-          "action": "handoff",
-          "msg": "next: READY_FOR_SORA"
-        },
+          "action": "done",
+          "msg": "architect.md の Bash ツール付与をレビュー。tools行・Bashルールセクション・既存セクション全て正常。APPROVED"
+        }
+      ],
+      "summary": "architect.md の Bash ツール付与をレビュー。tools行・Bashルールセクション・既存セクション全て正常。APPROVED"
+    },
+    {
+      "slug": "token-opt-design",
+      "title": "[#36] トークン最適化ルールの設計",
+      "status": "DONE",
+      "assigned_to": "Alex",
+      "complexity": "M",
+      "risk_level": "medium",
+      "parallel_group": null,
+      "depends_on": [],
+      "qa_mode": null,
+      "created_at": "2026-04-23",
+      "updated_at": "2026-04-23",
+      "notes": "ADR-004 の決定事項を pm.md と各エージェント定義に反映するための変更方針を設計",
+      "retry_count": 0,
+      "qa_result": null,
+      "events": [
         {
-          "ts": "2026-04-22T06:49:56+0000",
-          "agent": "Sora",
+          "ts": "2026-04-23T08:25:55+0900",
+          "agent": "Alex",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-22T06:50:27+0000",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 3ファイル全て受け入れ基準を満たす。共通12項目と各スタック別4項目が正確な位置に追記されており、見出しレベル・形式も既存DoDと整合。Soraの観点との役割分担も適切。"
-        },
-        {
-          "ts": "2026-04-22T06:50:30+0000",
-          "agent": "Sora",
+          "ts": "2026-04-23T08:29:47+0900",
+          "agent": "Alex",
           "action": "done",
-          "msg": "QA承認: 3ファイルの自己レビューチェックリスト追記を全受け入れ基準でAPPROVED"
+          "msg": "トークン最適化反映の設計書を作成"
         }
       ],
+      "summary": "トークン最適化反映の設計書を作成"
+    },
+    {
+      "slug": "token-opt-impl",
+      "title": "[#36] トークン最適化ルール反映",
+      "status": "DONE",
+      "assigned_to": "Riku",
+      "complexity": "M",
+      "risk_level": "medium",
+      "parallel_group": null,
+      "depends_on": [
+        "token-opt-design"
+      ],
+      "qa_mode": "inline",
+      "created_at": "2026-04-23",
+      "updated_at": "2026-04-23",
+      "notes": "設計書に基づき pm.md および各エージェント定義にルールを反映",
       "retry_count": 0,
+      "qa_result": null,
+      "events": [
+        {
+          "ts": "2026-04-23T08:29:58+0900",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-23T08:31:58+0900",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "pm.md・エージェント定義・ADR-004にトークン最適化ルールを反映"
+        }
+      ],
+      "summary": "pm.md・エージェント定義・ADR-004にトークン最適化ルールを反映"
+    },
+    {
+      "slug": "token-opt-qa",
+      "title": "[#36] トークン最適化反映の QA",
+      "status": "DONE",
+      "assigned_to": "Sora",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": null,
+      "depends_on": [
+        "token-opt-impl"
+      ],
+      "qa_mode": null,
+      "created_at": "2026-04-23",
+      "updated_at": "2026-04-23",
+      "notes": "委譲判断フローの ADR-004 整合性、Bash 上限ルールの統一性を確認",
+      "retry_count": 1,
       "qa_result": "APPROVED",
-      "summary": "QA承認: 3ファイルの自己レビューチェックリスト追記を全受け入れ基準でAPPROVED"
+      "events": [
+        {
+          "ts": "2026-04-23T08:46:52+0900",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: architect.md修正確認（3回上限・自己done/handoff可の記述あり）、全ファイルOK"
+        },
+        {
+          "ts": "2026-04-23T08:46:54+0900",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "再レビューAPPROVED"
+        }
+      ],
+      "summary": "再レビューAPPROVED"
+    },
+    {
+      "slug": "session-interrupt-design",
+      "title": "[#39] セッション中断タスク検出機構の設計",
+      "status": "DONE",
+      "assigned_to": "Alex",
+      "complexity": "M",
+      "risk_level": "medium",
+      "parallel_group": null,
+      "depends_on": [],
+      "qa_mode": null,
+      "created_at": "2026-04-23",
+      "updated_at": "2026-04-23",
+      "notes": "設計のみ。実装は Sprint-06 以降",
+      "retry_count": 0,
+      "qa_result": null,
+      "events": [
+        {
+          "ts": "2026-04-23T08:47:15+0900",
+          "agent": "Alex",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-23T09:15:00+0900",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "セッション中断検出機構の設計書を作成"
+        }
+      ],
+      "summary": "セッション中断検出機構の設計書を作成"
     }
   ]
 }
