@@ -1,176 +1,204 @@
 {
-  "sprint": "sprint-07",
+  "sprint": "sprint-09",
   "tasks": [
     {
-      "slug": "bash-quality-fix",
-      "title": "[#39] detect-stale: for+shift修正・--slack未実装フラグ明示・date -u統一",
+      "slug": "queue-py-design",
+      "title": "queue.py 設計（ADR・インターフェース定義）",
       "status": "DONE",
-      "assigned_to": null,
-      "complexity": "S",
-      "risk_level": "low",
+      "assigned_to": "Alex",
+      "complexity": "M",
+      "risk_level": "medium",
       "parallel_group": null,
       "depends_on": [],
-      "qa_mode": "inline",
-      "created_at": "2026-04-23",
-      "updated_at": "2026-04-23",
-      "notes": "Sprint-06 Sora MINOR指摘2件(for+shift誤用・--slack無音処理)とINFO(TZ依存)を修正。getopts/while+case パターンへ変換、--slack未実装時はerror exit、date -u統一",
+      "qa_mode": null,
+      "created_at": "2026-04-24",
+      "updated_at": "2026-04-24",
+      "notes": "Issue #66対応のqueue.py移行Phase1。typer+pydantic設計。docs/spec/queue-py-design.md を作成。",
       "retry_count": 0,
       "qa_result": null,
       "events": [
         {
-          "ts": "2026-04-23T17:27:43+0000",
-          "agent": "system",
+          "ts": "2026-04-24T02:23:38+0000",
+          "agent": "Alex",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-23T17:27:43+0000",
+          "ts": "2026-04-24T02:26:08+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "設計書作成完了: docs/adr/queue-py-adr.md"
+        }
+      ],
+      "summary": "設計書作成完了: docs/adr/queue-py-adr.md"
+    },
+    {
+      "slug": "queue-py-impl",
+      "title": "queue.py 実装（Phase 1: 全コマンドのPython実装）",
+      "status": "DONE",
+      "assigned_to": "Riku",
+      "complexity": "L",
+      "risk_level": "high",
+      "parallel_group": null,
+      "depends_on": [
+        "queue-py-design"
+      ],
+      "qa_mode": "inline",
+      "created_at": "2026-04-24",
+      "updated_at": "2026-04-24",
+      "notes": "scripts/queue.py 新規作成。queue.shと同じJSONスキーマを読み書き。typer+pydantic+fcntl.flock。tests/test_queue_py.py も同時作成（pytest 10ケース以上）。",
+      "retry_count": 0,
+      "qa_result": null,
+      "events": [
+        {
+          "ts": "2026-04-24T02:26:09+0000",
+          "agent": "Riku",
+          "action": "handoff",
+          "msg": "next: READY_FOR_RIKU"
+        },
+        {
+          "ts": "2026-04-24T13:11:50+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-24T13:11:50+0000",
           "agent": "Riku",
           "action": "done",
-          "msg": "for+shift修正済み(既にwhile+case)、--slack未実装時exit 1化、date -u統一"
+          "msg": "queue.py実装完了: 全コマンド・pytest 16/16 PASSED"
         }
       ],
-      "summary": "for+shift修正済み(既にwhile+case)、--slack未実装時exit 1化、date -u統一"
+      "summary": "queue.py実装完了: 全コマンド・pytest 16/16 PASSED"
     },
     {
-      "slug": "bash-quality-qa",
-      "title": "[#39] detect-stale品質修正 QA",
+      "slug": "queue-py-qa",
+      "title": "queue.py QA（テスト・既存スキーマ互換確認）",
       "status": "DONE",
-      "assigned_to": null,
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "bash-quality-fix"
-      ],
-      "qa_mode": null,
-      "created_at": "2026-04-23",
-      "updated_at": "2026-04-23",
-      "notes": "",
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "events": [
-        {
-          "ts": "2026-04-23T17:27:47+0000",
-          "agent": "system",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-23T17:27:47+0000",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: detect-stale修正確認: --slack exit 1動作OK、date -u統一OK、while+case維持"
-        },
-        {
-          "ts": "2026-04-23T17:27:47+0000",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QA APPROVED"
-        }
-      ],
-      "summary": "QA APPROVED"
-    },
-    {
-      "slug": "subagent-constraint-doc",
-      "title": "[#51] architect.md にサブエージェントBash不可制約を明記",
-      "status": "DONE",
-      "assigned_to": null,
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [],
-      "qa_mode": "inline",
-      "created_at": "2026-04-23",
-      "updated_at": "2026-04-23",
-      "notes": "Sprint-05 retro T-3の未実施課題。architect.mdに『サブエージェントコンテキストではBash不可』セクションを追加し、Yuki代行フローも明文化する",
-      "retry_count": 0,
-      "qa_result": null,
-      "events": [
-        {
-          "ts": "2026-04-23T17:27:53+0000",
-          "agent": "system",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-23T17:27:53+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "architect.mdにサブエージェントBash不可制約セクション追加"
-        }
-      ],
-      "summary": "architect.mdにサブエージェントBash不可制約セクション追加"
-    },
-    {
-      "slug": "subagent-constraint-qa",
-      "title": "[#51] サブエージェント制約ドキュメント QA",
-      "status": "DONE",
-      "assigned_to": null,
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "subagent-constraint-doc"
-      ],
-      "qa_mode": null,
-      "created_at": "2026-04-23",
-      "updated_at": "2026-04-23",
-      "notes": "",
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "events": [
-        {
-          "ts": "2026-04-23T18:10:10+0000",
-          "agent": "system",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-23T18:10:10+0000",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: architect.mdサブエージェント制約セクション記載確認OK"
-        },
-        {
-          "ts": "2026-04-23T18:10:10+0000",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QA APPROVED"
-        }
-      ],
-      "summary": "QA APPROVED"
-    },
-    {
-      "slug": "signals-jsonl-design",
-      "title": "[#23] _signals.jsonl 設計書の作成",
-      "status": "DONE",
-      "assigned_to": null,
+      "assigned_to": "Sora",
       "complexity": "M",
-      "risk_level": "low",
+      "risk_level": "medium",
       "parallel_group": null,
-      "depends_on": [],
-      "qa_mode": "inline",
-      "created_at": "2026-04-23",
-      "updated_at": "2026-04-23",
-      "notes": "phase-2知性強化の第一歩。スキーマ定義・記録タイミング・将来の自己改善ループへの接続方針をdocs/spec/signals-jsonl-design.mdに作成。スコープ: Phase-1(スキーマ定義)のみ",
+      "depends_on": [
+        "queue-py-impl"
+      ],
+      "qa_mode": null,
+      "created_at": "2026-04-24",
+      "updated_at": "2026-04-24",
+      "notes": "pytest全パス確認・queue.sh双方向互換テスト・エラーハンドリング・ファイルロック競合テスト。",
       "retry_count": 0,
-      "qa_result": null,
+      "qa_result": "APPROVED",
       "events": [
         {
-          "ts": "2026-04-23T18:10:13+0000",
-          "agent": "system",
+          "ts": "2026-04-24T13:11:50+0000",
+          "agent": "Sora",
+          "action": "handoff",
+          "msg": "next: READY_FOR_SORA"
+        },
+        {
+          "ts": "2026-04-24T13:12:02+0000",
+          "agent": "Sora",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-23T18:10:13+0000",
-          "agent": "Alex",
+          "ts": "2026-04-24T13:12:02+0000",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: queue.py全コマンド実装・pytest 16/16 PASSED・queue.sh出力と完全一致"
+        },
+        {
+          "ts": "2026-04-24T13:12:02+0000",
+          "agent": "Sora",
           "action": "done",
-          "msg": "_signals.jsonl設計書作成完了(Phase-1スキーマ定義)"
+          "msg": "QA APPROVED"
         }
       ],
-      "summary": "_signals.jsonl設計書作成完了(Phase-1スキーマ定義)"
+      "summary": "QA APPROVED"
+    },
+    {
+      "slug": "retro-autostart-fix",
+      "title": "レトロ自動起動の確実化（pm.md 完了基準修正・Issue #65）",
+      "status": "DONE",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": null,
+      "depends_on": [
+        "queue-py-qa"
+      ],
+      "qa_mode": "inline",
+      "created_at": "2026-04-24",
+      "updated_at": "2026-04-24",
+      "notes": "Issue #65対応。.claude/agents/pm.md のスプリント完了後自動フローに retro 起動必須を明示。",
+      "retry_count": 0,
+      "qa_result": null,
+      "events": [
+        {
+          "ts": "2026-04-24T13:12:02+0000",
+          "agent": "Riku",
+          "action": "handoff",
+          "msg": "next: READY_FOR_RIKU"
+        },
+        {
+          "ts": "2026-04-24T13:12:40+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-24T13:12:40+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "subagent_stop.sh: スプリント完了時にみゆきち起動を提示するNEXT STEPを追加"
+        }
+      ],
+      "summary": "subagent_stop.sh: スプリント完了時にみゆきち起動を提示するNEXT STEPを追加"
+    },
+    {
+      "slug": "retro-autostart-qa",
+      "title": "レトロ自動起動修正 QA",
+      "status": "DONE",
+      "assigned_to": "Sora",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": null,
+      "depends_on": [
+        "retro-autostart-fix"
+      ],
+      "qa_mode": null,
+      "created_at": "2026-04-24",
+      "updated_at": "2026-04-24",
+      "notes": "pm.md修正の意図確認・既存ルールとの矛盾チェック・文言明確性確認。",
+      "retry_count": 0,
+      "qa_result": "APPROVED",
+      "events": [
+        {
+          "ts": "2026-04-24T13:12:42+0000",
+          "agent": "Sora",
+          "action": "handoff",
+          "msg": "next: READY_FOR_SORA"
+        },
+        {
+          "ts": "2026-04-24T13:12:47+0000",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-24T13:12:48+0000",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: subagent_stop.sh修正確認: スプリント完了時にNEXT STEP+みゆきち起動メッセージが出力される"
+        },
+        {
+          "ts": "2026-04-24T13:12:48+0000",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "QA APPROVED"
+        }
+      ],
+      "summary": "QA APPROVED"
     }
   ]
 }
