@@ -1,1 +1,17 @@
 {"ts":"2026-04-24T00:51:25+0000","type":"task.done","sprint":"sprint-08","slug":"feedback-loop-issue","agent":"Alex","detail":{"summary":"signals emit修正確認"}}
+{"ts":"2026-04-24T23:11:48+0000","type":"task.start","sprint":"sprint-10","slug":"delegate-design","agent":"Alex","detail":{}}
+{"ts":"2026-04-24T23:11:48+0000","type":"task.done","sprint":"sprint-10","slug":"delegate-design","agent":"Alex","detail":{"summary":"設計書 docs/spec/delegate-design.md 作成完了。委譲方式・互換リスク・必須対応2件定義済み"}}
+{"ts":"2026-04-24T23:11:51+0000","type":"task.handoff","sprint":"sprint-10","slug":"delegate-impl","agent":"Riku","detail":{"to_agent":"Riku","next_slug":"delegate-impl"}}
+{"ts":"2026-04-24T23:13:39+0000","type":"task.start","sprint":"sprint-10","slug":"delegate-impl","agent":"Riku","detail":{}}
+{"ts":"2026-04-24T23:13:44+0000","type":"task.done","sprint":"sprint-10","slug":"delegate-impl","agent":"Riku","detail":{"summary":"init コマンド追加・テスト追加完了"}}
+{"ts":"2026-04-24T23:13:52+0000","type":"task.handoff","sprint":"sprint-10","slug":"delegate-qa","agent":"Sora","detail":{"to_agent":"Sora","next_slug":"delegate-qa"}}
+{"ts":"2026-04-24T23:15:16+0000","type":"task.start","sprint":"sprint-10","slug":"delegate-qa","agent":"Sora","detail":{}}
+{"ts":"2026-04-24T23:15:21+0000","type":"task.done","sprint":"sprint-10","slug":"delegate-qa","agent":"Sora","detail":{"summary":"QA確認完了: pytest 20/20 pass, スモークテスト全項目クリア"}}
+{"ts":"2026-04-24T23:15:27+0000","type":"qa.approved","sprint":"sprint-10","slug":"delegate-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
+{"ts":"2026-04-24T23:15:30+0000","type":"task.handoff","sprint":"sprint-10","slug":"max-retry-complexity","agent":"Riku","detail":{"to_agent":"Riku","next_slug":"max-retry-complexity"}}
+{"ts":"2026-04-24T23:17:41+0000","type":"task.start","sprint":"sprint-10","slug":"max-retry-complexity","agent":"Riku","detail":{}}
+{"ts":"2026-04-24T23:17:46+0000","type":"task.done","sprint":"sprint-10","slug":"max-retry-complexity","agent":"Riku","detail":{"summary":"complexity連動MAX_RETRY実装・テスト追加完了"}}
+{"ts":"2026-04-24T23:17:48+0000","type":"task.handoff","sprint":"sprint-10","slug":"max-retry-qa","agent":"Sora","detail":{"to_agent":"Sora","next_slug":"max-retry-qa"}}
+{"ts":"2026-04-24T23:18:48+0000","type":"task.start","sprint":"sprint-10","slug":"max-retry-qa","agent":"Sora","detail":{}}
+{"ts":"2026-04-24T23:18:52+0000","type":"task.done","sprint":"sprint-10","slug":"max-retry-qa","agent":"Sora","detail":{"summary":"QA確認完了"}}
+{"ts":"2026-04-24T23:18:56+0000","type":"qa.approved","sprint":"sprint-10","slug":"max-retry-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}

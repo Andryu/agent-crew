@@ -1,222 +1,204 @@
 {
-  "sprint": "sprint-08",
+  "sprint": "sprint-10",
   "tasks": [
     {
-      "slug": "pm-split",
-      "title": "[#55] pm.mdを3ファイルに分割（core/protocol/estimate）",
+      "slug": "delegate-design",
+      "title": "委譲戦略設計（ADR・移行方針・互換リスク洗い出し）",
       "status": "DONE",
       "assigned_to": "Alex",
       "complexity": "M",
       "risk_level": "medium",
       "parallel_group": null,
       "depends_on": [],
-      "qa_mode": "inline",
-      "created_at": "2026-04-24",
-      "updated_at": "2026-04-23",
-      "notes": "681行のpm.mdをpm-core.md（ペルソナ・責務・委譲ルール）/ pm-protocol.md（キュー管理・更新プロトコル・Quality Gate）/ pm-estimate.md（complexity見積もり・トークン消費・QAモード）の3ファイルに分割。各ファイル300行以下を目標。",
-      "retry_count": 0,
-      "qa_result": null,
-      "events": [
-        {
-          "ts": "2026-04-23T19:34:23+0000",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-23T19:34:23+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "pm.md分割完了: 681行→196行（pm-estimation.md 142行, pm-protocol.md 181行 新規作成）"
-        }
-      ],
-      "summary": "pm.md分割完了: 681行→196行（pm-estimation.md 142行, pm-protocol.md 181行 新規作成）"
-    },
-    {
-      "slug": "pm-split-qa",
-      "title": "[#55] pm.md分割 QA",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "M",
-      "risk_level": "medium",
-      "parallel_group": null,
-      "depends_on": [
-        "pm-split"
-      ],
       "qa_mode": null,
       "created_at": "2026-04-24",
-      "updated_at": "2026-04-23",
-      "notes": "分割後の3ファイルが元の681行の内容を漏れなくカバーしているか、各ファイル300行以下か、重複記述が削除されているかを確認。",
+      "updated_at": "2026-04-24",
+      "notes": "docs/spec/delegate-design.md を作成。委譲対象コマンド・互換リスク・フォールバック戦略を定義。",
       "retry_count": 0,
-      "qa_result": "APPROVED",
+      "qa_result": null,
+      "summary": "設計書 docs/spec/delegate-design.md 作成完了。委譲方式・互換リスク・必須対応2件定義済み",
       "events": [
         {
-          "ts": "2026-04-23T19:34:23+0000",
-          "agent": "Sora",
-          "action": "handoff",
-          "msg": "next: READY_FOR_SORA"
-        },
-        {
-          "ts": "2026-04-23T19:35:37+0000",
-          "agent": "Sora",
+          "ts": "2026-04-24T23:11:48+0000",
+          "agent": "Alex",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-23T19:35:37+0000",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 3ファイル分割の内容漏れ・重複なし。MINOR4件（Slack完了通知ステップの欠落・スタック検出簡略化・JSONスキーマ削除・見出し階層変更）のみ。CRITICAL/MAJOR指摘ゼロ"
-        },
-        {
-          "ts": "2026-04-23T19:35:37+0000",
-          "agent": "Sora",
+          "ts": "2026-04-24T23:11:48+0000",
+          "agent": "Alex",
           "action": "done",
-          "msg": "QA APPROVED — pm.md分割レビュー完了"
+          "msg": "設計書 docs/spec/delegate-design.md 作成完了。委譲方式・互換リスク・必須対応2件定義済み"
         }
-      ],
-      "summary": "QA APPROVED — pm.md分割レビュー完了"
+      ]
     },
     {
-      "slug": "signals-impl",
-      "title": "[#56] queue.shに_emit_signal()実装 + retro consumer",
+      "slug": "delegate-impl",
+      "title": "queue.sh → queue.py 委譲実装（Phase 2）",
       "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "L",
       "risk_level": "high",
       "parallel_group": null,
       "depends_on": [
-        "pm-split-qa"
+        "delegate-design"
       ],
       "qa_mode": "inline",
       "created_at": "2026-04-24",
       "updated_at": "2026-04-24",
-      "notes": "docs/spec/signals-jsonl-design.mdの設計書に従い実装。queue.shの全状態遷移（start/done/handoff/qa/retry/block）でシグナルをemitし、.claude/_signals.jsonlに追記。retro.mdにシグナル読み込み・メトリクス集計セクションを追加。",
+      "notes": "queue.sh の各 cmd_* 関数を python scripts/queue.py <subcommand> に委譲。queue.py に init・parallel-handoff コマンドを追加。",
       "retry_count": 0,
       "qa_result": null,
+      "summary": "init コマンド追加・テスト追加完了",
       "events": [
         {
-          "ts": "2026-04-23T19:35:37+0000",
+          "ts": "2026-04-24T23:11:51+0000",
           "agent": "Riku",
           "action": "handoff",
           "msg": "next: READY_FOR_RIKU"
         },
         {
-          "ts": "2026-04-24T00:13:48+0000",
+          "ts": "2026-04-24T23:13:39+0000",
           "agent": "Riku",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-24T00:43:53+0000",
+          "ts": "2026-04-24T23:13:44+0000",
           "agent": "Riku",
           "action": "done",
-          "msg": "signals-impl: _emit_signal実装確認"
+          "msg": "init コマンド追加・テスト追加完了"
         }
-      ],
-      "summary": "signals-impl: _emit_signal実装確認"
+      ]
     },
     {
-      "slug": "signals-qa",
-      "title": "[#56] signals実装 QA",
+      "slug": "delegate-qa",
+      "title": "委譲実装 QA（互換・退行テスト）",
       "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "M",
       "risk_level": "medium",
       "parallel_group": null,
       "depends_on": [
-        "signals-impl"
+        "delegate-impl"
       ],
       "qa_mode": null,
       "created_at": "2026-04-24",
       "updated_at": "2026-04-24",
-      "notes": "queue.shの各コマンドでシグナルが正しくemitされるか、JSONLフォーマットが正しいか、retro consumerがメトリクスを出力できるかを確認。",
+      "notes": "pytest 全パス・smoke test・exit code 互換・_signals.jsonl 書き込み確認。",
       "retry_count": 0,
-      "qa_result": null,
+      "qa_result": "APPROVED",
+      "summary": "QA確認完了: pytest 20/20 pass, スモークテスト全項目クリア",
       "events": [
         {
-          "ts": "2026-04-24T00:44:03+0000",
+          "ts": "2026-04-24T23:13:52+0000",
+          "agent": "Sora",
+          "action": "handoff",
+          "msg": "next: READY_FOR_SORA"
+        },
+        {
+          "ts": "2026-04-24T23:15:16+0000",
           "agent": "Sora",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-24T00:44:09+0000",
+          "ts": "2026-04-24T23:15:21+0000",
           "agent": "Sora",
           "action": "done",
-          "msg": "test"
+          "msg": "QA確認完了: pytest 20/20 pass, スモークテスト全項目クリア"
+        },
+        {
+          "ts": "2026-04-24T23:15:27+0000",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: pytest 20件全パス・スモークテスト・exitコード・signals書き込み全確認"
         }
-      ],
-      "summary": "test"
+      ]
     },
     {
-      "slug": "feedback-loop-issue",
-      "title": "[#57] Issue #57をSprint-09計画にIssue化・整理",
+      "slug": "max-retry-complexity",
+      "title": "MAX_RETRY complexity連動（Issue #58）",
       "status": "DONE",
-      "assigned_to": "Alex",
+      "assigned_to": "Riku",
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": null,
       "depends_on": [
-        "signals-qa"
+        "delegate-qa"
       ],
-      "qa_mode": "end_of_sprint",
+      "qa_mode": "inline",
       "created_at": "2026-04-24",
       "updated_at": "2026-04-24",
-      "notes": "_signals.jsonlとretro consumerが動いた状態を前提として、Issue #57（エージェント定義へのフィードバックループ）をSprint-09の先頭タスクとして設計メモを追記する。detect-patterns.shの設計骨格をIssueコメントに追記。",
+      "notes": "Issue #58。queue.py の retry コマンドで complexity に応じた MAX_RETRY 上限を適用（S=2, M=3, L=5）。",
       "retry_count": 0,
       "qa_result": null,
+      "summary": "complexity連動MAX_RETRY実装・テスト追加完了",
       "events": [
         {
-          "ts": "2026-04-24T00:44:29+0000",
-          "agent": "Alex",
+          "ts": "2026-04-24T23:15:30+0000",
+          "agent": "Riku",
+          "action": "handoff",
+          "msg": "next: READY_FOR_RIKU"
+        },
+        {
+          "ts": "2026-04-24T23:17:41+0000",
+          "agent": "Riku",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-24T00:44:34+0000",
-          "agent": "Alex",
+          "ts": "2026-04-24T23:17:46+0000",
+          "agent": "Riku",
           "action": "done",
-          "msg": "test"
-        },
-        {
-          "ts": "2026-04-24T00:46:41+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "emit動作テスト"
-        },
-        {
-          "ts": "2026-04-24T00:47:16+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "emit test 2"
-        },
-        {
-          "ts": "2026-04-24T00:48:25+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "emit動作確認"
-        },
-        {
-          "ts": "2026-04-24T00:48:35+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "test3"
-        },
-        {
-          "ts": "2026-04-24T00:49:05+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "emit確認テスト"
-        },
-        {
-          "ts": "2026-04-24T00:51:25+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "signals emit修正確認"
+          "msg": "complexity連動MAX_RETRY実装・テスト追加完了"
         }
+      ]
+    },
+    {
+      "slug": "max-retry-qa",
+      "title": "MAX_RETRY変更 QA",
+      "status": "DONE",
+      "assigned_to": "Sora",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": null,
+      "depends_on": [
+        "max-retry-complexity"
       ],
-      "summary": "signals emit修正確認"
+      "qa_mode": null,
+      "created_at": "2026-04-24",
+      "updated_at": "2026-04-24",
+      "notes": "S=2/M=3/L=5 の retry 上限が pytest で確認できること。null complexity は MAX_RETRY=3 にフォールバックすること。",
+      "retry_count": 0,
+      "qa_result": "APPROVED",
+      "summary": "QA確認完了",
+      "events": [
+        {
+          "ts": "2026-04-24T23:17:48+0000",
+          "agent": "Sora",
+          "action": "handoff",
+          "msg": "next: READY_FOR_SORA"
+        },
+        {
+          "ts": "2026-04-24T23:18:48+0000",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-24T23:18:52+0000",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "QA確認完了"
+        },
+        {
+          "ts": "2026-04-24T23:18:56+0000",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: 全確認項目クリア"
+        }
+      ]
     }
   ]
 }
