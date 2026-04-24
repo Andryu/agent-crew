@@ -128,7 +128,11 @@ if [[ "$INCOMPLETE" == "0" && "$QA_PENDING" == "0" ]]; then
   echo "🎉 $SPRINT 完了"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "全タスク DONE、QA判定すべて APPROVED です。"
-  echo "オーナーへの最終報告を推奨します。"
+  echo ""
+  echo "--- NEXT STEP ---"
+  echo "次のコマンド: Use the retro agent on \"${SPRINT}\""
+  echo "理由: スプリント完了 — みゆきちによるレトロスペクティブを自動実施してください"
+  echo "-----------------"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
