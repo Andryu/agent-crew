@@ -1,204 +1,222 @@
 {
-  "sprint": "sprint-09",
+  "sprint": "sprint-08",
   "tasks": [
     {
-      "slug": "queue-py-design",
-      "title": "queue.py 設計（ADR・インターフェース定義）",
+      "slug": "pm-split",
+      "title": "[#55] pm.mdを3ファイルに分割（core/protocol/estimate）",
       "status": "DONE",
       "assigned_to": "Alex",
       "complexity": "M",
       "risk_level": "medium",
       "parallel_group": null,
       "depends_on": [],
-      "qa_mode": null,
-      "created_at": "2026-04-24",
-      "updated_at": "2026-04-24",
-      "notes": "Issue #66対応のqueue.py移行Phase1。typer+pydantic設計。docs/spec/queue-py-design.md を作成。",
-      "retry_count": 0,
-      "qa_result": null,
-      "events": [
-        {
-          "ts": "2026-04-24T02:23:38+0000",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-24T02:26:08+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "設計書作成完了: docs/adr/queue-py-adr.md"
-        }
-      ],
-      "summary": "設計書作成完了: docs/adr/queue-py-adr.md"
-    },
-    {
-      "slug": "queue-py-impl",
-      "title": "queue.py 実装（Phase 1: 全コマンドのPython実装）",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "L",
-      "risk_level": "high",
-      "parallel_group": null,
-      "depends_on": [
-        "queue-py-design"
-      ],
       "qa_mode": "inline",
       "created_at": "2026-04-24",
-      "updated_at": "2026-04-24",
-      "notes": "scripts/queue.py 新規作成。queue.shと同じJSONスキーマを読み書き。typer+pydantic+fcntl.flock。tests/test_queue_py.py も同時作成（pytest 10ケース以上）。",
+      "updated_at": "2026-04-23",
+      "notes": "681行のpm.mdをpm-core.md（ペルソナ・責務・委譲ルール）/ pm-protocol.md（キュー管理・更新プロトコル・Quality Gate）/ pm-estimate.md（complexity見積もり・トークン消費・QAモード）の3ファイルに分割。各ファイル300行以下を目標。",
       "retry_count": 0,
       "qa_result": null,
       "events": [
         {
-          "ts": "2026-04-24T02:26:09+0000",
-          "agent": "Riku",
-          "action": "handoff",
-          "msg": "next: READY_FOR_RIKU"
-        },
-        {
-          "ts": "2026-04-24T13:11:50+0000",
-          "agent": "Riku",
+          "ts": "2026-04-23T19:34:23+0000",
+          "agent": "Alex",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-24T13:11:50+0000",
-          "agent": "Riku",
+          "ts": "2026-04-23T19:34:23+0000",
+          "agent": "Alex",
           "action": "done",
-          "msg": "queue.py実装完了: 全コマンド・pytest 16/16 PASSED"
+          "msg": "pm.md分割完了: 681行→196行（pm-estimation.md 142行, pm-protocol.md 181行 新規作成）"
         }
       ],
-      "summary": "queue.py実装完了: 全コマンド・pytest 16/16 PASSED"
+      "summary": "pm.md分割完了: 681行→196行（pm-estimation.md 142行, pm-protocol.md 181行 新規作成）"
     },
     {
-      "slug": "queue-py-qa",
-      "title": "queue.py QA（テスト・既存スキーマ互換確認）",
+      "slug": "pm-split-qa",
+      "title": "[#55] pm.md分割 QA",
       "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "M",
       "risk_level": "medium",
       "parallel_group": null,
       "depends_on": [
-        "queue-py-impl"
+        "pm-split"
       ],
       "qa_mode": null,
       "created_at": "2026-04-24",
-      "updated_at": "2026-04-24",
-      "notes": "pytest全パス確認・queue.sh双方向互換テスト・エラーハンドリング・ファイルロック競合テスト。",
+      "updated_at": "2026-04-23",
+      "notes": "分割後の3ファイルが元の681行の内容を漏れなくカバーしているか、各ファイル300行以下か、重複記述が削除されているかを確認。",
       "retry_count": 0,
       "qa_result": "APPROVED",
       "events": [
         {
-          "ts": "2026-04-24T13:11:50+0000",
+          "ts": "2026-04-23T19:34:23+0000",
           "agent": "Sora",
           "action": "handoff",
           "msg": "next: READY_FOR_SORA"
         },
         {
-          "ts": "2026-04-24T13:12:02+0000",
+          "ts": "2026-04-23T19:35:37+0000",
           "agent": "Sora",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-24T13:12:02+0000",
+          "ts": "2026-04-23T19:35:37+0000",
           "agent": "Sora",
           "action": "qa",
-          "msg": "APPROVED: queue.py全コマンド実装・pytest 16/16 PASSED・queue.sh出力と完全一致"
+          "msg": "APPROVED: 3ファイル分割の内容漏れ・重複なし。MINOR4件（Slack完了通知ステップの欠落・スタック検出簡略化・JSONスキーマ削除・見出し階層変更）のみ。CRITICAL/MAJOR指摘ゼロ"
         },
         {
-          "ts": "2026-04-24T13:12:02+0000",
+          "ts": "2026-04-23T19:35:37+0000",
           "agent": "Sora",
           "action": "done",
-          "msg": "QA APPROVED"
+          "msg": "QA APPROVED — pm.md分割レビュー完了"
         }
       ],
-      "summary": "QA APPROVED"
+      "summary": "QA APPROVED — pm.md分割レビュー完了"
     },
     {
-      "slug": "retro-autostart-fix",
-      "title": "レトロ自動起動の確実化（pm.md 完了基準修正・Issue #65）",
+      "slug": "signals-impl",
+      "title": "[#56] queue.shに_emit_signal()実装 + retro consumer",
       "status": "DONE",
       "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
+      "complexity": "L",
+      "risk_level": "high",
       "parallel_group": null,
       "depends_on": [
-        "queue-py-qa"
+        "pm-split-qa"
       ],
       "qa_mode": "inline",
       "created_at": "2026-04-24",
       "updated_at": "2026-04-24",
-      "notes": "Issue #65対応。.claude/agents/pm.md のスプリント完了後自動フローに retro 起動必須を明示。",
+      "notes": "docs/spec/signals-jsonl-design.mdの設計書に従い実装。queue.shの全状態遷移（start/done/handoff/qa/retry/block）でシグナルをemitし、.claude/_signals.jsonlに追記。retro.mdにシグナル読み込み・メトリクス集計セクションを追加。",
       "retry_count": 0,
       "qa_result": null,
       "events": [
         {
-          "ts": "2026-04-24T13:12:02+0000",
+          "ts": "2026-04-23T19:35:37+0000",
           "agent": "Riku",
           "action": "handoff",
           "msg": "next: READY_FOR_RIKU"
         },
         {
-          "ts": "2026-04-24T13:12:40+0000",
+          "ts": "2026-04-24T00:13:48+0000",
           "agent": "Riku",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-24T13:12:40+0000",
+          "ts": "2026-04-24T00:43:53+0000",
           "agent": "Riku",
           "action": "done",
-          "msg": "subagent_stop.sh: スプリント完了時にみゆきち起動を提示するNEXT STEPを追加"
+          "msg": "signals-impl: _emit_signal実装確認"
         }
       ],
-      "summary": "subagent_stop.sh: スプリント完了時にみゆきち起動を提示するNEXT STEPを追加"
+      "summary": "signals-impl: _emit_signal実装確認"
     },
     {
-      "slug": "retro-autostart-qa",
-      "title": "レトロ自動起動修正 QA",
+      "slug": "signals-qa",
+      "title": "[#56] signals実装 QA",
       "status": "DONE",
       "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
+      "complexity": "M",
+      "risk_level": "medium",
       "parallel_group": null,
       "depends_on": [
-        "retro-autostart-fix"
+        "signals-impl"
       ],
       "qa_mode": null,
       "created_at": "2026-04-24",
       "updated_at": "2026-04-24",
-      "notes": "pm.md修正の意図確認・既存ルールとの矛盾チェック・文言明確性確認。",
+      "notes": "queue.shの各コマンドでシグナルが正しくemitされるか、JSONLフォーマットが正しいか、retro consumerがメトリクスを出力できるかを確認。",
       "retry_count": 0,
-      "qa_result": "APPROVED",
+      "qa_result": null,
       "events": [
         {
-          "ts": "2026-04-24T13:12:42+0000",
-          "agent": "Sora",
-          "action": "handoff",
-          "msg": "next: READY_FOR_SORA"
-        },
-        {
-          "ts": "2026-04-24T13:12:47+0000",
+          "ts": "2026-04-24T00:44:03+0000",
           "agent": "Sora",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-24T13:12:48+0000",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: subagent_stop.sh修正確認: スプリント完了時にNEXT STEP+みゆきち起動メッセージが出力される"
-        },
-        {
-          "ts": "2026-04-24T13:12:48+0000",
+          "ts": "2026-04-24T00:44:09+0000",
           "agent": "Sora",
           "action": "done",
-          "msg": "QA APPROVED"
+          "msg": "test"
         }
       ],
-      "summary": "QA APPROVED"
+      "summary": "test"
+    },
+    {
+      "slug": "feedback-loop-issue",
+      "title": "[#57] Issue #57をSprint-09計画にIssue化・整理",
+      "status": "DONE",
+      "assigned_to": "Alex",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": null,
+      "depends_on": [
+        "signals-qa"
+      ],
+      "qa_mode": "end_of_sprint",
+      "created_at": "2026-04-24",
+      "updated_at": "2026-04-24",
+      "notes": "_signals.jsonlとretro consumerが動いた状態を前提として、Issue #57（エージェント定義へのフィードバックループ）をSprint-09の先頭タスクとして設計メモを追記する。detect-patterns.shの設計骨格をIssueコメントに追記。",
+      "retry_count": 0,
+      "qa_result": null,
+      "events": [
+        {
+          "ts": "2026-04-24T00:44:29+0000",
+          "agent": "Alex",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-24T00:44:34+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "test"
+        },
+        {
+          "ts": "2026-04-24T00:46:41+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "emit動作テスト"
+        },
+        {
+          "ts": "2026-04-24T00:47:16+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "emit test 2"
+        },
+        {
+          "ts": "2026-04-24T00:48:25+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "emit動作確認"
+        },
+        {
+          "ts": "2026-04-24T00:48:35+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "test3"
+        },
+        {
+          "ts": "2026-04-24T00:49:05+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "emit確認テスト"
+        },
+        {
+          "ts": "2026-04-24T00:51:25+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "signals emit修正確認"
+        }
+      ],
+      "summary": "signals emit修正確認"
     }
   ]
 }
