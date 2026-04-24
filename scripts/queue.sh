@@ -77,6 +77,35 @@ require_queue() {
 today() { date -u +%Y-%m-%d; }
 now_iso() { date -u +"%Y-%m-%dT%H:%M:%S+0000"; }
 
+# ---------- シグナル記録 ----------
+# タスク状態遷移時に .claude/_signals.jsonl へ1行追記する。
+# エラーが発生してもキュー本体の処理を止めない（|| true で続行）。
+_emit_signal() {
+  # set -e の影響を受けないようにサブシェルで実行し、失敗しても本体を止めない
+  ( set +e
+    local type="$1" slug="$2" agent="$3"
+    # ${4:-{}} はシェルが } を誤解釈するため明示的に分岐
+    local detail
+    local _raw_detail="${4:-}"
+    detail=$(printf '%s' "${_raw_detail:-{\}}" | tr -d '\n')
+    # 空の場合は {} にフォールバック
+    [[ -z "$detail" ]] && detail="{}"
+    local sprint
+    sprint=$(jq -r '.sprint // "unknown"' "$QUEUE_FILE" 2>/dev/null || echo "unknown")
+    local signals_file
+    signals_file="$(dirname "$QUEUE_FILE")/_signals.jsonl"
+    jq -cn \
+      --arg ts "$(date -u +"%Y-%m-%dT%H:%M:%S+0000")" \
+      --arg type "$type" \
+      --arg sprint "$sprint" \
+      --arg slug "$slug" \
+      --arg agent "$agent" \
+      --argjson detail "$detail" \
+      '{ts:$ts,type:$type,sprint:$sprint,slug:$slug,agent:$agent,detail:$detail}' \
+      >> "$signals_file" 2>/dev/null
+  ) || true
+}
+
 atomic_write() {
   local new_content="$1"
   local tmp
@@ -262,6 +291,8 @@ cmd_start() {
   atomic_write "$updated"
   release_lock
   echo "OK: $slug → IN_PROGRESS"
+  # IN_PROGRESS 遷移後にシグナルを記録
+  _emit_signal "task.start" "$slug" "system" "{}" || true
 }
 
 # ---------- コマンド: done ----------
@@ -297,6 +328,8 @@ cmd_done() {
   atomic_write "$updated"
   release_lock
   echo "OK: $slug → DONE"
+  # DONE 遷移後にシグナルを記録（summary を detail に含める）
+  _emit_signal "task.done" "$slug" "$agent" "$(jq -cn --arg s "$msg" '{"summary":$s}')" || true
 
   # notes から GitHub Issue 番号を抽出して自動クローズ
   if command -v gh >/dev/null 2>&1; then
@@ -334,6 +367,8 @@ cmd_handoff() {
   atomic_write "$updated"
   release_lock
   echo "OK: $slug → READY_FOR_$upper"
+  # READY_FOR 遷移後にシグナルを記録
+  _emit_signal "task.handoff" "$slug" "$next_agent" "$(jq -cn --arg a "$next_agent" --arg s "$slug" '{"to_agent":$a,"next_slug":$s}')" || true
 }
 
 # ---------- コマンド: parallel-handoff ----------
@@ -440,6 +475,15 @@ cmd_qa() {
   atomic_write "$updated"
   release_lock
   echo "OK: $slug qa_result = $result"
+  # qa_result 記録後にシグナルを記録（APPROVED / CHANGES_REQUESTED で type を分岐）
+  local signal_type
+  if [[ "$result" == "APPROVED" ]]; then
+    signal_type="qa.approved"
+  else
+    signal_type="qa.changes_requested"
+  fi
+  # qa コマンドのレビュアーは常に Sora
+  _emit_signal "$signal_type" "$slug" "Sora" "$(jq -cn --arg r "$result" '{"reviewer":"Sora","result":$r}')" || true
 }
 
 # ---------- コマンド: block ----------
@@ -463,6 +507,8 @@ cmd_block() {
   atomic_write "$updated"
   release_lock
   echo "BLOCKED: $slug ($reason)"
+  # BLOCKED 遷移後にシグナルを記録
+  _emit_signal "task.blocked" "$slug" "$agent" "$(jq -cn --arg r "$reason" '{"reason":$r}')" || true
 }
 
 # ---------- コマンド: retry ----------
@@ -489,6 +535,8 @@ cmd_retry() {
     atomic_write "$updated"
     release_lock
     echo "BLOCKED: $slug retry limit exceeded ($MAX_RETRY)"
+    # retry 上限超過による BLOCKED 遷移をシグナルに記録
+    _emit_signal "task.blocked" "$slug" "system" "{\"reason\":\"retry limit exceeded (max=$MAX_RETRY)\"}" || true
     exit 8
   fi
   local updated
@@ -506,6 +554,8 @@ cmd_retry() {
   atomic_write "$updated"
   release_lock
   echo "OK: $slug retry $next_retry/$MAX_RETRY → READY_FOR_RIKU"
+  # READY_FOR_RIKU 遷移後にシグナルを記録
+  _emit_signal "task.retry" "$slug" "system" "{\"retry_count\":$next_retry}" || true
 }
 
 # ---------- コマンド: show ----------
@@ -923,7 +973,29 @@ $(printf '%b' "$task_table")
 ### 次スプリントへの推奨アクション
 $(printf '%b' "$recommendations")"
 
+  # ---------- _signals.jsonl 集計（ファイルが存在する場合のみ追加） ----------
+  local signals_file
+  signals_file="$(dirname "$QUEUE_FILE")/_signals.jsonl"
+  local signals_section=""
+  if [[ -f "$signals_file" ]]; then
+    local sig_total sig_done sig_approved sig_changes sig_retry sig_blocked
+    sig_total=$(wc -l < "$signals_file" | tr -d ' ')
+    sig_done=$(grep -c '"type":"task.done"' "$signals_file" 2>/dev/null || echo 0)
+    sig_approved=$(grep -c '"type":"qa.approved"' "$signals_file" 2>/dev/null || echo 0)
+    sig_changes=$(grep -c '"type":"qa.changes_requested"' "$signals_file" 2>/dev/null || echo 0)
+    sig_retry=$(grep -c '"type":"task.retry"' "$signals_file" 2>/dev/null || echo 0)
+    sig_blocked=$(grep -c '"type":"task.blocked"' "$signals_file" 2>/dev/null || echo 0)
+    signals_section="
+## シグナル集計（_signals.jsonl）
+- 記録イベント数: ${sig_total}件
+- task.done: ${sig_done}件
+- qa.approved: ${sig_approved}件 / qa.changes_requested: ${sig_changes}件
+- task.retry: ${sig_retry}件
+- task.blocked: ${sig_blocked}件"
+  fi
+
   echo "$retro_body"
+  [[ -n "$signals_section" ]] && echo "$signals_section"
 
   # --save: docs/retro/<sprint>-retro.md に保存
   if [[ "$save_flag" == "true" ]]; then
@@ -937,6 +1009,7 @@ $(printf '%b' "$recommendations")"
     {
       printf '# リトロスペクティブ — %s\n\n生成日: %s\n\n' "$sprint" "$today_date"
       echo "$retro_body"
+      [[ -n "$signals_section" ]] && echo "$signals_section"
     } > "$out_file"
     echo "OK: retro saved to $out_file" >&2
   fi
