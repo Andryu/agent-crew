@@ -1063,25 +1063,29 @@ DECISIONS_HEADER
 }
 
 # ---------- ディスパッチ ----------
+# Python委譲コマンドリスト（start/done/handoff/qa/block/retry/show/next/detect-stale）
+_PY_COMMANDS="start done handoff qa block retry show next detect-stale"
+
 cmd=${1:-}
 shift || true
 case "$cmd" in
-  start)            cmd_start "$@" ;;
-  done)             cmd_done "$@" ;;
-  handoff)          cmd_handoff "$@" ;;
-  parallel-handoff) cmd_parallel_handoff "$@" ;;
-  qa)               cmd_qa "$@" ;;
-  block)            cmd_block "$@" ;;
-  retry)            cmd_retry "$@" ;;
-  show)             cmd_show "$@" ;;
-  next)             cmd_next "$@" ;;
-  graph)            cmd_graph "$@" ;;
-  detect-stale)     cmd_detect_stale "$@" ;;
-  retro)            cmd_retro "$@" ;;
+  graph)
+    cmd_graph "$@"
+    ;;
+  parallel-handoff)
+    cmd_parallel_handoff "$@"
+    ;;
+  retro)
+    cmd_retro "$@"
+    ;;
   ""|help|-h|--help)
     sed -n '2,28p' "$0"
     ;;
   *)
+    # Python委譲コマンドかチェック
+    if printf '%s\n' $_PY_COMMANDS | grep -qx "$cmd"; then
+      exec python3 "$(dirname "$0")/queue.py" "$cmd" "$@"
+    fi
     echo "ERROR: unknown command: $cmd" >&2
     exit 1
     ;;
