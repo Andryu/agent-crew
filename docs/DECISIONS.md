@@ -52,3 +52,32 @@
 - engineer-go 停止（Issue #64）は Sprint-10 で発生しなかったが、引き続き大規模タスクでは注意が必要。
 
 ---
+
+## sprint-11 — 2026-04-24
+
+### アーキテクチャ判断
+
+- **queue.sh レガシー Bash 実装の削除完了**: Sprint-09 の委譲完了後も残っていたデッドコード（cmd_start / cmd_done 等の関数定義・acquire_lock・共通ヘルパー群）を削除し、queue.sh を 1090行から 404行（63%削減）の軽量シンラッパーに変換した。queue.py が単一の信頼源となった。
+- **graph コマンドの Python 化完了**: queue.py に `graph` Click サブコマンドを追加。Mermaid flowchart 出力・`--save` オプション（docs/graphs/<sprint>.md 生成）・queue.sh からの委譲が正常動作。pytest が 23→27件に増加。
+- **フィードバックループ設計書の完成（docs/spec/feedback-loop-doc.md）**: Yuki のスプリント計画前確認フローをコマンド付きで定義。elapsed < 60秒の計画重複検出ロジックを含む。
+
+### 学び
+
+- 設計書（legacy-delete-design.md / graph-py-design.md）が削除対象・ロールバック手順・テストケースを網羅したことで、実装が最小手戻りで完了した。Sprint-10 に続き「設計への投資が実装品質に直結する」パターンを再確認。
+- queue.sh 63% 削減により、今後の Bash 実装残存コマンド（retro・parallel-handoff）の見通しが改善された。
+- テストスイートが 23 → 27 件に拡充。Python 化の進行に伴い自動テストのカバレッジが向上している。
+
+### 失敗パターン
+
+- **Riku レート制限中断**: `legacy-delete-impl`（L タスク）完了直後に Riku がレート制限に到達し、後続引き継ぎがメインセッション代行になった。L タスクを連続して処理した後のレート枯渇リスクへの配慮が計画時に不足していた。
+- **Sora Bash 上限による QA 代替**: `legacy-delete-qa` / `graph-py-qa` で Sora が Bash 実行上限に達し、スモークテストを静的検証で代替。キュー更新もメインセッション代行。QA エージェントが実際のコマンドを実行せずに APPROVED を出す状態が発生した（Sprint-08 QA形骸化の再現）。
+- **レトロ起動スキップ（5スプリント連続）**: Sora がスプリント完了時のレトロ起動を実行せず、オーナーが手動対応。pm.md への記載という対策が効果を発揮しておらず、Sora のエージェント定義への直接埋め込みが必要と判断。
+
+### 次スプリントへの推奨
+
+- Sora のエージェント定義（sora.md）に「全タスク DONE 時は完了報告末尾に @retro を含める」を直接記載する（pm.md 参照では不十分と確認済み）。
+- Sora の QA 手順に「Bash 不可の場合は CHANGES_REQUESTED（REASON: BASH_UNAVAILABLE）を返す」を追加し、メインセッション代行時に performed_by フラグを _queue.json に記録する。
+- Yuki は Riku の担当タスクで L タスクを1スプリント1件までに制限する計画ルールを pm.md に追加する。
+- priority_score >= 6 の未対処 lesson: agent-crew-sprint-11-reliability-002（Sora Bash上限QA）, agent-crew-sprint-11-process-001（レトロ自動起動）を次スプリント計画に反映する。
+
+---
