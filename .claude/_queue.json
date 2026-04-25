@@ -1,202 +1,259 @@
 {
-  "sprint": "sprint-10",
+  "sprint": "sprint-11",
   "tasks": [
     {
-      "slug": "delegate-design",
-      "title": "委譲戦略設計（ADR・移行方針・互換リスク洗い出し）",
+      "slug": "legacy-delete-design",
+      "title": "レガシー削除戦略設計（削除範囲・安全確認・ロールバック手順）",
       "status": "DONE",
       "assigned_to": "Alex",
       "complexity": "M",
       "risk_level": "medium",
-      "parallel_group": null,
+      "parallel_group": "batch1-design",
       "depends_on": [],
       "qa_mode": null,
       "created_at": "2026-04-24",
-      "updated_at": "2026-04-24",
-      "notes": "docs/spec/delegate-design.md を作成。委譲対象コマンド・互換リスク・フォールバック戦略を定義。",
+      "updated_at": "2026-04-25",
+      "notes": "docs/spec/legacy-delete-design.md を作成。queue.sh の削除対象関数一覧・削除後の期待構造・ロールバック手順・完了確認手順を定義する。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "設計書 docs/spec/delegate-design.md 作成完了。委譲方式・互換リスク・必須対応2件定義済み",
+      "summary": "設計書作成完了",
       "events": [
         {
-          "ts": "2026-04-24T23:11:48+0000",
+          "ts": "2026-04-25T00:45:51+0000",
           "agent": "Alex",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-24T23:11:48+0000",
+          "ts": "2026-04-25T00:48:17+0000",
           "agent": "Alex",
           "action": "done",
-          "msg": "設計書 docs/spec/delegate-design.md 作成完了。委譲方式・互換リスク・必須対応2件定義済み"
+          "msg": "設計書作成完了"
         }
       ]
     },
     {
-      "slug": "delegate-impl",
-      "title": "queue.sh → queue.py 委譲実装（Phase 2）",
+      "slug": "graph-py-design",
+      "title": "graph コマンド Python化 設計（queue.py への移植仕様）",
+      "status": "DONE",
+      "assigned_to": "Alex",
+      "complexity": "M",
+      "risk_level": "medium",
+      "parallel_group": "batch1-design",
+      "depends_on": [],
+      "qa_mode": null,
+      "created_at": "2026-04-24",
+      "updated_at": "2026-04-25",
+      "notes": "docs/spec/graph-py-design.md を作成。queue.sh cmd_graph の現行実装整理・queue.py Click サブコマンド graph の仕様・テストケース・委譲方法を定義する。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "設計書作成完了",
+      "events": [
+        {
+          "ts": "2026-04-25T00:48:17+0000",
+          "agent": "Alex",
+          "action": "handoff",
+          "msg": "next: READY_FOR_ALEX"
+        },
+        {
+          "ts": "2026-04-25T00:49:18+0000",
+          "agent": "Alex",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-25T00:49:19+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "設計書作成完了"
+        }
+      ]
+    },
+    {
+      "slug": "feedback-loop-doc",
+      "title": "pm.md 計画チェックリスト更新（Issue #69 対処）",
+      "status": "DONE",
+      "assigned_to": "Alex",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": null,
+      "depends_on": [],
+      "qa_mode": "end_of_sprint",
+      "created_at": "2026-04-24",
+      "updated_at": "2026-04-25",
+      "notes": ".claude/agents/pm.md の計画手順チェックリストに「前スプリントの DONE タスク実装状態の突合」と「_lessons.json priority_score >= 4 の未対処 lesson の反映ステップ」を追加する。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "設計書作成完了",
+      "events": [
+        {
+          "ts": "2026-04-25T00:49:19+0000",
+          "agent": "Alex",
+          "action": "handoff",
+          "msg": "next: READY_FOR_ALEX"
+        },
+        {
+          "ts": "2026-04-25T00:51:02+0000",
+          "agent": "Alex",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-25T00:51:02+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "設計書作成完了"
+        }
+      ]
+    },
+    {
+      "slug": "legacy-delete-impl",
+      "title": "queue.sh レガシー Bash 実装の削除",
       "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "L",
       "risk_level": "high",
       "parallel_group": null,
       "depends_on": [
-        "delegate-design"
+        "legacy-delete-design"
       ],
       "qa_mode": "inline",
       "created_at": "2026-04-24",
-      "updated_at": "2026-04-24",
-      "notes": "queue.sh の各 cmd_* 関数を python scripts/queue.py <subcommand> に委譲。queue.py に init・parallel-handoff コマンドを追加。",
+      "updated_at": "2026-04-25",
+      "notes": "legacy-delete-design.md に従い queue.sh のレガシー Bash 実装コードブロックを削除する。委譲ディスパッチは維持。pytest 全パス確認後に完了。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "init コマンド追加・テスト追加完了",
+      "summary": "旧Bash実装削除完了",
       "events": [
         {
-          "ts": "2026-04-24T23:11:51+0000",
+          "ts": "2026-04-25T00:51:02+0000",
           "agent": "Riku",
           "action": "handoff",
           "msg": "next: READY_FOR_RIKU"
         },
         {
-          "ts": "2026-04-24T23:13:39+0000",
+          "ts": "2026-04-25T00:52:00+0000",
           "agent": "Riku",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-24T23:13:44+0000",
+          "ts": "2026-04-25T00:55:35+0000",
           "agent": "Riku",
           "action": "done",
-          "msg": "init コマンド追加・テスト追加完了"
+          "msg": "旧Bash実装削除完了"
         }
       ]
     },
     {
-      "slug": "delegate-qa",
-      "title": "委譲実装 QA（互換・退行テスト）",
+      "slug": "legacy-delete-qa",
+      "title": "レガシー削除 QA（退行・互換テスト）",
       "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "M",
       "risk_level": "medium",
       "parallel_group": null,
       "depends_on": [
-        "delegate-impl"
+        "legacy-delete-impl"
       ],
       "qa_mode": null,
       "created_at": "2026-04-24",
-      "updated_at": "2026-04-24",
-      "notes": "pytest 全パス・smoke test・exit code 互換・_signals.jsonl 書き込み確認。",
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "QA確認完了: pytest 20/20 pass, スモークテスト全項目クリア",
-      "events": [
-        {
-          "ts": "2026-04-24T23:13:52+0000",
-          "agent": "Sora",
-          "action": "handoff",
-          "msg": "next: READY_FOR_SORA"
-        },
-        {
-          "ts": "2026-04-24T23:15:16+0000",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-24T23:15:21+0000",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QA確認完了: pytest 20/20 pass, スモークテスト全項目クリア"
-        },
-        {
-          "ts": "2026-04-24T23:15:27+0000",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: pytest 20件全パス・スモークテスト・exitコード・signals書き込み全確認"
-        }
-      ]
-    },
-    {
-      "slug": "max-retry-complexity",
-      "title": "MAX_RETRY complexity連動（Issue #58）",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "delegate-qa"
-      ],
-      "qa_mode": "inline",
-      "created_at": "2026-04-24",
-      "updated_at": "2026-04-24",
-      "notes": "Issue #58。queue.py の retry コマンドで complexity に応じた MAX_RETRY 上限を適用（S=2, M=3, L=5）。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "complexity連動MAX_RETRY実装・テスト追加完了",
-      "events": [
-        {
-          "ts": "2026-04-24T23:15:30+0000",
-          "agent": "Riku",
-          "action": "handoff",
-          "msg": "next: READY_FOR_RIKU"
-        },
-        {
-          "ts": "2026-04-24T23:17:41+0000",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-24T23:17:46+0000",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "complexity連動MAX_RETRY実装・テスト追加完了"
-        }
-      ]
-    },
-    {
-      "slug": "max-retry-qa",
-      "title": "MAX_RETRY変更 QA",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "max-retry-complexity"
-      ],
-      "qa_mode": null,
-      "created_at": "2026-04-24",
-      "updated_at": "2026-04-24",
-      "notes": "S=2/M=3/L=5 の retry 上限が pytest で確認できること。null complexity は MAX_RETRY=3 にフォールバックすること。",
+      "updated_at": "2026-04-25",
+      "notes": "pytest 全パス・smoke test（start/done/handoff/qa/block/retry/show/next）・exit code 互換・_signals.jsonl 書き込み・graph/retro の Bash 実装維持を確認する。",
       "retry_count": 0,
       "qa_result": "APPROVED",
       "summary": "QA確認完了",
       "events": [
         {
-          "ts": "2026-04-24T23:17:48+0000",
+          "ts": "2026-04-25T00:56:28+0000",
           "agent": "Sora",
           "action": "handoff",
           "msg": "next: READY_FOR_SORA"
         },
         {
-          "ts": "2026-04-24T23:18:48+0000",
+          "ts": "2026-04-25T06:49:29+0000",
           "agent": "Sora",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-24T23:18:52+0000",
+          "ts": "2026-04-25T06:50:23+0000",
           "agent": "Sora",
           "action": "done",
           "msg": "QA確認完了"
         },
         {
-          "ts": "2026-04-24T23:18:56+0000",
+          "ts": "2026-04-25T06:50:23+0000",
           "agent": "Sora",
           "action": "qa",
           "msg": "APPROVED: 全確認項目クリア"
+        }
+      ]
+    },
+    {
+      "slug": "graph-py-impl",
+      "title": "graph コマンドの queue.py への移植",
+      "status": "DONE",
+      "assigned_to": "Riku",
+      "complexity": "M",
+      "risk_level": "medium",
+      "parallel_group": null,
+      "depends_on": [
+        "graph-py-design",
+        "legacy-delete-qa"
+      ],
+      "qa_mode": "inline",
+      "created_at": "2026-04-24",
+      "updated_at": "2026-04-25",
+      "notes": "graph-py-design.md に従い queue.py に graph Click サブコマンドを追加。queue.sh の cmd_graph を Python 委譲に変更。pytest 追加。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "graphコマンドPython化完了",
+      "events": [
+        {
+          "ts": "2026-04-25T06:50:23+0000",
+          "agent": "Riku",
+          "action": "handoff",
+          "msg": "next: READY_FOR_RIKU"
+        },
+        {
+          "ts": "2026-04-25T06:52:21+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-25T06:52:26+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "graphコマンドPython化完了"
+        }
+      ]
+    },
+    {
+      "slug": "graph-py-qa",
+      "title": "graph Python実装 QA",
+      "status": "READY_FOR_SORA",
+      "assigned_to": "Sora",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": null,
+      "depends_on": [
+        "graph-py-impl"
+      ],
+      "qa_mode": null,
+      "created_at": "2026-04-24",
+      "updated_at": "2026-04-25",
+      "notes": "graph コマンドが Mermaid ブロックを正しく出力するか・--save オプションが docs/graphs/<sprint>.md を生成するか・pytest 全パスを確認する。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "",
+      "events": [
+        {
+          "ts": "2026-04-25T06:52:30+0000",
+          "agent": "Sora",
+          "action": "handoff",
+          "msg": "next: READY_FOR_SORA"
         }
       ]
     }

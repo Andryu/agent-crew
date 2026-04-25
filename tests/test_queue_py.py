@@ -338,6 +338,156 @@ def test_init_fails_if_already_exists(tmp_queue):
     assert "already initialized" in result.stderr
 
 
+# ---------- graph コマンドテスト ----------
+
+GRAPH_QUEUE = {
+    "sprint": "test-sprint",
+    "tasks": [
+        {
+            "slug": "task-a",
+            "title": "Task A",
+            "status": "DONE",
+            "assigned_to": "Riku",
+            "complexity": "S",
+            "risk_level": "low",
+            "parallel_group": None,
+            "depends_on": [],
+            "qa_mode": "inline",
+            "created_at": "2026-04-24",
+            "updated_at": "2026-04-24",
+            "notes": None,
+            "retry_count": 0,
+            "qa_result": None,
+            "summary": None,
+            "events": [],
+        },
+        {
+            "slug": "task-b",
+            "title": "Task B",
+            "status": "IN_PROGRESS",
+            "assigned_to": "Riku",
+            "complexity": "M",
+            "risk_level": "medium",
+            "parallel_group": None,
+            "depends_on": ["task-a"],
+            "qa_mode": None,
+            "created_at": "2026-04-24",
+            "updated_at": "2026-04-24",
+            "notes": None,
+            "retry_count": 0,
+            "qa_result": None,
+            "summary": None,
+            "events": [],
+        },
+    ],
+}
+
+
+def test_graph_outputs_mermaid(tmp_path):
+    """graph コマンドが Mermaid コードブロックを出力する"""
+    queue_file = tmp_path / "_queue.json"
+    queue_file.write_text(json.dumps(GRAPH_QUEUE, ensure_ascii=False))
+    result = run_queue(["graph"], queue_file)
+    assert result.returncode == 0, result.stderr
+    assert "```mermaid" in result.stdout
+    assert "flowchart LR" in result.stdout
+    assert "task-a" in result.stdout
+    assert "task-b" in result.stdout
+    assert "task-a --> task-b" in result.stdout
+    assert "classDef done" in result.stdout
+
+
+def test_graph_status_classes(tmp_path):
+    """各ステータスが正しい CSS クラスにマッピングされる"""
+    statuses = [
+        ("task-done", "DONE", "done"),
+        ("task-prog", "IN_PROGRESS", "in_progress"),
+        ("task-blk", "BLOCKED", "blocked"),
+        ("task-ready", "READY_FOR_Sora", "ready"),
+        ("task-todo", "TODO", "todo"),
+    ]
+    tasks = []
+    for slug, status, _ in statuses:
+        tasks.append({
+            "slug": slug,
+            "title": slug,
+            "status": status,
+            "assigned_to": "Riku",
+            "complexity": "S",
+            "risk_level": "low",
+            "parallel_group": None,
+            "depends_on": [],
+            "qa_mode": None,
+            "created_at": "2026-04-24",
+            "updated_at": "2026-04-24",
+            "notes": None,
+            "retry_count": 0,
+            "qa_result": None,
+            "summary": None,
+            "events": [],
+        })
+    queue_file = tmp_path / "_queue.json"
+    queue_file.write_text(json.dumps({"sprint": "s", "tasks": tasks}, ensure_ascii=False))
+    result = run_queue(["graph"], queue_file)
+    assert result.returncode == 0, result.stderr
+    for slug, _status, css_class in statuses:
+        assert f":::{css_class}" in result.stdout, f"{slug} should map to {css_class}"
+
+
+def test_graph_save(tmp_path):
+    """--save フラグで docs/graphs/<sprint>.md が生成される"""
+    # _save_graph は QUEUE_FILE.parent.parent / "docs/graphs/" に保存する。
+    # そのため queue_file を tmp_path/.claude/_queue.json に置くと
+    # project_root = tmp_path になる。
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    queue_file = claude_dir / "_queue.json"
+    queue_file.write_text(json.dumps(GRAPH_QUEUE, ensure_ascii=False))
+    result = run_queue(["graph", "--save"], queue_file)
+    assert result.returncode == 0, result.stderr
+    out_file = tmp_path / "docs" / "graphs" / "test-sprint.md"
+    assert out_file.exists(), f"期待するファイルが生成されていない: {out_file}"
+    content = out_file.read_text()
+    assert "# test-sprint — Mermaid依存グラフ" in content
+    assert "```mermaid" in content
+    assert "flowchart LR" in content
+
+
+def test_graph_no_edges(tmp_path):
+    """depends_on が空の場合エッジなしで正常終了する"""
+    queue_data = {
+        "sprint": "no-edge-sprint",
+        "tasks": [
+            {
+                "slug": "solo",
+                "title": "Solo Task",
+                "status": "TODO",
+                "assigned_to": "Riku",
+                "complexity": "S",
+                "risk_level": "low",
+                "parallel_group": None,
+                "depends_on": [],
+                "qa_mode": None,
+                "created_at": "2026-04-24",
+                "updated_at": "2026-04-24",
+                "notes": None,
+                "retry_count": 0,
+                "qa_result": None,
+                "summary": None,
+                "events": [],
+            }
+        ],
+    }
+    queue_file = tmp_path / "_queue.json"
+    queue_file.write_text(json.dumps(queue_data, ensure_ascii=False))
+    result = run_queue(["graph"], queue_file)
+    assert result.returncode == 0, result.stderr
+    assert "flowchart LR" in result.stdout
+    assert "solo" in result.stdout
+    # エッジ行（ --> ）が存在しない
+    assert " --> " not in result.stdout
+
+
 # ---------- スキーマ互換テスト ----------
 
 def test_schema_compat_with_queue_sh():
