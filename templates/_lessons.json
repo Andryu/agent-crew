@@ -1,10 +1,12 @@
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "lessons": [
     {
       "id": "agent-crew-sprint-00-tooling-001",
       "project": "agent-crew",
       "sprint": "sprint-00",
+      "scope": "project",
+      "stack": null,
       "category": "tooling",
       "type": "observation",
       "severity_score": 1,
