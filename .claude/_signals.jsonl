@@ -37,3 +37,10 @@
 {"ts":"2026-04-25T06:53:14+0000","type":"task.start","sprint":"sprint-11","slug":"graph-py-qa","agent":"Sora","detail":{}}
 {"ts":"2026-04-25T06:53:56+0000","type":"task.done","sprint":"sprint-11","slug":"graph-py-qa","agent":"Sora","detail":{"summary":"QA確認完了: pytest 27件全パス、graph実装・委譲・テスト品質確認済み"}}
 {"ts":"2026-04-25T06:53:56+0000","type":"qa.approved","sprint":"sprint-11","slug":"graph-py-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
+{"ts":"2026-04-25T13:35:38+0000","type":"task.done","sprint":"sprint-12","slug":"fix-sora-retro","agent":"Riku","detail":{"summary":"qa.md にレトロ起動指示を直接追記（Issue #77）"}}
+{"ts":"2026-04-25T13:36:20+0000","type":"task.done","sprint":"sprint-12","slug":"fix-qa-bash-limit","agent":"Riku","detail":{"summary":"qa.md に Bash不可時の CHANGES_REQUESTED ルールを追記（Issue #76 + #67）"}}
+{"ts":"2026-04-25T13:36:50+0000","type":"task.done","sprint":"sprint-12","slug":"fix-riku-l-limit","agent":"Riku","detail":{"summary":"pm.md に Riku の L タスク1件制限ルールを追記（Issue #78）"}}
+{"ts":"2026-04-25T13:39:05+0000","type":"task.done","sprint":"sprint-12","slug":"investigate-engineer-go","agent":"Alex","detail":{"summary":"engineer-go 無応答停止の再現条件・検出方法・対処方針を調査設計書にまとめた（docs/spec/engineer-go-investigation.md）"}}
+{"ts":"2026-04-25T13:39:27+0000","type":"task.handoff","sprint":"sprint-12","slug":"sprint-end-qa","agent":"Sora","detail":{"to_agent":"Sora","next_slug":"sprint-end-qa"}}
+{"ts":"2026-04-25T13:40:53+0000","type":"qa.approved","sprint":"sprint-12","slug":"sprint-end-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
+{"ts":"2026-04-25T13:41:02+0000","type":"task.done","sprint":"sprint-12","slug":"sprint-end-qa","agent":"Sora","detail":{"summary":"Sprint-12全3ファイルの静的レビュー完了。CRITICAL/MAJORなし。APPROVED。"}}
