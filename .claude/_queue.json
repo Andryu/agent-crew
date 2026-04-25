@@ -4,7 +4,7 @@
     {
       "slug": "lesson-schema-migrate",
       "title": "Phase 1: _lessons.json スキーマ移行（v1.2.0）と flock fallback 実装",
-      "status": "READY_FOR_RIKU",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "medium",
@@ -16,13 +16,20 @@
       "notes": "GitHub Issue #81",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
-      "events": []
+      "summary": "Phase 1: lessons.shのスキーマ更新、promoteとflock fallback実装完了",
+      "events": [
+        {
+          "ts": "2026-04-26T01:16:16.954559+09:00",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "Phase 1: lessons.shのスキーマ更新、promoteとflock fallback実装完了"
+        }
+      ]
     },
     {
       "slug": "qa-lesson-schema-migrate",
       "title": "QA: lesson-schema-migrate",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "low",
@@ -35,14 +42,33 @@
       "updated_at": "2026-04-26",
       "notes": "GitHub Issue #81",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
-      "events": []
+      "qa_result": "APPROVED",
+      "summary": "Phase 1: lessons.sh 挙動確認完了。scope/stack設定、promoteコマンド正常動作、flock代替mkdirロックのタイムアウトテストを全てパス。",
+      "events": [
+        {
+          "ts": "2026-04-26T01:16:16.954559+09:00",
+          "agent": "Sora",
+          "action": "handoff",
+          "msg": "Task is ready"
+        },
+        {
+          "ts": "2026-04-26T01:16:49.104381+09:00",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED"
+        },
+        {
+          "ts": "2026-04-26T01:16:49.104381+09:00",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "Phase 1 QA完了"
+        }
+      ]
     },
     {
       "slug": "lesson-session-start",
       "title": "Phase 2: session_start.sh にスタック検出と3層優先表示追加",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "S",
       "risk_level": "low",
@@ -56,13 +82,26 @@
       "notes": "GitHub Issue #81",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
-      "events": []
+      "summary": "session_start.sh にスタック自動検出、および scope, stack, global に基づいた表示制御を追加しました。",
+      "events": [
+        {
+          "ts": "2026-04-26T01:16:49.104381+09:00",
+          "agent": "Sora",
+          "action": "handoff",
+          "msg": "Task is ready"
+        },
+        {
+          "ts": "2026-04-26T01:23:00.000000+09:00",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "Phase 2の実装および修正が完了"
+        }
+      ]
     },
     {
       "slug": "qa-lesson-session-start",
       "title": "QA: lesson-session-start",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "low",
@@ -75,14 +114,27 @@
       "updated_at": "2026-04-26",
       "notes": "GitHub Issue #81",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
-      "events": []
+      "qa_result": "APPROVED",
+      "summary": "session_start.shのテストを実施し、降順表示、フィルタリング、環境変数からの設定適用など正常動作を確認しました。",
+      "events": [
+        {
+          "ts": "2026-04-26T01:23:00.000000+09:00",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED"
+        },
+        {
+          "ts": "2026-04-26T01:23:00.000000+09:00",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "QA完了"
+        }
+      ]
     },
     {
       "slug": "lesson-retro-prompt",
       "title": "Phase 3: retro.md スコープ判断ロジック追加",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "S",
       "risk_level": "low",
@@ -94,13 +146,26 @@
       "notes": "GitHub Issue #81",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
-      "events": []
+      "summary": "みゆきち（retroエージェント）のプロンプトに、プロジェクト/グローバル/スタックの3層スコープ判定および付与基準を追記しました。",
+      "events": [
+        {
+          "ts": "2026-04-26T01:23:00.000000+09:00",
+          "agent": "Riku",
+          "action": "handoff",
+          "msg": "Task is ready"
+        },
+        {
+          "ts": "2026-04-26T01:28:00.000000+09:00",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "Phase 3の実装が完了"
+        }
+      ]
     },
     {
       "slug": "lesson-install-symlink",
       "title": "Phase 4: install.sh のシンボリックリンク移行とスキーマ移行チェック",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "medium",
@@ -114,13 +179,26 @@
       "notes": "GitHub Issue #81",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
-      "events": []
+      "summary": "install.sh を改修し、シンボリックリンク移行、既存ファイル警告、flockチェック、_lessons.json マイグレーション機能を実装しました。",
+      "events": [
+        {
+          "ts": "2026-04-26T01:28:00.000000+09:00",
+          "agent": "Riku",
+          "action": "handoff",
+          "msg": "Task is ready"
+        },
+        {
+          "ts": "2026-04-26T01:45:00.000000+09:00",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "Phase 4の実装が完了"
+        }
+      ]
     },
     {
       "slug": "qa-lesson-install-symlink",
       "title": "QA: lesson-install-symlink",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "low",
@@ -133,14 +211,27 @@
       "updated_at": "2026-04-26",
       "notes": "GitHub Issue #81",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
-      "events": []
+      "qa_result": "APPROVED",
+      "summary": "install.sh のシンボリックリンク移行、警告処理、およびスキーママイグレーションの自動検知が正常に動作することを確認しました。",
+      "events": [
+        {
+          "ts": "2026-04-26T01:55:00.000000+09:00",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED"
+        },
+        {
+          "ts": "2026-04-26T01:55:00.000000+09:00",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "Phase 4 QA完了"
+        }
+      ]
     },
     {
       "slug": "sprint-13-qa",
       "title": "Sprint-13 最終 QA",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "low",
@@ -155,9 +246,22 @@
       "updated_at": "2026-04-26",
       "notes": "GitHub Issue #81",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
-      "events": []
+      "qa_result": "APPROVED",
+      "summary": "Sprint-13 の全フェーズ（マルチプロダクト対応 lesson 管理アーキテクチャ）の統合 QA を完了しました。全機能が設計通り動作し、他プロダクトへの配布準備が整いました。",
+      "events": [
+        {
+          "ts": "2026-04-26T01:56:00.000000+09:00",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED"
+        },
+        {
+          "ts": "2026-04-26T01:56:00.000000+09:00",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "Sprint-13 最終QA完了"
+        }
+      ]
     }
   ]
 }
