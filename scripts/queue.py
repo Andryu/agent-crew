@@ -28,6 +28,9 @@ from pydantic import BaseModel, Field
 QUEUE_FILE = Path(os.environ.get("QUEUE_FILE", ".claude/_queue.json"))
 MAX_RETRY = int(os.environ.get("MAX_RETRY", "3"))
 
+# complexity に応じた retry 上限値（未設定・不明は MAX_RETRY にフォールバック）
+COMPLEXITY_MAX_RETRY: dict[str, int] = {"S": 2, "M": 3, "L": 5}
+
 app = typer.Typer(help="agent-crew タスクキュー操作", add_completion=False)
 
 # ---------- Pydantic モデル ----------
@@ -187,6 +190,22 @@ def auto_close_issue(q: QueueFile, slug: str, agent: str, summary: str) -> None:
     except Exception:
         pass
 
+# ---------- コマンド: init ----------
+
+@app.command(name="init")
+def cmd_init(sprint: str) -> None:
+    """キューファイルを初期化する（既存ファイルがある場合はエラー）"""
+    queue_file = QUEUE_FILE
+    if queue_file.exists():
+        typer.echo("ERROR: queue already initialized", err=True)
+        raise typer.Exit(1)
+    queue_file.parent.mkdir(parents=True, exist_ok=True)
+    q = QueueFile(sprint=sprint, tasks=[])
+    content = q.model_dump_json(indent=2)
+    queue_file.write_text(content)
+    typer.echo(f"OK: queue initialized (sprint={sprint})")
+
+
 # ---------- コマンド: start ----------
 
 @app.command()
@@ -201,6 +220,9 @@ def start(slug: str) -> None:
             typer.echo(f"ERROR: {slug} is already DONE.", err=True); raise typer.Exit(12)
         if task.status == "BLOCKED":
             typer.echo(f"ERROR: {slug} is BLOCKED.", err=True); raise typer.Exit(13)
+        if task.complexity not in ("S", "M", "L", None):
+            typer.echo(f"ERROR: complexity must be S, M, or L for {slug} (got: {task.complexity})", err=True)
+            raise typer.Exit(10)
         unresolved = [
             d for d in task.depends_on
             if any(t.slug == d and t.status != "DONE" for t in q.tasks)
@@ -262,6 +284,9 @@ def qa(slug: str, result: str, summary: str = typer.Argument(default="")) -> Non
     with queue_lock(QUEUE_FILE):
         q = load_queue()
         task = get_task(q, slug)
+        if task.qa_result is not None:
+            typer.echo(f"ERROR: {slug} already has qa_result={task.qa_result}.", err=True)
+            raise typer.Exit(14)
         task.qa_result = result
         task.updated_at = today()
         task.events.append(TaskEvent(ts=now_iso(), agent="Sora", action="qa", msg=f"{result}: {summary}"))
@@ -289,25 +314,26 @@ def block(slug: str, agent: str, reason: str) -> None:
 
 @app.command()
 def retry(slug: str) -> None:
-    """retry_count を増やして READY_FOR_RIKU に戻す"""
+    """retry_count を増やして READY_FOR_RIKU に戻す。上限は complexity に連動する"""
     with queue_lock(QUEUE_FILE):
         q = load_queue()
         task = get_task(q, slug)
+        effective_max = COMPLEXITY_MAX_RETRY.get(task.complexity, MAX_RETRY)
         next_retry = (task.retry_count or 0) + 1
-        if next_retry > MAX_RETRY:
+        if next_retry > effective_max:
             task.status = "BLOCKED"
-            task.events.append(TaskEvent(ts=now_iso(), agent="system", action="block", msg=f"retry limit exceeded (max={MAX_RETRY})"))
+            task.events.append(TaskEvent(ts=now_iso(), agent="system", action="block", msg=f"retry limit exceeded (max={effective_max})"))
             save_queue(q)
-            typer.echo(f"BLOCKED: {slug} (retry limit {MAX_RETRY} exceeded)")
-            emit_signal("task.blocked", slug, "system", {"reason": f"retry limit exceeded (max={MAX_RETRY})"})
+            typer.echo(f"BLOCKED: {slug} (retry limit {effective_max} exceeded)")
+            emit_signal("task.blocked", slug, "system", {"reason": f"retry limit exceeded (max={effective_max})"})
             raise typer.Exit(8)
         task.retry_count = next_retry
         task.qa_result = None
         task.status = "READY_FOR_RIKU"
         task.updated_at = today()
-        task.events.append(TaskEvent(ts=now_iso(), agent="system", action="retry", msg=f"retry {next_retry}/{MAX_RETRY}"))
+        task.events.append(TaskEvent(ts=now_iso(), agent="system", action="retry", msg=f"retry {next_retry}/{effective_max}"))
         save_queue(q)
-    typer.echo(f"OK: {slug} retry {next_retry}/{MAX_RETRY} → READY_FOR_RIKU")
+    typer.echo(f"OK: {slug} retry {next_retry}/{effective_max} → READY_FOR_RIKU")
     emit_signal("task.retry", slug, "system", {"retry_count": next_retry})
 
 # ---------- コマンド: show ----------

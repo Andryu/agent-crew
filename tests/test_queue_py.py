@@ -142,6 +142,17 @@ def test_start_duplicate(tmp_queue):
     result = run_queue(["start", "task-a"], tmp_queue)
     assert result.returncode == 11
 
+
+def test_start_invalid_complexity(tmp_path):
+    """complexity が S/M/L 以外のタスクは start できない（exit 10）"""
+    queue_file = tmp_path / "_queue.json"
+    data = json.loads(json.dumps(MINIMAL_QUEUE))
+    data["tasks"][0]["complexity"] = "XL"  # 不正な complexity
+    queue_file.write_text(json.dumps(data))
+    result = run_queue(["start", "task-a"], queue_file)
+    assert result.returncode == 10
+    assert "complexity" in result.stderr
+
 # ---------- done コマンドテスト ----------
 
 def test_done_normal(tmp_queue):
@@ -205,6 +216,16 @@ def test_qa_invalid_result(tmp_queue):
     result = run_queue(["qa", "task-a", "INVALID", ""], tmp_queue)
     assert result.returncode != 0
 
+
+def test_qa_idempotency_guard(tmp_queue):
+    """qa_result が既に設定済みの場合は exit 14 で拒否する"""
+    run_queue(["start", "task-a"], tmp_queue)
+    run_queue(["done", "task-a", "Riku", "完了"], tmp_queue)
+    run_queue(["qa", "task-a", "APPROVED", "初回"], tmp_queue)
+    result = run_queue(["qa", "task-a", "APPROVED", "重複"], tmp_queue)
+    assert result.returncode == 14
+    assert "already has qa_result" in result.stderr
+
 # ---------- retry コマンドテスト ----------
 
 def test_retry_increments_count(tmp_queue):
@@ -220,13 +241,66 @@ def test_retry_increments_count(tmp_queue):
 
 
 def test_retry_blocked_on_max(tmp_path):
-    """MAX_RETRY=1 の環境で retry 2回目は BLOCKED になる"""
+    """complexity: None のタスクで MAX_RETRY=1 の環境なら retry 2回目は BLOCKED になる"""
     queue_file = tmp_path / "_queue.json"
     data = json.loads(json.dumps(MINIMAL_QUEUE))
+    data["tasks"][0]["complexity"] = None  # complexity 未設定 → MAX_RETRY 環境変数にフォールバック
     data["tasks"][0]["retry_count"] = 1  # 既に1回
     queue_file.write_text(json.dumps(data))
     uv = str(Path.home() / ".local/bin/uv")
     env = {**os.environ, "QUEUE_FILE": str(queue_file), "MAX_RETRY": "1"}
+    result = subprocess.run(
+        [uv, "run", "scripts/queue.py", "retry", "task-a"],
+        capture_output=True, text=True, env=env
+    )
+    assert result.returncode == 8
+    assert "BLOCKED" in result.stdout
+
+
+def test_retry_complexity_s_blocked_on_second(tmp_path):
+    """complexity: S のタスクは 2回目の retry で BLOCKED になる（exit 8）"""
+    queue_file = tmp_path / "_queue.json"
+    data = json.loads(json.dumps(MINIMAL_QUEUE))
+    data["tasks"][0]["complexity"] = "S"
+    data["tasks"][0]["retry_count"] = 2  # 既に2回（max=2）
+    queue_file.write_text(json.dumps(data))
+    result = run_queue(["retry", "task-a"], queue_file)
+    assert result.returncode == 8
+    assert "BLOCKED" in result.stdout
+    # キューファイルで BLOCKED になっていることを確認
+    saved = json.loads(queue_file.read_text())
+    task = next(t for t in saved["tasks"] if t["slug"] == "task-a")
+    assert task["status"] == "BLOCKED"
+
+
+def test_retry_complexity_l_allows_up_to_five(tmp_path):
+    """complexity: L のタスクは 5回目の retry まで READY_FOR_RIKU に戻る"""
+    queue_file = tmp_path / "_queue.json"
+    data = json.loads(json.dumps(MINIMAL_QUEUE))
+    data["tasks"][0]["complexity"] = "L"
+    data["tasks"][0]["retry_count"] = 4  # 既に4回（max=5 なのでまだ通る）
+    queue_file.write_text(json.dumps(data))
+    result = run_queue(["retry", "task-a"], queue_file)
+    assert result.returncode == 0
+    saved = json.loads(queue_file.read_text())
+    task = next(t for t in saved["tasks"] if t["slug"] == "task-a")
+    assert task["retry_count"] == 5
+    assert task["status"] == "READY_FOR_RIKU"
+    # 6回目は BLOCKED になる
+    result = run_queue(["retry", "task-a"], queue_file)
+    assert result.returncode == 8
+    assert "BLOCKED" in result.stdout
+
+
+def test_retry_complexity_none_uses_env_max_retry(tmp_path):
+    """complexity: None のタスクは MAX_RETRY 環境変数（デフォルト3）で動作する"""
+    queue_file = tmp_path / "_queue.json"
+    data = json.loads(json.dumps(MINIMAL_QUEUE))
+    data["tasks"][0]["complexity"] = None
+    data["tasks"][0]["retry_count"] = 3  # 既に3回（MAX_RETRY=3 なので次は BLOCKED）
+    queue_file.write_text(json.dumps(data))
+    uv = str(Path.home() / ".local/bin/uv")
+    env = {**os.environ, "QUEUE_FILE": str(queue_file), "MAX_RETRY": "3"}
     result = subprocess.run(
         [uv, "run", "scripts/queue.py", "retry", "task-a"],
         capture_output=True, text=True, env=env
@@ -243,6 +317,26 @@ def test_atomic_write_produces_valid_json(tmp_queue):
     parsed = json.loads(content)
     assert "tasks" in parsed
     assert parsed["sprint"] == "test-sprint"
+
+# ---------- init コマンドテスト ----------
+
+def test_init_creates_queue(tmp_path):
+    """存在しないファイルパスに init すると空のキューが作られる"""
+    queue_file = tmp_path / "_queue.json"
+    result = run_queue(["init", "sprint-99"], queue_file)
+    assert result.returncode == 0, result.stderr
+    assert "OK" in result.stdout
+    data = json.loads(queue_file.read_text())
+    assert data["sprint"] == "sprint-99"
+    assert data["tasks"] == []
+
+
+def test_init_fails_if_already_exists(tmp_queue):
+    """既存のキューファイルがある場合は exit 1 でエラーになる"""
+    result = run_queue(["init", "sprint-99"], tmp_queue)
+    assert result.returncode == 1
+    assert "already initialized" in result.stderr
+
 
 # ---------- スキーマ互換テスト ----------
 
