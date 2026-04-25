@@ -187,7 +187,18 @@ _do_set_status() {
     --arg id         "$target_id" \
     --arg status     "$new_status" \
     --arg updated_at "$updated_at" \
-    '.lessons |= map(if .id == $id then .status = $status | .updated_at = $updated_at else . end)' \
+    '.lessons |= map(
+      if .id == $id then
+        {
+          id, project, sprint, category, type,
+          severity_score, frequency_score, priority_score,
+          description, evidence, action,
+          issue_url, status: $status,
+          supersedes, tags,
+          created_at, updated_at: $updated_at
+        }
+      else . end
+    )' \
     <<< "$existing")
 
   tmp=$(mktemp "${LESSONS_FILE}.tmp.XXXXXX")
