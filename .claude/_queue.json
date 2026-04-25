@@ -233,7 +233,7 @@
     {
       "slug": "graph-py-qa",
       "title": "graph Python実装 QA",
-      "status": "READY_FOR_SORA",
+      "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "low",
@@ -246,14 +246,32 @@
       "updated_at": "2026-04-25",
       "notes": "graph コマンドが Mermaid ブロックを正しく出力するか・--save オプションが docs/graphs/<sprint>.md を生成するか・pytest 全パスを確認する。",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": "",
+      "qa_result": "APPROVED",
+      "summary": "QA確認完了: pytest 27件全パス、graph実装・委譲・テスト品質確認済み",
       "events": [
         {
           "ts": "2026-04-25T06:52:30+0000",
           "agent": "Sora",
           "action": "handoff",
           "msg": "next: READY_FOR_SORA"
+        },
+        {
+          "ts": "2026-04-25T06:53:14+0000",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-25T06:53:56+0000",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "QA確認完了: pytest 27件全パス、graph実装・委譲・テスト品質確認済み"
+        },
+        {
+          "ts": "2026-04-25T06:53:56+0000",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: 全確認項目クリア: pytest 27/27 PASS、Mermaid flowchart出力・--save動作・queue.sh委譲すべて正常"
         }
       ]
     }
