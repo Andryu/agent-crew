@@ -103,6 +103,17 @@ APPROVED / APPROVED_WITH_COMMENTS / CHANGES_REQUESTED
 
 ---
 
+## レトロスペクティブ起動ルール
+
+**全タスクが DONE になった時点**（キュー上の全タスクの `status == "DONE"` かつ全 QA 対象の `qa_result == "APPROVED"` を確認した後）で、完了報告の末尾に必ず以下を含めること:
+
+> @retro を起動してください。
+
+このルールは pm.md 等の参照ではなく、本ファイル内に直接定められたルールである（Issue #77）。
+Sora はスプリント完了を宣言する前に上記文言を完了報告へ追記し、Yuki が @retro エージェントを起動できるようにする。
+
+---
+
 ## 差し戻し時のフォーマット
 
 ```
@@ -236,3 +247,52 @@ Yuki へは `BLOCKED` ステータスとともにキューの notes へ詳細を
 - Bash コマンド実行は **1 タスクあたり最大 3 回**を目安とする
 - レビュー目的での `go test` / `npm test` 実行は 1 回のみ許容
 - `timeout 60 <test-command>` でタイムアウトを設定する
+
+---
+
+## Bash 不可時のルール（Issue #76 + #67）
+
+### Bash 実行が不可能な場合（上限到達・ツール制限等）
+
+Bash が実行できない状況でテスト・ビルド確認が必要な場合、**静的検証のみで APPROVED を出してはいけません。**
+
+必ず以下のいずれかの対応を取ってください:
+
+#### 対応 A: CHANGES_REQUESTED を返す
+
+```
+CHANGES_REQUESTED (REASON: BASH_UNAVAILABLE)
+Bash 実行上限に達したため、テスト・ビルドの動的検証が実施できませんでした。
+メインセッション（オーナー）が手動で以下を確認してください:
+- go test ./...
+- go build ./...
+確認後、再レビューをリクエストしてください。
+```
+
+#### 対応 B: メインセッション（オーナー）が QA を代行した場合
+
+オーナーが Bash でテスト・ビルドを実行して結果を確認した場合、キューの notes に以下を記録してから APPROVED を出すことができます:
+
+```json
+{
+  "performed_by": "human",
+  "test_result": "PASS",
+  "build_result": "PASS",
+  "verified_commands": ["go test ./...", "go build ./..."]
+}
+```
+
+### 禁止事項
+
+- Bash 不可の状態で、静的レビュー（Read / Grep / Glob のみ）によって APPROVED を発行すること
+- 「静的検証で問題なし」を理由に動的テスト確認をスキップすること
+
+### 判定フロー
+
+```
+Bash 実行可能？
+  YES → 通常通りテスト・ビルドを実行してレビュー
+  NO  → オーナーが代行確認済み？
+          YES → performed_by: human を notes に記録して APPROVED 可
+          NO  → CHANGES_REQUESTED (REASON: BASH_UNAVAILABLE) を返す
+```
