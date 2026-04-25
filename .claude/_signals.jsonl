@@ -15,3 +15,25 @@
 {"ts":"2026-04-24T23:18:48+0000","type":"task.start","sprint":"sprint-10","slug":"max-retry-qa","agent":"Sora","detail":{}}
 {"ts":"2026-04-24T23:18:52+0000","type":"task.done","sprint":"sprint-10","slug":"max-retry-qa","agent":"Sora","detail":{"summary":"QA確認完了"}}
 {"ts":"2026-04-24T23:18:56+0000","type":"qa.approved","sprint":"sprint-10","slug":"max-retry-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
+{"ts":"2026-04-25T00:45:51+0000","type":"task.start","sprint":"sprint-11","slug":"legacy-delete-design","agent":"Alex","detail":{}}
+{"ts":"2026-04-25T00:48:17+0000","type":"task.done","sprint":"sprint-11","slug":"legacy-delete-design","agent":"Alex","detail":{"summary":"設計書作成完了"}}
+{"ts":"2026-04-25T00:48:17+0000","type":"task.handoff","sprint":"sprint-11","slug":"graph-py-design","agent":"Alex","detail":{"to_agent":"Alex","next_slug":"graph-py-design"}}
+{"ts":"2026-04-25T00:49:18+0000","type":"task.start","sprint":"sprint-11","slug":"graph-py-design","agent":"Alex","detail":{}}
+{"ts":"2026-04-25T00:49:19+0000","type":"task.done","sprint":"sprint-11","slug":"graph-py-design","agent":"Alex","detail":{"summary":"設計書作成完了"}}
+{"ts":"2026-04-25T00:49:19+0000","type":"task.handoff","sprint":"sprint-11","slug":"feedback-loop-doc","agent":"Alex","detail":{"to_agent":"Alex","next_slug":"feedback-loop-doc"}}
+{"ts":"2026-04-25T00:51:02+0000","type":"task.start","sprint":"sprint-11","slug":"feedback-loop-doc","agent":"Alex","detail":{}}
+{"ts":"2026-04-25T00:51:02+0000","type":"task.done","sprint":"sprint-11","slug":"feedback-loop-doc","agent":"Alex","detail":{"summary":"設計書作成完了"}}
+{"ts":"2026-04-25T00:51:02+0000","type":"task.handoff","sprint":"sprint-11","slug":"legacy-delete-impl","agent":"Riku","detail":{"to_agent":"Riku","next_slug":"legacy-delete-impl"}}
+{"ts":"2026-04-25T00:52:00+0000","type":"task.start","sprint":"sprint-11","slug":"legacy-delete-impl","agent":"Riku","detail":{}}
+{"ts":"2026-04-25T00:55:35+0000","type":"task.done","sprint":"sprint-11","slug":"legacy-delete-impl","agent":"Riku","detail":{"summary":"旧Bash実装削除完了"}}
+{"ts":"2026-04-25T00:56:28+0000","type":"task.handoff","sprint":"sprint-11","slug":"legacy-delete-qa","agent":"Sora","detail":{"to_agent":"Sora","next_slug":"legacy-delete-qa"}}
+{"ts":"2026-04-25T06:49:29+0000","type":"task.start","sprint":"sprint-11","slug":"legacy-delete-qa","agent":"Sora","detail":{}}
+{"ts":"2026-04-25T06:50:23+0000","type":"task.done","sprint":"sprint-11","slug":"legacy-delete-qa","agent":"Sora","detail":{"summary":"QA確認完了"}}
+{"ts":"2026-04-25T06:50:23+0000","type":"qa.approved","sprint":"sprint-11","slug":"legacy-delete-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
+{"ts":"2026-04-25T06:50:23+0000","type":"task.handoff","sprint":"sprint-11","slug":"graph-py-impl","agent":"Riku","detail":{"to_agent":"Riku","next_slug":"graph-py-impl"}}
+{"ts":"2026-04-25T06:52:21+0000","type":"task.start","sprint":"sprint-11","slug":"graph-py-impl","agent":"Riku","detail":{}}
+{"ts":"2026-04-25T06:52:26+0000","type":"task.done","sprint":"sprint-11","slug":"graph-py-impl","agent":"Riku","detail":{"summary":"graphコマンドPython化完了"}}
+{"ts":"2026-04-25T06:52:30+0000","type":"task.handoff","sprint":"sprint-11","slug":"graph-py-qa","agent":"Sora","detail":{"to_agent":"Sora","next_slug":"graph-py-qa"}}
+{"ts":"2026-04-25T06:53:14+0000","type":"task.start","sprint":"sprint-11","slug":"graph-py-qa","agent":"Sora","detail":{}}
+{"ts":"2026-04-25T06:53:56+0000","type":"task.done","sprint":"sprint-11","slug":"graph-py-qa","agent":"Sora","detail":{"summary":"QA確認完了: pytest 27件全パス、graph実装・委譲・テスト品質確認済み"}}
+{"ts":"2026-04-25T06:53:56+0000","type":"qa.approved","sprint":"sprint-11","slug":"graph-py-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}

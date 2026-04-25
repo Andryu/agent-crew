@@ -438,6 +438,82 @@ def retro(
 
     typer.echo("\n".join(lines))
 
+# ---------- graph ヘルパー ----------
+
+MERMAID_CLASS_DEFS = [
+    "  classDef done fill:#22c55e,color:#fff",
+    "  classDef in_progress fill:#f59e0b,color:#fff",
+    "  classDef blocked fill:#ef4444,color:#fff",
+    "  classDef ready fill:#3b82f6,color:#fff",
+    "  classDef todo fill:#e5e7eb,color:#374151",
+]
+
+
+def _status_to_class(status: str) -> str:
+    """タスクステータスを Mermaid CSS クラス名に変換する"""
+    if status.startswith("READY_FOR_"):
+        return "ready"
+    return {
+        "IN_PROGRESS": "in_progress",
+        "DONE": "done",
+        "BLOCKED": "blocked",
+    }.get(status, "todo")
+
+
+def _build_mermaid(q: QueueFile) -> list[str]:
+    """QueueFile から Mermaid flowchart LR の行リストを生成する"""
+    lines = ["flowchart LR"]
+
+    # ノード定義（_queue.json の記述順を維持）
+    for task in q.tasks:
+        cls = _status_to_class(task.status)
+        agent = task.assigned_to or "?"
+        label = f"{task.slug}\\n({agent} · {task.status})"
+        lines.append(f'  {task.slug}["{label}"]:::{cls}')
+
+    lines.append("")
+
+    # エッジ定義
+    for task in q.tasks:
+        for dep in task.depends_on:
+            lines.append(f"  {dep} --> {task.slug}")
+
+    lines.append("")
+    lines.extend(MERMAID_CLASS_DEFS)
+
+    return lines
+
+
+def _save_graph(sprint: str, mermaid_body: str) -> None:
+    """Mermaid グラフを docs/graphs/<sprint>.md に保存する"""
+    project_root = QUEUE_FILE.parent.parent
+    graphs_dir = project_root / "docs" / "graphs"
+    graphs_dir.mkdir(parents=True, exist_ok=True)
+    out_file = graphs_dir / f"{sprint}.md"
+    content = f"# {sprint} — Mermaid依存グラフ\n\n```mermaid\n{mermaid_body}\n```\n"
+    out_file.write_text(content)
+    typer.echo(f"OK: graph saved to {out_file}", err=True)
+
+
+# ---------- コマンド: graph ----------
+
+@app.command()
+def graph(
+    save: bool = typer.Option(False, "--save", help="docs/graphs/<sprint>.md に保存"),
+) -> None:
+    """タスク依存関係を Mermaid flowchart LR 形式で出力する"""
+    q = load_queue()
+    mermaid_lines = _build_mermaid(q)
+    output = "\n".join(mermaid_lines)
+
+    typer.echo("```mermaid")
+    typer.echo(output)
+    typer.echo("```")
+
+    if save:
+        _save_graph(q.sprint, output)
+
+
 # ---------- エントリポイント ----------
 
 if __name__ == "__main__":
