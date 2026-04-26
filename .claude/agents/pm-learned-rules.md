@@ -400,5 +400,43 @@ pm-learned-rules.md 初版で「やってはいけないこと」セクション
 
 ---
 
+## [全エージェント] Bash 許可パターンは相対パスのみ一致する
+
+- lesson_id: agent-crew-sprint-15-tooling-001
+- priority: 4 / sprint: sprint-15
+
+**やること**
+
+settings.json の `permissions.allow` に登録する Bash パターンは相対パス形式（`scripts/xxx.sh *`）で記述すること。スプリント開始前にパターン形式が相対パスになっているか確認する。
+
+**やってはいけないこと**
+
+絶対パス（`/Users/...`）で Bash 権限パターンを設定する。相対パスで機能していても絶対パスは一致しないため、サブエージェントから実行されるコマンドが権限拒否になる。
+
+**エビデンス**
+
+Sprint-15 開始直後に Bash コマンドが絶対パスで拒否された。設定を相対パスに変更することで即時解消した（agent-crew-sprint-15-tooling-001）。
+
+---
+
+## [Yuki] retro フェーズで使用するスクリプトを permissions.allow に事前登録する
+
+- lesson_id: agent-crew-sprint-15-tooling-002
+- priority: 4 / sprint: sprint-15
+
+**やること**
+
+スプリント開始前に `scripts/lessons.sh` など retro フェーズで使うコマンドが `permissions.allow` に含まれているか確認する。未登録の場合はスプリント開始時に追加する。
+
+**やってはいけないこと**
+
+retro フェーズで使用するスクリプトを `permissions.allow` に未登録のままスプリントを開始する。
+
+**エビデンス**
+
+Sprint-15 の retro フェーズで `scripts/lessons.sh` が `permissions.allow` に未登録であり、`lessons.sh add` が実行できなかった。DECISIONS.md での代替記録で対応した（agent-crew-sprint-15-tooling-002）。
+
+---
+
 *このファイルは retro エージェント（みゆきち）が `priority_score >= 3` の新規 lesson を追加するたびに更新されます。*
-*最終更新: sprint-14（retro自己適用） / 2026-04-26*
+*最終更新: sprint-16（Yuki/Riku追記） / 2026-04-26*

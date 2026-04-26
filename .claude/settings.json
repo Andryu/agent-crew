@@ -45,6 +45,7 @@
     "allow": [
       "Bash(scripts/queue.sh *)",
       "Bash(scripts/propose-lesson-rules.sh *)",
+      "Bash(scripts/lessons.sh *)",
       "Bash(gh issue create *)",
       "Bash(gh issue close *)",
       "Bash(gh issue reopen *)",

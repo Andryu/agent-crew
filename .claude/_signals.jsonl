@@ -63,3 +63,11 @@
 {"ts":"2026-04-26T06:55:20+0000","type":"task.start","sprint":"sprint-15","slug":"sprint15-qa","agent":"Sora","detail":{}}
 {"ts":"2026-04-26T06:55:53+0000","type":"qa.approved","sprint":"sprint-15","slug":"sprint15-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
 {"ts":"2026-04-26T06:55:53+0000","type":"task.done","sprint":"sprint-15","slug":"sprint15-qa","agent":"Sora","detail":{"summary":"全実装タスクのQA完了。APPROVED。動的テスト（--dry-run実行・jq valid・bash -n）実施済み。"}}
+{"ts":"2026-04-26T07:13:47+0000","type":"task.start","sprint":"sprint-16","slug":"pm-learned-rules-sprint15","agent":"Riku","detail":{}}
+{"ts":"2026-04-26T07:18:21+0000","type":"task.done","sprint":"sprint-16","slug":"pm-learned-rules-sprint15","agent":"Riku","detail":{"summary":"pm-learned-rules.md に Sprint-15 lesson 2件追記（agent-crew-sprint-15-tooling-001: Bash相対パスルール、agent-crew-sprint-15-tooling-002: lessons.sh事前登録ルール）。priority フィルタ確認済み（priority<3 混入なし）。_lessons.json にも同2件を追記。"}}
+{"ts":"2026-04-26T07:18:28+0000","type":"task.start","sprint":"sprint-16","slug":"propose-lesson-rules-exec","agent":"Riku","detail":{}}
+{"ts":"2026-04-26T07:18:56+0000","type":"task.done","sprint":"sprint-16","slug":"propose-lesson-rules-exec","agent":"Riku","detail":{"summary":"propose-lesson-rules.sh 本番実行完了。20件の lesson（priority>=4）を engineer-go.md・pm.md の禁止パターンセクションへ追記。Draft PR #93 作成: https://github.com/Andryu/agent-crew/pull/93"}}
+{"ts":"2026-04-26T07:18:59+0000","type":"task.handoff","sprint":"sprint-16","slug":"sprint16-qa","agent":"Sora","detail":{"to_agent":"Sora","next_slug":"sprint16-qa"}}
+{"ts":"2026-04-26T07:19:26+0000","type":"task.start","sprint":"sprint-16","slug":"sprint16-qa","agent":"Sora","detail":{}}
+{"ts":"2026-04-26T07:19:26+0000","type":"qa.approved","sprint":"sprint-16","slug":"sprint16-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
+{"ts":"2026-04-26T07:19:31+0000","type":"task.done","sprint":"sprint-16","slug":"sprint16-qa","agent":"Sora","detail":{"summary":"全5チェック通過。pm-learned-rules.md Sprint-15 lesson 2件追記・Draft PR #93 作成・settings.json valid・lessons.sh 権限登録を確認。APPROVED。"}}
