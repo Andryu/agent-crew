@@ -19,7 +19,7 @@ fi
 
 # ---------- 3. 設定 ----------
 QUEUE_FILE=".claude/_queue.json"
-LESSONS_FILE="${LESSONS_FILE:-$HOME/.claude/_lessons.json}"
+LESSONS_FILE="${HOME}/.claude/_lessons.json"
 
 # プロジェクト名取得（git remote → ディレクトリ名フォールバック）
 PROJECT=$(git remote get-url origin 2>/dev/null | sed 's|.*/||; s|\.git$||')
@@ -56,35 +56,20 @@ fi
 
 echo ""
 
-# スタック検出
-DETECTED_STACK="null"
-if [[ -f "go.mod" ]]; then
-  DETECTED_STACK="go"
-elif ls next.config.* 1> /dev/null 2>&1; then
-  DETECTED_STACK="next"
-elif [[ -f "package.json" ]] && grep -q '"vue"' package.json 2>/dev/null; then
-  DETECTED_STACK="vue"
-fi
-
 # ---------- 6. 直近 lesson ----------
-echo "[直近 lesson（関連スコープ / 未対処 / priority 上位5件）]"
+echo "[直近 lesson（このプロジェクト / 未対処 / priority 上位3件）]"
 if [[ -f "$LESSONS_FILE" ]]; then
-  LESSONS=$(jq -r --arg proj "$PROJECT" --arg stack "$DETECTED_STACK" '
+  LESSONS=$(jq -r --arg proj "$PROJECT" '
     [
       .lessons[] |
       select(
-        (
-          (.scope == "global") or
-          (.scope == "stack" and .stack == $stack) or
-          ((.scope == "project" or .scope == null) and .project == $proj)
-        ) and
+        .project == $proj and
         (.issue_url == null)
       )
     ] |
-    unique_by(.description) |
-    sort_by([.priority_score, .created_at]) | reverse |
-    .[0:5][] |
-    "  [\(.scope // "project")] [score:\(.priority_score)] [\(.category)] \(.description | .[0:60])\(if (.description | length) > 60 then "..." else "" end)"
+    sort_by([-.priority_score, -.created_at]) |
+    .[0:3][] |
+    "  [score:\(.priority_score)] [\(.category)] \(.description | .[0:60])\(if (.description | length) > 60 then "..." else "" end)"
   ' "$LESSONS_FILE" 2>/dev/null)
   if [[ -n "$LESSONS" ]]; then
     echo "$LESSONS"

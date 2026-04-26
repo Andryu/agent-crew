@@ -180,7 +180,7 @@ if [[ "$CMD" == "add" ]]; then
   [[ "$SPRINT" =~ ^sprint-[0-9]+$ ]] \
     || die "--sprint must match 'sprint-NNN' (e.g. sprint-02), got: '$SPRINT'"
 
-  VALID_CATEGORIES="planning implementation qa communication tooling process architecture"
+  VALID_CATEGORIES="planning implementation qa communication tooling process architecture reliability"
   echo "$VALID_CATEGORIES" | tr ' ' '\n' | grep -qx "$CATEGORY" \
     || die "--category must be one of: $VALID_CATEGORIES, got: '$CATEGORY'"
 

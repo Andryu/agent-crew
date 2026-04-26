@@ -223,113 +223,6 @@ ensure_dir() {
 # 競合が発生した際のグローバル応答（'a' で全て上書き）
 GLOBAL_ANSWER=""
 
-# ファイルを1件シンボリックリンクする
-# 引数: <src> <dst> <policy: conflict|overwrite|skip>
-symlink_file() {
-  local src="$1"
-  local dst="$2"
-  local policy="$3"
-
-  check_src "$src"
-
-  # すでに正しい symlink かチェック
-  if [ -L "$dst" ]; then
-    local current_target
-    current_target=$(readlink "$dst")
-    if [ "$current_target" = "$src" ]; then
-      if [ $OPT_DRY_RUN -eq 1 ]; then
-        printf "  [SKIP]      %s  <- すでに正しいシンボリックリンクです\n" "$dst"
-      fi
-      return 0
-    fi
-  fi
-
-  # 既存ファイルが存在する場合
-  if [ -e "$dst" ] || [ -L "$dst" ]; then
-    # 非symlinkの場合の保護
-    if [ ! -L "$dst" ]; then
-      if [ "$policy" = "skip" ]; then
-        printf "  [SKIP]      %s  <- 既存ファイル(非symlink)を保護\n" "$dst"
-        return 0
-      fi
-
-      if [ $OPT_FORCE -eq 1 ]; then
-        if [ $OPT_DRY_RUN -eq 1 ]; then
-          printf "  [SYMLINK]   %s -> %s  <- --force により非symlinkを上書き\n" "$dst" "$src"
-        else
-          ensure_dir "$(dirname "$dst")"
-          rm -f "$dst"
-          ln -sf "$src" "$dst"
-          printf "  [SYMLINK]   %s -> %s\n" "$dst" "$src"
-        fi
-        return 0
-      fi
-
-      if [ $OPT_DRY_RUN -eq 1 ]; then
-        printf "  [CONFLICT]  %s  <- 非symlinkな既存ファイルが存在\n" "$dst"
-        return 0
-      fi
-
-      if [ "$GLOBAL_ANSWER" = "a" ]; then
-        ensure_dir "$(dirname "$dst")"
-        rm -f "$dst"
-        ln -sf "$src" "$dst"
-        printf "  [SYMLINK]   %s -> %s\n" "$dst" "$src"
-        return 0
-      fi
-
-      echo ""
-      echo "  [WARNING] 既存の非シンボリックリンクファイルが存在します: $dst"
-      printf "  上書き（symlink化）しますか? [y/N/a/q] (y=はい, N=スキップ, a=以降すべて上書き, q=中断): "
-      local answer
-      read -r answer </dev/tty || answer="N"
-
-      case "$answer" in
-        y|Y)
-          ensure_dir "$(dirname "$dst")"
-          rm -f "$dst"
-          ln -sf "$src" "$dst"
-          printf "  [SYMLINK]   %s -> %s\n" "$dst" "$src"
-          ;;
-        a|A)
-          GLOBAL_ANSWER="a"
-          ensure_dir "$(dirname "$dst")"
-          rm -f "$dst"
-          ln -sf "$src" "$dst"
-          printf "  [SYMLINK]   %s -> %s\n" "$dst" "$src"
-          ;;
-        q|Q)
-          echo "中断しました。" >&2
-          exit $EXIT_ABORTED
-          ;;
-        *)
-          printf "  [SKIP]      %s\n" "$dst"
-          ;;
-      esac
-      return 0
-    else
-      # すでにシンボリックリンクだがリンク先が違う場合、上書き
-      if [ $OPT_DRY_RUN -eq 1 ]; then
-        printf "  [SYMLINK]   %s -> %s  <- 既存のsymlinkを更新\n" "$dst" "$src"
-      else
-        ensure_dir "$(dirname "$dst")"
-        ln -sf "$src" "$dst"
-        printf "  [SYMLINK]   %s -> %s\n" "$dst" "$src"
-      fi
-      return 0
-    fi
-  fi
-
-  # 新規作成
-  if [ $OPT_DRY_RUN -eq 1 ]; then
-    printf "  [SYMLINK]   %s -> %s\n" "$dst" "$src"
-  else
-    ensure_dir "$(dirname "$dst")"
-    ln -sf "$src" "$dst"
-    printf "  [SYMLINK]   %s -> %s\n" "$dst" "$src"
-  fi
-}
-
 # ファイルを1件コピーする
 # 引数: <src> <dst> <policy: conflict|overwrite|skip>
 copy_file() {
@@ -432,15 +325,6 @@ copy_file() {
 # ---------------------------------------------------------------------------
 # メイン処理
 # ---------------------------------------------------------------------------
-if ! command -v flock >/dev/null 2>&1; then
-  echo "WARN: flock がインストールされていません。" >&2
-  echo "      排他制御は mkdir によるフォールバックで動作しますが、" >&2
-  echo "      安定した動作のために flock のインストールを推奨します。" >&2
-  echo "      macOS: brew install flock" >&2
-  echo "      Ubuntu/Debian: apt-get install util-linux" >&2
-  echo "" >&2
-fi
-
 echo "=== claude-crew インストール (stack: $STACK) ==="
 echo "インストール先: $TARGET_DIR"
 if [ $OPT_DRY_RUN -eq 1 ]; then
@@ -456,7 +340,7 @@ if [ $COMP_GLOBAL_AGENTS -eq 1 ]; then
 
   for agent_file in pm.md architect.md ux-designer.md qa.md doc-reviewer.md \
                     security.md devops.md data-analyst.md; do
-    symlink_file \
+    copy_file \
       "$REPO_DIR/.claude/agents/$agent_file" \
       "$GLOBAL_AGENTS_DIR/$agent_file" \
       "conflict"
@@ -490,7 +374,7 @@ if [ $COMP_RIKU -eq 1 ]; then
     echo "  注意: riku-${STACK}.md が見つからないため engineer-go.md を使用します"
   fi
 
-  symlink_file \
+  copy_file \
     "$RIKU_SRC" \
     "$TARGET_DIR/.claude/agents/riku.md" \
     "conflict"
@@ -501,24 +385,16 @@ fi
 if [ $COMP_HOOKS -eq 1 ]; then
   echo "--- hooks ($TARGET_DIR/.claude/hooks/) ---"
 
-  for hook_name in subagent_stop.sh session_start.sh; do
-    HOOK_DST="$TARGET_DIR/.claude/hooks/$hook_name"
-    hook_src="$REPO_DIR/.claude/hooks/$hook_name"
-    
-    if [ ! -f "$hook_src" ] && [ -f "$REPO_DIR/hooks/$hook_name" ]; then
-      hook_src="$REPO_DIR/hooks/$hook_name"
-    fi
+  HOOK_DST="$TARGET_DIR/.claude/hooks/subagent_stop.sh"
+  copy_file \
+    "$REPO_DIR/hooks/subagent_stop.sh" \
+    "$HOOK_DST" \
+    "overwrite"
 
-    symlink_file \
-      "$hook_src" \
-      "$HOOK_DST" \
-      "overwrite"
-
-    # dry-run 以外では実行権限を付与
-    if [ $OPT_DRY_RUN -eq 0 ] && [ -f "$HOOK_DST" ]; then
-      chmod +x "$HOOK_DST"
-    fi
-  done
+  # dry-run 以外では実行権限を付与
+  if [ $OPT_DRY_RUN -eq 0 ] && [ -f "$HOOK_DST" ]; then
+    chmod +x "$HOOK_DST"
+  fi
   echo ""
 fi
 
@@ -537,34 +413,6 @@ if [ $COMP_CONFIG -eq 1 ]; then
     "$TARGET_DIR/.claude/settings.json" \
     "skip"
   echo ""
-fi
-
-# --- migrations ---
-if [ $COMP_CONFIG -eq 1 ]; then
-  LESSONS_FILE="${HOME}/.claude/_lessons.json"
-  if [ -f "$LESSONS_FILE" ]; then
-    version=$(jq -r '.version // "1.0.0"' "$LESSONS_FILE" 2>/dev/null || echo "1.0.0")
-    if [ "$version" != "1.2.0" ]; then
-      echo "--- マイグレーション ---"
-      echo "INFO: 古い _lessons.json (v$version) を検出しました。スキーマ移行を実行します。"
-      if [ $OPT_DRY_RUN -eq 1 ]; then
-        echo "  [DRY-RUN] bash $REPO_DIR/scripts/lessons_migrate.sh"
-      else
-        bash "$REPO_DIR/scripts/lessons_migrate.sh" || echo "WARN: マイグレーションに失敗しました"
-      fi
-      echo ""
-    fi
-  else
-    echo "--- マイグレーション ---"
-    echo "INFO: ~/.claude/_lessons.json を初期化します"
-    if [ $OPT_DRY_RUN -eq 1 ]; then
-      echo "  [DRY-RUN] cp $REPO_DIR/templates/_lessons.json $LESSONS_FILE"
-    else
-      ensure_dir "$(dirname "$LESSONS_FILE")"
-      cp "$REPO_DIR/templates/_lessons.json" "$LESSONS_FILE"
-    fi
-    echo ""
-  fi
 fi
 
 # ---------------------------------------------------------------------------
