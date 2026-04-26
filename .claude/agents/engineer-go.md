@@ -325,3 +325,61 @@ Yuki へは `BLOCKED` ステータスとともにキューの notes へ詳細を
   - 外部 API への連続リクエスト
   - `git push`（ネットワーク依存・長時間化リスク）
 - Bash コマンドには原則 `timeout 30 <command>` を付与する（長時間処理を除く）
+
+---
+
+## 禁止パターン（lessons より自動提案）
+
+> このセクションは `scripts/propose-lesson-rules.sh` によって生成されました。
+> オーナーのレビュー後にマージしてください。
+> 最終更新: 2026-04-26
+
+### agent-crew-sprint-05-reliability-001
+- **lesson**: スマホRemote Controlのスリープにより接続が切断され、Soraが内部エラーで落ちた。深夜セッション（alex-bash-impl完了）と朝セッション（alex-bash-qa実施）の間に約8時間のブレイクが発生した。
+- **禁止行動**: #39（セッション中断検出機構）の実装を Sprint-06 で行う。検出後はSlackまたはSTDOUTに通知することで作業再開を促す。
+- **priority**: 4 / sprint: sprint-05
+
+### agent-crew-sprint-05-tooling-001
+- **lesson**: Alexへの Bash 付与後、token-opt-designではstart/doneを自己発行できた。しかしsession-interrupt-designはサブエージェントコンテキストで実行されBashが利用できなかった。Bash付与
+- **禁止行動**: Alexがサブエージェントとして実行される場合のBash利用可否を次スプリントで明示的に検証し、結果をarchitect.mdに注意事項として記載する。
+- **priority**: 4 / sprint: sprint-05
+
+### agent-crew-sprint-08-tooling-001
+- **lesson**: Bash の ${4:-{}} 構文で、デフォルト値に {} を使うとシェルが } を誤解釈し JSON が破損する。set -e + || true の組み合わせでサイレントに失敗し、Sprint-08 の大半のシグナルが _signal
+- **禁止行動**: 設計書に含まれる Bash コードサンプルは Sora が bash -n または実行でバリデーションを行う。${...} 展開を含むコードは特に要注意。サブシェル内で set +e を先行させ jq -cn --argjson を使ってデフォルト値を渡すパターンを標準とする。
+- **priority**: 9 / sprint: sprint-08
+
+### agent-crew-sprint-08-reliability-001
+- **lesson**: engineer-go サブエージェントに長い実装指示（queue.sh 全体 + 詳細指示）を渡したとき、Agent tool が [Tool result missing due to internal error] で無応答停止した。
+- **禁止行動**: サブエージェントへの実装指示は 2,000 トークン以下を目安に分割する。queue.sh 全体を渡さず関係する関数部分のみ抜粋する。complexity L タスクは 2つの complexity M に分割することを検討する。
+- **priority**: 6 / sprint: sprint-08
+
+### agent-crew-sprint-09-tooling-001
+- **lesson**: Sprint-08 の emit バグ修正後も _signals.jsonl ファイルが存在しない。queue.py では Python で正しく実装されたとの報告があるが、signals の書き込みが実際に機能しているか検証されていない。
+- **禁止行動**: 各スプリント開始後の最初のタスク完了時に Sora が _signals.jsonl の存在と内容を確認するスモークテストを QA チェックリストに追加する。
+- **priority**: 4 / sprint: sprint-09
+
+### agent-crew-sprint-11-reliability-001
+- **lesson**: 
+- **禁止行動**: Yuki は Riku の L タスクを1スプリント1件までに制限する計画ルールを追加。フォールバック手順を pm.md に明記。
+- **priority**: 4 / sprint: sprint-11
+
+### agent-crew-sprint-11-reliability-002
+- **lesson**: 
+- **禁止行動**: Sora のエージェント定義に「Bash 不可の場合は CHANGES_REQUESTED（REASON: BASH_UNAVAILABLE）を返す」を追加。
+- **priority**: 6 / sprint: sprint-11
+
+### agent-crew-sprint-12-reliability-001
+- **lesson**: Sprint-12 で Alex による investigate-engineer-go タスクが完了し、Issue #64（engineer-go 無応答停止）の根本原因仮説（仮説 A: コンテキストウィンドウ超過が最有力）・検出方法・対
+- **禁止行動**: Sprint-13 で engineer-go.md に「参照ファイル3件以下・200行超は limit/offset 使用」のルールを追記し、pm.md に委譲チェックリストを追記する。完了後に Issue #64 をクローズする。
+- **priority**: 6 / sprint: sprint-12
+
+### agent-crew-sprint-15-tooling-001
+- **lesson**: Sprint-15 開始直後、Bash コマンドが絶対パス（/Users/...）で拒否された。settings.json の permissions.allow の Bash パターンは相対パス形式のみ一致し、絶対パスでは権限拒否になる。
+- **禁止行動**: 
+- **priority**: 4 / sprint: sprint-15
+
+### agent-crew-sprint-15-tooling-002
+- **lesson**: Sprint-15 の retro フェーズで scripts/lessons.sh が permissions.allow に未登録であり、lesson 記録（lessons.sh add）が実行できなかった。
+- **禁止行動**: 
+- **priority**: 4 / sprint: sprint-15
