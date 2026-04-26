@@ -1,2 +1,16 @@
 .claude/settings.local.json
 .env
+
+# runtime lock files
+.claude/_queue.lock
+.claude/scheduled_tasks.lock
+
+# logs
+error.log
+
+# Python cache
+__pycache__/
+*.pyc
+
+# local work-in-progress
+agent-crew-architecture.html
