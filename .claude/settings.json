@@ -29,12 +29,22 @@
             "command": ".claude/hooks/subagent_stop.sh"
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null)\" && scripts/propose-lesson-rules.sh --dry-run 2>/dev/null || true'"
+          }
+        ]
       }
     ]
   },
   "permissions": {
     "allow": [
       "Bash(scripts/queue.sh *)",
+      "Bash(scripts/propose-lesson-rules.sh *)",
       "Bash(gh issue create *)",
       "Bash(gh issue close *)",
       "Bash(gh issue reopen *)",
@@ -43,8 +53,12 @@
       "Bash(gh pr close *)",
       "Bash(gh pr edit *)",
       "Bash(gh pr ready *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
       "Bash(git pull *)",
-      "Bash(git fetch *)"
+      "Bash(git fetch *)",
+      "Bash(jq *)"
     ]
   }
 }

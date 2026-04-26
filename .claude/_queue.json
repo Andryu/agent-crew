@@ -1,146 +1,257 @@
 {
-  "sprint": "sprint-14",
+  "sprint": "sprint-15",
   "tasks": [
     {
-      "slug": "learnings-schema",
-      "title": "pm-learned-rules.md: スキーマ・フォーマット定義ファイル作成",
+      "slug": "engineer-go-fix-design",
+      "title": "engineer-go.md への参照ファイル制限・委譲チェックリスト追記の設計",
+      "status": "DONE",
+      "assigned_to": "Alex",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-1",
+      "depends_on": [],
+      "qa_mode": null,
+      "created_at": "2026-04-26T20:00:00+09:00",
+      "updated_at": "2026-04-26",
+      "notes": "Issue #64。engineer-go-investigation.md §5（検出方法・対処方針）を参照し、engineer-go.md に追記すべき内容を設計する。追記対象: 参照ファイル上限3件・指示トークン2000以下・complexity L時は委譲しないルール・委譲前チェックリスト。設計書は docs/spec/ に保存不要、設計内容を notes または短いドキュメントで Riku へ引き渡す形でよい。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "engineer-go-fix-design.md 作成。engineer-go.md へのコンテキスト超過防止ルール追記位置・追記テキスト、pm.md への委譲前チェックリスト追記位置・追記テキストを定義。",
+      "events": [
+        {
+          "ts": "2026-04-26T20:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-15 キュー登録"
+        },
+        {
+          "ts": "2026-04-26T03:02:42+0000",
+          "agent": "Alex",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-26T06:49:02+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "engineer-go-fix-design.md 作成。engineer-go.md へのコンテキスト超過防止ルール追記位置・追記テキスト、pm.md への委譲前チェックリスト追記位置・追記テキストを定義。"
+        }
+      ]
+    },
+    {
+      "slug": "sora-qa-guard-impl",
+      "title": "qa.md: Bash不可時CHANGES_REQUESTED・QA summary必須記録ルールを実装",
       "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "S",
       "risk_level": "low",
-      "parallel_group": null,
+      "parallel_group": "phase-1",
       "depends_on": [],
       "qa_mode": "inline",
-      "created_at": "2026-04-26T12:00:00+09:00",
-      "updated_at": "2026-04-26T12:30:00+09:00",
-      "notes": "GitHub Issue #24。.claude/agents/pm-learned-rules.md を新規作成。ルールのスキーマ（trigger / rule / evidence / effect）とサンプルを定義する。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "pm-learned-rules.md 新規作成。_lessons.json から status:open かつ priority_score>=3 の18件を変換し、エージェント別ルール形式で記載。",
-      "events": [
-        {
-          "ts": "2026-04-26T12:30:00+09:00",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "learnings-schema 実装開始"
-        },
-        {
-          "ts": "2026-04-26T12:30:00+09:00",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "pm-learned-rules.md 新規作成。_lessons.json から status:open かつ priority_score>=3 の18件を変換し、エージェント別ルール形式で記載。"
-        }
-      ]
-    },
-    {
-      "slug": "learnings-retro",
-      "title": "retro.md: ルール書き出し手順を追加",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "learnings-schema"
-      ],
-      "qa_mode": "inline",
-      "created_at": "2026-04-26T12:00:00+09:00",
-      "updated_at": "2026-04-26T13:00:00+09:00",
-      "notes": "GitHub Issue #24。retro.md に「スプリント完了後に priority_score >= 6 の lesson を pm-learned-rules.md へ書き出す」手順を追加する。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "retro.md にステップ5「pm-learned-rules.md へのルール書き出し」を追加。status:open かつ priority_score>=3 の未記載 lesson を重複チェック後に追記する手順と、完了報告フォーマットへの「ルール追加 X件」記載を定義。",
-      "events": [
-        {
-          "ts": "2026-04-26T13:00:00+09:00",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "learnings-retro 実装開始"
-        },
-        {
-          "ts": "2026-04-26T13:00:00+09:00",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "retro.md にステップ5「pm-learned-rules.md へのルール書き出し」を追加。status:open かつ priority_score>=3 の未記載 lesson を重複チェック後に追記する手順と、完了報告フォーマットへの「ルール追加 X件」記載を定義。"
-        }
-      ]
-    },
-    {
-      "slug": "learnings-pm",
-      "title": "pm.md: スプリント計画時の pm-learned-rules.md 読み込み指示を追加",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "learnings-schema"
-      ],
-      "qa_mode": "inline",
-      "created_at": "2026-04-26T12:00:00+09:00",
-      "updated_at": "2026-04-26T14:00:00+09:00",
-      "notes": "GitHub Issue #24。pm.md のスプリント計画前チェックリストに「pm-learned-rules.md を読み込み、該当ルールをタスク設計に反映する」ステップを追加する。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "pm.md のスプリント開始前チェックにステップ0.5「pm-learned-rules.md の読み込み」を追加。関連ルールのタスク設計への反映、および反映不要の場合は理由を確認事項に記載する指示を明記。",
-      "events": [
-        {
-          "ts": "2026-04-26T14:00:00+09:00",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "learnings-pm 実装開始"
-        },
-        {
-          "ts": "2026-04-26T14:00:00+09:00",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "pm.md のスプリント開始前チェックにステップ0.5「pm-learned-rules.md の読み込み」を追加。関連ルールのタスク設計への反映、および反映不要の場合は理由を確認事項に記載する指示を明記。"
-        }
-      ]
-    },
-    {
-      "slug": "qa-learnings-loop",
-      "title": "QA: learnings-schema / learnings-retro / learnings-pm の統合確認",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "learnings-retro",
-        "learnings-pm"
-      ],
-      "qa_mode": null,
-      "created_at": "2026-04-26T12:00:00+09:00",
+      "created_at": "2026-04-26T20:00:00+09:00",
       "updated_at": "2026-04-26",
-      "notes": "GitHub Issue #24。3ファイルの整合性（スキーマ・参照・手順）を確認。pm-learned-rules.md のサンプルが retro.md 手順・pm.md 参照と矛盾しないこと。",
+      "notes": "Issue #67。.claude/agents/qa.md に以下2点を追記する。(1) Bash実行不可の場合は CHANGES_REQUESTED（REASON: BASH_UNAVAILABLE）を返し、Bash実行可能な環境での再確認を求める。(2) QAタスクのsummaryには実際に実行したテストコマンドと結果を必ず記録する。テスト実行なしのDONEはCHANGES_REQUESTED扱い。",
       "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "3ファイル整合性確認完了。MINOR3件のコメント付きでAPPROVED。",
+      "qa_result": null,
+      "summary": "qa.md に3点追記: (1)DoDに実行コマンド・出力結果のsummary記録義務を追加 (2)完了報告フォーマットのテスト結果セクションを実出力記録必須形式に変更 (3)Bash不可時ルールの禁止事項にテスト実行なしDON禁止(Issue #67)を追記",
       "events": [
         {
-          "ts": "2026-04-26T14:00:00+09:00",
+          "ts": "2026-04-26T20:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-15 キュー登録"
+        },
+        {
+          "ts": "2026-04-26T03:02:36+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-26T06:47:31+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "qa.md に3点追記: (1)DoDに実行コマンド・出力結果のsummary記録義務を追加 (2)完了報告フォーマットのテスト結果セクションを実出力記録必須形式に変更 (3)Bash不可時ルールの禁止事項にテスト実行なしDON禁止(Issue #67)を追記"
+        }
+      ]
+    },
+    {
+      "slug": "lessons-pr-flow-design",
+      "title": "lessons → agent .md への Draft PR 提案フロー設計",
+      "status": "DONE",
+      "assigned_to": "Alex",
+      "complexity": "M",
+      "risk_level": "medium",
+      "parallel_group": "phase-1",
+      "depends_on": [],
+      "qa_mode": null,
+      "created_at": "2026-04-26T20:00:00+09:00",
+      "updated_at": "2026-04-26",
+      "notes": "Issue #59。設計書を docs/spec/lessons-pr-flow-design.md に作成する。設計に含める内容: (1) スクリプト仕様（scripts/propose-lesson-rules.sh または .py）: _lessons.json から priority_score>=4 の未対処lessonを抽出し、対象エージェント.mdの「禁止パターン」セクションへの差分を生成して Draft PR を作成する。(2) settings.json への PostToolUse または Stop hook 設定: スプリント完了フロー（queue.sh done が全タスクに完了したタイミング）で自動実行する仕組みの設計。hook の trigger 条件・スクリプト呼び出し方法を明示すること。(3) 既存 .claude/settings.json の hook 設定と競合しないか確認すること。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "lessons-pr-flow-design.md 作成。scripts/propose-lesson-rules.sh 仕様（引数・フロー・category→エージェントマッピング・出力フォーマット）、settings.json Stop hook への--dry-run追加、pm.md 完了フロー step3.5 追記内容を定義。",
+      "events": [
+        {
+          "ts": "2026-04-26T20:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-15 キュー登録"
+        },
+        {
+          "ts": "2026-04-26T03:02:42+0000",
+          "agent": "Alex",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-26T06:49:04+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "lessons-pr-flow-design.md 作成。scripts/propose-lesson-rules.sh 仕様（引数・フロー・category→エージェントマッピング・出力フォーマット）、settings.json Stop hook への--dry-run追加、pm.md 完了フロー step3.5 追記内容を定義。"
+        }
+      ]
+    },
+    {
+      "slug": "engineer-go-fix-impl",
+      "title": "engineer-go.md・pm.md へのガード記載実装",
+      "status": "DONE",
+      "assigned_to": "Riku",
+      "complexity": "M",
+      "risk_level": "medium",
+      "parallel_group": "phase-2",
+      "depends_on": [
+        "engineer-go-fix-design"
+      ],
+      "qa_mode": "inline",
+      "created_at": "2026-04-26T20:00:00+09:00",
+      "updated_at": "2026-04-26",
+      "notes": "Issue #64。engineer-go-fix-design の成果物を受けて実装する。変更対象: .claude/agents/engineer-go.md（参照ファイル上限3件・指示トークン2000以下・complexity L委譲禁止・委譲前チェックリスト）。また pm.md の「Riku への L タスク制限ルール」セクションに「engineer-go への委譲前チェックリスト」への言及を追記する。実装後、Issue #64 をクローズすること。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "engineer-go.md に「コンテキスト超過防止ルール（Issue #64）」セクション追記（参照ファイル3件上限・委譲拒否条件）。pm.md に「engineer-go委譲前チェックリスト（Issue #64）」と完了フローstep3.5（propose-lesson-rules.sh）を追記。",
+      "events": [
+        {
+          "ts": "2026-04-26T20:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-15 キュー登録"
+        },
+        {
+          "ts": "2026-04-26T06:49:11+0000",
           "agent": "Riku",
           "action": "handoff",
-          "msg": "Task is ready"
+          "msg": "next: READY_FOR_RIKU"
         },
         {
-          "ts": "2026-04-26T02:32:32+0000",
+          "ts": "2026-04-26T06:49:14+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-26T06:52:54+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "engineer-go.md に「コンテキスト超過防止ルール（Issue #64）」セクション追記（参照ファイル3件上限・委譲拒否条件）。pm.md に「engineer-go委譲前チェックリスト（Issue #64）」と完了フローstep3.5（propose-lesson-rules.sh）を追記。"
+        }
+      ]
+    },
+    {
+      "slug": "lessons-pr-flow-impl",
+      "title": "lessons → agent .md 自動PR提案フロー実装（スクリプト + hook設定）",
+      "status": "DONE",
+      "assigned_to": "Riku",
+      "complexity": "M",
+      "risk_level": "medium",
+      "parallel_group": "phase-2",
+      "depends_on": [
+        "lessons-pr-flow-design"
+      ],
+      "qa_mode": "inline",
+      "created_at": "2026-04-26T20:00:00+09:00",
+      "updated_at": "2026-04-26",
+      "notes": "Issue #59。lessons-pr-flow-design の成果物を受けて実装する。実装対象: (1) scripts/propose-lesson-rules.sh（または .py）: _lessons.json から priority_score>=4 の未対処lessonを抽出し対象エージェント.mdへの差分を生成しDraft PRを作成する。(2) .claude/settings.json への hook 設定: スプリント完了フローで自動実行されるよう設定する。設計書で定義された trigger 条件に従うこと。実装後、Issue #59 をクローズすること。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "scripts/propose-lesson-rules.sh 実装（--dry-run/--min-priority対応・category->エージェントマッピング・重複防止・Draft PR作成）。settings.json Stop hookに--dry-run実行エントリ追加。pm.md完了フローstep3.5は engineer-go-fix-impl で実装済み。スモークテスト18件検出確認。",
+      "events": [
+        {
+          "ts": "2026-04-26T20:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-15 キュー登録"
+        },
+        {
+          "ts": "2026-04-26T06:49:11+0000",
+          "agent": "Riku",
+          "action": "handoff",
+          "msg": "next: READY_FOR_RIKU"
+        },
+        {
+          "ts": "2026-04-26T06:49:14+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-26T06:55:15+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "scripts/propose-lesson-rules.sh 実装（--dry-run/--min-priority対応・category->エージェントマッピング・重複防止・Draft PR作成）。settings.json Stop hookに--dry-run実行エントリ追加。pm.md完了フローstep3.5は engineer-go-fix-impl で実装済み。スモークテスト18件検出確認。"
+        }
+      ]
+    },
+    {
+      "slug": "sprint15-qa",
+      "title": "Sprint-15 最終QA: 全実装タスクのスモークテスト・整合性確認",
+      "status": "DONE",
+      "assigned_to": "Sora",
+      "complexity": "M",
+      "risk_level": "low",
+      "parallel_group": "phase-3",
+      "depends_on": [
+        "engineer-go-fix-impl",
+        "sora-qa-guard-impl",
+        "lessons-pr-flow-impl"
+      ],
+      "qa_mode": null,
+      "created_at": "2026-04-26T20:00:00+09:00",
+      "updated_at": "2026-04-26",
+      "notes": "全実装タスクの確認。(1) engineer-go.md に参照ファイル制限・委譲チェックリストが追記されているか。(2) qa.md に Bash不可時CHANGES_REQUESTED・summary必須記録が追記されているか。(3) scripts/propose-lesson-rules.sh が実行可能か（--dry-run または実際の実行）。(4) .claude/settings.json の hook 設定が JSON として valid か（jq . で確認）。Bash実行不可の場合は CHANGES_REQUESTED（REASON: BASH_UNAVAILABLE）を返すこと。",
+      "retry_count": 0,
+      "qa_result": "APPROVED",
+      "summary": "全実装タスクのQA完了。APPROVED。動的テスト（--dry-run実行・jq valid・bash -n）実施済み。",
+      "events": [
+        {
+          "ts": "2026-04-26T20:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-15 キュー登録"
+        },
+        {
+          "ts": "2026-04-26T06:55:20+0000",
+          "agent": "Sora",
+          "action": "handoff",
+          "msg": "next: READY_FOR_SORA"
+        },
+        {
+          "ts": "2026-04-26T06:55:20+0000",
           "agent": "Sora",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-26T02:32:38+0000",
+          "ts": "2026-04-26T06:55:53+0000",
           "agent": "Sora",
           "action": "qa",
-          "msg": "APPROVED: 3ファイル間の連携・フォーマット整合性を確認。MINOR3件（priority2エントリの混入・2件の未記載教訓・やってはいけないこと省略ルールの曖昧さ）。CRITICAL/MAJORなし。ドキュメントのみのためテスト不要と判断し承認。"
+          "msg": "APPROVED: 全4チェック通過。engineer-go.md: コンテキスト超過防止ルール・委譲拒否条件追記確認。qa.md: BASH_UNAVAILABLE・summary記録義務追記確認。pm.md: engineer-go委譲前チェックリスト・step3.5追記確認。settings.json: JSON valid・Stop hook追加確認。propose-lesson-rules.sh: --dry-run 18件検出正常動作確認。CRITICAL/MAJORなし。"
         },
         {
-          "ts": "2026-04-26T02:32:41+0000",
+          "ts": "2026-04-26T06:55:53+0000",
           "agent": "Sora",
           "action": "done",
-          "msg": "3ファイル整合性確認完了。MINOR3件のコメント付きでAPPROVED。"
+          "msg": "全実装タスクのQA完了。APPROVED。動的テスト（--dry-run実行・jq valid・bash -n）実施済み。"
         }
       ]
     }

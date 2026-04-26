@@ -65,7 +65,7 @@
 
 - 設計書（legacy-delete-design.md / graph-py-design.md）が削除対象・ロールバック手順・テストケースを網羅したことで、実装が最小手戻りで完了した。Sprint-10 に続き「設計への投資が実装品質に直結する」パターンを再確認。
 - queue.sh 63% 削減により、今後の Bash 実装残存コマンド（retro・parallel-handoff）の見通しが改善された。
-- テストスイートが 23 → 27 件に拡充。Python 化の進行に伴い自動テストのカバレッジが向上している。
+- テストスイートが 23 → 27 件に拡充。Python 化の進行に伴い自動テストのカバレッジが出向している。
 
 ### 失敗パターン
 
@@ -79,5 +79,32 @@
 - Sora の QA 手順に「Bash 不可の場合は CHANGES_REQUESTED（REASON: BASH_UNAVAILABLE）を返す」を追加し、メインセッション代行時に performed_by フラグを _queue.json に記録する。
 - Yuki は Riku の担当タスクで L タスクを1スプリント1件までに制限する計画ルールを pm.md に追加する。
 - priority_score >= 6 の未対処 lesson: agent-crew-sprint-11-reliability-002（Sora Bash上限QA）, agent-crew-sprint-11-process-001（レトロ自動起動）を次スプリント計画に反映する。
+
+---
+
+## sprint-15 — 2026-04-26
+
+### アーキテクチャ判断
+
+- **engineer-go 停止バグ対処方針の実装完了（Issue #64）**: 5スプリント積み残しだった根本対策を実装。engineer-go.md にコンテキスト超過防止ルール（参照ファイル3件上限・200行超は offset/limit使用・複雑度L委譲禁止）、pm.md に委譲前チェックリスト（5項目）を追記。
+- **lessons → agent .md 自動 PR 提案フロー確立（Issue #59）**: `scripts/propose-lesson-rules.sh` を新規作成。`--dry-run` / `--min-priority` オプション対応。category → エージェントマッピングで自動分類し、重複防止チェックの上 Draft PR を作成する。settings.json Stop hook で `--dry-run` を自動実行（差分レポートを STDOUT 出力）。スプリント完了フローにステップ3.5として組み込み。
+- **QA summary 記録義務の明文化（Issue #67）**: qa.md の DoD に「実行コマンドと出力結果を summary に記録する」を追加。完了報告フォーマットのテスト結果セクションを実出力記録必須形式に変更。禁止事項に「テスト実行なしの DONE」を明示。
+
+### 学び
+
+- Phase-1 並列設計（Alex×2 + Riku×1）が計画通り機能し、retry ゼロ・BLOCKED ゼロで全6タスク完了した。設計と実装を同一フェーズで並行処理する計画構造が有効と確認。
+- `propose-lesson-rules.sh --dry-run` のスモークテストで 18件の未対処 lesson が検出された。lesson の蓄積量が PR 提案フローの実用水準に達していることを確認。次スプリントでの実際の PR 作成が推奨される。
+- `scripts/lessons.sh` が settings.json の permissions に未登録であることが判明（`Bash(scripts/lessons.sh *)` パターンが未許可）。retro ステップでの lesson 記録が実行できなかった。
+
+### 失敗パターン
+
+- **Bash 許可パターンの相対パス限定**: settings.json の `Bash(scripts/queue.sh *)` は相対パスのみ一致し、絶対パス（/Users/...）では権限拒否になる。スプリント開始直後に発生し、相対パスに変更することで即時解消した。
+- **lessons.sh が permissions 未登録**: `scripts/lessons.sh` が `permissions.allow` に含まれておらず、retro フェーズでの lesson 記録（`lessons.sh add`）が実行できなかった。DECISIONS.md での代替記録で対応した。
+
+### 次スプリントへの推奨
+
+- settings.json の `permissions.allow` に `Bash(scripts/lessons.sh *)` を追加し、lessons.sh を利用するフローを有効化する。
+- `scripts/propose-lesson-rules.sh`（`--dry-run` なし）を実行して、蓄積済み 18件の lesson を対象エージェント .md へ実際に反映する Draft PR を作成する。
+- pm-learned-rules.md に Sprint-15 の2件の新規 lesson（Bash絶対パス問題・lessons.sh未登録）を追記する（priority_score=4 のため対象）。
 
 ---
