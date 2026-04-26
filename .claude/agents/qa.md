@@ -69,6 +69,7 @@ model: sonnet
 - [ ] 全チェックリスト項目を確認した
 - [ ] CRITICAL・MAJORの指摘がゼロになっている（または承認済み）
 - [ ] テスト・ビルドが通っている
+- [ ] 実行したテストコマンドと出力結果を完了報告の「テスト結果」セクションに記録した
 - [ ] レビュー結果をファイルに記録した
 
 ---
@@ -94,8 +95,12 @@ APPROVED / APPROVED_WITH_COMMENTS / CHANGES_REQUESTED
 - 提案: [どう直すか]
 
 ### テスト結果
-- [ ] go test ./... : PASS / FAIL
-- [ ] npm run test : PASS / FAIL
+実行コマンドと出力を必ず記録すること。テスト実行なし（静的検証のみ）での APPROVED は禁止。
+
+- コマンド: `go test ./...`
+  出力: [実際の出力を貼り付ける。例: ok  github.com/... 0.123s]
+- コマンド: `go build ./...`
+  出力: [実際の出力、またはエラーなし]
 
 ### Rikuへの差し戻し
 [CHANGES_REQUESTEDの場合のみ。修正してほしい内容を箇条書き]
@@ -286,12 +291,14 @@ Bash 実行上限に達したため、テスト・ビルドの動的検証が実
 
 - Bash 不可の状態で、静的レビュー（Read / Grep / Glob のみ）によって APPROVED を発行すること
 - 「静的検証で問題なし」を理由に動的テスト確認をスキップすること
+- テスト実行コマンドと出力結果を summary に記録せずに DONE にすること（Issue #67）
 
 ### 判定フロー
 
 ```
 Bash 実行可能？
   YES → 通常通りテスト・ビルドを実行してレビュー
+      → 実行コマンドと出力を完了報告の「テスト結果」セクションに必ず記録する
   NO  → オーナーが代行確認済み？
           YES → performed_by: human を notes に記録して APPROVED 可
           NO  → CHANGES_REQUESTED (REASON: BASH_UNAVAILABLE) を返す
