@@ -12,12 +12,15 @@
 #     --action "<action>" \
 #     [--type <failure|success|observation>] \
 #     [--status <proposed|issue_created|implemented|verified|dismissed>] \
+#     [--scope <project|global|stack>] \
+#     [--stack <stack>] \
 #     [--evidence "<evidence1>" --evidence "<evidence2>" ...] \
 #     [--tags "<tag1>" --tags "<tag2>" ...] \
 #     [--issue-url <url>] \
 #     [--supersedes <id>]
 #
 #   lessons.sh set-status <id> <proposed|issue_created|implemented|verified|dismissed>
+#   lessons.sh promote <id> <project|global|stack> [<stack>]
 #
 # 環境変数:
 #   LESSONS_FILE   lessons ファイルパス (default: ~/.claude/_lessons.json)
@@ -33,12 +36,13 @@ LOCK_TIMEOUT="${LOCK_TIMEOUT:-10}"
 # ---------- ユーティリティ ----------
 
 usage() {
-  cat >&2 <<'EOF'
+  cat >&2 <<'HELP_EOF'
 Usage: lessons.sh <command> [OPTIONS]
 
 Commands:
   add            新しい lesson を追加する
   set-status     既存 lesson のステータスを更新する
+  promote        既存 lesson の scope (と stack) を更新する
 
 add options:
   --project      プロジェクト名 (必須)
@@ -50,6 +54,8 @@ add options:
   --action       次回取るべきアクション (必須)
   --type         failure|success|observation (省略時: failure)
   --status       proposed|issue_created|implemented|verified|dismissed (省略時: proposed)
+  --scope        project|global|stack (省略時: project)
+  --stack        スタック名 (scope=stack時に必須)
   --evidence     観察の根拠 (複数指定可)
   --tags         自由タグ (複数指定可)
   --issue-url    対応 GitHub Issue の URL
@@ -59,13 +65,35 @@ add options:
 set-status args:
   <id>           lesson ID (必須)
   <status>       proposed|issue_created|implemented|verified|dismissed (必須)
-EOF
+
+promote args:
+  <id>           lesson ID (必須)
+  <scope>        project|global|stack (必須)
+  <stack>        スタック名 (scope=stack時に必須)
+HELP_EOF
   exit 1
 }
 
 die() {
   echo "ERROR: $*" >&2
   exit 1
+}
+
+acquire_mkdir_lock() {
+  local lock_dir="${LESSONS_FILE}.lock.d"
+  local wait_time=0
+  while ! mkdir "$lock_dir" 2>/dev/null; do
+    sleep 1
+    wait_time=$((wait_time + 1))
+    if [[ $wait_time -ge $LOCK_TIMEOUT ]]; then
+      die "lock timeout (${LOCK_TIMEOUT}s). Another process may be writing."
+    fi
+  done
+}
+
+release_mkdir_lock() {
+  local lock_dir="${LESSONS_FILE}.lock.d"
+  rm -rf "$lock_dir"
 }
 
 # ---------- 引数パース ----------
@@ -77,13 +105,26 @@ if [[ "$CMD" == "--help" || "$CMD" == "-h" || -z "$CMD" ]]; then
   usage
 fi
 
-if [[ "$CMD" != "add" && "$CMD" != "set-status" ]]; then
-  die "unknown command: '$CMD'. Use 'add' or 'set-status'."
+if [[ "$CMD" != "add" && "$CMD" != "set-status" && "$CMD" != "promote" ]]; then
+  die "unknown command: '$CMD'. Use 'add', 'set-status', or 'promote'."
 fi
 
-# set-status の場合は positional args のみ保持して add 用パース処理をスキップ
-SET_STATUS_ID="${1:-}"
-SET_STATUS_VAL="${2:-}"
+SET_STATUS_ID=""
+SET_STATUS_VAL=""
+PROMOTE_ID=""
+PROMOTE_SCOPE=""
+PROMOTE_STACK="null"
+
+if [[ "$CMD" == "set-status" ]]; then
+  SET_STATUS_ID="${1:-}"
+  SET_STATUS_VAL="${2:-}"
+elif [[ "$CMD" == "promote" ]]; then
+  PROMOTE_ID="${1:-}"
+  PROMOTE_SCOPE="${2:-}"
+  if [[ "$PROMOTE_SCOPE" == "stack" ]]; then
+    PROMOTE_STACK="\"${3:-}\""
+  fi
+fi
 
 PROJECT=""
 SPRINT=""
@@ -94,6 +135,8 @@ DESCRIPTION=""
 ACTION=""
 TYPE="failure"
 STATUS="proposed"
+SCOPE="project"
+STACK="null"
 ISSUE_URL="null"
 SUPERSEDES="null"
 EVIDENCE_ITEMS=()
@@ -111,6 +154,8 @@ while [[ $# -gt 0 ]]; do
     --action)      ACTION="$2";       shift 2 ;;
     --type)        TYPE="$2";         shift 2 ;;
     --status)      STATUS="$2";       shift 2 ;;
+    --scope)       SCOPE="$2";        shift 2 ;;
+    --stack)       STACK="\"$2\"";    shift 2 ;;
     --issue-url)   ISSUE_URL="\"$2\""; shift 2 ;;
     --supersedes)  SUPERSEDES="\"$2\""; shift 2 ;;
     --evidence)    EVIDENCE_ITEMS+=("$2"); shift 2 ;;
@@ -135,7 +180,7 @@ if [[ "$CMD" == "add" ]]; then
   [[ "$SPRINT" =~ ^sprint-[0-9]+$ ]] \
     || die "--sprint must match 'sprint-NNN' (e.g. sprint-02), got: '$SPRINT'"
 
-  VALID_CATEGORIES="planning implementation qa communication tooling process architecture"
+  VALID_CATEGORIES="planning implementation qa communication tooling process architecture reliability"
   echo "$VALID_CATEGORIES" | tr ' ' '\n' | grep -qx "$CATEGORY" \
     || die "--category must be one of: $VALID_CATEGORIES, got: '$CATEGORY'"
 
@@ -150,10 +195,28 @@ if [[ "$CMD" == "add" ]]; then
   [[ "$STATUS" =~ ^(proposed|issue_created|implemented|verified|dismissed)$ ]] \
     || die "--status must be proposed|issue_created|implemented|verified|dismissed, got: '$STATUS'"
 
+  [[ "$SCOPE" =~ ^(project|global|stack)$ ]] \
+    || die "--scope must be project, global, or stack, got: '$SCOPE'"
+
+  if [[ "$SCOPE" == "stack" && "$STACK" == "null" ]]; then
+    die "--stack is required when --scope is stack"
+  fi
+
   [[ ${#DESCRIPTION} -ge 10 ]] \
     || die "--description must be at least 10 characters"
   [[ ${#ACTION} -ge 5 ]] \
     || die "--action must be at least 5 characters"
+fi
+
+# ---------- バリデーション (promote) ----------
+if [[ "$CMD" == "promote" ]]; then
+  [[ -n "$PROMOTE_ID" ]] || die "promote requires <id> argument"
+  [[ -n "$PROMOTE_SCOPE" ]] || die "promote requires <scope> argument"
+  [[ "$PROMOTE_SCOPE" =~ ^(project|global|stack)$ ]] \
+    || die "promote scope must be project, global, or stack, got: '$PROMOTE_SCOPE'"
+  if [[ "$PROMOTE_SCOPE" == "stack" && "$PROMOTE_STACK" == "null" ]]; then
+    die "promote requires <stack> argument when scope is stack"
+  fi
 fi
 
 # ファイル存在確認（初期化済みか）
@@ -167,8 +230,6 @@ command -v jq >/dev/null 2>&1 \
 
 # ---------- ロック & アトミック書き込み ----------
 
-# flock が使えない環境（macOS では util-linux の flock が無い場合がある）への対応:
-# lockfile コマンドまたは mkdir を fallback として使う
 _do_set_status() {
   local target_id="$1" new_status="$2"
   local existing updated tmp updated_at
@@ -189,14 +250,7 @@ _do_set_status() {
     --arg updated_at "$updated_at" \
     '.lessons |= map(
       if .id == $id then
-        {
-          id, project, sprint, category, type,
-          severity_score, frequency_score, priority_score,
-          description, evidence, action,
-          issue_url, status: $status,
-          supersedes, tags,
-          created_at, updated_at: $updated_at
-        }
+        .status = $status | .updated_at = $updated_at
       else . end
     )' \
     <<< "$existing")
@@ -206,6 +260,37 @@ _do_set_status() {
   mv "$tmp" "$LESSONS_FILE"
 
   echo "Updated $target_id: status → $new_status"
+}
+
+_do_promote() {
+  local target_id="$1" new_scope="$2" new_stack="$3"
+  local existing updated tmp updated_at
+
+  [[ -f "$LESSONS_FILE" ]] || die "$LESSONS_FILE does not exist."
+
+  existing=$(cat "$LESSONS_FILE")
+
+  jq -e --arg id "$target_id" '.lessons[] | select(.id == $id)' <<< "$existing" > /dev/null \
+    || die "lesson not found: '$target_id'"
+
+  updated_at=$(date -u +"%Y-%m-%dT%H:%M:%S+0000")
+  updated=$(jq \
+    --arg id         "$target_id" \
+    --arg scope      "$new_scope" \
+    --argjson stack  "$new_stack" \
+    --arg updated_at "$updated_at" \
+    '.lessons |= map(
+      if .id == $id then
+        .scope = $scope | .stack = $stack | .updated_at = $updated_at
+      else . end
+    )' \
+    <<< "$existing")
+
+  tmp=$(mktemp "${LESSONS_FILE}.tmp.XXXXXX")
+  echo "$updated" > "$tmp"
+  mv "$tmp" "$LESSONS_FILE"
+
+  echo "Updated $target_id: scope → $new_scope"
 }
 
 _do_add() {
@@ -263,6 +348,8 @@ _do_add() {
     --argjson priority "$priority_score" \
     --arg description  "$DESCRIPTION" \
     --arg action       "$ACTION" \
+    --arg scope        "$SCOPE" \
+    --argjson stack    "$STACK" \
     --argjson evidence "$evidence_json" \
     --argjson tags     "$tags_json" \
     --argjson issue_url "$ISSUE_URL" \
@@ -281,6 +368,8 @@ _do_add() {
       description:     $description,
       evidence:        $evidence,
       action:          $action,
+      scope:           $scope,
+      stack:           $stack,
       issue_url:       $issue_url,
       status:          $status,
       supersedes:      $supersedes,
@@ -301,42 +390,39 @@ _do_add() {
 
 # ---------- コマンド実行 ----------
 
-if [[ "$CMD" == "set-status" ]]; then
-  [[ -n "$SET_STATUS_ID" ]]  || die "set-status requires <id> argument"
-  [[ -n "$SET_STATUS_VAL" ]] || die "set-status requires <status> argument"
-
-  command -v jq >/dev/null 2>&1 || die "jq is not installed."
-  [[ -f "$LESSONS_FILE" ]]      || die "$LESSONS_FILE does not exist."
-
+execute_with_lock() {
+  local cmd_func="$1"
+  shift
+  local result
+  
   if command -v flock >/dev/null 2>&1; then
     result=$(
       (
         flock -x -w "$LOCK_TIMEOUT" 200 || die "lock timeout (${LOCK_TIMEOUT}s). Another process may be writing."
-        _do_set_status "$SET_STATUS_ID" "$SET_STATUS_VAL"
+        "$cmd_func" "$@"
       ) 200>"$LOCK_FILE"
     )
   else
-    echo "WARN: flock not available. Running without file lock." >&2
-    result=$(_do_set_status "$SET_STATUS_ID" "$SET_STATUS_VAL")
+    acquire_mkdir_lock
+    trap release_mkdir_lock EXIT INT TERM
+    result=$("$cmd_func" "$@")
+    trap - EXIT INT TERM
+    release_mkdir_lock
   fi
-
   echo "$result"
+}
+
+if [[ "$CMD" == "set-status" ]]; then
+  result=$(execute_with_lock _do_set_status "$SET_STATUS_ID" "$SET_STATUS_VAL")
+  echo "$result"
+  exit 0
+elif [[ "$CMD" == "promote" ]]; then
+  result=$(execute_with_lock _do_promote "$PROMOTE_ID" "$PROMOTE_SCOPE" "$PROMOTE_STACK")
+  echo "$result"
+  exit 0
+elif [[ "$CMD" == "add" ]]; then
+  result=$(execute_with_lock _do_add)
+  echo "Added lesson: $result"
   exit 0
 fi
 
-# flock が使えるか確認（macOS の util-linux 版）
-if command -v flock >/dev/null 2>&1; then
-  # flock 経由でアトミック書き込み
-  result=$(
-    (
-      flock -x -w "$LOCK_TIMEOUT" 200 || die "lock timeout (${LOCK_TIMEOUT}s). Another process may be writing."
-      _do_add
-    ) 200>"$LOCK_FILE"
-  )
-else
-  # fallback: flock が無い場合は警告を出しつつ直接実行（シングルセッション想定）
-  echo "WARN: flock not available. Running without file lock." >&2
-  result=$(_do_add)
-fi
-
-echo "Added lesson: $result"
