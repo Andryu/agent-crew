@@ -267,3 +267,61 @@ Antigravity（SubagentStop hook 未対応）の場合：
 理由: [一文で説明]
 ---
 ```
+
+---
+
+## 禁止パターン（lessons より自動提案）
+
+> このセクションは `scripts/propose-lesson-rules.sh` によって生成されました。
+> オーナーのレビュー後にマージしてください。
+> 最終更新: 2026-04-26
+
+### agent-crew-sprint-05-process-001
+- **lesson**: PR作成時のTest Planチェックリスト確認漏れがオーナーに指摘された。sprint-04でも同じ指摘を受けており、2スプリント連続の繰り返し問題。PRテンプレートまたはRikuの完了基準にTest Plan確認が含まれていないことが根
+- **禁止行動**: PRテンプレートにTest Planチェックリスト確認を明示する。Rikuの実装完了チェックリストに「PR Test Planが記入されているか確認する」を追加する。
+- **priority**: 6 / sprint: sprint-05
+
+### agent-crew-sprint-05-process-002
+- **lesson**: スプリント完了後のコミット可否をオーナーに確認した。MEMORYにKeep going（介入最小化）と記録されているにもかかわらず確認が発生した。コミット判断基準がCLAUDE.mdまたはpm.mdに明文化されていないことが根因。
+- **禁止行動**: CLAUDE.mdまたはpm.mdに「スプリント完了後はオーナー確認なしにコミット・PR作成してよい（ブランチ: feat/sprint-XX-clean）」というルールを明記する。
+- **priority**: 4 / sprint: sprint-05
+
+### agent-crew-sprint-07-process-001
+- **lesson**: Sprint-07 完了後にレトロが実施されないまま Sprint-08 に突入した。Sprint-06 で「みゆきち自動起動を pm.md に明文化した」にもかかわらず Sprint-07 完了時に実行されなかった。振り返りが欠落すると 
+- **禁止行動**: pm.md または retro.md の完了基準に「スプリント完了時、Yuki は @retro を呼ぶ」を追加し、スプリント完了メッセージのテンプレートに @retro 呼び出しを含める。
+- **priority**: 6 / sprint: sprint-07
+
+### agent-crew-sprint-08-process-001
+- **lesson**: signals-qa タスクの summary が test のまま記録されており、QA の実施内容が不明。シグナルのバグが残ったまま QA APPROVED の形になっている。QA タスクで実際に動作確認が行われたかどうかが記録から判断で
+- **禁止行動**: QA タスクの notes に実際のテスト手順を明記し、Sora は手順を実行した結果を summary に記録することをルール化する。テスト実行なしの DONE は CHANGES_REQUESTED 扱いとする。
+- **priority**: 4 / sprint: sprint-08
+
+### agent-crew-sprint-09-process-001
+- **lesson**: engineer-go サブエージェントが複雑な実装タスクで Agent tool internal error により無応答停止する問題が Sprint-08 に続き Sprint-09 でも再発した。Sprint-08 retro の改
+- **禁止行動**: pm.md のスプリント計画手順に「complexity L タスクは M×2 に自動分割する」を明記する。engineer-go 起動前に実装指示のトークン数を推定し 2,000 超の場合は分割する。
+- **priority**: 9 / sprint: sprint-09
+
+### agent-crew-sprint-09-process-002
+- **lesson**: Sprint-08 retro で記録された高優先度 lesson（engineer-go 停止対策）のアクションが Sprint-09 のスプリント計画に反映されなかった。lesson を _lessons.json に記録しても、計画フ
+- **禁止行動**: Yuki（pm エージェント）がスプリント計画を立てる前に _lessons.json の priority_score >= 6 かつ未解決エントリを確認し、アクションを計画タスクに反映するステップを pm.md に追加する。
+- **priority**: 6 / sprint: sprint-09
+
+### agent-crew-sprint-10-process-001
+- **lesson**: delegate-impl の大半（queue.sh ディスパッチ委譲・complexityバリデーション・qa冪等性ガード）が Sprint-09 で完了済みだったことが実装着手後に発覚した。Yuki がスプリント計画時に前スプリントの実
+- **禁止行動**: pm.md の計画手順チェックリストに「前スプリントの DONE タスクの実装状態を確認し、計画済みだが未実装・実装済みだが未計画の両方を洗い出す」ステップを追加する。
+- **priority**: 4 / sprint: sprint-10
+
+### agent-crew-sprint-11-process-001
+- **lesson**: 
+- **禁止行動**: sora.md に「全タスク DONE 時は完了報告末尾に @retro を含める」を直接記載する。
+- **priority**: 8 / sprint: sprint-11
+
+### agent-crew-sprint-13-process-001
+- **lesson**: Antigravity が Issue #82（マルチプロダクト対応ロードマップ）の実装を Sprint-13 でスコープ外実装した。Issue #82 には「単体プロジェクト安定後に着手」と明記されていたにもかかわらず、session_s
+- **禁止行動**: エージェント定義（Antigravity または担当エージェント）に「Issue の着手条件（前提条件・制約）を実装開始前に必ず確認し、条件未成立の場合はスキップして Yuki に報告する」を追記する。Yuki のスプリント計画手順に「各 Issue の着手条件を _queue.json の notes に転記する」ステップを追加する。
+- **priority**: 6 / sprint: sprint-13
+
+### agent-crew-sprint-14-process-001
+- **lesson**: pm-learned-rules.md の初版作成時に、フィルタ条件 priority_score >= 3 のはずが priority:2 のエントリ（agent-crew-sprint-05-qa-001）が混入した。変換スクリプトや手
+- **禁止行動**: retro エージェント（みゆきち）が pm-learned-rules.md を更新する際は、追記前に jq で priority_score >= 3 を必ずフィルタし、変換後に全エントリの priority 値を確認するステップを手順に追加する。
+- **priority**: 4 / sprint: sprint-14
