@@ -12,5 +12,3 @@ error.log
 __pycache__/
 *.pyc
 
-# local work-in-progress
-agent-crew-architecture.html
