@@ -1,9 +1,46 @@
 {
-  "sprint": "sprint-16",
+  "sprint": "sprint-17",
   "tasks": [
     {
-      "slug": "lessons-permission-fix",
-      "title": "settings.json に Bash(scripts/lessons.sh *) を追加（Sprint-15 lessons.sh 未登録の修正）",
+      "slug": "hook-design",
+      "title": "TaskCompleted hook の設計（settings.json 組み込み設計・SubagentStop 責務再定義含む）",
+      "status": "DONE",
+      "assigned_to": "Alex",
+      "complexity": "M",
+      "risk_level": "medium",
+      "parallel_group": "phase-1",
+      "depends_on": [],
+      "qa_mode": null,
+      "created_at": "2026-04-26T22:00:00+09:00",
+      "updated_at": "2026-04-26",
+      "notes": "Issue #61 対応。設計書 docs/spec/hook-taskcompleted-design.md を作成する。内容: (1) TaskCompleted hook の責務定義（シグナル emit・queue ステータス更新など）、(2) settings.json への組み込み方法、(3) SubagentStop hook との責務分離・再定義、(4) Bash コードサンプルは bash -n でバリデーション済みのものを含めること（pm-learned-rules.md [Alex] ルール準拠）。着手条件: なし。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "設計書 docs/spec/hook-taskcompleted-design.md を作成。TaskCompleted hook の責務定義・settings.json 組み込み方法・SubagentStop との責務分離・Bash サンプルコードを記述。",
+      "events": [
+        {
+          "ts": "2026-04-26T22:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-17 キュー登録"
+        },
+        {
+          "ts": "2026-04-26T13:53:41+0000",
+          "agent": "Alex",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-26T13:54:35+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "設計書 docs/spec/hook-taskcompleted-design.md を作成。TaskCompleted hook の責務定義・settings.json 組み込み方法・SubagentStop との責務分離・Bash サンプルコードを記述。"
+        }
+      ]
+    },
+    {
+      "slug": "lesson-issue-close",
+      "title": "PR #93 マージ済み対応: lesson status 更新 + Issue #95 #96 #78 #36 クローズ",
       "status": "DONE",
       "assigned_to": "Yuki",
       "complexity": "S",
@@ -11,30 +48,36 @@
       "parallel_group": "phase-1",
       "depends_on": [],
       "qa_mode": null,
-      "created_at": "2026-04-26T21:00:00+09:00",
-      "updated_at": "2026-04-26",
-      "notes": "Sprint-15 失敗パターン: lessons.sh が permissions 未登録。settings.json の permissions.allow に Bash(scripts/lessons.sh *) を追加する。",
+      "created_at": "2026-04-26T22:00:00+09:00",
+      "updated_at": "2026-04-26T22:00:00+09:00",
+      "notes": "着手条件: PR #93 が MERGED 済みであること（確認済み）。実施内容: (1) ~/.claude/_lessons.json の PR #93 で反映済み lesson の status を implemented に更新、(2) Issue #95・#96・#78 をクローズ（pm-learned-rules.md 反映済みのため）、(3) Issue #36 をクローズ（ADR 既存・pm.md/engineer-go.md 反映済みのため）。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "settings.json の permissions.allow に Bash(scripts/lessons.sh *) を追加完了。",
+      "summary": "Issue #95/#96/#78/#36 クローズ完了。_lessons.json の10件（sprint-15-tooling-001/002・sprint-11-reliability-001/002・sprint-11-process-001・sprint-08-tooling-001/reliability-001・sprint-09-process-001/002・sprint-12-reliability-001）の status を implemented に更新。",
       "events": [
         {
-          "ts": "2026-04-26T21:00:00+09:00",
+          "ts": "2026-04-26T22:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-16 キュー登録"
+          "msg": "Sprint-17 キュー登録"
         },
         {
-          "ts": "2026-04-26T21:00:00+09:00",
+          "ts": "2026-04-26T22:00:00+09:00",
+          "agent": "Yuki",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-26T22:05:00+09:00",
           "agent": "Yuki",
           "action": "done",
-          "msg": "settings.json の permissions.allow に Bash(scripts/lessons.sh *) を追加完了。"
+          "msg": "Issue #95/#96/#78/#36 クローズ。_lessons.json 10件 status=implemented 更新完了。"
         }
       ]
     },
     {
-      "slug": "pm-learned-rules-sprint15",
-      "title": "pm-learned-rules.md に Sprint-15 の2件の lesson を追記",
+      "slug": "agent-precondition-doc",
+      "title": "Issue #86 対応 — engineer-go.md に「着手条件チェック」ルールを追記",
       "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "S",
@@ -42,119 +85,127 @@
       "parallel_group": "phase-1",
       "depends_on": [],
       "qa_mode": "inline",
-      "created_at": "2026-04-26T21:00:00+09:00",
+      "created_at": "2026-04-26T22:00:00+09:00",
       "updated_at": "2026-04-26",
-      "notes": "Sprint-15 推奨アクション3。pm-learned-rules.md に以下2件の lesson を追記する。(1) [全エージェント] Bash許可パターンは相対パスのみ一致する（絶対パス指定では拒否される）: settings.json の permissions.allow に登録するパターンは相対パス形式（scripts/xxx.sh *）で記述すること。絶対パス（/Users/...）は一致しない。(2) [みゆきち/Yuki] retro フェーズで使用するスクリプトは permissions.allow に事前登録する: スプリント開始前に scripts/lessons.sh など retro フェーズで使うコマンドが permissions.allow に含まれているか確認する。priority_score=4 以上のため対象。追記前に priority フィルタ確認（Issue #89 対策）を実施すること。",
+      "notes": "Issue #86 対応。着手条件: Issue #86 がオープンであること（確認済み）。対象ファイル: .claude/agents/engineer-go.md（1件のみ）。追記内容: 「タスク着手前に _queue.json の notes フィールドで着手条件を確認する。着手条件が未成立の場合は実装を開始せず Yuki へ報告する。」を禁止パターンまたはタスク開始手順セクションに追記する。変更ファイル: .claude/agents/engineer-go.md のみ（1件）。完了後に Yuki へ inline QA 報告すること。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "pm-learned-rules.md に Sprint-15 lesson 2件追記（agent-crew-sprint-15-tooling-001: Bash相対パスルール、agent-crew-sprint-15-tooling-002: lessons.sh事前登録ルール）。priority フィルタ確認済み（priority<3 混入なし）。_lessons.json にも同2件を追記。",
+      "summary": "engineer-go.md の委譲拒否条件と着手時フローに着手条件チェックを追記（Issue #86 対応）。変更ファイル: .claude/agents/engineer-go.md のみ。",
       "events": [
         {
-          "ts": "2026-04-26T21:00:00+09:00",
+          "ts": "2026-04-26T22:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-16 キュー登録"
+          "msg": "Sprint-17 キュー登録"
         },
         {
-          "ts": "2026-04-26T07:13:47+0000",
+          "ts": "2026-04-26T08:12:34+0000",
           "agent": "Riku",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-26T07:18:21+0000",
+          "ts": "2026-04-26T08:15:07+0000",
           "agent": "Riku",
           "action": "done",
-          "msg": "pm-learned-rules.md に Sprint-15 lesson 2件追記（agent-crew-sprint-15-tooling-001: Bash相対パスルール、agent-crew-sprint-15-tooling-002: lessons.sh事前登録ルール）。priority フィルタ確認済み（priority<3 混入なし）。_lessons.json にも同2件を追記。"
+          "msg": "engineer-go.md の委譲拒否条件と着手時フローに着手条件チェックを追記（Issue #86 対応）。変更ファイル: .claude/agents/engineer-go.md のみ。"
         }
       ]
     },
     {
-      "slug": "propose-lesson-rules-exec",
-      "title": "propose-lesson-rules.sh 本番実行: 蓄積 lesson 18件を agent .md へ反映する Draft PR 作成",
+      "slug": "hook-impl",
+      "title": "TaskCompleted hook 実装（.claude/hooks/task_completed.sh 新規作成 + settings.json 更新）",
       "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "medium",
-      "parallel_group": "phase-1",
-      "depends_on": [],
+      "parallel_group": "phase-2",
+      "depends_on": [
+        "hook-design"
+      ],
       "qa_mode": "inline",
-      "created_at": "2026-04-26T21:00:00+09:00",
+      "created_at": "2026-04-26T22:00:00+09:00",
       "updated_at": "2026-04-26",
-      "notes": "Sprint-15 推奨アクション2。scripts/propose-lesson-rules.sh（--dry-run なし）を実行して、蓄積済み 18件の lesson（priority_score>=4）を対象エージェント .md の「禁止パターン」セクションへ反映した Draft PR を作成する。実行前に feat/sprint-16 ブランチ上であることを確認する。スクリプトが作成するブランチ名は fix/lesson-rules-YYYYMMDD 形式。実行後に gh pr view で Draft PR の URL を確認して summary に記録する。注意: propose-lesson-rules.sh は内部で git checkout -b / git add / git commit / gh pr create を実行するため、feat/sprint-16 ブランチからの実行では別ブランチに切り替わる。実行後に git checkout feat/sprint-16 で戻ること。",
+      "notes": "着手条件: hook-design タスクが DONE で docs/spec/hook-taskcompleted-design.md が存在すること。実装内容は設計書に従う。変更ファイル上限3件（.claude/hooks/task_completed.sh, .claude/settings.json, 必要に応じて .claude/hooks/subagent_stop.sh）。指示文は 2,000 トークン以下で作成する（engineer-go 委譲前チェックリスト準拠）。qa_mode: inline（実装後に Sora QA 前に自己確認）。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "propose-lesson-rules.sh 本番実行完了。20件の lesson（priority>=4）を engineer-go.md・pm.md の禁止パターンセクションへ追記。Draft PR #93 作成: https://github.com/Andryu/agent-crew/pull/93",
+      "summary": ".claude/hooks/task_completed.sh 新規作成（bash -n 構文OK・chmod +x済み）。settings.json に TaskCompleted hook を登録。jq valid 確認済み。変更ファイル: task_completed.sh, settings.json の2件。",
       "events": [
         {
-          "ts": "2026-04-26T21:00:00+09:00",
+          "ts": "2026-04-26T22:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-16 キュー登録"
+          "msg": "Sprint-17 キュー登録"
         },
         {
-          "ts": "2026-04-26T07:18:28+0000",
+          "ts": "2026-04-26T13:54:43+0000",
+          "agent": "Riku",
+          "action": "handoff",
+          "msg": "next: READY_FOR_RIKU"
+        },
+        {
+          "ts": "2026-04-26T13:54:46+0000",
           "agent": "Riku",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-26T07:18:56+0000",
+          "ts": "2026-04-26T13:56:41+0000",
           "agent": "Riku",
           "action": "done",
-          "msg": "propose-lesson-rules.sh 本番実行完了。20件の lesson（priority>=4）を engineer-go.md・pm.md の禁止パターンセクションへ追記。Draft PR #93 作成: https://github.com/Andryu/agent-crew/pull/93"
+          "msg": ".claude/hooks/task_completed.sh 新規作成（bash -n 構文OK・chmod +x済み）。settings.json に TaskCompleted hook を登録。jq valid 確認済み。変更ファイル: task_completed.sh, settings.json の2件。"
         }
       ]
     },
     {
-      "slug": "sprint16-qa",
-      "title": "Sprint-16 最終QA: pm-learned-rules.md 追記・Draft PR 作成の確認",
+      "slug": "sprint17-qa",
+      "title": "Sprint-17 最終QA: hook実装・エージェント定義追記の確認",
       "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "low",
-      "parallel_group": "phase-2",
+      "parallel_group": "phase-3",
       "depends_on": [
-        "pm-learned-rules-sprint15",
-        "propose-lesson-rules-exec"
+        "agent-precondition-doc",
+        "hook-impl"
       ],
       "qa_mode": null,
-      "created_at": "2026-04-26T21:00:00+09:00",
+      "created_at": "2026-04-26T22:00:00+09:00",
       "updated_at": "2026-04-26",
-      "notes": "確認内容: (1) pm-learned-rules.md に Sprint-15 の2件の lesson が追記されているか。priority < 3 のエントリが混入していないか（Issue #89 対策）。(2) fix/lesson-rules-YYYYMMDD ブランチの Draft PR が作成されているか（gh pr list --state open で確認）。(3) settings.json が JSON として valid か（jq . で確認）。Bash実行不可の場合は CHANGES_REQUESTED（REASON: BASH_UNAVAILABLE）を返すこと。",
+      "notes": "確認内容: (1) .claude/hooks/task_completed.sh が存在し bash -n で構文エラーなしか。(2) settings.json に TaskCompleted hook が正しく登録されているか（jq . で確認）。(3) .claude/agents/engineer-go.md に着手条件チェックルールが追記されているか。(4) Bash 実行不可の場合は CHANGES_REQUESTED（REASON: BASH_UNAVAILABLE）を返すこと。",
       "retry_count": 0,
       "qa_result": "APPROVED",
-      "summary": "全5チェック通過。pm-learned-rules.md Sprint-15 lesson 2件追記・Draft PR #93 作成・settings.json valid・lessons.sh 権限登録を確認。APPROVED。",
+      "summary": "全5チェック APPROVED。task_completed.sh・settings.json・engineer-go.md の変更を確認。",
       "events": [
         {
-          "ts": "2026-04-26T21:00:00+09:00",
+          "ts": "2026-04-26T22:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-16 キュー登録"
+          "msg": "Sprint-17 キュー登録"
         },
         {
-          "ts": "2026-04-26T07:18:59+0000",
+          "ts": "2026-04-26T13:56:41+0000",
           "agent": "Sora",
           "action": "handoff",
           "msg": "next: READY_FOR_SORA"
         },
         {
-          "ts": "2026-04-26T07:19:26+0000",
+          "ts": "2026-04-26T13:56:44+0000",
           "agent": "Sora",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-26T07:19:26+0000",
+          "ts": "2026-04-26T13:57:22+0000",
           "agent": "Sora",
           "action": "qa",
-          "msg": "APPROVED: APPROVED: 全5チェック通過。(1)pm-learned-rules.md: Sprint-15 lesson 2件（tooling-001・tooling-002）追記確認。(2)priority フィルタ: priority<3 混入なし（最小 priority=3）。(3)Draft PR #93: fix/lesson-rules-20260426 ブランチで作成確認。(4)settings.json: JSON valid。(5)lessons.sh 権限: Bash(scripts/lessons.sh *) 登録確認。CRITICAL/MAJOR なし。"
+          "msg": "APPROVED: 全5チェック通過。(1)task_completed.sh 存在・bash -n OK・chmod +x済み。(2)settings.json に TaskCompleted hook 登録確認。(3)settings.json jq valid。(4)engineer-go.md に着手条件チェック2箇所追記確認（行114:委譲拒否条件、行119:着手時フロー）。(5)スモークテスト: _signals.jsonl に task_completed イベント emit・JSON valid確認。CRITICAL/MAJOR なし。"
         },
         {
-          "ts": "2026-04-26T07:19:31+0000",
+          "ts": "2026-04-26T13:57:22+0000",
           "agent": "Sora",
           "action": "done",
-          "msg": "全5チェック通過。pm-learned-rules.md Sprint-15 lesson 2件追記・Draft PR #93 作成・settings.json valid・lessons.sh 権限登録を確認。APPROVED。"
+          "msg": "全5チェック APPROVED。task_completed.sh・settings.json・engineer-go.md の変更を確認。"
         }
       ]
     }

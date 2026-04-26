@@ -1,5 +1,15 @@
 {
   "hooks": {
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/task_completed.sh"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "",
@@ -59,7 +69,10 @@
       "Bash(git push *)",
       "Bash(git pull *)",
       "Bash(git fetch *)",
-      "Bash(jq *)"
+      "Bash(jq *)",
+      "Bash(chmod *)",
+      "Bash(bash *)",
+      "Write(**)"
     ]
   }
 }
