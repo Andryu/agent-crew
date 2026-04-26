@@ -108,3 +108,28 @@
 - pm-learned-rules.md に Sprint-15 の2件の新規 lesson（Bash絶対パス問題・lessons.sh未登録）を追記する（priority_score=4 のため対象）。
 
 ---
+
+## sprint-16 — 2026-04-26
+
+### アーキテクチャ判断
+
+- **lessons.sh を permissions.allow に登録完了（Sprint-15 失敗パターン修正）**: `settings.json` の `permissions.allow` に `Bash(scripts/lessons.sh *)` を追加。retro フェーズでの lesson 記録が正式に自動化フローに組み込まれた。
+- **propose-lesson-rules.sh 初の本番実行（Issue #59 完全完了）**: 蓄積済み 20件の lesson（priority_score>=4）を `engineer-go.md`・`pm.md` の「禁止パターン」セクションへ自動反映し、Draft PR #93 を作成した。設計（Sprint-15）→ 実装（Sprint-15）→ 本番実行（Sprint-16）の3スプリントに渡るフローが完結した。
+- **pm-learned-rules.md に Bash相対パス・permissions事前登録ルールを追記**: Sprint-15 の失敗パターン2件をルール化し記録。Issue #95・#96 として Issue 化済み。
+
+### 学び
+
+- 後処理スプリント（Sprint-16）を設けることで、Sprint-15 の積み残し（lesson 記録・本番実行）を確実に完了できた。スプリント間のバトンタッチが機能している。
+- `propose-lesson-rules.sh` が独立ブランチ（fix/lesson-rules-YYYYMMDD）を作成する設計により、Sprint-16 ブランチ（feat/sprint-16）を汚染せずに lesson PR を並行管理できた。
+
+### 失敗パターン
+
+- なし（retry_count=0、BLOCKED=0）
+
+### 次スプリントへの推奨
+
+- Draft PR #93（fix/lesson-rules-20260426）をオーナーがレビューしてマージする。マージ後、対応 lesson の status を `implemented` に更新する。
+- Issue #36（サブエージェントのトークン消費最適化）、Issue #61（TaskCompleted/PreToolUse hookの活用）などのオープン Issue から次スプリントのゴールを選定する。
+- `propose-lesson-rules.sh` 実行後にブランチが fix/lesson-rules-YYYYMMDD に切り替わり、feat/sprint-XX ブランチに戻る必要がある（スクリプトは自動で戻るが確認が必要）。次回実行時も同様の挙動を想定すること。
+
+---
