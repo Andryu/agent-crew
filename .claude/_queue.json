@@ -1,265 +1,146 @@
 {
-  "sprint": "sprint-13",
+  "sprint": "sprint-14",
   "tasks": [
     {
-      "slug": "lesson-schema-migrate",
-      "title": "Phase 1: _lessons.json スキーマ移行（v1.2.0）と flock fallback 実装",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "M",
-      "risk_level": "medium",
-      "parallel_group": null,
-      "depends_on": [],
-      "qa_mode": "inline",
-      "created_at": "2026-04-26T01:00:00+09:00",
-      "updated_at": "2026-04-26",
-      "notes": "GitHub Issue #81",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "Phase 1: lessons.shのスキーマ更新、promoteとflock fallback実装完了",
-      "events": [
-        {
-          "ts": "2026-04-26T01:16:16.954559+09:00",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "Phase 1: lessons.shのスキーマ更新、promoteとflock fallback実装完了"
-        }
-      ]
-    },
-    {
-      "slug": "qa-lesson-schema-migrate",
-      "title": "QA: lesson-schema-migrate",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "lesson-schema-migrate"
-      ],
-      "qa_mode": null,
-      "created_at": "2026-04-26T01:00:00+09:00",
-      "updated_at": "2026-04-26",
-      "notes": "GitHub Issue #81",
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "Phase 1: lessons.sh 挙動確認完了。scope/stack設定、promoteコマンド正常動作、flock代替mkdirロックのタイムアウトテストを全てパス。",
-      "events": [
-        {
-          "ts": "2026-04-26T01:16:16.954559+09:00",
-          "agent": "Sora",
-          "action": "handoff",
-          "msg": "Task is ready"
-        },
-        {
-          "ts": "2026-04-26T01:16:49.104381+09:00",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED"
-        },
-        {
-          "ts": "2026-04-26T01:16:49.104381+09:00",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "Phase 1 QA完了"
-        }
-      ]
-    },
-    {
-      "slug": "lesson-session-start",
-      "title": "Phase 2: session_start.sh にスタック検出と3層優先表示追加",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "qa-lesson-schema-migrate"
-      ],
-      "qa_mode": "inline",
-      "created_at": "2026-04-26T01:00:00+09:00",
-      "updated_at": "2026-04-26",
-      "notes": "GitHub Issue #81",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "session_start.sh にスタック自動検出、および scope, stack, global に基づいた表示制御を追加しました。",
-      "events": [
-        {
-          "ts": "2026-04-26T01:16:49.104381+09:00",
-          "agent": "Sora",
-          "action": "handoff",
-          "msg": "Task is ready"
-        },
-        {
-          "ts": "2026-04-26T01:23:00.000000+09:00",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "Phase 2の実装および修正が完了"
-        }
-      ]
-    },
-    {
-      "slug": "qa-lesson-session-start",
-      "title": "QA: lesson-session-start",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "lesson-session-start"
-      ],
-      "qa_mode": null,
-      "created_at": "2026-04-26T01:00:00+09:00",
-      "updated_at": "2026-04-26",
-      "notes": "GitHub Issue #81",
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "session_start.shのテストを実施し、降順表示、フィルタリング、環境変数からの設定適用など正常動作を確認しました。",
-      "events": [
-        {
-          "ts": "2026-04-26T01:23:00.000000+09:00",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED"
-        },
-        {
-          "ts": "2026-04-26T01:23:00.000000+09:00",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "QA完了"
-        }
-      ]
-    },
-    {
-      "slug": "lesson-retro-prompt",
-      "title": "Phase 3: retro.md スコープ判断ロジック追加",
+      "slug": "learnings-schema",
+      "title": "pm-learned-rules.md: スキーマ・フォーマット定義ファイル作成",
       "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": null,
       "depends_on": [],
-      "qa_mode": "end_of_sprint",
-      "created_at": "2026-04-26T01:00:00+09:00",
-      "updated_at": "2026-04-26",
-      "notes": "GitHub Issue #81",
+      "qa_mode": "inline",
+      "created_at": "2026-04-26T12:00:00+09:00",
+      "updated_at": "2026-04-26T12:30:00+09:00",
+      "notes": "GitHub Issue #24。.claude/agents/pm-learned-rules.md を新規作成。ルールのスキーマ（trigger / rule / evidence / effect）とサンプルを定義する。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "みゆきち（retroエージェント）のプロンプトに、プロジェクト/グローバル/スタックの3層スコープ判定および付与基準を追記しました。",
+      "summary": "pm-learned-rules.md 新規作成。_lessons.json から status:open かつ priority_score>=3 の18件を変換し、エージェント別ルール形式で記載。",
       "events": [
         {
-          "ts": "2026-04-26T01:23:00.000000+09:00",
+          "ts": "2026-04-26T12:30:00+09:00",
           "agent": "Riku",
-          "action": "handoff",
-          "msg": "Task is ready"
+          "action": "start",
+          "msg": "learnings-schema 実装開始"
         },
         {
-          "ts": "2026-04-26T01:28:00.000000+09:00",
+          "ts": "2026-04-26T12:30:00+09:00",
           "agent": "Riku",
           "action": "done",
-          "msg": "Phase 3の実装が完了"
+          "msg": "pm-learned-rules.md 新規作成。_lessons.json から status:open かつ priority_score>=3 の18件を変換し、エージェント別ルール形式で記載。"
         }
       ]
     },
     {
-      "slug": "lesson-install-symlink",
-      "title": "Phase 4: install.sh のシンボリックリンク移行とスキーマ移行チェック",
+      "slug": "learnings-retro",
+      "title": "retro.md: ルール書き出し手順を追加",
       "status": "DONE",
       "assigned_to": "Riku",
-      "complexity": "M",
-      "risk_level": "medium",
+      "complexity": "S",
+      "risk_level": "low",
       "parallel_group": null,
       "depends_on": [
-        "qa-lesson-schema-migrate"
+        "learnings-schema"
       ],
       "qa_mode": "inline",
-      "created_at": "2026-04-26T01:00:00+09:00",
-      "updated_at": "2026-04-26",
-      "notes": "GitHub Issue #81",
+      "created_at": "2026-04-26T12:00:00+09:00",
+      "updated_at": "2026-04-26T13:00:00+09:00",
+      "notes": "GitHub Issue #24。retro.md に「スプリント完了後に priority_score >= 6 の lesson を pm-learned-rules.md へ書き出す」手順を追加する。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "install.sh を改修し、シンボリックリンク移行、既存ファイル警告、flockチェック、_lessons.json マイグレーション機能を実装しました。",
+      "summary": "retro.md にステップ5「pm-learned-rules.md へのルール書き出し」を追加。status:open かつ priority_score>=3 の未記載 lesson を重複チェック後に追記する手順と、完了報告フォーマットへの「ルール追加 X件」記載を定義。",
       "events": [
         {
-          "ts": "2026-04-26T01:28:00.000000+09:00",
+          "ts": "2026-04-26T13:00:00+09:00",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "learnings-retro 実装開始"
+        },
+        {
+          "ts": "2026-04-26T13:00:00+09:00",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "retro.md にステップ5「pm-learned-rules.md へのルール書き出し」を追加。status:open かつ priority_score>=3 の未記載 lesson を重複チェック後に追記する手順と、完了報告フォーマットへの「ルール追加 X件」記載を定義。"
+        }
+      ]
+    },
+    {
+      "slug": "learnings-pm",
+      "title": "pm.md: スプリント計画時の pm-learned-rules.md 読み込み指示を追加",
+      "status": "DONE",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": null,
+      "depends_on": [
+        "learnings-schema"
+      ],
+      "qa_mode": "inline",
+      "created_at": "2026-04-26T12:00:00+09:00",
+      "updated_at": "2026-04-26T14:00:00+09:00",
+      "notes": "GitHub Issue #24。pm.md のスプリント計画前チェックリストに「pm-learned-rules.md を読み込み、該当ルールをタスク設計に反映する」ステップを追加する。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "pm.md のスプリント開始前チェックにステップ0.5「pm-learned-rules.md の読み込み」を追加。関連ルールのタスク設計への反映、および反映不要の場合は理由を確認事項に記載する指示を明記。",
+      "events": [
+        {
+          "ts": "2026-04-26T14:00:00+09:00",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "learnings-pm 実装開始"
+        },
+        {
+          "ts": "2026-04-26T14:00:00+09:00",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "pm.md のスプリント開始前チェックにステップ0.5「pm-learned-rules.md の読み込み」を追加。関連ルールのタスク設計への反映、および反映不要の場合は理由を確認事項に記載する指示を明記。"
+        }
+      ]
+    },
+    {
+      "slug": "qa-learnings-loop",
+      "title": "QA: learnings-schema / learnings-retro / learnings-pm の統合確認",
+      "status": "DONE",
+      "assigned_to": "Sora",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": null,
+      "depends_on": [
+        "learnings-retro",
+        "learnings-pm"
+      ],
+      "qa_mode": null,
+      "created_at": "2026-04-26T12:00:00+09:00",
+      "updated_at": "2026-04-26",
+      "notes": "GitHub Issue #24。3ファイルの整合性（スキーマ・参照・手順）を確認。pm-learned-rules.md のサンプルが retro.md 手順・pm.md 参照と矛盾しないこと。",
+      "retry_count": 0,
+      "qa_result": "APPROVED",
+      "summary": "3ファイル整合性確認完了。MINOR3件のコメント付きでAPPROVED。",
+      "events": [
+        {
+          "ts": "2026-04-26T14:00:00+09:00",
           "agent": "Riku",
           "action": "handoff",
           "msg": "Task is ready"
         },
         {
-          "ts": "2026-04-26T01:45:00.000000+09:00",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "Phase 4の実装が完了"
-        }
-      ]
-    },
-    {
-      "slug": "qa-lesson-install-symlink",
-      "title": "QA: lesson-install-symlink",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "lesson-install-symlink"
-      ],
-      "qa_mode": null,
-      "created_at": "2026-04-26T01:00:00+09:00",
-      "updated_at": "2026-04-26",
-      "notes": "GitHub Issue #81",
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "install.sh のシンボリックリンク移行、警告処理、およびスキーママイグレーションの自動検知が正常に動作することを確認しました。",
-      "events": [
-        {
-          "ts": "2026-04-26T01:55:00.000000+09:00",
+          "ts": "2026-04-26T02:32:32+0000",
           "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED"
+          "action": "start",
+          "msg": "着手"
         },
         {
-          "ts": "2026-04-26T01:55:00.000000+09:00",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "Phase 4 QA完了"
-        }
-      ]
-    },
-    {
-      "slug": "sprint-13-qa",
-      "title": "Sprint-13 最終 QA",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": null,
-      "depends_on": [
-        "qa-lesson-session-start",
-        "lesson-retro-prompt",
-        "qa-lesson-install-symlink"
-      ],
-      "qa_mode": null,
-      "created_at": "2026-04-26T01:00:00+09:00",
-      "updated_at": "2026-04-26",
-      "notes": "GitHub Issue #81",
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "Sprint-13 の全フェーズ（マルチプロダクト対応 lesson 管理アーキテクチャ）の統合 QA を完了しました。全機能が設計通り動作し、他プロダクトへの配布準備が整いました。",
-      "events": [
-        {
-          "ts": "2026-04-26T01:56:00.000000+09:00",
+          "ts": "2026-04-26T02:32:38+0000",
           "agent": "Sora",
           "action": "qa",
-          "msg": "APPROVED"
+          "msg": "APPROVED: 3ファイル間の連携・フォーマット整合性を確認。MINOR3件（priority2エントリの混入・2件の未記載教訓・やってはいけないこと省略ルールの曖昧さ）。CRITICAL/MAJORなし。ドキュメントのみのためテスト不要と判断し承認。"
         },
         {
-          "ts": "2026-04-26T01:56:00.000000+09:00",
+          "ts": "2026-04-26T02:32:41+0000",
           "agent": "Sora",
           "action": "done",
-          "msg": "Sprint-13 最終QA完了"
+          "msg": "3ファイル整合性確認完了。MINOR3件のコメント付きでAPPROVED。"
         }
       ]
     }
