@@ -1,46 +1,9 @@
 {
-  "sprint": "sprint-17",
+  "sprint": "sprint-18",
   "tasks": [
     {
-      "slug": "hook-design",
-      "title": "TaskCompleted hook の設計（settings.json 組み込み設計・SubagentStop 責務再定義含む）",
-      "status": "DONE",
-      "assigned_to": "Alex",
-      "complexity": "M",
-      "risk_level": "medium",
-      "parallel_group": "phase-1",
-      "depends_on": [],
-      "qa_mode": null,
-      "created_at": "2026-04-26T22:00:00+09:00",
-      "updated_at": "2026-04-26",
-      "notes": "Issue #61 対応。設計書 docs/spec/hook-taskcompleted-design.md を作成する。内容: (1) TaskCompleted hook の責務定義（シグナル emit・queue ステータス更新など）、(2) settings.json への組み込み方法、(3) SubagentStop hook との責務分離・再定義、(4) Bash コードサンプルは bash -n でバリデーション済みのものを含めること（pm-learned-rules.md [Alex] ルール準拠）。着手条件: なし。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "設計書 docs/spec/hook-taskcompleted-design.md を作成。TaskCompleted hook の責務定義・settings.json 組み込み方法・SubagentStop との責務分離・Bash サンプルコードを記述。",
-      "events": [
-        {
-          "ts": "2026-04-26T22:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-17 キュー登録"
-        },
-        {
-          "ts": "2026-04-26T13:53:41+0000",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-26T13:54:35+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "設計書 docs/spec/hook-taskcompleted-design.md を作成。TaskCompleted hook の責務定義・settings.json 組み込み方法・SubagentStop との責務分離・Bash サンプルコードを記述。"
-        }
-      ]
-    },
-    {
-      "slug": "lesson-issue-close",
-      "title": "PR #93 マージ済み対応: lesson status 更新 + Issue #95 #96 #78 #36 クローズ",
+      "slug": "lesson-dedup-close",
+      "title": "Issue #99/#100 重複クローズ + sprint-17-tooling-001 lesson status 更新",
       "status": "DONE",
       "assigned_to": "Yuki",
       "complexity": "S",
@@ -48,164 +11,147 @@
       "parallel_group": "phase-1",
       "depends_on": [],
       "qa_mode": null,
-      "created_at": "2026-04-26T22:00:00+09:00",
-      "updated_at": "2026-04-26T22:00:00+09:00",
-      "notes": "着手条件: PR #93 が MERGED 済みであること（確認済み）。実施内容: (1) ~/.claude/_lessons.json の PR #93 で反映済み lesson の status を implemented に更新、(2) Issue #95・#96・#78 をクローズ（pm-learned-rules.md 反映済みのため）、(3) Issue #36 をクローズ（ADR 既存・pm.md/engineer-go.md 反映済みのため）。",
+      "created_at": "2026-04-26T23:00:00+09:00",
+      "updated_at": "2026-04-26T23:10:00+09:00",
+      "notes": "Issue #99 と #100 は同じ lesson（agent-crew-sprint-17-tooling-001）から二重生成された重複 Issue。#99 をクローズし #100 を残す（#100 の方が新しく内容が正確）。その後 ~/.claude/_lessons.json の agent-crew-sprint-17-tooling-001 の status を implemented に更新する（settings.json への権限追加は Sprint-17 で完了済みのため）。着手条件: なし。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "Issue #95/#96/#78/#36 クローズ完了。_lessons.json の10件（sprint-15-tooling-001/002・sprint-11-reliability-001/002・sprint-11-process-001・sprint-08-tooling-001/reliability-001・sprint-09-process-001/002・sprint-12-reliability-001）の status を implemented に更新。",
+      "summary": "Issue #99 をクローズ（#100 に統合）。~/.claude/_lessons.json の agent-crew-sprint-17-tooling-001 の status を implemented に更新。",
       "events": [
         {
-          "ts": "2026-04-26T22:00:00+09:00",
+          "ts": "2026-04-26T23:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-17 キュー登録"
+          "msg": "Sprint-18 キュー登録"
         },
         {
-          "ts": "2026-04-26T22:00:00+09:00",
+          "ts": "2026-04-26T23:05:00+09:00",
           "agent": "Yuki",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-26T22:05:00+09:00",
+          "ts": "2026-04-26T23:10:00+09:00",
           "agent": "Yuki",
           "action": "done",
-          "msg": "Issue #95/#96/#78/#36 クローズ。_lessons.json 10件 status=implemented 更新完了。"
+          "msg": "Issue #99 CLOSED（#100 に統合）。_lessons.json agent-crew-sprint-17-tooling-001 status=implemented 更新完了。"
         }
       ]
     },
     {
-      "slug": "agent-precondition-doc",
-      "title": "Issue #86 対応 — engineer-go.md に「着手条件チェック」ルールを追記",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-1",
-      "depends_on": [],
-      "qa_mode": "inline",
-      "created_at": "2026-04-26T22:00:00+09:00",
-      "updated_at": "2026-04-26",
-      "notes": "Issue #86 対応。着手条件: Issue #86 がオープンであること（確認済み）。対象ファイル: .claude/agents/engineer-go.md（1件のみ）。追記内容: 「タスク着手前に _queue.json の notes フィールドで着手条件を確認する。着手条件が未成立の場合は実装を開始せず Yuki へ報告する。」を禁止パターンまたはタスク開始手順セクションに追記する。変更ファイル: .claude/agents/engineer-go.md のみ（1件）。完了後に Yuki へ inline QA 報告すること。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "engineer-go.md の委譲拒否条件と着手時フローに着手条件チェックを追記（Issue #86 対応）。変更ファイル: .claude/agents/engineer-go.md のみ。",
-      "events": [
-        {
-          "ts": "2026-04-26T22:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-17 キュー登録"
-        },
-        {
-          "ts": "2026-04-26T08:12:34+0000",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-26T08:15:07+0000",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "engineer-go.md の委譲拒否条件と着手時フローに着手条件チェックを追記（Issue #86 対応）。変更ファイル: .claude/agents/engineer-go.md のみ。"
-        }
-      ]
-    },
-    {
-      "slug": "hook-impl",
-      "title": "TaskCompleted hook 実装（.claude/hooks/task_completed.sh 新規作成 + settings.json 更新）",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "M",
-      "risk_level": "medium",
-      "parallel_group": "phase-2",
-      "depends_on": [
-        "hook-design"
-      ],
-      "qa_mode": "inline",
-      "created_at": "2026-04-26T22:00:00+09:00",
-      "updated_at": "2026-04-26",
-      "notes": "着手条件: hook-design タスクが DONE で docs/spec/hook-taskcompleted-design.md が存在すること。実装内容は設計書に従う。変更ファイル上限3件（.claude/hooks/task_completed.sh, .claude/settings.json, 必要に応じて .claude/hooks/subagent_stop.sh）。指示文は 2,000 トークン以下で作成する（engineer-go 委譲前チェックリスト準拠）。qa_mode: inline（実装後に Sora QA 前に自己確認）。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": ".claude/hooks/task_completed.sh 新規作成（bash -n 構文OK・chmod +x済み）。settings.json に TaskCompleted hook を登録。jq valid 確認済み。変更ファイル: task_completed.sh, settings.json の2件。",
-      "events": [
-        {
-          "ts": "2026-04-26T22:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-17 キュー登録"
-        },
-        {
-          "ts": "2026-04-26T13:54:43+0000",
-          "agent": "Riku",
-          "action": "handoff",
-          "msg": "next: READY_FOR_RIKU"
-        },
-        {
-          "ts": "2026-04-26T13:54:46+0000",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-26T13:56:41+0000",
-          "agent": "Riku",
-          "action": "done",
-          "msg": ".claude/hooks/task_completed.sh 新規作成（bash -n 構文OK・chmod +x済み）。settings.json に TaskCompleted hook を登録。jq valid 確認済み。変更ファイル: task_completed.sh, settings.json の2件。"
-        }
-      ]
-    },
-    {
-      "slug": "sprint17-qa",
-      "title": "Sprint-17 最終QA: hook実装・エージェント定義追記の確認",
+      "slug": "hook-smoke-test",
+      "title": "TaskCompleted hook 実動作確認（スモークテスト）",
       "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "low",
-      "parallel_group": "phase-3",
-      "depends_on": [
-        "agent-precondition-doc",
-        "hook-impl"
-      ],
+      "parallel_group": "phase-1",
+      "depends_on": [],
       "qa_mode": null,
-      "created_at": "2026-04-26T22:00:00+09:00",
-      "updated_at": "2026-04-26",
-      "notes": "確認内容: (1) .claude/hooks/task_completed.sh が存在し bash -n で構文エラーなしか。(2) settings.json に TaskCompleted hook が正しく登録されているか（jq . で確認）。(3) .claude/agents/engineer-go.md に着手条件チェックルールが追記されているか。(4) Bash 実行不可の場合は CHANGES_REQUESTED（REASON: BASH_UNAVAILABLE）を返すこと。",
+      "created_at": "2026-04-26T23:00:00+09:00",
+      "updated_at": "2026-04-26T23:10:00+09:00",
+      "notes": "Sprint-17 で導入した TaskCompleted hook の実動作を確認する。確認内容: (1) .claude/hooks/task_completed.sh が存在し実行権限があるか（ls -la）。(2) .claude/_signals.jsonl に sprint-17 の task_completed イベントが記録されているか（jq で確認）。(3) task_completed イベントのレコードが正しい JSON 形式か（ts/sprint/slug/agent/event フィールドが存在するか）。(4) settings.json の TaskCompleted hook 設定が正しいか（jq . で確認）。結果を summary に記録して DONE にする。Bash 不可の場合は CHANGES_REQUESTED（REASON: BASH_UNAVAILABLE）を返すこと。着手条件: なし。",
       "retry_count": 0,
       "qa_result": "APPROVED",
-      "summary": "全5チェック APPROVED。task_completed.sh・settings.json・engineer-go.md の変更を確認。",
+      "summary": "(1) task_completed.sh 存在・-rwxr-xr-x・bash -n OK。(2) _signals.jsonl に sprint-17 task_completed イベント存在（ts=2026-04-26T13:57:09+0000 slug=sprint17-qa）。(3) JSON フィールド ts/sprint/slug/agent/event 全て有効。(4) settings.json に TaskCompleted hook 登録確認。全4チェック PASS。",
       "events": [
         {
-          "ts": "2026-04-26T22:00:00+09:00",
+          "ts": "2026-04-26T23:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-17 キュー登録"
+          "msg": "Sprint-18 キュー登録"
         },
         {
-          "ts": "2026-04-26T13:56:41+0000",
-          "agent": "Sora",
-          "action": "handoff",
-          "msg": "next: READY_FOR_SORA"
-        },
-        {
-          "ts": "2026-04-26T13:56:44+0000",
+          "ts": "2026-04-26T23:05:00+09:00",
           "agent": "Sora",
           "action": "start",
           "msg": "着手"
         },
         {
-          "ts": "2026-04-26T13:57:22+0000",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 全5チェック通過。(1)task_completed.sh 存在・bash -n OK・chmod +x済み。(2)settings.json に TaskCompleted hook 登録確認。(3)settings.json jq valid。(4)engineer-go.md に着手条件チェック2箇所追記確認（行114:委譲拒否条件、行119:着手時フロー）。(5)スモークテスト: _signals.jsonl に task_completed イベント emit・JSON valid確認。CRITICAL/MAJOR なし。"
-        },
-        {
-          "ts": "2026-04-26T13:57:22+0000",
+          "ts": "2026-04-26T23:10:00+09:00",
           "agent": "Sora",
           "action": "done",
-          "msg": "全5チェック APPROVED。task_completed.sh・settings.json・engineer-go.md の変更を確認。"
+          "msg": "全4チェック PASS。task_completed.sh 実行権限あり・bash -n OK・_signals.jsonl に task_completed イベント存在・JSON フィールド有効・settings.json 登録確認。"
+        }
+      ]
+    },
+    {
+      "slug": "pm-rules-update",
+      "title": "pm-learned-rules.md の未コミット変更をコミット + 最終更新日を sprint-18 に更新",
+      "status": "DONE",
+      "assigned_to": "Yuki",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-1",
+      "depends_on": [],
+      "qa_mode": null,
+      "created_at": "2026-04-26T23:00:00+09:00",
+      "updated_at": "2026-04-26T23:10:00+09:00",
+      "notes": "pm-learned-rules.md に sprint-17 の2件の lesson（sprint-17-tooling-001・sprint-17-reliability-001）が未コミットで残っている。最終更新日を sprint-18 / 2026-04-26 に更新してからコミットに含める。変更ファイル: .claude/agents/pm-learned-rules.md のみ。着手条件: なし。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "pm-learned-rules.md の最終更新日を sprint-18 / 2026-04-26 に更新。sprint-17 の2件の lesson エントリを含む未コミット変更を確認。",
+      "events": [
+        {
+          "ts": "2026-04-26T23:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-18 キュー登録"
+        },
+        {
+          "ts": "2026-04-26T23:05:00+09:00",
+          "agent": "Yuki",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-26T23:10:00+09:00",
+          "agent": "Yuki",
+          "action": "done",
+          "msg": "pm-learned-rules.md 最終更新日を sprint-18 に更新。2件のsprint-17 lesson エントリ（sprint-17-tooling-001・sprint-17-reliability-001）を含む変更確定。"
+        }
+      ]
+    },
+    {
+      "slug": "sprint18-qa",
+      "title": "Sprint-18 最終QA",
+      "status": "DONE",
+      "assigned_to": "Sora",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-2",
+      "depends_on": ["lesson-dedup-close", "hook-smoke-test", "pm-rules-update"],
+      "qa_mode": null,
+      "created_at": "2026-04-26T23:00:00+09:00",
+      "updated_at": "2026-04-26T23:15:00+09:00",
+      "notes": "確認内容: (1) Issue #99 が CLOSED か（gh issue view 99）。(2) ~/.claude/_lessons.json の agent-crew-sprint-17-tooling-001 の status が implemented か（jq）。(3) .claude/_signals.jsonl に task_completed イベントが存在するか。(4) pm-learned-rules.md の最終更新日が sprint-18 になっているか。(5) _queue.json の sprint が sprint-18 になっているか。全て PASS なら APPROVED、1件でも NG なら CHANGES_REQUESTED。",
+      "retry_count": 0,
+      "qa_result": "APPROVED",
+      "summary": "全5チェック APPROVED。(1)Issue #99 CLOSED確認。(2)_lessons.json sprint-17-tooling-001 status=implemented確認。(3)_signals.jsonl task_completed イベント存在確認。(4)pm-learned-rules.md 最終更新日 sprint-18 確認。(5)_queue.json sprint=sprint-18 確認。CRITICAL/MAJOR なし。",
+      "events": [
+        {
+          "ts": "2026-04-26T23:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-18 キュー登録"
+        },
+        {
+          "ts": "2026-04-26T23:12:00+09:00",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-04-26T23:15:00+09:00",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: 全5チェック通過。(1)#99 CLOSED。(2)sprint-17-tooling-001 status=implemented。(3)_signals.jsonl task_completed イベント存在。(4)pm-learned-rules.md sprint-18 更新済み。(5)_queue.json sprint=sprint-18。"
+        },
+        {
+          "ts": "2026-04-26T23:15:00+09:00",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "全5チェック APPROVED。CRITICAL/MAJOR なし。@retro を起動してください。"
         }
       ]
     }
