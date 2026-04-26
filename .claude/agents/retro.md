@@ -102,7 +102,60 @@ gh issue create \
 
 Issue 作成後、`issue_url` を lesson エントリに書き戻す（flock 経由）。
 
-### ステップ 5: Yuki への完了報告
+### ステップ 5: `pm-learned-rules.md` へのルール書き出し
+
+`_lessons.json` の教訓を `agents/pm-learned-rules.md` に反映する。
+
+#### 対象教訓の抽出
+
+```bash
+jq '.lessons[] | select(
+  (.status == "open" or .status == null) and
+  (.priority_score >= 3)
+)' ~/.claude/_lessons.json
+```
+
+#### 重複チェック
+
+`pm-learned-rules.md` に既に `lesson_id` が記載されているエントリは追加しない。
+
+```bash
+# 既存の lesson_id 一覧を取得
+grep -o 'lesson_id: [a-z0-9_-]*' agents/pm-learned-rules.md | awk '{print $2}'
+```
+
+上記で得た既存 lesson_id と照合し、未記載のものだけを追加対象とする。
+
+#### 新規ルールの追記
+
+追加対象が存在する場合、以下のフォーマットで `pm-learned-rules.md` の末尾（最終行 `*このファイルは…*` の直前）に追記する：
+
+```
+## [エージェント名] ルールタイトル
+
+- lesson_id: <id>
+- priority: <score> / sprint: <sprint>
+
+**やること / やってはいけないこと**
+<具体的な行動指針（description + action から生成）>
+
+**エビデンス**
+<evidence フィールドの内容、または description の根拠部分>
+
+---
+```
+
+`エージェント名` は lesson の `category` フィールドまたは `description` の文脈から判断する。対象エージェントが不明な場合は `[全エージェント]` とする。
+
+#### 更新後のフッター修正
+
+ファイル末尾のフッター行を最新スプリント・日付に更新する：
+
+```
+*最終更新: [sprint名] / [YYYY-MM-DD]*
+```
+
+### ステップ 6: Yuki への完了報告
 
 以下のフォーマットで完了報告を返す：
 
@@ -120,6 +173,10 @@ Issue 作成後、`issue_url` を lesson エントリに書き戻す（flock 経
 
 ### 保留 lesson（バックログ候補）
 - [lesson-id]: [理由]
+
+### ルール書き出し結果
+- 追加: [n] 件（pm-learned-rules.md）
+- スキップ（重複）: [n] 件
 ```
 
 ---

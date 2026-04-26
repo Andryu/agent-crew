@@ -44,3 +44,6 @@
 {"ts":"2026-04-25T13:39:27+0000","type":"task.handoff","sprint":"sprint-12","slug":"sprint-end-qa","agent":"Sora","detail":{"to_agent":"Sora","next_slug":"sprint-end-qa"}}
 {"ts":"2026-04-25T13:40:53+0000","type":"qa.approved","sprint":"sprint-12","slug":"sprint-end-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
 {"ts":"2026-04-25T13:41:02+0000","type":"task.done","sprint":"sprint-12","slug":"sprint-end-qa","agent":"Sora","detail":{"summary":"Sprint-12全3ファイルの静的レビュー完了。CRITICAL/MAJORなし。APPROVED。"}}
+{"ts":"2026-04-26T02:32:32+0000","type":"task.start","sprint":"sprint-14","slug":"qa-learnings-loop","agent":"Sora","detail":{}}
+{"ts":"2026-04-26T02:32:38+0000","type":"qa.approved","sprint":"sprint-14","slug":"qa-learnings-loop","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
+{"ts":"2026-04-26T02:32:41+0000","type":"task.done","sprint":"sprint-14","slug":"qa-learnings-loop","agent":"Sora","detail":{"summary":"3ファイル整合性確認完了。MINOR3件のコメント付きでAPPROVED。"}}

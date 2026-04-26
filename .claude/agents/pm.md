@@ -77,6 +77,21 @@ model: sonnet
 git fetch origin && git checkout main && git pull
 ```
 
+### ステップ0.5: pm-learned-rules.md の読み込み
+
+```bash
+# ルール集を読み込む
+cat .claude/agents/pm-learned-rules.md
+```
+
+確認内容:
+- `status: open` かつ `priority_score >= 3` のルールを全件確認する
+- 今スプリントのタスク設計に関連するルールを抽出し、タスク設計に反映する
+- 反映不要と判断したルールがある場合は、その理由をスプリント計画案の「確認事項」セクションに記載する
+
+**ステップ3の「確認事項」に必ず追記する:**
+- [ ] pm-learned-rules.md 反映: [反映したルールの一覧、または「対象なし（理由: ...）」]
+
 ### ステップ1: 前スプリントの実装完了状態の突合
 
 ```bash
