@@ -47,3 +47,19 @@
 {"ts":"2026-04-26T02:32:32+0000","type":"task.start","sprint":"sprint-14","slug":"qa-learnings-loop","agent":"Sora","detail":{}}
 {"ts":"2026-04-26T02:32:38+0000","type":"qa.approved","sprint":"sprint-14","slug":"qa-learnings-loop","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
 {"ts":"2026-04-26T02:32:41+0000","type":"task.done","sprint":"sprint-14","slug":"qa-learnings-loop","agent":"Sora","detail":{"summary":"3ファイル整合性確認完了。MINOR3件のコメント付きでAPPROVED。"}}
+{"ts":"2026-04-26T03:02:36+0000","type":"task.start","sprint":"sprint-15","slug":"sora-qa-guard-impl","agent":"Riku","detail":{}}
+{"ts":"2026-04-26T03:02:42+0000","type":"task.start","sprint":"sprint-15","slug":"engineer-go-fix-design","agent":"Alex","detail":{}}
+{"ts":"2026-04-26T03:02:42+0000","type":"task.start","sprint":"sprint-15","slug":"lessons-pr-flow-design","agent":"Alex","detail":{}}
+{"ts":"2026-04-26T06:47:31+0000","type":"task.done","sprint":"sprint-15","slug":"sora-qa-guard-impl","agent":"Riku","detail":{"summary":"qa.md に3点追記: (1)DoDに実行コマンド・出力結果のsummary記録義務を追加 (2)完了報告フォーマットのテスト結果セクションを実出力記録必須形式に変更 (3)Bash不可時ルールの禁止事項にテスト実行なしDON禁止(Issue #67)を追記"}}
+{"ts":"2026-04-26T06:49:02+0000","type":"task.done","sprint":"sprint-15","slug":"engineer-go-fix-design","agent":"Alex","detail":{"summary":"engineer-go-fix-design.md 作成。engineer-go.md へのコンテキスト超過防止ルール追記位置・追記テキスト、pm.md への委譲前チェックリスト追記位置・追記テキストを定義。"}}
+{"ts":"2026-04-26T06:49:04+0000","type":"task.done","sprint":"sprint-15","slug":"lessons-pr-flow-design","agent":"Alex","detail":{"summary":"lessons-pr-flow-design.md 作成。scripts/propose-lesson-rules.sh 仕様（引数・フロー・category→エージェントマッピング・出力フォーマット）、settings.json Stop hook への--dry-run追加、pm.md 完了フロー step3.5 追記内容を定義。"}}
+{"ts":"2026-04-26T06:49:11+0000","type":"task.handoff","sprint":"sprint-15","slug":"engineer-go-fix-impl","agent":"Riku","detail":{"to_agent":"Riku","next_slug":"engineer-go-fix-impl"}}
+{"ts":"2026-04-26T06:49:11+0000","type":"task.handoff","sprint":"sprint-15","slug":"lessons-pr-flow-impl","agent":"Riku","detail":{"to_agent":"Riku","next_slug":"lessons-pr-flow-impl"}}
+{"ts":"2026-04-26T06:49:14+0000","type":"task.start","sprint":"sprint-15","slug":"engineer-go-fix-impl","agent":"Riku","detail":{}}
+{"ts":"2026-04-26T06:49:14+0000","type":"task.start","sprint":"sprint-15","slug":"lessons-pr-flow-impl","agent":"Riku","detail":{}}
+{"ts":"2026-04-26T06:52:54+0000","type":"task.done","sprint":"sprint-15","slug":"engineer-go-fix-impl","agent":"Riku","detail":{"summary":"engineer-go.md に「コンテキスト超過防止ルール（Issue #64）」セクション追記（参照ファイル3件上限・委譲拒否条件）。pm.md に「engineer-go委譲前チェックリスト（Issue #64）」と完了フローstep3.5（propose-lesson-rules.sh）を追記。"}}
+{"ts":"2026-04-26T06:55:15+0000","type":"task.done","sprint":"sprint-15","slug":"lessons-pr-flow-impl","agent":"Riku","detail":{"summary":"scripts/propose-lesson-rules.sh 実装（--dry-run/--min-priority対応・category->エージェントマッピング・重複防止・Draft PR作成）。settings.json Stop hookに--dry-run実行エントリ追加。pm.md完了フローstep3.5は engineer-go-fix-impl で実装済み。スモークテスト18件検出確認。"}}
+{"ts":"2026-04-26T06:55:20+0000","type":"task.handoff","sprint":"sprint-15","slug":"sprint15-qa","agent":"Sora","detail":{"to_agent":"Sora","next_slug":"sprint15-qa"}}
+{"ts":"2026-04-26T06:55:20+0000","type":"task.start","sprint":"sprint-15","slug":"sprint15-qa","agent":"Sora","detail":{}}
+{"ts":"2026-04-26T06:55:53+0000","type":"qa.approved","sprint":"sprint-15","slug":"sprint15-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
+{"ts":"2026-04-26T06:55:53+0000","type":"task.done","sprint":"sprint-15","slug":"sprint15-qa","agent":"Sora","detail":{"summary":"全実装タスクのQA完了。APPROVED。動的テスト（--dry-run実行・jq valid・bash -n）実施済み。"}}
