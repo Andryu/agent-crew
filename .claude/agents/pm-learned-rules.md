@@ -438,5 +438,58 @@ Sprint-15 の retro フェーズで `scripts/lessons.sh` が `permissions.allow`
 
 ---
 
+## [Yuki] フック実装タスクに必要な権限を計画時に settings.json へ事前登録する
+
+- lesson_id: agent-crew-sprint-17-tooling-001
+- priority: 6 / sprint: sprint-17
+
+**やること**
+
+フック実装タスクをキューに積む際、`notes` に必要権限（`Write(**)`・`Bash(chmod *)`・`Bash(bash *)`）を明記し、スプリント開始前に `settings.json` の `permissions.allow` に追加しておく。
+
+**やってはいけないこと**
+
+フック実装タスクを計画する際に権限要件を洗い出さず、実行時に権限拒否で手動追記対処する。
+
+**エビデンス**
+
+Sprint-17 で `Write(**)`・`Bash(chmod *)`・`Bash(bash *)` が `settings.json` に未登録だったため、Yuki が hook-impl タスク中に2回権限拒否ブロックに遭遇した。settings.json への手動追記で対処した（agent-crew-sprint-17-tooling-001、Issue #100）。
+
+---
+
+## [全エージェント] _queue.json への状態記録はレート制限中断後の再開耐性を高める
+
+- lesson_id: agent-crew-sprint-17-reliability-001
+- priority: 3 / sprint: sprint-17
+
+**やること**
+
+各タスク完了時に `_queue.json` の status・summary・events を確実に記録する。レート制限中断後の再開時に、完了済みタスクを重複実行しないために状態記録が必要。
+
+**エビデンス**
+
+Sprint-17 でレート制限による一時中断が発生したが、`_queue.json` の状態記録により重複作業なく再開できた。全タスク retry_count=0（agent-crew-sprint-17-reliability-001）。
+
+---
+
+## [みゆきち] Issue 作成前に issue_url の重複チェックを実施する
+
+- lesson_id: agent-crew-sprint-18-process-001
+- priority: 4 / sprint: sprint-18
+
+**やること**
+
+retro の Issue 作成手順（ステップ4）で `gh issue create` を実行する前に、`_lessons.json` の `issue_url` が null であることを確認する。null でない場合は Issue 作成をスキップする。
+
+**やってはいけないこと**
+
+同一 lesson_id に対して `issue_url` の確認なしに `gh issue create` を複数回実行する。
+
+**エビデンス**
+
+Sprint-18 で agent-crew-sprint-17-tooling-001 から Issue #99 と #100 が二重生成された。retro.md に重複チェックステップが欠如していたことが根因（Sprint-18 で #99 をクローズして対処）。
+
+---
+
 *このファイルは retro エージェント（みゆきち）が `priority_score >= 3` の新規 lesson を追加するたびに更新されます。*
-*最終更新: sprint-16（Yuki/Riku追記） / 2026-04-26*
+*最終更新: sprint-18 / 2026-04-26*
