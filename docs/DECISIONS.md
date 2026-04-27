@@ -133,3 +133,27 @@
 - `propose-lesson-rules.sh` 実行後にブランチが fix/lesson-rules-YYYYMMDD に切り替わり、feat/sprint-XX ブランチに戻る必要がある（スクリプトは自動で戻るが確認が必要）。次回実行時も同様の挙動を想定すること。
 
 ---
+## sprint-18 — 2026-04-26
+
+### アーキテクチャ判断
+
+- **Issue 重複整理完了（Issue #99/#100）**: Sprint-17 の retro で二重生成された Issue #99 を CLOSED にし、#100 に統合。_lessons.json の agent-crew-sprint-17-tooling-001 の status を implemented に更新。
+- **TaskCompleted hook 実動作確認**: Sprint-17 で導入した task_completed.sh が正常動作していることを Sora QA が確認（_signals.jsonl に sprint-17 task_completed イベントが正しい JSON 形式で記録済み）。
+- **pm-learned-rules.md に sprint-17 lesson 2件を追記・コミット**: sprint-17-tooling-001（フック実装権限事前登録）・sprint-17-reliability-001（_queue.json 状態記録）を正式記録。
+
+### 学び
+
+- 後処理スプリントパターン（Sprint-16・18）が2回連続で機能し、積み残し処理の信頼性が高いことを確認。
+- Sora が QA 完了報告末尾に @retro を記載したが、みゆきちが起動されなかった。実行環境依存の問題（~/.claude/_lessons.json 未初期化）が影響していると推測。
+
+### 失敗パターン
+
+- **みゆきち未起動**: Sprint-18 完了後のレトロが実施されず、Sprint-19 計画時に遡及記録となった。~/.claude/_lessons.json が環境に存在しないため lessons.sh による lesson 記録フローが実質的に機能していない。
+- **_lessons.json 未初期化の継続**: install.sh に lessons_init.sh 呼び出しが欠落しており、新規インストール環境では _lessons.json が自動作成されない。
+
+### 次スプリントへの推奨
+
+- install.sh に lessons_init.sh の呼び出しを追加し、インストール時に _lessons.json を自動初期化する（Sprint-19: lessons-init-fix）。
+- retro.md のステップ4（gh issue create）直前に issue_url null チェックを明示追加し、二重 Issue 作成を防ぐ（Sprint-19: retro-dedup-fix）。
+
+---
