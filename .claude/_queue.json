@@ -1,254 +1,151 @@
 {
-  "sprint": "sprint-21",
+  "sprint": "sprint-22",
   "tasks": [
     {
-      "slug": "source-repo-retro",
-      "title": "Issue #110: retro.md に source_repo 記録ステップ追加（ステップ2に git remote get-url origin 取得を追加）",
-      "status": "TODO",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-1",
-      "depends_on": [],
-      "qa_mode": "inline",
-      "created_at": "2026-06-14T22:00:00+09:00",
-      "updated_at": "2026-06-14T22:00:00+09:00",
-      "notes": "着手条件: なし。変更対象: .claude/agents/retro.md のステップ2。追加内容: (1) `source_repo=$(git remote get-url origin 2>/dev/null || echo 'local')` で取得、(2) _lessons.json への lesson 記録時に source_repo フィールドを必ず含める。変更対象ファイル: .claude/agents/retro.md のみ（1件）。Issue #110 実装1/3。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
-      "events": [
-        {
-          "ts": "2026-06-14T22:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-21 キュー登録"
-        }
-      ]
-    },
-    {
-      "slug": "scope-required-retro",
-      "title": "Issue #110: retro.md に scope フィールド必須化（global/project/stack の分類ルールを追加）",
-      "status": "TODO",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-1",
-      "depends_on": ["source-repo-retro"],
-      "qa_mode": "inline",
-      "created_at": "2026-06-14T22:00:00+09:00",
-      "updated_at": "2026-06-14T22:00:00+09:00",
-      "notes": "着手条件: source-repo-retro 完了（同一ファイル retro.md を編集するため直列）。変更対象: .claude/agents/retro.md。追加内容: lesson 記録時に scope フィールド（global=複数プロジェクト共通/project=このリポジトリ固有/stack=特定技術スタック固有）を必須とするルールを追記。変更対象ファイル: .claude/agents/retro.md のみ（1件）。Issue #110 実装2/3。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
-      "events": [
-        {
-          "ts": "2026-06-14T22:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-21 キュー登録"
-        }
-      ]
-    },
-    {
-      "slug": "pm-source-repo-step",
-      "title": "Issue #110: pm.md のスプリント計画前チェックに source_repo 別集計ステップを追加",
-      "status": "TODO",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-1",
-      "depends_on": [],
-      "qa_mode": "inline",
-      "created_at": "2026-06-14T22:00:00+09:00",
-      "updated_at": "2026-06-14T22:00:00+09:00",
-      "notes": "着手条件: なし（source-repo-retro と独立。pm.md と retro.md は別ファイル）。変更対象: .claude/agents/pm.md のスプリント開始前チェック ステップ0.5（pm-learned-rules.md 読み込み）の後に追加。追加内容: `jq '.lessons[] | select(.source_repo != null) | .source_repo' ~/.claude/_lessons.json | sort | uniq -c` で source_repo 別教訓数を集計し、多リポジトリからの教訓がある場合は計画に反映するステップ。変更対象ファイル: .claude/agents/pm.md のみ（1件）。Issue #110 実装3/3。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
-      "events": [
-        {
-          "ts": "2026-06-14T22:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-21 キュー登録"
-        }
-      ]
-    },
-    {
-      "slug": "privacy-check-script",
-      "title": "Issue #108: scripts/privacy-check.sh 作成（差分ファイルへの個人情報パターンスキャン）",
-      "status": "TODO",
+      "slug": "capture-learning-sh",
+      "title": "Issue #112 (1/5): ~/.claude/hooks/capture-learning.sh 作成（SubagentStop ログ収集）",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "S",
       "risk_level": "medium",
       "parallel_group": "phase-1",
       "depends_on": [],
       "qa_mode": "inline",
-      "created_at": "2026-06-14T22:00:00+09:00",
-      "updated_at": "2026-06-14T22:00:00+09:00",
-      "notes": "着手条件: なし。変更対象ファイル: scripts/privacy-check.sh（新規、1件）。スキャン対象パターン: メールアドレス（@含む）・日本語氏名パターン・電話番号・個人の GitHub アカウント名（hardcode されたもの）。git diff --cached のファイルを対象に grep。問題がある行を stdout に出力し exit 1。問題なければ exit 0。bash -n でバリデーション済みのサンプルを実装すること（sprint-08-tooling-001 より）。Issue #108 実装1/3。",
+      "created_at": "2026-06-14T23:00:00+09:00",
+      "updated_at": "2026-06-14T23:00:00+09:00",
+      "notes": "scripts/capture-learning.sh を作成。bash -n バリデーション通過。",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
+      "qa_result": "PASS",
+      "summary": "scripts/capture-learning.sh 作成完了。SubagentStop ペイロードから cwd を取得し git remote で repo 特定。~/.claude/learning-logs.jsonl に JSONL 追記。",
       "events": [
-        {
-          "ts": "2026-06-14T22:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-21 キュー登録"
-        }
+        {"ts": "2026-06-14T23:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-22 キュー登録"},
+        {"ts": "2026-06-14T23:30:00+09:00", "agent": "Riku", "action": "completed", "msg": "scripts/capture-learning.sh 作成、bash -n PASS"}
       ]
     },
     {
-      "slug": "privacy-hook-skill",
-      "title": "Issue #108: settings.json の hooks.Stop に privacy-check.sh を登録 + .claude/skills/privacy-audit/SKILL.md 作成",
-      "status": "TODO",
+      "slug": "aggregate-learnings-sh",
+      "title": "Issue #112 (2/5): ~/.claude/hooks/aggregate-learnings.sh 作成（Stop 時集約処理）",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "S",
       "risk_level": "medium",
       "parallel_group": "phase-1",
-      "depends_on": ["privacy-check-script"],
+      "depends_on": ["capture-learning-sh"],
       "qa_mode": "inline",
-      "created_at": "2026-06-14T22:00:00+09:00",
-      "updated_at": "2026-06-14T22:00:00+09:00",
-      "notes": "着手条件: privacy-check-script 完了。変更対象ファイル(2件): .claude/settings.json（hooks.Stop に bash scripts/privacy-check.sh を追加）、.claude/skills/privacy-audit/SKILL.md（新規: トリガー=「個人情報チェック」「プライバシー監査」、実行内容=privacy-check.sh の手動呼び出し）。permissions.allow への Bash(scripts/privacy-check.sh *) 追加も忘れずに。Issue #108 実装2/3。変更対象ファイル: 2件（settings.json + SKILL.md）。",
+      "created_at": "2026-06-14T23:00:00+09:00",
+      "updated_at": "2026-06-14T23:00:00+09:00",
+      "notes": "scripts/aggregate-learnings.sh を作成。bash -n バリデーション通過。",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
+      "qa_result": "PASS",
+      "summary": "scripts/aggregate-learnings.sh 作成完了。当日の learning-logs.jsonl から agent-crew 以外を集計し stderr に出力。",
       "events": [
-        {
-          "ts": "2026-06-14T22:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-21 キュー登録"
-        }
+        {"ts": "2026-06-14T23:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-22 キュー登録"},
+        {"ts": "2026-06-14T23:35:00+09:00", "agent": "Riku", "action": "completed", "msg": "scripts/aggregate-learnings.sh 作成、bash -n PASS"}
       ]
     },
     {
-      "slug": "privacy-install-link",
-      "title": "Issue #108: install.sh の --only=skills で privacy-audit をリンク対象に追加",
-      "status": "TODO",
+      "slug": "global-hooks-settings",
+      "title": "Issue #112 (3/5): グローバル ~/.claude/settings.json に SubagentStop + Stop フックを登録",
+      "status": "DONE",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "medium",
+      "parallel_group": "phase-1",
+      "depends_on": ["capture-learning-sh", "aggregate-learnings-sh"],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T23:00:00+09:00",
+      "updated_at": "2026-06-14T23:00:00+09:00",
+      "notes": "~/.claude/settings.json に SubagentStop + Stop フックを追記。permissions.allow への Bash(~/.claude/hooks/*) 追加はユーザーアクション（install.sh --only=global-hooks）が必要。",
+      "retry_count": 0,
+      "qa_result": "APPROVED_WITH_NOTE",
+      "summary": "hooks.SubagentStop と hooks.Stop に登録完了。permissions.allow は install.sh --only=global-hooks でユーザーが追加要。",
+      "events": [
+        {"ts": "2026-06-14T23:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-22 キュー登録"},
+        {"ts": "2026-06-14T23:40:00+09:00", "agent": "Riku", "action": "completed", "msg": "~/.claude/settings.json に hooks 追記完了"}
+      ]
+    },
+    {
+      "slug": "install-global-hooks",
+      "title": "Issue #112 (4/5): install.sh に --global-hooks オプションを追加",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": "phase-1",
-      "depends_on": ["privacy-hook-skill"],
+      "depends_on": ["global-hooks-settings"],
       "qa_mode": "inline",
-      "created_at": "2026-06-14T22:00:00+09:00",
-      "updated_at": "2026-06-14T22:00:00+09:00",
-      "notes": "着手条件: privacy-hook-skill 完了（SKILL.md が存在する必要がある）。変更対象ファイル(1件): install.sh の --only=skills 処理部分に privacy-audit のシンボリックリンク作成を追加。既存の life-planner などと同じパターンで実装。Issue #108 実装3/3。",
+      "created_at": "2026-06-14T23:00:00+09:00",
+      "updated_at": "2026-06-14T23:00:00+09:00",
+      "notes": "install.sh に --global-hooks / --only=global-hooks オプション追加。シンボリックリンク + settings.json マージを自動化。",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
+      "qa_result": "PASS",
+      "summary": "install.sh に --global-hooks オプション実装完了。--only=global-hooks でも選択実行可能。",
       "events": [
-        {
-          "ts": "2026-06-14T22:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-21 キュー登録"
-        }
+        {"ts": "2026-06-14T23:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-22 キュー登録"},
+        {"ts": "2026-06-14T23:45:00+09:00", "agent": "Riku", "action": "completed", "msg": "install.sh --global-hooks 実装完了"}
       ]
     },
     {
-      "slug": "session-start-fix",
-      "title": "Issue #109: session_start.sh の QUEUE_FILE ハードコードを修正（動的パス解決）",
-      "status": "TODO",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-1",
-      "depends_on": [],
-      "qa_mode": "inline",
-      "created_at": "2026-06-14T22:00:00+09:00",
-      "updated_at": "2026-06-14T22:00:00+09:00",
-      "notes": "着手条件: なし（独立タスク）。変更対象ファイル(1件): scripts/session_start.sh。修正内容: QUEUE_FILE のパスを `$(git rev-parse --show-toplevel)/.claude/_queue.json` で動的に解決する。agent-crew 以外のリポジトリでも動作するよう汎用化。Issue #109 実装1/2。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
-      "events": [
-        {
-          "ts": "2026-06-14T22:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-21 キュー登録"
-        }
-      ]
-    },
-    {
-      "slug": "setup-sprint-sh",
-      "title": "Issue #109: scripts/setup-sprint.sh 汎用インストーラを新規作成",
-      "status": "TODO",
-      "assigned_to": "Riku",
+      "slug": "adr-013-global-learning",
+      "title": "Issue #112 (5/5): ADR-013 作成（グローバル学習ログアーキテクチャ決定記録）",
+      "status": "DONE",
+      "assigned_to": "Alex",
       "complexity": "M",
-      "risk_level": "medium",
+      "risk_level": "low",
       "parallel_group": "phase-1",
-      "depends_on": ["session-start-fix"],
-      "qa_mode": "inline",
-      "created_at": "2026-06-14T22:00:00+09:00",
-      "updated_at": "2026-06-14T22:00:00+09:00",
-      "notes": "着手条件: session-start-fix 完了。変更対象ファイル(1件): scripts/setup-sprint.sh（新規）。機能: (1) 対象リポジトリのルートに .claude/_queue.json が存在しない場合に空のキュー JSON を生成する、(2) SPRINT_NAME 引数を受け取り sprint フィールドをセット、(3) 使い方を --help で表示。bash -n でバリデーション後に実装すること。Issue #109 実装2/2。",
+      "depends_on": [],
+      "qa_mode": "—",
+      "created_at": "2026-06-14T23:00:00+09:00",
+      "updated_at": "2026-06-14T23:00:00+09:00",
+      "notes": "docs/adr/ADR-013-global-learning-log.md 作成。",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
+      "qa_result": "PASS",
+      "summary": "ADR-013 作成完了。Cron フック不在の調査結果・代替案比較表・learning-logs.jsonl スキーマ定義・セットアップ手順を記載。",
       "events": [
-        {
-          "ts": "2026-06-14T22:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-21 キュー登録"
-        }
+        {"ts": "2026-06-14T23:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-22 キュー登録"},
+        {"ts": "2026-06-14T23:50:00+09:00", "agent": "Alex", "action": "completed", "msg": "ADR-013 作成完了"}
       ]
     },
     {
-      "slug": "plugin-feedback-loop",
-      "title": "Issue #111: retro.md と pm.md にクロスポストステップを追加（scope==global かつ priority_score>=6 かつ source_repo!=agent-crew の教訓を Issue クロスポスト）",
-      "status": "TODO",
-      "assigned_to": "Riku",
-      "complexity": "M",
-      "risk_level": "medium",
-      "parallel_group": "phase-2",
-      "depends_on": ["source-repo-retro", "scope-required-retro", "pm-source-repo-step"],
-      "qa_mode": "inline",
-      "created_at": "2026-06-14T22:00:00+09:00",
-      "updated_at": "2026-06-14T22:00:00+09:00",
-      "notes": "着手条件: source-repo-retro, scope-required-retro, pm-source-repo-step の全3タスクが DONE（Issue #110 完了が前提）。変更対象ファイル(2件): .claude/agents/retro.md（クロスポストステップ追加）、.claude/agents/pm.md（plugin-feedback ラベル未処理 Issue 確認ステップを計画前チェックに追加）。retro.md への追加内容: lesson 記録後に `scope == 'global' && priority_score >= 6 && source_repo != 'agent-crew'` を満たす lesson を gh issue create で agent-crew に `plugin-feedback` ラベル付きでクロスポスト。Issue #111。",
+      "slug": "close-stale-issues",
+      "title": "Stale lesson Issue クローズ: #100, #102, #114",
+      "status": "DONE",
+      "assigned_to": "Yuki",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-1",
+      "depends_on": [],
+      "qa_mode": "—",
+      "created_at": "2026-06-14T23:00:00+09:00",
+      "updated_at": "2026-06-14T23:00:00+09:00",
+      "notes": "Issue #100, #102, #114 クローズ済み。",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
+      "qa_result": "PASS",
+      "summary": "Issue #100, #102, #114 を CLOSED に変更。各 Issue にクローズ理由コメントを追加済み。",
       "events": [
-        {
-          "ts": "2026-06-14T22:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-21 キュー登録"
-        }
+        {"ts": "2026-06-14T23:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-22 キュー登録"},
+        {"ts": "2026-06-14T23:10:00+09:00", "agent": "Yuki", "action": "completed", "msg": "Issue #100, #102, #114 CLOSED"}
       ]
     },
     {
-      "slug": "sprint21-qa",
-      "title": "Sprint-21 最終 QA: 全実装タスクの動作検証",
-      "status": "TODO",
+      "slug": "sprint22-qa",
+      "title": "Sprint-22 最終 QA: 全実装タスクの動作検証",
+      "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "low",
-      "parallel_group": "phase-3",
-      "depends_on": ["source-repo-retro", "scope-required-retro", "pm-source-repo-step", "privacy-check-script", "privacy-hook-skill", "privacy-install-link", "session-start-fix", "setup-sprint-sh", "plugin-feedback-loop"],
+      "parallel_group": "phase-2",
+      "depends_on": ["capture-learning-sh", "aggregate-learnings-sh", "global-hooks-settings", "install-global-hooks", "adr-013-global-learning", "close-stale-issues"],
       "qa_mode": null,
-      "created_at": "2026-06-14T22:00:00+09:00",
-      "updated_at": "2026-06-14T22:00:00+09:00",
-      "notes": "着手条件: 全実装タスクが DONE。検証項目: (1) retro.md に source_repo 取得コマンドが含まれるか、(2) retro.md に scope フィールド定義（global/project/stack）が含まれるか、(3) pm.md に source_repo 別集計の jq コマンドが含まれるか、(4) scripts/privacy-check.sh が存在し bash -n でバリデーション通過するか、(5) settings.json の hooks.Stop に privacy-check.sh が登録されているか、(6) .claude/skills/privacy-audit/SKILL.md が存在するか、(7) settings.json の permissions.allow に Bash(scripts/privacy-check.sh *) が含まれるか、(8) scripts/session_start.sh の QUEUE_FILE が動的パス解決になっているか、(9) scripts/setup-sprint.sh が存在し bash -n でバリデーション通過するか、(10) retro.md のクロスポストステップが含まれるか。テスト実行結果を summary に記録すること（sprint-08-process-001 より）。",
+      "created_at": "2026-06-14T23:00:00+09:00",
+      "updated_at": "2026-06-14T23:00:00+09:00",
+      "notes": "APPROVED WITH NOTE: permissions.allow への Bash(~/.claude/hooks/*) 追加のみ未完了（ユーザーアクション必要）。それ以外は全 PASS。",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
+      "qa_result": "APPROVED_WITH_NOTE",
+      "summary": "Sprint-22 QA: 9項目中8項目 PASS。permissions.allow の Bash(~/.claude/hooks/*) のみ未追加（install.sh --only=global-hooks でユーザーが実行要）。",
       "events": [
-        {
-          "ts": "2026-06-14T22:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-21 キュー登録"
-        }
+        {"ts": "2026-06-14T23:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-22 キュー登録"},
+        {"ts": "2026-06-14T23:55:00+09:00", "agent": "Sora", "action": "completed", "msg": "QA APPROVED WITH NOTE"}
       ]
     }
   ]

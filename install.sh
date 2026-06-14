@@ -41,6 +41,7 @@ OPT_ONLY=""
 OPT_NO_GLOBAL=0
 OPT_FORCE=0
 OPT_UNINSTALL=0
+OPT_GLOBAL_HOOKS=0
 STACK="go"
 TARGET_DIR="."
 
@@ -64,6 +65,8 @@ OPTIONS:
   --no-global         グローバルエージェントのインストールをスキップ
   --force             競合プロンプトをスキップして全て上書き
   --uninstall         インストール済みファイルを削除
+  --global-hooks      グローバルフック (~/.claude/hooks/) をセットアップし
+                      ~/.claude/settings.json に SubagentStop/Stop フックを登録
   --help              このヘルプを表示
 
 引数:
@@ -100,6 +103,9 @@ for arg in "$@"; do
       ;;
     --uninstall)
       OPT_UNINSTALL=1
+      ;;
+    --global-hooks)
+      OPT_GLOBAL_HOOKS=1
       ;;
     --help|-h)
       usage
@@ -172,9 +178,12 @@ if [ -n "$OPT_ONLY" ]; then
       config)
         COMP_CONFIG=1
         ;;
+      global-hooks)
+        OPT_GLOBAL_HOOKS=1
+        ;;
       *)
         echo "エラー: 不明なコンポーネント: $comp" >&2
-        echo "有効な値: agents, global-agents, skills, global-skills, riku, hooks, config" >&2
+        echo "有効な値: agents, global-agents, skills, global-skills, riku, hooks, config, global-hooks" >&2
         exit $EXIT_ARG_ERROR
         ;;
     esac
@@ -528,6 +537,67 @@ if [ $COMP_CONFIG -eq 1 ]; then
     "$REPO_DIR/templates/settings.json" \
     "$TARGET_DIR/.claude/settings.json" \
     "skip"
+  echo ""
+fi
+
+# --- グローバルフック ---
+if [ $OPT_GLOBAL_HOOKS -eq 1 ]; then
+  echo "--- グローバルフック (~/.claude/hooks/) ---"
+  GLOBAL_HOOKS_DIR="$HOME/.claude/hooks"
+  ensure_dir "$GLOBAL_HOOKS_DIR"
+
+  for hook_script in capture-learning.sh aggregate-learnings.sh; do
+    src="$REPO_DIR/scripts/$hook_script"
+    dst="$GLOBAL_HOOKS_DIR/$hook_script"
+    check_src "$src"
+    if [ $OPT_DRY_RUN -eq 1 ]; then
+      printf "  [SYMLINK]   %s -> %s\n" "$dst" "$src"
+    else
+      { [ -e "$dst" ] || [ -L "$dst" ]; } && rm "$dst"
+      ln -sf "$src" "$dst"
+      chmod +x "$src"
+      printf "  [SYMLINK]   %s\n" "$dst"
+    fi
+  done
+
+  GLOBAL_SETTINGS="$HOME/.claude/settings.json"
+  NEW_HOOKS=$(cat <<'HOOKSJSON'
+{
+  "SubagentStop": [{"matcher": "", "hooks": [{"type": "command", "command": "~/.claude/hooks/capture-learning.sh"}]}],
+  "Stop": [{"matcher": "", "hooks": [{"type": "command", "command": "~/.claude/hooks/aggregate-learnings.sh"}]}]
+}
+HOOKSJSON
+)
+
+  if [ $OPT_DRY_RUN -eq 1 ]; then
+    echo "  [DRY-RUN] $GLOBAL_SETTINGS に SubagentStop/Stop フックを追加"
+  elif [ -f "$GLOBAL_SETTINGS" ]; then
+    MERGED=$(jq --argjson nh "$NEW_HOOKS" '
+      .hooks = (
+        .hooks as $h |
+        reduce ($nh | to_entries[]) as $e (
+          ($h // {});
+          .[$e.key] = ((.[$e.key] // []) + $e.value)
+        )
+      ) |
+      .permissions.allow = (
+        ((.permissions.allow) // []) + ["Bash(~/.claude/hooks/*)"] | unique
+      )
+    ' "$GLOBAL_SETTINGS" 2>/dev/null || echo "")
+    if [ -n "$MERGED" ]; then
+      echo "$MERGED" > "$GLOBAL_SETTINGS"
+      printf "  [MERGE]   %s\n" "$GLOBAL_SETTINGS"
+    else
+      echo "WARN: ~/.claude/settings.json のマージに失敗。手動で hooks を追加してください。" >&2
+    fi
+  else
+    ensure_dir "$(dirname "$GLOBAL_SETTINGS")"
+    jq -n --argjson nh "$NEW_HOOKS" '{
+      "hooks": $nh,
+      "permissions": {"allow": ["Bash(~/.claude/hooks/*)"]}
+    }' > "$GLOBAL_SETTINGS"
+    printf "  [CREATE]  %s\n" "$GLOBAL_SETTINGS"
+  fi
   echo ""
 fi
 
