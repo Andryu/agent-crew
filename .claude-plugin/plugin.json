@@ -1,0 +1,16 @@
+{
+  "name": "agent-crew",
+  "displayName": "Agent Crew",
+  "version": "1.0.0",
+  "description": "個人開発チームを模したエージェント群（PM・Architect・QA・Engineer など）とスキル（life-planner・life-plan-review）を提供するプラグイン。スプリント管理・振り返り・設計・実装・レビューを専門エージェントに委譲できる。",
+  "author": {
+    "name": "Andryu",
+    "url": "https://github.com/Andryu"
+  },
+  "repository": "https://github.com/Andryu/agent-crew",
+  "license": "MIT",
+  "keywords": ["agent", "pm", "sprint", "personal-dev", "life-planner"],
+  "agents": "./.claude/agents/",
+  "skills": "./.claude/skills/",
+  "defaultEnabled": true
+}

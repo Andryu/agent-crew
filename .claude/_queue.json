@@ -1,202 +1,220 @@
 {
-  "sprint": "sprint-19",
+  "sprint": "sprint-20",
   "tasks": [
     {
-      "slug": "fix-retro-issue-dedup",
-      "title": "retro.md ステップ4に issue_url 重複チェックを追記（Issue #102 クローズ）",
+      "slug": "plugin-research",
+      "title": "Claude Code プラグイン仕様リサーチ: plugin.json スキーマ・hooks 登録方法・書き込みパス制約の調査",
       "status": "DONE",
-      "assigned_to": "Yuki",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-1",
-      "depends_on": [],
-      "qa_mode": "end_of_sprint",
-      "created_at": "2026-06-14T11:00:00+09:00",
-      "updated_at": "2026-06-14T14:00:00+09:00",
-      "notes": "retro.md のステップ3（エビデンスゲート）とステップ4（gh issue create）の間に issue_url 重複チェック（ステップ3.5）を追記。gh issue create 実行前に _lessons.json の issue_url が null であることを確認するシェルコードを追加。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "retro.md にステップ3.5（issue_url 重複チェック）を追記。issue_url が null でない lesson はスキップするフローを明記。",
-      "events": [
-        {
-          "ts": "2026-06-14T11:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-19 キュー登録"
-        },
-        {
-          "ts": "2026-06-14T14:00:00+09:00",
-          "agent": "Yuki",
-          "action": "done",
-          "msg": "retro.md ステップ3.5追記完了"
-        }
-      ]
-    },
-    {
-      "slug": "fix-retro-hook-perms",
-      "title": "pm.md スプリント開始前チェックにフック権限確認ステップを追記（Issue #100 クローズ）",
-      "status": "DONE",
-      "assigned_to": "Yuki",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-1",
-      "depends_on": [],
-      "qa_mode": "end_of_sprint",
-      "created_at": "2026-06-14T11:00:00+09:00",
-      "updated_at": "2026-06-14T14:05:00+09:00",
-      "notes": "pm.md スプリント開始前チェックに ステップ2.5（フック権限の事前確認）を追記。フック関連タスクがある場合は settings.json の permissions.allow 登録を着手前に確認するフローを明記。ステップ3チェックリストにも確認項目を追加。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "pm.md にステップ2.5（フック権限事前確認）を追記。スプリント開始前チェックリストにフック権限確認項目を追加。",
-      "events": [
-        {
-          "ts": "2026-06-14T11:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-19 キュー登録"
-        },
-        {
-          "ts": "2026-06-14T14:05:00+09:00",
-          "agent": "Yuki",
-          "action": "done",
-          "msg": "pm.md ステップ2.5追記完了"
-        }
-      ]
-    },
-    {
-      "slug": "install-skill-link",
-      "title": "install.sh にグローバルスキルのシンボリックリンク機能を追加 + ADR-012 作成",
-      "status": "DONE",
-      "assigned_to": "Riku",
+      "assigned_to": "Alex",
       "complexity": "M",
-      "risk_level": "low",
+      "risk_level": "high",
       "parallel_group": "phase-1",
       "depends_on": [],
-      "qa_mode": "inline",
-      "created_at": "2026-06-14T11:00:00+09:00",
-      "updated_at": "2026-06-14T14:10:00+09:00",
-      "notes": "symlink_skill 関数追加、COMP_GLOBAL_SKILLS フラグ追加、--only=skills/global-skills オプション追加。ADR-012 を docs/adr/ に作成。既存の life-plan-review スキルをグローバルリンク済み。",
+      "qa_mode": null,
+      "created_at": "2026-06-14T19:00:00+09:00",
+      "updated_at": "2026-06-14T19:30:00+09:00",
+      "notes": "調査結果: docs/spec/plugin-research.md に記録済み。重要な発見: plugin.json の agents/skills フィールドでカスタムパス指定が可能なため、ディレクトリ移行不要。~/.claude/ 書き込みは低リスク（plugin コンテキストでも可能）。フックはプラグイン外に残す設計を推奨。",
       "retry_count": 0,
       "qa_result": "APPROVED",
-      "summary": "install.sh に COMP_GLOBAL_SKILLS セクション追加。bash install.sh --only=skills で life-plan-review + life-planner が ~/.claude/skills/ にシンボリックリンクされることを確認。ADR-012 を docs/adr/ に作成。",
+      "summary": "docs/spec/plugin-research.md 作成完了。dir-migrate-* 3タスクを SKIPPED に変更。Sprint-20 は plugin-manifest + install-sh-refactor + sprint20-qa の3タスクに縮小。",
       "events": [
         {
-          "ts": "2026-06-14T11:00:00+09:00",
+          "ts": "2026-06-14T19:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-19 キュー登録"
+          "msg": "Sprint-20 キュー登録"
         },
         {
-          "ts": "2026-06-14T14:10:00+09:00",
+          "ts": "2026-06-14T19:30:00+09:00",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "plugin-research 完了。docs/spec/plugin-research.md 作成。ディレクトリ移行3タスクをスキップ推奨に変更"
+        }
+      ]
+    },
+    {
+      "slug": "plugin-manifest",
+      "title": ".claude-plugin/plugin.json + marketplace.json を新規作成",
+      "status": "DONE",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-2",
+      "depends_on": ["plugin-research"],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T19:00:00+09:00",
+      "updated_at": "2026-06-14T19:30:00+09:00",
+      "notes": "着手条件: plugin-research 完了（DONE）。docs/spec/plugin-research.md を参照。plugin.json には agents='./.claude/agents/'・skills='./.claude/skills/' を設定（ディレクトリ移動なし）。フック設定は含めない。marketplace.json は GitHub ソース形式で作成。変更対象: .claude-plugin/plugin.json（新規）、.claude-plugin/marketplace.json（新規）。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
+        {
+          "ts": "2026-06-14T19:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-20 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "dir-migrate-agents",
+      "title": ".claude/agents/ → agents/（プロジェクトルート）へ移動",
+      "status": "SKIPPED",
+      "assigned_to": "Riku",
+      "complexity": "M",
+      "risk_level": "medium",
+      "parallel_group": "phase-2",
+      "depends_on": ["plugin-research"],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T19:00:00+09:00",
+      "updated_at": "2026-06-14T19:30:00+09:00",
+      "notes": "SKIPPED: plugin-research の結果、plugin.json の agents フィールドで './.claude/agents/' を指定することで移動不要と判明。移動によるリスク（15ファイル・設定パス更新）を回避。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "plugin.json カスタムパス指定で不要と判明。スキップ。",
+      "events": [
+        {
+          "ts": "2026-06-14T19:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-20 キュー登録"
+        },
+        {
+          "ts": "2026-06-14T19:30:00+09:00",
+          "agent": "Alex",
+          "action": "skip",
+          "msg": "plugin-research 結果によりスキップ"
+        }
+      ]
+    },
+    {
+      "slug": "dir-migrate-skills",
+      "title": ".claude/skills/ → skills/（プロジェクトルート）へ移動",
+      "status": "SKIPPED",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-2",
+      "depends_on": ["plugin-research"],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T19:00:00+09:00",
+      "updated_at": "2026-06-14T19:30:00+09:00",
+      "notes": "SKIPPED: plugin.json の skills フィールドで './.claude/skills/' を指定することで移動不要。install.sh の COMP_GLOBAL_SKILLS パスも変更不要。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "plugin.json カスタムパス指定で不要と判明。スキップ。",
+      "events": [
+        {
+          "ts": "2026-06-14T19:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-20 キュー登録"
+        },
+        {
+          "ts": "2026-06-14T19:30:00+09:00",
+          "agent": "Alex",
+          "action": "skip",
+          "msg": "plugin-research 結果によりスキップ"
+        }
+      ]
+    },
+    {
+      "slug": "dir-migrate-hooks",
+      "title": ".claude/hooks/ → hooks/（プロジェクトルート）へ移動・settings.json の hook パスを更新",
+      "status": "SKIPPED",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "medium",
+      "parallel_group": "phase-3",
+      "depends_on": ["dir-migrate-agents"],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T19:00:00+09:00",
+      "updated_at": "2026-06-14T19:30:00+09:00",
+      "notes": "SKIPPED: sprint管理フック（TaskCompleted, PreToolUse等）はagent-crew固有のため、プラグイン配布物に含めない設計を採用。フックは .claude/settings.json・.claude/hooks/ のままで問題なし。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "フックはプラグイン外設計のためスキップ。",
+      "events": [
+        {
+          "ts": "2026-06-14T19:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-20 キュー登録"
+        },
+        {
+          "ts": "2026-06-14T19:30:00+09:00",
+          "agent": "Alex",
+          "action": "skip",
+          "msg": "フックはプラグイン外設計のためスキップ"
+        }
+      ]
+    },
+    {
+      "slug": "install-sh-refactor",
+      "title": "install.sh に claude plugin install コマンドの案内コメントを追加",
+      "status": "TODO",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-2",
+      "depends_on": ["plugin-manifest"],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T19:00:00+09:00",
+      "updated_at": "2026-06-14T19:30:00+09:00",
+      "notes": "着手条件: plugin-manifest 完了。Sprint-20 ではグローバル配置ロジックは削除せず、プラグイン利用への案内コメントを install.sh の先頭に追加するのみ。'claude plugin install github:Andryu/agent-crew でプラグインとしてインストール可能' を明記。既存機能（COMP_GLOBAL_SKILLS等）は維持。",
+      "retry_count": 0,
+      "qa_result": "APPROVED",
+      "summary": "install.sh 先頭に claude plugin install 案内コメントを追加。既存機能は維持。",
+      "events": [
+        {
+          "ts": "2026-06-14T19:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-20 キュー登録"
+        },
+        {
+          "ts": "2026-06-14T19:30:00+09:00",
+          "agent": "Yuki",
+          "action": "update",
+          "msg": "M→S に縮小。削除ではなく案内コメント追加のみ"
+        },
+        {
+          "ts": "2026-06-14T19:45:00+09:00",
           "agent": "Riku",
           "action": "done",
-          "msg": "install.sh + ADR-012 実装完了。dry-run 確認済み"
+          "msg": "install.sh にプラグイン案内コメント追加完了"
         }
       ]
     },
     {
-      "slug": "alpha-setup-claude",
-      "title": "alpha-predict-jp に CLAUDE.md + .claude/settings.json を新規作成",
-      "status": "IN_PROGRESS",
-      "assigned_to": "Alex",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-1",
-      "depends_on": [],
-      "qa_mode": "end_of_sprint",
-      "created_at": "2026-06-14T11:00:00+09:00",
-      "updated_at": "2026-06-14T14:10:00+09:00",
-      "notes": "alpha-predict-jp/.claude/CLAUDE.md（プロジェクト文脈・禁止事項・エージェント利用方法）と settings.json（WebSearch/WebFetch共通許可）を新規作成。settings.local.json（絶対パス含む）はそのまま維持。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
-      "events": [
-        {
-          "ts": "2026-06-14T11:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-19 キュー登録"
-        },
-        {
-          "ts": "2026-06-14T14:10:00+09:00",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "alpha-predict-jp CLAUDE.md + settings.json 作成開始"
-        }
-      ]
-    },
-    {
-      "slug": "jp-stock-analyst-skill",
-      "title": "jp-stock-analyst SKILL.md + references/pipeline-outputs.md を alpha-predict-jp に作成",
-      "status": "TODO",
-      "assigned_to": "Alex",
-      "complexity": "M",
-      "risk_level": "low",
-      "parallel_group": "phase-2",
-      "depends_on": ["alpha-setup-claude"],
-      "qa_mode": "inline",
-      "created_at": "2026-06-14T11:00:00+09:00",
-      "updated_at": "2026-06-14T11:00:00+09:00",
-      "notes": "alpha-predict-jpのML予測結果・バックテスト・ペーパートレード履歴を分析するスキル。ワークフロー5ステップ: readiness確認→予測値Top5→バックテスト履歴→相場環境→統合サマリー。Issue #10（EDINET MCP）のプレースホルダを含める。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
-      "events": [
-        {
-          "ts": "2026-06-14T11:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-19 キュー登録"
-        }
-      ]
-    },
-    {
-      "slug": "pipeline-monitor-skill",
-      "title": "pipeline-monitor SKILL.md を alpha-predict-jp に新規作成",
-      "status": "TODO",
-      "assigned_to": "Alex",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-2",
-      "depends_on": ["alpha-setup-claude"],
-      "qa_mode": "end_of_sprint",
-      "created_at": "2026-06-14T11:00:00+09:00",
-      "updated_at": "2026-06-14T11:00:00+09:00",
-      "notes": "日次パイプライン（run_daily_pipeline.sh）の健全性チェックスキル。ワークフロー4ステップ: pipeline.log確認→readiness全チェック→stock.db最新日付→トラブルシューティング提示。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
-      "events": [
-        {
-          "ts": "2026-06-14T11:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-19 キュー登録"
-        }
-      ]
-    },
-    {
-      "slug": "sprint19-qa",
-      "title": "Sprint-19 最終 QA",
-      "status": "TODO",
+      "slug": "sprint20-qa",
+      "title": "Sprint-20 最終 QA: plugin.json・marketplace.json の検証",
+      "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": "phase-3",
-      "depends_on": ["fix-retro-issue-dedup", "fix-retro-hook-perms", "install-skill-link", "alpha-setup-claude", "jp-stock-analyst-skill", "pipeline-monitor-skill"],
+      "depends_on": ["plugin-manifest", "install-sh-refactor"],
       "qa_mode": null,
-      "created_at": "2026-06-14T11:00:00+09:00",
-      "updated_at": "2026-06-14T11:00:00+09:00",
-      "notes": "変更ファイル確認: retro.md（ステップ3.5）、pm.md（ステップ2.5）、install.sh（COMP_GLOBAL_SKILLS）、ADR-012、alpha-predict-jp/.claude/CLAUDE.md、alpha-predict-jp/.claude/skills/jp-stock-analyst/SKILL.md、pipeline-monitor/SKILL.md",
+      "created_at": "2026-06-14T19:00:00+09:00",
+      "updated_at": "2026-06-14T19:30:00+09:00",
+      "notes": "着手条件: plugin-manifest・install-sh-refactor の両方が DONE。検証項目: (1) .claude-plugin/plugin.json が有効な JSON で name・agents・skills フィールドを持つ、(2) .claude-plugin/marketplace.json が有効な JSON、(3) install.sh 先頭にプラグインインストール案内コメントが存在する、(4) docs/spec/plugin-research.md が存在する。スコープ縮小（フック・ディレクトリ移行のQA不要のため）。",
       "retry_count": 0,
       "qa_result": null,
       "summary": null,
       "events": [
         {
-          "ts": "2026-06-14T11:00:00+09:00",
+          "ts": "2026-06-14T19:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-19 キュー登録"
+          "msg": "Sprint-20 キュー登録"
+        },
+        {
+          "ts": "2026-06-14T19:30:00+09:00",
+          "agent": "Yuki",
+          "action": "update",
+          "msg": "M→S に縮小。ディレクトリ移行QA不要のためスコープ縮小"
         }
       ]
     }

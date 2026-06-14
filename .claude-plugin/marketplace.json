@@ -1,0 +1,24 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "andryu-marketplace",
+  "description": "agent-crew plugin marketplace",
+  "owner": {
+    "name": "Andryu",
+    "url": "https://github.com/Andryu"
+  },
+  "plugins": [
+    {
+      "name": "agent-crew",
+      "displayName": "Agent Crew",
+      "description": "PM・Architect・QA・Engineer など専門エージェントと life-planner スキルを提供。個人開発のスプリント管理・設計・レビューを自動化する。",
+      "category": "productivity",
+      "tags": ["agent", "pm", "sprint", "personal-dev"],
+      "homepage": "https://github.com/Andryu/agent-crew",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/Andryu/agent-crew.git",
+        "sha": ""
+      }
+    }
+  ]
+}
