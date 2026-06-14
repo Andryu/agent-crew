@@ -1,220 +1,253 @@
 {
-  "sprint": "sprint-20",
+  "sprint": "sprint-21",
   "tasks": [
     {
-      "slug": "plugin-research",
-      "title": "Claude Code プラグイン仕様リサーチ: plugin.json スキーマ・hooks 登録方法・書き込みパス制約の調査",
-      "status": "DONE",
-      "assigned_to": "Alex",
-      "complexity": "M",
-      "risk_level": "high",
-      "parallel_group": "phase-1",
-      "depends_on": [],
-      "qa_mode": null,
-      "created_at": "2026-06-14T19:00:00+09:00",
-      "updated_at": "2026-06-14T19:30:00+09:00",
-      "notes": "調査結果: docs/spec/plugin-research.md に記録済み。重要な発見: plugin.json の agents/skills フィールドでカスタムパス指定が可能なため、ディレクトリ移行不要。~/.claude/ 書き込みは低リスク（plugin コンテキストでも可能）。フックはプラグイン外に残す設計を推奨。",
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "docs/spec/plugin-research.md 作成完了。dir-migrate-* 3タスクを SKIPPED に変更。Sprint-20 は plugin-manifest + install-sh-refactor + sprint20-qa の3タスクに縮小。",
-      "events": [
-        {
-          "ts": "2026-06-14T19:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-20 キュー登録"
-        },
-        {
-          "ts": "2026-06-14T19:30:00+09:00",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "plugin-research 完了。docs/spec/plugin-research.md 作成。ディレクトリ移行3タスクをスキップ推奨に変更"
-        }
-      ]
-    },
-    {
-      "slug": "plugin-manifest",
-      "title": ".claude-plugin/plugin.json + marketplace.json を新規作成",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-2",
-      "depends_on": ["plugin-research"],
-      "qa_mode": "inline",
-      "created_at": "2026-06-14T19:00:00+09:00",
-      "updated_at": "2026-06-14T19:30:00+09:00",
-      "notes": "着手条件: plugin-research 完了（DONE）。docs/spec/plugin-research.md を参照。plugin.json には agents='./.claude/agents/'・skills='./.claude/skills/' を設定（ディレクトリ移動なし）。フック設定は含めない。marketplace.json は GitHub ソース形式で作成。変更対象: .claude-plugin/plugin.json（新規）、.claude-plugin/marketplace.json（新規）。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
-      "events": [
-        {
-          "ts": "2026-06-14T19:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-20 キュー登録"
-        }
-      ]
-    },
-    {
-      "slug": "dir-migrate-agents",
-      "title": ".claude/agents/ → agents/（プロジェクトルート）へ移動",
-      "status": "SKIPPED",
-      "assigned_to": "Riku",
-      "complexity": "M",
-      "risk_level": "medium",
-      "parallel_group": "phase-2",
-      "depends_on": ["plugin-research"],
-      "qa_mode": "inline",
-      "created_at": "2026-06-14T19:00:00+09:00",
-      "updated_at": "2026-06-14T19:30:00+09:00",
-      "notes": "SKIPPED: plugin-research の結果、plugin.json の agents フィールドで './.claude/agents/' を指定することで移動不要と判明。移動によるリスク（15ファイル・設定パス更新）を回避。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "plugin.json カスタムパス指定で不要と判明。スキップ。",
-      "events": [
-        {
-          "ts": "2026-06-14T19:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-20 キュー登録"
-        },
-        {
-          "ts": "2026-06-14T19:30:00+09:00",
-          "agent": "Alex",
-          "action": "skip",
-          "msg": "plugin-research 結果によりスキップ"
-        }
-      ]
-    },
-    {
-      "slug": "dir-migrate-skills",
-      "title": ".claude/skills/ → skills/（プロジェクトルート）へ移動",
-      "status": "SKIPPED",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-2",
-      "depends_on": ["plugin-research"],
-      "qa_mode": "inline",
-      "created_at": "2026-06-14T19:00:00+09:00",
-      "updated_at": "2026-06-14T19:30:00+09:00",
-      "notes": "SKIPPED: plugin.json の skills フィールドで './.claude/skills/' を指定することで移動不要。install.sh の COMP_GLOBAL_SKILLS パスも変更不要。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "plugin.json カスタムパス指定で不要と判明。スキップ。",
-      "events": [
-        {
-          "ts": "2026-06-14T19:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-20 キュー登録"
-        },
-        {
-          "ts": "2026-06-14T19:30:00+09:00",
-          "agent": "Alex",
-          "action": "skip",
-          "msg": "plugin-research 結果によりスキップ"
-        }
-      ]
-    },
-    {
-      "slug": "dir-migrate-hooks",
-      "title": ".claude/hooks/ → hooks/（プロジェクトルート）へ移動・settings.json の hook パスを更新",
-      "status": "SKIPPED",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "medium",
-      "parallel_group": "phase-3",
-      "depends_on": ["dir-migrate-agents"],
-      "qa_mode": "inline",
-      "created_at": "2026-06-14T19:00:00+09:00",
-      "updated_at": "2026-06-14T19:30:00+09:00",
-      "notes": "SKIPPED: sprint管理フック（TaskCompleted, PreToolUse等）はagent-crew固有のため、プラグイン配布物に含めない設計を採用。フックは .claude/settings.json・.claude/hooks/ のままで問題なし。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "フックはプラグイン外設計のためスキップ。",
-      "events": [
-        {
-          "ts": "2026-06-14T19:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-20 キュー登録"
-        },
-        {
-          "ts": "2026-06-14T19:30:00+09:00",
-          "agent": "Alex",
-          "action": "skip",
-          "msg": "フックはプラグイン外設計のためスキップ"
-        }
-      ]
-    },
-    {
-      "slug": "install-sh-refactor",
-      "title": "install.sh に claude plugin install コマンドの案内コメントを追加",
+      "slug": "source-repo-retro",
+      "title": "Issue #110: retro.md に source_repo 記録ステップ追加（ステップ2に git remote get-url origin 取得を追加）",
       "status": "TODO",
       "assigned_to": "Riku",
       "complexity": "S",
       "risk_level": "low",
-      "parallel_group": "phase-2",
-      "depends_on": ["plugin-manifest"],
+      "parallel_group": "phase-1",
+      "depends_on": [],
       "qa_mode": "inline",
-      "created_at": "2026-06-14T19:00:00+09:00",
-      "updated_at": "2026-06-14T19:30:00+09:00",
-      "notes": "着手条件: plugin-manifest 完了。Sprint-20 ではグローバル配置ロジックは削除せず、プラグイン利用への案内コメントを install.sh の先頭に追加するのみ。'claude plugin install github:Andryu/agent-crew でプラグインとしてインストール可能' を明記。既存機能（COMP_GLOBAL_SKILLS等）は維持。",
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "install.sh 先頭に claude plugin install 案内コメントを追加。既存機能は維持。",
-      "events": [
-        {
-          "ts": "2026-06-14T19:00:00+09:00",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-20 キュー登録"
-        },
-        {
-          "ts": "2026-06-14T19:30:00+09:00",
-          "agent": "Yuki",
-          "action": "update",
-          "msg": "M→S に縮小。削除ではなく案内コメント追加のみ"
-        },
-        {
-          "ts": "2026-06-14T19:45:00+09:00",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "install.sh にプラグイン案内コメント追加完了"
-        }
-      ]
-    },
-    {
-      "slug": "sprint20-qa",
-      "title": "Sprint-20 最終 QA: plugin.json・marketplace.json の検証",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-3",
-      "depends_on": ["plugin-manifest", "install-sh-refactor"],
-      "qa_mode": null,
-      "created_at": "2026-06-14T19:00:00+09:00",
-      "updated_at": "2026-06-14T19:30:00+09:00",
-      "notes": "着手条件: plugin-manifest・install-sh-refactor の両方が DONE。検証項目: (1) .claude-plugin/plugin.json が有効な JSON で name・agents・skills フィールドを持つ、(2) .claude-plugin/marketplace.json が有効な JSON、(3) install.sh 先頭にプラグインインストール案内コメントが存在する、(4) docs/spec/plugin-research.md が存在する。スコープ縮小（フック・ディレクトリ移行のQA不要のため）。",
+      "created_at": "2026-06-14T22:00:00+09:00",
+      "updated_at": "2026-06-14T22:00:00+09:00",
+      "notes": "着手条件: なし。変更対象: .claude/agents/retro.md のステップ2。追加内容: (1) `source_repo=$(git remote get-url origin 2>/dev/null || echo 'local')` で取得、(2) _lessons.json への lesson 記録時に source_repo フィールドを必ず含める。変更対象ファイル: .claude/agents/retro.md のみ（1件）。Issue #110 実装1/3。",
       "retry_count": 0,
       "qa_result": null,
       "summary": null,
       "events": [
         {
-          "ts": "2026-06-14T19:00:00+09:00",
+          "ts": "2026-06-14T22:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-20 キュー登録"
-        },
+          "msg": "Sprint-21 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "scope-required-retro",
+      "title": "Issue #110: retro.md に scope フィールド必須化（global/project/stack の分類ルールを追加）",
+      "status": "TODO",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-1",
+      "depends_on": ["source-repo-retro"],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T22:00:00+09:00",
+      "updated_at": "2026-06-14T22:00:00+09:00",
+      "notes": "着手条件: source-repo-retro 完了（同一ファイル retro.md を編集するため直列）。変更対象: .claude/agents/retro.md。追加内容: lesson 記録時に scope フィールド（global=複数プロジェクト共通/project=このリポジトリ固有/stack=特定技術スタック固有）を必須とするルールを追記。変更対象ファイル: .claude/agents/retro.md のみ（1件）。Issue #110 実装2/3。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
         {
-          "ts": "2026-06-14T19:30:00+09:00",
+          "ts": "2026-06-14T22:00:00+09:00",
           "agent": "Yuki",
-          "action": "update",
-          "msg": "M→S に縮小。ディレクトリ移行QA不要のためスコープ縮小"
+          "action": "created",
+          "msg": "Sprint-21 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "pm-source-repo-step",
+      "title": "Issue #110: pm.md のスプリント計画前チェックに source_repo 別集計ステップを追加",
+      "status": "TODO",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-1",
+      "depends_on": [],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T22:00:00+09:00",
+      "updated_at": "2026-06-14T22:00:00+09:00",
+      "notes": "着手条件: なし（source-repo-retro と独立。pm.md と retro.md は別ファイル）。変更対象: .claude/agents/pm.md のスプリント開始前チェック ステップ0.5（pm-learned-rules.md 読み込み）の後に追加。追加内容: `jq '.lessons[] | select(.source_repo != null) | .source_repo' ~/.claude/_lessons.json | sort | uniq -c` で source_repo 別教訓数を集計し、多リポジトリからの教訓がある場合は計画に反映するステップ。変更対象ファイル: .claude/agents/pm.md のみ（1件）。Issue #110 実装3/3。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
+        {
+          "ts": "2026-06-14T22:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-21 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "privacy-check-script",
+      "title": "Issue #108: scripts/privacy-check.sh 作成（差分ファイルへの個人情報パターンスキャン）",
+      "status": "TODO",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "medium",
+      "parallel_group": "phase-1",
+      "depends_on": [],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T22:00:00+09:00",
+      "updated_at": "2026-06-14T22:00:00+09:00",
+      "notes": "着手条件: なし。変更対象ファイル: scripts/privacy-check.sh（新規、1件）。スキャン対象パターン: メールアドレス（@含む）・日本語氏名パターン・電話番号・個人の GitHub アカウント名（hardcode されたもの）。git diff --cached のファイルを対象に grep。問題がある行を stdout に出力し exit 1。問題なければ exit 0。bash -n でバリデーション済みのサンプルを実装すること（sprint-08-tooling-001 より）。Issue #108 実装1/3。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
+        {
+          "ts": "2026-06-14T22:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-21 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "privacy-hook-skill",
+      "title": "Issue #108: settings.json の hooks.Stop に privacy-check.sh を登録 + .claude/skills/privacy-audit/SKILL.md 作成",
+      "status": "TODO",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "medium",
+      "parallel_group": "phase-1",
+      "depends_on": ["privacy-check-script"],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T22:00:00+09:00",
+      "updated_at": "2026-06-14T22:00:00+09:00",
+      "notes": "着手条件: privacy-check-script 完了。変更対象ファイル(2件): .claude/settings.json（hooks.Stop に bash scripts/privacy-check.sh を追加）、.claude/skills/privacy-audit/SKILL.md（新規: トリガー=「個人情報チェック」「プライバシー監査」、実行内容=privacy-check.sh の手動呼び出し）。permissions.allow への Bash(scripts/privacy-check.sh *) 追加も忘れずに。Issue #108 実装2/3。変更対象ファイル: 2件（settings.json + SKILL.md）。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
+        {
+          "ts": "2026-06-14T22:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-21 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "privacy-install-link",
+      "title": "Issue #108: install.sh の --only=skills で privacy-audit をリンク対象に追加",
+      "status": "TODO",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-1",
+      "depends_on": ["privacy-hook-skill"],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T22:00:00+09:00",
+      "updated_at": "2026-06-14T22:00:00+09:00",
+      "notes": "着手条件: privacy-hook-skill 完了（SKILL.md が存在する必要がある）。変更対象ファイル(1件): install.sh の --only=skills 処理部分に privacy-audit のシンボリックリンク作成を追加。既存の life-planner などと同じパターンで実装。Issue #108 実装3/3。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
+        {
+          "ts": "2026-06-14T22:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-21 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "session-start-fix",
+      "title": "Issue #109: session_start.sh の QUEUE_FILE ハードコードを修正（動的パス解決）",
+      "status": "TODO",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-1",
+      "depends_on": [],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T22:00:00+09:00",
+      "updated_at": "2026-06-14T22:00:00+09:00",
+      "notes": "着手条件: なし（独立タスク）。変更対象ファイル(1件): scripts/session_start.sh。修正内容: QUEUE_FILE のパスを `$(git rev-parse --show-toplevel)/.claude/_queue.json` で動的に解決する。agent-crew 以外のリポジトリでも動作するよう汎用化。Issue #109 実装1/2。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
+        {
+          "ts": "2026-06-14T22:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-21 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "setup-sprint-sh",
+      "title": "Issue #109: scripts/setup-sprint.sh 汎用インストーラを新規作成",
+      "status": "TODO",
+      "assigned_to": "Riku",
+      "complexity": "M",
+      "risk_level": "medium",
+      "parallel_group": "phase-1",
+      "depends_on": ["session-start-fix"],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T22:00:00+09:00",
+      "updated_at": "2026-06-14T22:00:00+09:00",
+      "notes": "着手条件: session-start-fix 完了。変更対象ファイル(1件): scripts/setup-sprint.sh（新規）。機能: (1) 対象リポジトリのルートに .claude/_queue.json が存在しない場合に空のキュー JSON を生成する、(2) SPRINT_NAME 引数を受け取り sprint フィールドをセット、(3) 使い方を --help で表示。bash -n でバリデーション後に実装すること。Issue #109 実装2/2。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
+        {
+          "ts": "2026-06-14T22:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-21 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "plugin-feedback-loop",
+      "title": "Issue #111: retro.md と pm.md にクロスポストステップを追加（scope==global かつ priority_score>=6 かつ source_repo!=agent-crew の教訓を Issue クロスポスト）",
+      "status": "TODO",
+      "assigned_to": "Riku",
+      "complexity": "M",
+      "risk_level": "medium",
+      "parallel_group": "phase-2",
+      "depends_on": ["source-repo-retro", "scope-required-retro", "pm-source-repo-step"],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T22:00:00+09:00",
+      "updated_at": "2026-06-14T22:00:00+09:00",
+      "notes": "着手条件: source-repo-retro, scope-required-retro, pm-source-repo-step の全3タスクが DONE（Issue #110 完了が前提）。変更対象ファイル(2件): .claude/agents/retro.md（クロスポストステップ追加）、.claude/agents/pm.md（plugin-feedback ラベル未処理 Issue 確認ステップを計画前チェックに追加）。retro.md への追加内容: lesson 記録後に `scope == 'global' && priority_score >= 6 && source_repo != 'agent-crew'` を満たす lesson を gh issue create で agent-crew に `plugin-feedback` ラベル付きでクロスポスト。Issue #111。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
+        {
+          "ts": "2026-06-14T22:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-21 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "sprint21-qa",
+      "title": "Sprint-21 最終 QA: 全実装タスクの動作検証",
+      "status": "TODO",
+      "assigned_to": "Sora",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-3",
+      "depends_on": ["source-repo-retro", "scope-required-retro", "pm-source-repo-step", "privacy-check-script", "privacy-hook-skill", "privacy-install-link", "session-start-fix", "setup-sprint-sh", "plugin-feedback-loop"],
+      "qa_mode": null,
+      "created_at": "2026-06-14T22:00:00+09:00",
+      "updated_at": "2026-06-14T22:00:00+09:00",
+      "notes": "着手条件: 全実装タスクが DONE。検証項目: (1) retro.md に source_repo 取得コマンドが含まれるか、(2) retro.md に scope フィールド定義（global/project/stack）が含まれるか、(3) pm.md に source_repo 別集計の jq コマンドが含まれるか、(4) scripts/privacy-check.sh が存在し bash -n でバリデーション通過するか、(5) settings.json の hooks.Stop に privacy-check.sh が登録されているか、(6) .claude/skills/privacy-audit/SKILL.md が存在するか、(7) settings.json の permissions.allow に Bash(scripts/privacy-check.sh *) が含まれるか、(8) scripts/session_start.sh の QUEUE_FILE が動的パス解決になっているか、(9) scripts/setup-sprint.sh が存在し bash -n でバリデーション通過するか、(10) retro.md のクロスポストステップが含まれるか。テスト実行結果を summary に記録すること（sprint-08-process-001 より）。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
+        {
+          "ts": "2026-06-14T22:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-21 キュー登録"
         }
       ]
     }
