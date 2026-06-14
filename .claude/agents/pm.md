@@ -92,6 +92,34 @@ cat .claude/agents/pm-learned-rules.md
 **ステップ3の「確認事項」に必ず追記する:**
 - [ ] pm-learned-rules.md 反映: [反映したルールの一覧、または「対象なし（理由: ...）」]
 
+### ステップ0.7: 外部リポジトリ教訓の確認（クロスリポジトリ集約）
+
+`~/.claude/_lessons.json` から、agent-crew 以外のリポジトリ由来の未処理教訓を集計する。
+
+```bash
+AGENT_CREW_REPO=$(git remote get-url origin 2>/dev/null || echo "")
+
+jq -r --arg own "$AGENT_CREW_REPO" '
+  [.lessons[] | select(
+    .source_repo != null and
+    .source_repo != $own and
+    .scope == "global" and
+    (.issue_url == null)
+  )] |
+  if length == 0 then
+    "（外部リポジトリ由来の global 教訓なし）"
+  else
+    "外部リポジトリ由来の global 教訓: \(length) 件",
+    (.[] | "  [\(.source_repo | split("/")[-1])] score:\(.priority_score) — \(.description | .[0:60])")
+  end
+' ~/.claude/_lessons.json 2>/dev/null || echo "（_lessons.json が存在しないか読み取り不可）"
+```
+
+確認内容:
+- `scope: global` かつ `source_repo != agent-crew` の未 Issue 化 lesson が 1 件以上ある場合、
+  今スプリントのタスク設計に関連するか確認し、関連するなら計画に取り込む
+- `priority_score >= 6` のものは Issue 化（Issue #111 Plugin Feedback ループ参照）を検討する
+
 ### ステップ1: 前スプリントの実装完了状態の突合
 
 ```bash

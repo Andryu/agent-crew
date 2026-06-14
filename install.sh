@@ -13,6 +13,7 @@
 # スキルはネームスペース付きで利用可能:
 #   /agent-crew:life-planner
 #   /agent-crew:life-plan-review
+#   /agent-crew:privacy-audit
 #
 # このスクリプトは開発環境セットアップ用途（git hooks・
 # スクリプト権限付与・グローバルシンボリックリンク配置）

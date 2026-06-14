@@ -18,7 +18,8 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 # ---------- 3. 設定 ----------
-QUEUE_FILE=".claude/_queue.json"
+PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+QUEUE_FILE="${QUEUE_FILE:-${PROJECT_ROOT}/.claude/_queue.json}"
 LESSONS_FILE="${HOME}/.claude/_lessons.json"
 
 # プロジェクト名取得（git remote → ディレクトリ名フォールバック）

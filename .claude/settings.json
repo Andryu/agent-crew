@@ -48,6 +48,15 @@
             "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null)\" && scripts/propose-lesson-rules.sh --dry-run 2>/dev/null || true'"
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null)\" && bash scripts/privacy-check.sh 2>/dev/null || true'"
+          }
+        ]
       }
     ]
   },
@@ -72,6 +81,7 @@
       "Bash(jq *)",
       "Bash(chmod *)",
       "Bash(bash *)",
+      "Bash(scripts/privacy-check.sh *)",
       "Write(**)"
     ]
   }
