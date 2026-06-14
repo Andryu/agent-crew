@@ -46,9 +46,22 @@ model: sonnet
 ### ステップ 2: `_lessons.json` への記録（flock 経由）
 
 収集した観察を lesson エントリとして `_lessons.json` に追記する。
-その際、対象の知見がどの範囲に適用可能かを判断し、`scope` および `stack` フィールドを適切に付与する。
+その際、対象の知見がどの範囲に適用可能かを判断し、`scope`・`stack`・`source_repo` フィールドを適切に付与する。
 
-#### スコープ（scope）の判断基準
+#### source_repo の取得（必須）
+
+lesson を記録する前に、呼び出し元リポジトリの URL を取得して `source_repo` フィールドに設定する。
+
+```bash
+SOURCE_REPO=$(git remote get-url origin 2>/dev/null || echo "local")
+```
+
+`source_repo` はクロスリポジトリ教訓集約（Issue #110）の基盤フィールドであり、**必ず全 lesson エントリに含める**。
+
+#### スコープ（scope）の判断基準（必須）
+
+`scope` フィールドは **必須**。以下の基準で判定し、省略してはならない。
+
 | scope | 判定基準 | 具体例 |
 |-------|----------|--------|
 | `project` | このプロダクト（リポジトリ）固有のワークフロー、ビジネスロジック、設定の癖 | 「当プロジェクトのデプロイパイプラインでタイムアウトが発生しやすい」 |
@@ -57,9 +70,29 @@ model: sonnet
 
 ※ `scope` が `stack` の場合のみ、該当する技術要素名（例: `"next"`, `"vue"`, `"go"`）を `stack` フィールドに文字列で指定する。それ以外の scope の場合、`stack` は `null` とする。
 
+#### lesson エントリの必須フィールド
+
+```json
+{
+  "id": "...",
+  "project": "...",
+  "source_repo": "https://github.com/owner/repo",
+  "scope": "global | project | stack",
+  "stack": null,
+  ...
+}
+```
+
 書き込み手順：
 
 ```bash
+SOURCE_REPO=$(git remote get-url origin 2>/dev/null || echo "local")
+
+NEW_ENTRY=$(jq -n \
+  --arg source_repo "$SOURCE_REPO" \
+  --arg scope "$SCOPE" \
+  '{ ..., source_repo: $source_repo, scope: $scope }')
+
 (
   flock -x -w 10 200 || { echo "ERROR: lock timeout" >&2; exit 1; }
 
@@ -114,6 +147,50 @@ gh issue create \
 ```
 
 Issue 作成後、`issue_url` を lesson エントリに書き戻す（flock 経由）。
+
+### ステップ 4.5: Plugin Feedback クロスポスト（外部リポジトリ由来の高優先度 global 教訓）
+
+ステップ4完了後、以下の条件を **すべて** 満たす lesson について `agent-crew` リポジトリへのクロスポスト Issue を作成する：
+
+- `source_repo` が agent-crew のリポジトリ URL **以外**
+- `scope == "global"`
+- `priority_score >= 6`
+- `issue_url == null`（まだ Issue 化されていない）
+
+```bash
+AGENT_CREW_REPO="https://github.com/Andryu/agent-crew"
+
+jq -c --arg own "$AGENT_CREW_REPO" '
+  .lessons[] | select(
+    .source_repo != null and
+    .source_repo != $own and
+    .scope == "global" and
+    .priority_score >= 6 and
+    .issue_url == null
+  )
+' ~/.claude/_lessons.json | while IFS= read -r lesson; do
+  LESSON_ID=$(echo "$lesson" | jq -r '.id')
+  TITLE=$(echo "$lesson" | jq -r '.description | .[0:60]')
+  DESCRIPTION=$(echo "$lesson" | jq -r '.description')
+  ACTION=$(echo "$lesson" | jq -r '.action // "調査・対応を検討"')
+  PRIORITY=$(echo "$lesson" | jq -r '.priority_score')
+  SOURCE=$(echo "$lesson" | jq -r '.source_repo')
+
+  CROSSPOST_URL=$(gh issue create \
+    --repo Andryu/agent-crew \
+    --title "[plugin-feedback] ${TITLE}" \
+    --body "## 発生元リポジトリ\n\n${SOURCE}\n\n## 観察された問題\n\n${DESCRIPTION}\n\n## 推奨アクション\n\n${ACTION}\n\n---\n*lesson ID: ${LESSON_ID} / priority: ${PRIORITY} / scope: global*\n*このIssueは みゆきち（retro エージェント）が Plugin Feedback フローで自動生成しました。*" \
+    --label "plugin-feedback" \
+    --label "retro" \
+    --label "lessons-learned" 2>/dev/null || echo "")
+
+  if [[ -n "$CROSSPOST_URL" ]]; then
+    echo "  [plugin-feedback] クロスポスト: $CROSSPOST_URL"
+  fi
+done
+```
+
+クロスポスト後、`plugin_feedback_url` を lesson エントリに書き戻すことを推奨（任意）。
 
 ### ステップ 5: `pm-learned-rules.md` へのルール書き出し
 
