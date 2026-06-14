@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "andryu-marketplace",
-  "description": "Andryu の Claude Code プラグインマーケットプレイス",
+  "description": "agent-crew plugin marketplace",
   "owner": {
     "name": "Andryu",
     "url": "https://github.com/Andryu"
