@@ -1,157 +1,202 @@
 {
-  "sprint": "sprint-18",
+  "sprint": "sprint-19",
   "tasks": [
     {
-      "slug": "lesson-dedup-close",
-      "title": "Issue #99/#100 重複クローズ + sprint-17-tooling-001 lesson status 更新",
+      "slug": "fix-retro-issue-dedup",
+      "title": "retro.md ステップ4に issue_url 重複チェックを追記（Issue #102 クローズ）",
       "status": "DONE",
       "assigned_to": "Yuki",
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": "phase-1",
       "depends_on": [],
-      "qa_mode": null,
-      "created_at": "2026-04-26T23:00:00+09:00",
-      "updated_at": "2026-04-26T23:10:00+09:00",
-      "notes": "Issue #99 と #100 は同じ lesson（agent-crew-sprint-17-tooling-001）から二重生成された重複 Issue。#99 をクローズし #100 を残す（#100 の方が新しく内容が正確）。その後 ~/.claude/_lessons.json の agent-crew-sprint-17-tooling-001 の status を implemented に更新する（settings.json への権限追加は Sprint-17 で完了済みのため）。着手条件: なし。",
+      "qa_mode": "end_of_sprint",
+      "created_at": "2026-06-14T11:00:00+09:00",
+      "updated_at": "2026-06-14T14:00:00+09:00",
+      "notes": "retro.md のステップ3（エビデンスゲート）とステップ4（gh issue create）の間に issue_url 重複チェック（ステップ3.5）を追記。gh issue create 実行前に _lessons.json の issue_url が null であることを確認するシェルコードを追加。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "Issue #99 をクローズ（#100 に統合）。~/.claude/_lessons.json の agent-crew-sprint-17-tooling-001 の status を implemented に更新。",
+      "summary": "retro.md にステップ3.5（issue_url 重複チェック）を追記。issue_url が null でない lesson はスキップするフローを明記。",
       "events": [
         {
-          "ts": "2026-04-26T23:00:00+09:00",
+          "ts": "2026-06-14T11:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-18 キュー登録"
+          "msg": "Sprint-19 キュー登録"
         },
         {
-          "ts": "2026-04-26T23:05:00+09:00",
-          "agent": "Yuki",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-26T23:10:00+09:00",
+          "ts": "2026-06-14T14:00:00+09:00",
           "agent": "Yuki",
           "action": "done",
-          "msg": "Issue #99 CLOSED（#100 に統合）。_lessons.json agent-crew-sprint-17-tooling-001 status=implemented 更新完了。"
+          "msg": "retro.md ステップ3.5追記完了"
         }
       ]
     },
     {
-      "slug": "hook-smoke-test",
-      "title": "TaskCompleted hook 実動作確認（スモークテスト）",
+      "slug": "fix-retro-hook-perms",
+      "title": "pm.md スプリント開始前チェックにフック権限確認ステップを追記（Issue #100 クローズ）",
       "status": "DONE",
-      "assigned_to": "Sora",
+      "assigned_to": "Yuki",
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": "phase-1",
       "depends_on": [],
-      "qa_mode": null,
-      "created_at": "2026-04-26T23:00:00+09:00",
-      "updated_at": "2026-04-26T23:10:00+09:00",
-      "notes": "Sprint-17 で導入した TaskCompleted hook の実動作を確認する。確認内容: (1) .claude/hooks/task_completed.sh が存在し実行権限があるか（ls -la）。(2) .claude/_signals.jsonl に sprint-17 の task_completed イベントが記録されているか（jq で確認）。(3) task_completed イベントのレコードが正しい JSON 形式か（ts/sprint/slug/agent/event フィールドが存在するか）。(4) settings.json の TaskCompleted hook 設定が正しいか（jq . で確認）。結果を summary に記録して DONE にする。Bash 不可の場合は CHANGES_REQUESTED（REASON: BASH_UNAVAILABLE）を返すこと。着手条件: なし。",
+      "qa_mode": "end_of_sprint",
+      "created_at": "2026-06-14T11:00:00+09:00",
+      "updated_at": "2026-06-14T14:05:00+09:00",
+      "notes": "pm.md スプリント開始前チェックに ステップ2.5（フック権限の事前確認）を追記。フック関連タスクがある場合は settings.json の permissions.allow 登録を着手前に確認するフローを明記。ステップ3チェックリストにも確認項目を追加。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": "pm.md にステップ2.5（フック権限事前確認）を追記。スプリント開始前チェックリストにフック権限確認項目を追加。",
+      "events": [
+        {
+          "ts": "2026-06-14T11:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-19 キュー登録"
+        },
+        {
+          "ts": "2026-06-14T14:05:00+09:00",
+          "agent": "Yuki",
+          "action": "done",
+          "msg": "pm.md ステップ2.5追記完了"
+        }
+      ]
+    },
+    {
+      "slug": "install-skill-link",
+      "title": "install.sh にグローバルスキルのシンボリックリンク機能を追加 + ADR-012 作成",
+      "status": "DONE",
+      "assigned_to": "Riku",
+      "complexity": "M",
+      "risk_level": "low",
+      "parallel_group": "phase-1",
+      "depends_on": [],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T11:00:00+09:00",
+      "updated_at": "2026-06-14T14:10:00+09:00",
+      "notes": "symlink_skill 関数追加、COMP_GLOBAL_SKILLS フラグ追加、--only=skills/global-skills オプション追加。ADR-012 を docs/adr/ に作成。既存の life-plan-review スキルをグローバルリンク済み。",
       "retry_count": 0,
       "qa_result": "APPROVED",
-      "summary": "(1) task_completed.sh 存在・-rwxr-xr-x・bash -n OK。(2) _signals.jsonl に sprint-17 task_completed イベント存在（ts=2026-04-26T13:57:09+0000 slug=sprint17-qa）。(3) JSON フィールド ts/sprint/slug/agent/event 全て有効。(4) settings.json に TaskCompleted hook 登録確認。全4チェック PASS。",
+      "summary": "install.sh に COMP_GLOBAL_SKILLS セクション追加。bash install.sh --only=skills で life-plan-review + life-planner が ~/.claude/skills/ にシンボリックリンクされることを確認。ADR-012 を docs/adr/ に作成。",
       "events": [
         {
-          "ts": "2026-04-26T23:00:00+09:00",
+          "ts": "2026-06-14T11:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-18 キュー登録"
+          "msg": "Sprint-19 キュー登録"
         },
         {
-          "ts": "2026-04-26T23:05:00+09:00",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-26T23:10:00+09:00",
-          "agent": "Sora",
+          "ts": "2026-06-14T14:10:00+09:00",
+          "agent": "Riku",
           "action": "done",
-          "msg": "全4チェック PASS。task_completed.sh 実行権限あり・bash -n OK・_signals.jsonl に task_completed イベント存在・JSON フィールド有効・settings.json 登録確認。"
+          "msg": "install.sh + ADR-012 実装完了。dry-run 確認済み"
         }
       ]
     },
     {
-      "slug": "pm-rules-update",
-      "title": "pm-learned-rules.md の未コミット変更をコミット + 最終更新日を sprint-18 に更新",
-      "status": "DONE",
-      "assigned_to": "Yuki",
+      "slug": "alpha-setup-claude",
+      "title": "alpha-predict-jp に CLAUDE.md + .claude/settings.json を新規作成",
+      "status": "IN_PROGRESS",
+      "assigned_to": "Alex",
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": "phase-1",
       "depends_on": [],
-      "qa_mode": null,
-      "created_at": "2026-04-26T23:00:00+09:00",
-      "updated_at": "2026-04-26T23:10:00+09:00",
-      "notes": "pm-learned-rules.md に sprint-17 の2件の lesson（sprint-17-tooling-001・sprint-17-reliability-001）が未コミットで残っている。最終更新日を sprint-18 / 2026-04-26 に更新してからコミットに含める。変更ファイル: .claude/agents/pm-learned-rules.md のみ。着手条件: なし。",
+      "qa_mode": "end_of_sprint",
+      "created_at": "2026-06-14T11:00:00+09:00",
+      "updated_at": "2026-06-14T14:10:00+09:00",
+      "notes": "alpha-predict-jp/.claude/CLAUDE.md（プロジェクト文脈・禁止事項・エージェント利用方法）と settings.json（WebSearch/WebFetch共通許可）を新規作成。settings.local.json（絶対パス含む）はそのまま維持。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "pm-learned-rules.md の最終更新日を sprint-18 / 2026-04-26 に更新。sprint-17 の2件の lesson エントリを含む未コミット変更を確認。",
+      "summary": null,
       "events": [
         {
-          "ts": "2026-04-26T23:00:00+09:00",
+          "ts": "2026-06-14T11:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-18 キュー登録"
+          "msg": "Sprint-19 キュー登録"
         },
         {
-          "ts": "2026-04-26T23:05:00+09:00",
-          "agent": "Yuki",
+          "ts": "2026-06-14T14:10:00+09:00",
+          "agent": "Alex",
           "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-26T23:10:00+09:00",
-          "agent": "Yuki",
-          "action": "done",
-          "msg": "pm-learned-rules.md 最終更新日を sprint-18 に更新。2件のsprint-17 lesson エントリ（sprint-17-tooling-001・sprint-17-reliability-001）を含む変更確定。"
+          "msg": "alpha-predict-jp CLAUDE.md + settings.json 作成開始"
         }
       ]
     },
     {
-      "slug": "sprint18-qa",
-      "title": "Sprint-18 最終QA",
-      "status": "DONE",
-      "assigned_to": "Sora",
+      "slug": "jp-stock-analyst-skill",
+      "title": "jp-stock-analyst SKILL.md + references/pipeline-outputs.md を alpha-predict-jp に作成",
+      "status": "TODO",
+      "assigned_to": "Alex",
+      "complexity": "M",
+      "risk_level": "low",
+      "parallel_group": "phase-2",
+      "depends_on": ["alpha-setup-claude"],
+      "qa_mode": "inline",
+      "created_at": "2026-06-14T11:00:00+09:00",
+      "updated_at": "2026-06-14T11:00:00+09:00",
+      "notes": "alpha-predict-jpのML予測結果・バックテスト・ペーパートレード履歴を分析するスキル。ワークフロー5ステップ: readiness確認→予測値Top5→バックテスト履歴→相場環境→統合サマリー。Issue #10（EDINET MCP）のプレースホルダを含める。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
+        {
+          "ts": "2026-06-14T11:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-19 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "pipeline-monitor-skill",
+      "title": "pipeline-monitor SKILL.md を alpha-predict-jp に新規作成",
+      "status": "TODO",
+      "assigned_to": "Alex",
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": "phase-2",
-      "depends_on": ["lesson-dedup-close", "hook-smoke-test", "pm-rules-update"],
-      "qa_mode": null,
-      "created_at": "2026-04-26T23:00:00+09:00",
-      "updated_at": "2026-04-26T23:15:00+09:00",
-      "notes": "確認内容: (1) Issue #99 が CLOSED か（gh issue view 99）。(2) ~/.claude/_lessons.json の agent-crew-sprint-17-tooling-001 の status が implemented か（jq）。(3) .claude/_signals.jsonl に task_completed イベントが存在するか。(4) pm-learned-rules.md の最終更新日が sprint-18 になっているか。(5) _queue.json の sprint が sprint-18 になっているか。全て PASS なら APPROVED、1件でも NG なら CHANGES_REQUESTED。",
+      "depends_on": ["alpha-setup-claude"],
+      "qa_mode": "end_of_sprint",
+      "created_at": "2026-06-14T11:00:00+09:00",
+      "updated_at": "2026-06-14T11:00:00+09:00",
+      "notes": "日次パイプライン（run_daily_pipeline.sh）の健全性チェックスキル。ワークフロー4ステップ: pipeline.log確認→readiness全チェック→stock.db最新日付→トラブルシューティング提示。",
       "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "全5チェック APPROVED。(1)Issue #99 CLOSED確認。(2)_lessons.json sprint-17-tooling-001 status=implemented確認。(3)_signals.jsonl task_completed イベント存在確認。(4)pm-learned-rules.md 最終更新日 sprint-18 確認。(5)_queue.json sprint=sprint-18 確認。CRITICAL/MAJOR なし。",
+      "qa_result": null,
+      "summary": null,
       "events": [
         {
-          "ts": "2026-04-26T23:00:00+09:00",
+          "ts": "2026-06-14T11:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-18 キュー登録"
-        },
+          "msg": "Sprint-19 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "sprint19-qa",
+      "title": "Sprint-19 最終 QA",
+      "status": "TODO",
+      "assigned_to": "Sora",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-3",
+      "depends_on": ["fix-retro-issue-dedup", "fix-retro-hook-perms", "install-skill-link", "alpha-setup-claude", "jp-stock-analyst-skill", "pipeline-monitor-skill"],
+      "qa_mode": null,
+      "created_at": "2026-06-14T11:00:00+09:00",
+      "updated_at": "2026-06-14T11:00:00+09:00",
+      "notes": "変更ファイル確認: retro.md（ステップ3.5）、pm.md（ステップ2.5）、install.sh（COMP_GLOBAL_SKILLS）、ADR-012、alpha-predict-jp/.claude/CLAUDE.md、alpha-predict-jp/.claude/skills/jp-stock-analyst/SKILL.md、pipeline-monitor/SKILL.md",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
         {
-          "ts": "2026-04-26T23:12:00+09:00",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-04-26T23:15:00+09:00",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 全5チェック通過。(1)#99 CLOSED。(2)sprint-17-tooling-001 status=implemented。(3)_signals.jsonl task_completed イベント存在。(4)pm-learned-rules.md sprint-18 更新済み。(5)_queue.json sprint=sprint-18。"
-        },
-        {
-          "ts": "2026-04-26T23:15:00+09:00",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "全5チェック APPROVED。CRITICAL/MAJOR なし。@retro を起動してください。"
+          "ts": "2026-06-14T11:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-19 キュー登録"
         }
       ]
     }

@@ -85,9 +85,22 @@ jq '.lessons[] | select(
 )' ~/.claude/_lessons.json
 ```
 
+### ステップ 3.5: issue_url 重複チェック（必須）
+
+ステップ3でゲート通過した各 lesson について、`gh issue create` を実行する **前に** 必ず重複チェックを行う。
+`issue_url` が既に設定されている場合はスキップする。
+
+```bash
+EXISTING_URL=$(jq -r --arg id "$LESSON_ID" '.lessons[] | select(.id == $id) | .issue_url' ~/.claude/_lessons.json)
+if [ -n "$EXISTING_URL" ] && [ "$EXISTING_URL" != "null" ]; then
+  echo "SKIP: lesson $LESSON_ID は既に Issue 作成済み ($EXISTING_URL)" >&2
+  continue
+fi
+```
+
 ### ステップ 4: gh issue create の実行
 
-ゲート通過エントリごとに以下を実行する：
+ゲート通過エントリごとに以下を実行する（ステップ3.5の重複チェックを通過したもののみ）：
 
 ```bash
 LABEL=$(assign_label "$PRIORITY_SCORE")

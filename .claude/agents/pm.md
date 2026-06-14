@@ -120,6 +120,19 @@ tail -n 40 docs/DECISIONS.md
 - 「次スプリントへの推奨」を具体的にタスク設計に落とし込んだか
 - risk_level: high のタスクを最初のフェーズに配置したか
 
+### ステップ2.5: フック権限の事前確認
+
+今スプリントのタスク一覧にフック関連の実装が含まれる場合（hook, PreToolUse, Stop, SubagentStop 等）、
+必要な権限パターンを **スプリント開始前に** `.claude/settings.json` の `permissions.allow` に登録済みか確認する。
+
+```bash
+# 現在の permissions.allow を確認
+jq '.permissions.allow' .claude/settings.json
+```
+
+権限が不足している場合は、タスク着手前に `settings.json` へ追記してからスプリントを開始する。
+登録漏れはフック実装タスクがブロックされる主因（lesson #agent-crew-sprint-17-tooling-001 参照）。
+
 ### ステップ3: 確認結果をスプリント計画案に明記する
 
 スプリント計画案の「確認事項」セクションに以下を追加すること:
@@ -127,6 +140,7 @@ tail -n 40 docs/DECISIONS.md
 - [ ] 前スプリントの設計完了タスクとの突合: 実施済み（結果: [一行で]）
 - [ ] 計画重複タスク: なし / あり（[slug]: [対処]）
 - [ ] DECISIONS.md 反映: [具体的に何を反映したか]
+- [ ] フック関連タスクの権限: 対象なし / 登録済み（[追加したパターン一覧]）
 
 ---
 

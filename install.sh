@@ -39,6 +39,8 @@ OPTIONS:
   --only=<component>  選択的インストール（カンマ区切り）
                         agents       グローバルエージェント + Riku
                         global-agents グローバルエージェントのみ
+                        skills       グローバルスキルのみ
+                        global-skills グローバルスキルのみ
                         riku         Riku のみ
                         hooks        subagent_stop.sh
                         config       _queue.json + settings.json
@@ -118,12 +120,14 @@ TARGET_DIR="$(cd "$TARGET_DIR" 2>/dev/null && pwd)" || {
 # --only が未指定なら全コンポーネントを有効にする
 # bash 3.2 互換のため連想配列不使用
 COMP_GLOBAL_AGENTS=1
+COMP_GLOBAL_SKILLS=1
 COMP_RIKU=1
 COMP_HOOKS=1
 COMP_CONFIG=1
 
 if [ -n "$OPT_ONLY" ]; then
   COMP_GLOBAL_AGENTS=0
+  COMP_GLOBAL_SKILLS=0
   COMP_RIKU=0
   COMP_HOOKS=0
   COMP_CONFIG=0
@@ -139,6 +143,9 @@ if [ -n "$OPT_ONLY" ]; then
       global-agents)
         COMP_GLOBAL_AGENTS=1
         ;;
+      skills|global-skills)
+        COMP_GLOBAL_SKILLS=1
+        ;;
       riku)
         COMP_RIKU=1
         ;;
@@ -150,16 +157,17 @@ if [ -n "$OPT_ONLY" ]; then
         ;;
       *)
         echo "エラー: 不明なコンポーネント: $comp" >&2
-        echo "有効な値: agents, global-agents, riku, hooks, config" >&2
+        echo "有効な値: agents, global-agents, skills, global-skills, riku, hooks, config" >&2
         exit $EXIT_ARG_ERROR
         ;;
     esac
   done
 fi
 
-# --no-global はグローバルエージェントを無効化
+# --no-global はグローバルエージェントとグローバルスキルを無効化
 if [ $OPT_NO_GLOBAL -eq 1 ]; then
   COMP_GLOBAL_AGENTS=0
+  COMP_GLOBAL_SKILLS=0
 fi
 
 # ---------------------------------------------------------------------------
@@ -187,6 +195,32 @@ if [ $OPT_UNINSTALL -eq 1 ]; then
   done
 
   echo ""
+
+  if [ $COMP_GLOBAL_SKILLS -eq 1 ]; then
+    echo "--- グローバルスキル削除 (~/.claude/skills/) ---"
+    GLOBAL_SKILLS_DIR="$HOME/.claude/skills"
+    if [ -d "$GLOBAL_SKILLS_DIR" ]; then
+      for skill_dir in "$REPO_DIR/.claude/skills"/*/; do
+        [ -d "$skill_dir" ] || continue
+        skill_name=$(basename "$skill_dir")
+        dst_skill_dir="$GLOBAL_SKILLS_DIR/$skill_name"
+        if [ -L "$dst_skill_dir/SKILL.md" ]; then
+          if [ $OPT_DRY_RUN -eq 1 ]; then
+            printf "  [DRY-RUN] 削除予定: %s\n" "$dst_skill_dir/SKILL.md"
+          else
+            rm "$dst_skill_dir/SKILL.md"
+            printf "  [REMOVED]   %s\n" "$dst_skill_dir/SKILL.md"
+          fi
+        else
+          printf "  [SKIP]      %s (リンクなし)\n" "$dst_skill_dir/SKILL.md"
+        fi
+      done
+    else
+      echo "  [SKIP] $GLOBAL_SKILLS_DIR (存在しない)"
+    fi
+    echo ""
+  fi
+
   echo "アンインストール完了。"
   echo "注意: _queue.json / settings.json / グローバルエージェントは保護されています。"
   exit $EXIT_OK
@@ -322,6 +356,55 @@ copy_file() {
   esac
 }
 
+# スキルを ~/.claude/skills/ にシンボリックリンクする
+# 引数: <src_dir> <dst_dir>
+symlink_skill() {
+  local src_skill_dir="$1"
+  local dst_skill_dir="$2"
+
+  local skill_md_src="$src_skill_dir/SKILL.md"
+  check_src "$skill_md_src"
+
+  # dst_skill_dir がディレクトリシンボリックリンクの場合はスキップ
+  # （例: life-planner のようにディレクトリ丸ごとリンク済みの場合、
+  #   SKILL.md を操作するとリンク先のソースファイルを破壊してしまう）
+  if [ -L "$dst_skill_dir" ]; then
+    printf "  [SKIP]      %s (ディレクトリシンボリックリンク済み)\n" "$dst_skill_dir"
+    return 0
+  fi
+
+  ensure_dir "$dst_skill_dir"
+
+  # SKILL.md をリンク
+  local dst_md="$dst_skill_dir/SKILL.md"
+  if [ $OPT_DRY_RUN -eq 1 ]; then
+    printf "  [SYMLINK]   %s\n" "$dst_md"
+  else
+    # 既存ファイル/リンクを削除してから再作成
+    { [ -e "$dst_md" ] || [ -L "$dst_md" ]; } && rm "$dst_md"
+    ln -sf "$skill_md_src" "$dst_md"
+    printf "  [SYMLINK]   %s\n" "$dst_md"
+  fi
+
+  # references/ 配下の .md ファイルもリンク
+  local ref_src_dir="$src_skill_dir/references"
+  if [ -d "$ref_src_dir" ]; then
+    local ref_dst_dir="$dst_skill_dir/references"
+    ensure_dir "$ref_dst_dir"
+    for ref_file in "$ref_src_dir"/*.md; do
+      [ -f "$ref_file" ] || continue
+      local dst_ref="$ref_dst_dir/$(basename "$ref_file")"
+      if [ $OPT_DRY_RUN -eq 1 ]; then
+        printf "  [SYMLINK]   %s\n" "$dst_ref"
+      else
+        { [ -e "$dst_ref" ] || [ -L "$dst_ref" ]; } && rm "$dst_ref"
+        ln -sf "$ref_file" "$dst_ref"
+        printf "  [SYMLINK]   %s\n" "$dst_ref"
+      fi
+    done
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # メイン処理
 # ---------------------------------------------------------------------------
@@ -344,6 +427,22 @@ if [ $COMP_GLOBAL_AGENTS -eq 1 ]; then
       "$REPO_DIR/.claude/agents/$agent_file" \
       "$GLOBAL_AGENTS_DIR/$agent_file" \
       "conflict"
+  done
+  echo ""
+fi
+
+# --- グローバルスキル ---
+if [ $COMP_GLOBAL_SKILLS -eq 1 ]; then
+  echo "--- グローバルスキル (~/.claude/skills/) ---"
+  echo "# 複数マシン運用: agent-crew を同じパスに clone してください"
+  echo "# (シンボリックリンクは絶対パスで作成されます)"
+  GLOBAL_SKILLS_DIR="$HOME/.claude/skills"
+  ensure_dir "$GLOBAL_SKILLS_DIR"
+
+  for skill_dir in "$REPO_DIR/.claude/skills"/*/; do
+    [ -d "$skill_dir" ] || continue
+    skill_name=$(basename "$skill_dir")
+    symlink_skill "$skill_dir" "$GLOBAL_SKILLS_DIR/$skill_name"
   done
   echo ""
 fi
