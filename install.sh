@@ -2,6 +2,22 @@
 # claude-crew install script
 # 使い方: bash install.sh [OPTIONS] [STACK] [TARGET_DIR]
 # 例:     bash install.sh --dry-run go /path/to/myproject
+#
+# ─────────────────────────────────────────────────────────
+# [推奨] Claude Code プラグインとしてインストールする場合:
+#   claude plugin install github:Andryu/agent-crew
+#   または
+#   claude plugin marketplace add Andryu/agent-crew
+#   claude plugin install agent-crew
+#
+# スキルはネームスペース付きで利用可能:
+#   /agent-crew:life-planner
+#   /agent-crew:life-plan-review
+#
+# このスクリプトは開発環境セットアップ用途（git hooks・
+# スクリプト権限付与・グローバルシンボリックリンク配置）
+# に引き続き利用できます。
+# ─────────────────────────────────────────────────────────
 
 set -euo pipefail
 
