@@ -83,3 +83,7 @@
 {"ts":"2026-04-26T13:57:09+0000","sprint":"sprint-17","slug":"sprint17-qa","agent":"Sora","event":"task_completed","tool_use_id":"unknown"}
 {"ts":"2026-04-26T13:57:22+0000","type":"qa.approved","sprint":"sprint-17","slug":"sprint17-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
 {"ts":"2026-04-26T13:57:22+0000","type":"task.done","sprint":"sprint-17","slug":"sprint17-qa","agent":"Sora","detail":{"summary":"全5チェック APPROVED。task_completed.sh・settings.json・engineer-go.md の変更を確認。"}}
+{"ts":"2026-06-14T08:34:55+0000","sprint":"sprint-19","slug":"alpha-setup-claude","agent":"Alex","event":"task_completed","tool_use_id":"unknown"}
+{"ts":"2026-06-14T08:34:55+0000","sprint":"sprint-19","slug":"alpha-setup-claude","agent":"Alex","event":"task_completed","tool_use_id":"unknown"}
+{"ts":"2026-06-14T08:34:55+0000","sprint":"sprint-19","slug":"alpha-setup-claude","agent":"Alex","event":"task_completed","tool_use_id":"unknown"}
+{"ts":"2026-06-14T08:40:57+0000","sprint":"sprint-19","slug":"alpha-setup-claude","agent":"Alex","event":"task_completed","tool_use_id":"unknown"}
