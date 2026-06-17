@@ -4,7 +4,7 @@
     {
       "slug": "sprint22-retro",
       "title": "Sprint-22 レトロスペクティブ実施（みゆきち）",
-      "status": "done",
+      "status": "DONE",
       "assigned_to": "みゆきち",
       "complexity": "S",
       "risk_level": "low",
@@ -78,7 +78,7 @@
     {
       "slug": "rubric-retro",
       "title": "Issue #22 (1/2): retro.md にルーブリック計算ロジックを追加",
-      "status": "done",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "medium",
@@ -117,7 +117,7 @@
     {
       "slug": "rubric-pm",
       "title": "Issue #22 (2/2): pm.md の完了報告フォーマットにスコア欄を追加",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "S",
       "risk_level": "low",
@@ -127,17 +127,29 @@
       ],
       "qa_mode": "inline",
       "created_at": "2026-06-15T00:00:00+09:00",
-      "updated_at": "2026-06-15T00:00:00+09:00",
+      "updated_at": "2026-06-17",
       "notes": "変更対象: agents/pm.md のみ（1件）。完了報告フォーマットのスプリント完了報告セクションにルーブリックスコア表を追加。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "pm.md の完了報告フォーマットにルーブリックスコア4軸の表を追加（Issue #22 2/2）",
       "events": [
         {
           "ts": "2026-06-15T00:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
           "msg": "Sprint-23 キュー登録"
+        },
+        {
+          "ts": "2026-06-17T17:57:28+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-06-17T17:57:31+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "pm.md の完了報告フォーマットにルーブリックスコア4軸の表を追加（Issue #22 2/2）"
         }
       ]
     },
