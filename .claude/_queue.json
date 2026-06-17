@@ -78,7 +78,7 @@
     {
       "slug": "rubric-retro",
       "title": "Issue #22 (1/2): retro.md にルーブリック計算ロジックを追加",
-      "status": "TODO",
+      "status": "done",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "medium",
@@ -88,17 +88,29 @@
       ],
       "qa_mode": "inline",
       "created_at": "2026-06-15T00:00:00+09:00",
-      "updated_at": "2026-06-15T00:00:00+09:00",
+      "updated_at": "2026-06-17T00:00:00+09:00",
       "notes": "Issue #22 着手条件: 前提条件なし（即着手可）。参照ファイル: agents/retro.md（1件）。評価軸4軸（仕様明確度/QA合格率/ブロック率/負荷分散）を jq で計算するロジックをステップ6直前に追加。変更ファイルは agents/retro.md のみ。",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
+      "qa_result": "APPROVED",
+      "summary": "retro.md ステップ6にルーブリック計算ロジック（4軸 jq コマンド＋表フォーマット）を追加。従来のステップ6をステップ7に繰り下げ。",
       "events": [
         {
           "ts": "2026-06-15T00:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
           "msg": "Sprint-23 キュー登録"
+        },
+        {
+          "ts": "2026-06-17T00:00:00+09:00",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-06-17T00:00:00+09:00",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "retro.md にルーブリックスコア計算ロジックを追加（Issue #22 1/2）"
         }
       ]
     },
