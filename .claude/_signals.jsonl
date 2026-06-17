@@ -87,3 +87,7 @@
 {"ts":"2026-06-14T08:34:55+0000","sprint":"sprint-19","slug":"alpha-setup-claude","agent":"Alex","event":"task_completed","tool_use_id":"unknown"}
 {"ts":"2026-06-14T08:34:55+0000","sprint":"sprint-19","slug":"alpha-setup-claude","agent":"Alex","event":"task_completed","tool_use_id":"unknown"}
 {"ts":"2026-06-14T08:40:57+0000","sprint":"sprint-19","slug":"alpha-setup-claude","agent":"Alex","event":"task_completed","tool_use_id":"unknown"}
+{"ts":"2026-06-17T00:19:19+0000","type":"task.start","sprint":"sprint-23","slug":"permissions-allow-fix","agent":"Riku","detail":{}}
+{"ts":"2026-06-17T00:19:21+0000","type":"task.done","sprint":"sprint-23","slug":"permissions-allow-fix","agent":"Riku","detail":{"summary":"Bash(~/.claude/hooks/*) を permissions.allow に追記、jq 検証済み、feat/sprint-23 にコミット済み"}}
+{"ts":"2026-06-17T00:20:35+0000","type":"task.start","sprint":"sprint-23","slug":"slack-persona-design","agent":"Alex","detail":{}}
+{"ts":"2026-06-17T00:20:38+0000","type":"task.done","sprint":"sprint-23","slug":"slack-persona-design","agent":"Alex","detail":{"summary":"6エージェント×3パターンの口調テンプレート設計完了。docs/spec/slack-persona.md を新規作成。差し戻し(build_retry_message)関数仕様・変数定義・検出ロジックを含む"}}

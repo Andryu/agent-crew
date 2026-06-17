@@ -120,7 +120,7 @@
     {
       "slug": "slack-persona-design",
       "title": "Issue #30 (1/2): エージェント人格 Slack 口調テンプレート設計 (Alex)",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Alex",
       "complexity": "M",
       "risk_level": "low",
@@ -128,17 +128,29 @@
       "depends_on": [],
       "qa_mode": "—",
       "created_at": "2026-06-15T00:00:00+09:00",
-      "updated_at": "2026-06-15T00:00:00+09:00",
+      "updated_at": "2026-06-17",
       "notes": "Issue #30 着手条件: 前提条件なし（即着手可）。参照ファイル: hooks/subagent_stop.sh（1件）。成果物: docs/spec/slack-persona.md（新規）。6エージェント × 3パターン（完了・ブロック・差し戻し）のテンプレート定義。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "6エージェント×3パターンの口調テンプレート設計完了。docs/spec/slack-persona.md を新規作成。差し戻し(build_retry_message)関数仕様・変数定義・検出ロジックを含む",
       "events": [
         {
           "ts": "2026-06-15T00:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
           "msg": "Sprint-23 キュー登録"
+        },
+        {
+          "ts": "2026-06-17T00:20:35+0000",
+          "agent": "Alex",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-06-17T00:20:38+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "6エージェント×3パターンの口調テンプレート設計完了。docs/spec/slack-persona.md を新規作成。差し戻し(build_retry_message)関数仕様・変数定義・検出ロジックを含む"
         }
       ]
     },
