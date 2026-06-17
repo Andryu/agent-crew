@@ -157,7 +157,7 @@
     {
       "slug": "slack-persona-impl",
       "title": "Issue #30 (2/2): subagent_stop.sh に人格別テンプレートを実装",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "medium",
@@ -167,17 +167,29 @@
       ],
       "qa_mode": "inline",
       "created_at": "2026-06-15T00:00:00+09:00",
-      "updated_at": "2026-06-15T00:00:00+09:00",
+      "updated_at": "2026-06-17",
       "notes": "参照ファイル: docs/spec/slack-persona.md, hooks/subagent_stop.sh（2件）。変更対象: hooks/subagent_stop.sh（1件）。bash -n バリデーション必須。既存 get_agent_display_name / get_agent_icon 関数を活用。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "build_retry_message追加・差し戻し検出ロジック実装・bash3.2互換",
       "events": [
         {
           "ts": "2026-06-15T00:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
           "msg": "Sprint-23 キュー登録"
+        },
+        {
+          "ts": "2026-06-17T00:22:28+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-06-17T00:22:31+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "build_retry_message追加・差し戻し検出ロジック実装・bash3.2互換"
         }
       ]
     },
