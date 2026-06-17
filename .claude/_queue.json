@@ -18,13 +18,18 @@
       "qa_result": null,
       "summary": null,
       "events": [
-        {"ts": "2026-06-15T00:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-23 キュー登録"}
+        {
+          "ts": "2026-06-15T00:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-23 キュー登録"
+        }
       ]
     },
     {
       "slug": "permissions-allow-fix",
       "title": "Sprint-22 積み残し: permissions.allow に Bash(~/.claude/hooks/*) を追記",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "S",
       "risk_level": "low",
@@ -32,13 +37,30 @@
       "depends_on": [],
       "qa_mode": "inline",
       "created_at": "2026-06-15T00:00:00+09:00",
-      "updated_at": "2026-06-15T00:00:00+09:00",
+      "updated_at": "2026-06-17",
       "notes": "変更対象: .claude/settings.json のみ（1件）。jq . で JSON 構文検証必須。sprint-22 QA の APPROVED_WITH_NOTE 事項。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "Bash(~/.claude/hooks/*) を permissions.allow に追記、jq 検証済み、feat/sprint-23 にコミット済み",
       "events": [
-        {"ts": "2026-06-15T00:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-23 キュー登録"}
+        {
+          "ts": "2026-06-15T00:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-23 キュー登録"
+        },
+        {
+          "ts": "2026-06-17T00:19:19+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-06-17T00:19:21+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "Bash(~/.claude/hooks/*) を permissions.allow に追記、jq 検証済み、feat/sprint-23 にコミット済み"
+        }
       ]
     },
     {
@@ -49,7 +71,9 @@
       "complexity": "M",
       "risk_level": "medium",
       "parallel_group": "phase-2",
-      "depends_on": ["sprint22-retro"],
+      "depends_on": [
+        "sprint22-retro"
+      ],
       "qa_mode": "inline",
       "created_at": "2026-06-15T00:00:00+09:00",
       "updated_at": "2026-06-15T00:00:00+09:00",
@@ -58,7 +82,12 @@
       "qa_result": null,
       "summary": null,
       "events": [
-        {"ts": "2026-06-15T00:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-23 キュー登録"}
+        {
+          "ts": "2026-06-15T00:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-23 キュー登録"
+        }
       ]
     },
     {
@@ -69,7 +98,9 @@
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": "phase-2",
-      "depends_on": ["rubric-retro"],
+      "depends_on": [
+        "rubric-retro"
+      ],
       "qa_mode": "inline",
       "created_at": "2026-06-15T00:00:00+09:00",
       "updated_at": "2026-06-15T00:00:00+09:00",
@@ -78,7 +109,12 @@
       "qa_result": null,
       "summary": null,
       "events": [
-        {"ts": "2026-06-15T00:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-23 キュー登録"}
+        {
+          "ts": "2026-06-15T00:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-23 キュー登録"
+        }
       ]
     },
     {
@@ -98,7 +134,12 @@
       "qa_result": null,
       "summary": null,
       "events": [
-        {"ts": "2026-06-15T00:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-23 キュー登録"}
+        {
+          "ts": "2026-06-15T00:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-23 キュー登録"
+        }
       ]
     },
     {
@@ -109,7 +150,9 @@
       "complexity": "M",
       "risk_level": "medium",
       "parallel_group": "phase-3",
-      "depends_on": ["slack-persona-design"],
+      "depends_on": [
+        "slack-persona-design"
+      ],
       "qa_mode": "inline",
       "created_at": "2026-06-15T00:00:00+09:00",
       "updated_at": "2026-06-15T00:00:00+09:00",
@@ -118,7 +161,12 @@
       "qa_result": null,
       "summary": null,
       "events": [
-        {"ts": "2026-06-15T00:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-23 キュー登録"}
+        {
+          "ts": "2026-06-15T00:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-23 キュー登録"
+        }
       ]
     },
     {
@@ -129,7 +177,12 @@
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": "phase-4",
-      "depends_on": ["permissions-allow-fix", "rubric-retro", "rubric-pm", "slack-persona-impl"],
+      "depends_on": [
+        "permissions-allow-fix",
+        "rubric-retro",
+        "rubric-pm",
+        "slack-persona-impl"
+      ],
       "qa_mode": null,
       "created_at": "2026-06-15T00:00:00+09:00",
       "updated_at": "2026-06-15T00:00:00+09:00",
@@ -138,7 +191,12 @@
       "qa_result": null,
       "summary": null,
       "events": [
-        {"ts": "2026-06-15T00:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-23 キュー登録"}
+        {
+          "ts": "2026-06-15T00:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-23 キュー登録"
+        }
       ]
     }
   ]
