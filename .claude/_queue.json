@@ -4,7 +4,7 @@
     {
       "slug": "sprint22-retro",
       "title": "Sprint-22 レトロスペクティブ実施（みゆきち）",
-      "status": "TODO",
+      "status": "done",
       "assigned_to": "みゆきち",
       "complexity": "S",
       "risk_level": "low",
@@ -12,17 +12,29 @@
       "depends_on": [],
       "qa_mode": "—",
       "created_at": "2026-06-15T00:00:00+09:00",
-      "updated_at": "2026-06-15T00:00:00+09:00",
+      "updated_at": "2026-06-17T00:00:00+09:00",
       "notes": "Sprint-22 で未実施のレトロスペクティブを補完。_lessons.json に Sprint-22 の観察を記録し、pm-learned-rules.md を更新する。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "lesson 2件記録（sprint-22-process-001: レトロ未実施パターン再発/sprint-22-tooling-001: APPROVED_WITH_NOTE 積み残し）。pm-learned-rules.md に2ルール追記。Issue #118・#119 を作成。",
       "events": [
         {
           "ts": "2026-06-15T00:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
           "msg": "Sprint-23 キュー登録"
+        },
+        {
+          "ts": "2026-06-17T00:00:00+09:00",
+          "agent": "みゆきち",
+          "action": "start",
+          "msg": "Sprint-22 レトロスペクティブ開始"
+        },
+        {
+          "ts": "2026-06-17T00:00:00+09:00",
+          "agent": "みゆきち",
+          "action": "done",
+          "msg": "Sprint-22 レトロ完了: lesson 2件記録 / Issue #118 #119 作成 / pm-learned-rules.md 更新"
         }
       ]
     },
