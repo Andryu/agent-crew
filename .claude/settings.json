@@ -82,6 +82,7 @@
       "Bash(chmod *)",
       "Bash(bash *)",
       "Bash(scripts/privacy-check.sh *)",
+      "Bash(~/.claude/hooks/*)",
       "Write(**)"
     ]
   }
