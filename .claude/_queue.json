@@ -232,7 +232,7 @@
     {
       "slug": "sprint23-qa",
       "title": "Sprint-23 最終 QA: 全実装タスクの動作検証",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "low",
@@ -245,17 +245,35 @@
       ],
       "qa_mode": null,
       "created_at": "2026-06-15T00:00:00+09:00",
-      "updated_at": "2026-06-15T00:00:00+09:00",
+      "updated_at": "2026-06-17",
       "notes": "QA 対象: permissions-allow-fix / rubric-retro / rubric-pm / slack-persona-impl。確認項目: (1) jq . .claude/settings.json で JSON 構文有効性 (2) retro.md のルーブリック jq コマンドが bash -n 通過 (3) pm.md スコア欄が追加されている (4) hooks/subagent_stop.sh bash -n PASS かつ 6エージェント × 3パターン実装済み。",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
+      "qa_result": "APPROVED",
+      "summary": "Sprint-23 最終QA完了 — 全4タスク APPROVED、CRITICAL/MAJORゼロ",
       "events": [
         {
           "ts": "2026-06-15T00:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
           "msg": "Sprint-23 キュー登録"
+        },
+        {
+          "ts": "2026-06-17T17:58:59+0000",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-06-17T17:59:53+0000",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: 全4タスク APPROVED。MINOR2件（retry_count表示の不一致・dead code コメント欠如）、CRITICAL/MAJOR ゼロ"
+        },
+        {
+          "ts": "2026-06-17T17:59:56+0000",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "Sprint-23 最終QA完了 — 全4タスク APPROVED、CRITICAL/MAJORゼロ"
         }
       ]
     }
