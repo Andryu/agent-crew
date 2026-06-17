@@ -100,6 +100,25 @@ build_block_message() {
   esac
 }
 
+# build_retry_message <agent> <slug> <retry_count>
+# 差し戻し(changes_requested)通知メッセージを返す
+# 通常は agent="Sora" で呼び出す（QAが差し戻し主語）
+build_retry_message() {
+  local agent="$1" slug="$2" retry_count="$3"
+  case "$agent" in
+    Yuki)  echo "🔄 ${slug} はまだ完了していません。未承認のタスクが残っています。" ;;
+    Alex)  echo "🔄 ${slug} の設計を見直します。指摘事項を確認してください。" ;;
+    Mina)  echo "🔄 ${slug} のデザイン、修正します。フィードバックありがとうございます。" ;;
+    Riku)  echo "🔄 ${slug} 修正する。指摘箇所確認した。" ;;
+    Sora)  echo "🔄 ${slug} 差し戻し。修正が必要な箇所を記録しました — CHANGES_REQUESTED" ;;
+    Hana)  echo "🔄 ${slug} に修正依頼を出しました。詳細はコメントを参照してください。" ;;
+    Kai)   echo "🔄 ${slug} のセキュリティ指摘を差し戻しました (retry ${retry_count})" ;;
+    Tomo)  echo "🔄 ${slug} のインフラ設定を差し戻しました (retry ${retry_count})" ;;
+    Ren)   echo "🔄 ${slug} のデータ設計を差し戻しました (retry ${retry_count})" ;;
+    *)     echo "🔄 ${agent}: ${slug} を差し戻しました (retry ${retry_count})" ;;
+  esac
+}
+
 if [[ ! -f "$QUEUE_FILE" ]]; then
   exit 0
 fi
@@ -185,18 +204,25 @@ if [[ -n "$NEXT" ]]; then
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
-    # 直近の done イベントから完了したエージェント名を取得
-    LAST_AGENT=$(jq -r '
-      .tasks
-      | map(.events // [])
-      | flatten
-      | map(select(.action == "done"))
-      | last
-      | .agent // "Yuki"
-    ' "$QUEUE_FILE")
-    AGENT_UPPER=$(echo "$AGENT" | tr '[:lower:]' '[:upper:]')
-    MESSAGE=$(build_done_message "$LAST_AGENT" "$SLUG" "$AGENT_UPPER")
-    slack_notify "$LAST_AGENT" "$MESSAGE"
+    # 差し戻し検出: retry_count > 0 なら Sora 主語の差し戻し通知を送る
+    RETRY_COUNT=$(jq -r --arg s "$SLUG" '.tasks[] | select(.slug == $s) | .retry_count // 0' "$QUEUE_FILE")
+    if [[ "$RETRY_COUNT" -gt 0 ]]; then
+      MESSAGE=$(build_retry_message "Sora" "$SLUG" "$RETRY_COUNT")
+      slack_notify "Sora" "$MESSAGE"
+    else
+      # 直近の done イベントから完了したエージェント名を取得
+      LAST_AGENT=$(jq -r '
+        .tasks
+        | map(.events // [])
+        | flatten
+        | map(select(.action == "done"))
+        | last
+        | .agent // "Yuki"
+      ' "$QUEUE_FILE")
+      AGENT_UPPER=$(echo "$AGENT" | tr '[:lower:]' '[:upper:]')
+      MESSAGE=$(build_done_message "$LAST_AGENT" "$SLUG" "$AGENT_UPPER")
+      slack_notify "$LAST_AGENT" "$MESSAGE"
+    fi
   fi
   exit 0
 fi
