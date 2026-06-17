@@ -245,12 +245,79 @@ grep -o 'lesson_id: [a-z0-9_-]*' agents/pm-learned-rules.md | awk '{print $2}'
 *最終更新: [sprint名] / [YYYY-MM-DD]*
 ```
 
-### ステップ 6: Yuki への完了報告
+### ステップ 6: ルーブリックスコアの計算
+
+Yuki への完了報告の前に、4軸ルーブリックスコアを計算して添付する。
+Anthropic の Criterion + Rubric パターンに基づく定量自己評価（Issue #22）。
+
+#### スコア計算手順
+
+以下の jq コマンドで `_queue.json` から各指標を算出する。
+
+```bash
+QUEUE=".claude/_queue.json"
+
+# 総タスク数
+TOTAL=$(jq '[.tasks[]] | length' "$QUEUE")
+
+# --- 仕様明確度: 1 - (retry_count合計 / タスク数) ---
+RETRY_SUM=$(jq '[.tasks[].retry_count // 0] | add // 0' "$QUEUE")
+SPEC_CLARITY=$(jq -n --argjson r "$RETRY_SUM" --argjson t "$TOTAL" '
+  if $t > 0 then (1 - ($r / $t)) else 1 end
+')
+
+# --- QA合格率: APPROVED数 / QA対象タスク数 ---
+QA_TARGET=$(jq '[.tasks[] | select(.qa_result != null)] | length' "$QUEUE")
+QA_APPROVED=$(jq '[.tasks[] | select(.qa_result == "APPROVED")] | length' "$QUEUE")
+QA_RATE=$(jq -n --argjson a "$QA_APPROVED" --argjson t "$QA_TARGET" '
+  if $t > 0 then ($a / $t) else 1 end
+')
+
+# --- ブロック率: BLOCKED数 / 総タスク数 ---
+BLOCKED=$(jq '[.tasks[] | select(.status == "BLOCKED")] | length' "$QUEUE")
+BLOCK_RATE=$(jq -n --argjson b "$BLOCKED" --argjson t "$TOTAL" '
+  if $t > 0 then ($b / $t) else 0 end
+')
+
+# --- 負荷分散: 最多担当数 / 平均担当数 ---
+LOAD_RATIO=$(jq '
+  [.tasks[].agent // "unassigned"] |
+  group_by(.) |
+  map(length) |
+  if length > 0 then
+    (max / ((add) / length))
+  else 1 end
+' "$QUEUE")
+```
+
+#### スコアの判定基準
+
+| 評価軸 | 計算方法 | 合格基準 |
+|--------|---------|---------|
+| 仕様明確度 | `1 - (retry_count合計 / タスク数)` | >= 0.8 |
+| QA合格率 | `APPROVED数 / QA対象タスク数` | >= 0.9 |
+| ブロック率 | `BLOCKED数 / 総タスク数` | <= 0.1 |
+| 負荷分散 | `最多担当数 / 平均担当数` | <= 2.0 |
+
+スコアが合格基準を下回った軸は、次スプリントの改善優先事項として lesson に記録する。
+
+### ステップ 7: Yuki への完了報告
 
 以下のフォーマットで完了報告を返す：
 
 ```
 ## レトロスペクティブ完了 — [sprint名]
+
+### ルーブリックスコア
+
+| 評価軸 | スコア | 合格基準 | 判定 |
+|--------|--------|---------|------|
+| 仕様明確度 | [0.xx] | >= 0.8 | [PASS / FAIL] |
+| QA合格率 | [0.xx] | >= 0.9 | [PASS / FAIL] |
+| ブロック率 | [0.xx] | <= 0.1 | [PASS / FAIL] |
+| 負荷分散 | [0.xx] | <= 2.0 | [PASS / FAIL] |
+
+> FAIL 軸: [軸名]（次スプリントの改善優先事項）
 
 ### 記録した lesson
 - [lesson-id]: [description の冒頭30文字] (priority: [score])
