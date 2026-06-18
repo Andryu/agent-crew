@@ -4,7 +4,7 @@
     {
       "slug": "sprint22-retro",
       "title": "Sprint-22 レトロスペクティブ実施（みゆきち）",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "みゆきち",
       "complexity": "S",
       "risk_level": "low",
@@ -12,19 +12,36 @@
       "depends_on": [],
       "qa_mode": "—",
       "created_at": "2026-06-15T00:00:00+09:00",
-      "updated_at": "2026-06-15T00:00:00+09:00",
+      "updated_at": "2026-06-17T00:00:00+09:00",
       "notes": "Sprint-22 で未実施のレトロスペクティブを補完。_lessons.json に Sprint-22 の観察を記録し、pm-learned-rules.md を更新する。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "lesson 2件記録（sprint-22-process-001: レトロ未実施パターン再発/sprint-22-tooling-001: APPROVED_WITH_NOTE 積み残し）。pm-learned-rules.md に2ルール追記。Issue #118・#119 を作成。",
       "events": [
-        {"ts": "2026-06-15T00:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-23 キュー登録"}
+        {
+          "ts": "2026-06-15T00:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-23 キュー登録"
+        },
+        {
+          "ts": "2026-06-17T00:00:00+09:00",
+          "agent": "みゆきち",
+          "action": "start",
+          "msg": "Sprint-22 レトロスペクティブ開始"
+        },
+        {
+          "ts": "2026-06-17T00:00:00+09:00",
+          "agent": "みゆきち",
+          "action": "done",
+          "msg": "Sprint-22 レトロ完了: lesson 2件記録 / Issue #118 #119 作成 / pm-learned-rules.md 更新"
+        }
       ]
     },
     {
       "slug": "permissions-allow-fix",
       "title": "Sprint-22 積み残し: permissions.allow に Bash(~/.claude/hooks/*) を追記",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "S",
       "risk_level": "low",
@@ -32,59 +49,114 @@
       "depends_on": [],
       "qa_mode": "inline",
       "created_at": "2026-06-15T00:00:00+09:00",
-      "updated_at": "2026-06-15T00:00:00+09:00",
+      "updated_at": "2026-06-17",
       "notes": "変更対象: .claude/settings.json のみ（1件）。jq . で JSON 構文検証必須。sprint-22 QA の APPROVED_WITH_NOTE 事項。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "Bash(~/.claude/hooks/*) を permissions.allow に追記、jq 検証済み、feat/sprint-23 にコミット済み",
       "events": [
-        {"ts": "2026-06-15T00:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-23 キュー登録"}
+        {
+          "ts": "2026-06-15T00:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-23 キュー登録"
+        },
+        {
+          "ts": "2026-06-17T00:19:19+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-06-17T00:19:21+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "Bash(~/.claude/hooks/*) を permissions.allow に追記、jq 検証済み、feat/sprint-23 にコミット済み"
+        }
       ]
     },
     {
       "slug": "rubric-retro",
       "title": "Issue #22 (1/2): retro.md にルーブリック計算ロジックを追加",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "medium",
       "parallel_group": "phase-2",
-      "depends_on": ["sprint22-retro"],
+      "depends_on": [
+        "sprint22-retro"
+      ],
       "qa_mode": "inline",
       "created_at": "2026-06-15T00:00:00+09:00",
-      "updated_at": "2026-06-15T00:00:00+09:00",
+      "updated_at": "2026-06-17T00:00:00+09:00",
       "notes": "Issue #22 着手条件: 前提条件なし（即着手可）。参照ファイル: agents/retro.md（1件）。評価軸4軸（仕様明確度/QA合格率/ブロック率/負荷分散）を jq で計算するロジックをステップ6直前に追加。変更ファイルは agents/retro.md のみ。",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
+      "qa_result": "APPROVED",
+      "summary": "retro.md ステップ6にルーブリック計算ロジック（4軸 jq コマンド＋表フォーマット）を追加。従来のステップ6をステップ7に繰り下げ。",
       "events": [
-        {"ts": "2026-06-15T00:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-23 キュー登録"}
+        {
+          "ts": "2026-06-15T00:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-23 キュー登録"
+        },
+        {
+          "ts": "2026-06-17T00:00:00+09:00",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-06-17T00:00:00+09:00",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "retro.md にルーブリックスコア計算ロジックを追加（Issue #22 1/2）"
+        }
       ]
     },
     {
       "slug": "rubric-pm",
       "title": "Issue #22 (2/2): pm.md の完了報告フォーマットにスコア欄を追加",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": "phase-2",
-      "depends_on": ["rubric-retro"],
+      "depends_on": [
+        "rubric-retro"
+      ],
       "qa_mode": "inline",
       "created_at": "2026-06-15T00:00:00+09:00",
-      "updated_at": "2026-06-15T00:00:00+09:00",
+      "updated_at": "2026-06-17",
       "notes": "変更対象: agents/pm.md のみ（1件）。完了報告フォーマットのスプリント完了報告セクションにルーブリックスコア表を追加。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "pm.md の完了報告フォーマットにルーブリックスコア4軸の表を追加（Issue #22 2/2）",
       "events": [
-        {"ts": "2026-06-15T00:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-23 キュー登録"}
+        {
+          "ts": "2026-06-15T00:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-23 キュー登録"
+        },
+        {
+          "ts": "2026-06-17T17:57:28+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-06-17T17:57:31+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "pm.md の完了報告フォーマットにルーブリックスコア4軸の表を追加（Issue #22 2/2）"
+        }
       ]
     },
     {
       "slug": "slack-persona-design",
       "title": "Issue #30 (1/2): エージェント人格 Slack 口調テンプレート設計 (Alex)",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Alex",
       "complexity": "M",
       "risk_level": "low",
@@ -92,53 +164,117 @@
       "depends_on": [],
       "qa_mode": "—",
       "created_at": "2026-06-15T00:00:00+09:00",
-      "updated_at": "2026-06-15T00:00:00+09:00",
+      "updated_at": "2026-06-17",
       "notes": "Issue #30 着手条件: 前提条件なし（即着手可）。参照ファイル: hooks/subagent_stop.sh（1件）。成果物: docs/spec/slack-persona.md（新規）。6エージェント × 3パターン（完了・ブロック・差し戻し）のテンプレート定義。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "6エージェント×3パターンの口調テンプレート設計完了。docs/spec/slack-persona.md を新規作成。差し戻し(build_retry_message)関数仕様・変数定義・検出ロジックを含む",
       "events": [
-        {"ts": "2026-06-15T00:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-23 キュー登録"}
+        {
+          "ts": "2026-06-15T00:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-23 キュー登録"
+        },
+        {
+          "ts": "2026-06-17T00:20:35+0000",
+          "agent": "Alex",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-06-17T00:20:38+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "6エージェント×3パターンの口調テンプレート設計完了。docs/spec/slack-persona.md を新規作成。差し戻し(build_retry_message)関数仕様・変数定義・検出ロジックを含む"
+        }
       ]
     },
     {
       "slug": "slack-persona-impl",
       "title": "Issue #30 (2/2): subagent_stop.sh に人格別テンプレートを実装",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "medium",
       "parallel_group": "phase-3",
-      "depends_on": ["slack-persona-design"],
+      "depends_on": [
+        "slack-persona-design"
+      ],
       "qa_mode": "inline",
       "created_at": "2026-06-15T00:00:00+09:00",
-      "updated_at": "2026-06-15T00:00:00+09:00",
+      "updated_at": "2026-06-17",
       "notes": "参照ファイル: docs/spec/slack-persona.md, hooks/subagent_stop.sh（2件）。変更対象: hooks/subagent_stop.sh（1件）。bash -n バリデーション必須。既存 get_agent_display_name / get_agent_icon 関数を活用。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "build_retry_message追加・差し戻し検出ロジック実装・bash3.2互換",
       "events": [
-        {"ts": "2026-06-15T00:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-23 キュー登録"}
+        {
+          "ts": "2026-06-15T00:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-23 キュー登録"
+        },
+        {
+          "ts": "2026-06-17T00:22:28+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-06-17T00:22:31+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "build_retry_message追加・差し戻し検出ロジック実装・bash3.2互換"
+        }
       ]
     },
     {
       "slug": "sprint23-qa",
       "title": "Sprint-23 最終 QA: 全実装タスクの動作検証",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": "phase-4",
-      "depends_on": ["permissions-allow-fix", "rubric-retro", "rubric-pm", "slack-persona-impl"],
+      "depends_on": [
+        "permissions-allow-fix",
+        "rubric-retro",
+        "rubric-pm",
+        "slack-persona-impl"
+      ],
       "qa_mode": null,
       "created_at": "2026-06-15T00:00:00+09:00",
-      "updated_at": "2026-06-15T00:00:00+09:00",
+      "updated_at": "2026-06-17",
       "notes": "QA 対象: permissions-allow-fix / rubric-retro / rubric-pm / slack-persona-impl。確認項目: (1) jq . .claude/settings.json で JSON 構文有効性 (2) retro.md のルーブリック jq コマンドが bash -n 通過 (3) pm.md スコア欄が追加されている (4) hooks/subagent_stop.sh bash -n PASS かつ 6エージェント × 3パターン実装済み。",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
+      "qa_result": "APPROVED",
+      "summary": "Sprint-23 最終QA完了 — 全4タスク APPROVED、CRITICAL/MAJORゼロ",
       "events": [
-        {"ts": "2026-06-15T00:00:00+09:00", "agent": "Yuki", "action": "created", "msg": "Sprint-23 キュー登録"}
+        {
+          "ts": "2026-06-15T00:00:00+09:00",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-23 キュー登録"
+        },
+        {
+          "ts": "2026-06-17T17:58:59+0000",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-06-17T17:59:53+0000",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: 全4タスク APPROVED。MINOR2件（retry_count表示の不一致・dead code コメント欠如）、CRITICAL/MAJOR ゼロ"
+        },
+        {
+          "ts": "2026-06-17T17:59:56+0000",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "Sprint-23 最終QA完了 — 全4タスク APPROVED、CRITICAL/MAJORゼロ"
+        }
       ]
     }
   ]

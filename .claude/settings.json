@@ -78,10 +78,17 @@
       "Bash(git push *)",
       "Bash(git pull *)",
       "Bash(git fetch *)",
+      "Bash(git log *)",
+      "Bash(git status *)",
+      "Bash(git checkout *)",
+      "Bash(git diff *)",
+      "Bash(git branch *)",
+      "Bash(git rev-parse *)",
       "Bash(jq *)",
       "Bash(chmod *)",
       "Bash(bash *)",
       "Bash(scripts/privacy-check.sh *)",
+      "Bash(~/.claude/hooks/*)",
       "Write(**)"
     ]
   }
