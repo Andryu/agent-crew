@@ -549,5 +549,43 @@ Sprint-22 で capture-learning.sh / aggregate-learnings.sh を実装したが、
 
 ---
 
+## [Yuki] スプリント計画時に担当者の負荷分散スコアを事前計算する
+
+- lesson_id: agent-crew-sprint-23-planning-001
+- priority: 6 / sprint: sprint-23
+
+**やること**
+
+担当者ドラフトを作成した後、rubric 負荷分散スコア（最多担当数 / 平均担当数）を事前計算する。スコアが 2.0 を超える場合、Riku 担当の S/M タスクを Alex（設計系）・みゆきち（retro 系）・Sora（QA 系）へ再配分する。Riku の担当比率が全タスクの50%を超える場合は必ず再配分を検討する。
+
+**やってはいけないこと**
+
+「実装タスクは Riku が適任」という暗黙の想定のまま担当者を決定し、負荷分散スコアを確認しない。
+
+**エビデンス**
+
+Sprint-23 でタスク7件中4件が Riku に集中し、負荷分散スコア 2.29（基準 <=2.0）で FAIL となった。permissions-allow-fix(S)・rubric-pm(S) は他エージェントへの再配分が可能だった（agent-crew-sprint-23-planning-001）。
+
+---
+
+## [Alex / Riku] 設計書には条件分岐ごとの挙動差異を明示し、実装前にレビューする
+
+- lesson_id: agent-crew-sprint-23-design-001
+- priority: 4 / sprint: sprint-23
+
+**やること**
+
+設計書（docs/spec/*.md）を作成する際は、条件分岐を含む挙動の差異（表示有無・省略ルール・エージェント別の処理差など）を明示的に記述する。Riku が実装に着手する前に Alex が設計書をレビューし、dead code が生じうるケースや挙動の非一貫性を事前に検出する。
+
+**やってはいけないこと**
+
+条件分岐の挙動差異を設計書に記述せず、実装者の判断に委ねる。
+
+**エビデンス**
+
+Sprint-23 の build_retry_message 実装で、Yuki 系エージェントのみ retry_count 表示を省略し他は表示する非一貫な実装が混入した。設計書（slack-persona.md）に省略ルールが明記されていなかったことが根因で、Sora QA MINOR 指摘として検出された（agent-crew-sprint-23-design-001）。
+
+---
+
 *このファイルは retro エージェント（みゆきち）が `priority_score >= 3` の新規 lesson を追加するたびに更新されます。*
-*最終更新: sprint-22 / 2026-06-17*
+*最終更新: sprint-23 / 2026-06-18*
