@@ -23,12 +23,22 @@
 #   CONDA_ENV_NAME           condaの環境名（デフォルト: animated_drawings）
 #   USE_MESA                 1 を指定すると view.USE_MESA: True を設定してレンダリングする
 #                             （このリポジトリではmacOSネイティブのオフスクリーンGLFWで問題なく動作したため通常は不要）
+#   CAMERA_POS / CAMERA_FWD  カメラ位置・向きを上書きする（"x,y,z" 形式、カンマ or スペース区切り）。
+#                             デフォルトは胸から上がフレームの6割以上を占める胸像構図
+#                             （CAMERA_POS=0,0.55,2.2 / CAMERA_FWD=0,0.35,2.2）にチューニング済み。
+#                             AnimatedDrawings同梱サンプルは自動アノテーションで胴体・腕までしか
+#                             マスクに含まれないことが多く（脚が別の輪郭として除外されるため）、
+#                             全身が写る前提のカメラ距離にするとキャラが小さく見切れて写る。
+#                             キャラの体格が大きく異なる場合は個別に調整すること。
 #
 # 例:
 #   video-studio/scripts/animate.sh \
 #     ~/Workspace/video-tools/AnimatedDrawings/examples/characters/char1 \
 #     jump \
 #     ./out/char1_jump.mp4
+#
+#   CAMERA_POS="0,0.6,2.4" CAMERA_FWD="0,0.4,2.4" \
+#   video-studio/scripts/animate.sh ... （カメラを個別調整する場合）
 
 set -euo pipefail
 
@@ -111,14 +121,24 @@ source "$CONDA_BASE/etc/profile.d/conda.sh"
 conda activate "$CONDA_ENV_NAME"
 
 USE_MESA_FLAG="${USE_MESA:-0}"
+CAMERA_POS="${CAMERA_POS:-0,0.55,2.2}"
+CAMERA_FWD="${CAMERA_FWD:-0,0.35,2.2}"
 
-python - "$CHAR_ANNO_DIR" "$MOTION_CFG_FN" "$RETARGET_CFG" "$OUTPUT_MP4_PATH" "$USE_MESA_FLAG" <<'PYEOF'
+python - "$CHAR_ANNO_DIR" "$MOTION_CFG_FN" "$RETARGET_CFG" "$OUTPUT_MP4_PATH" "$USE_MESA_FLAG" "$CAMERA_POS" "$CAMERA_FWD" <<'PYEOF'
 import sys
 import yaml
 from pathlib import Path
 import animated_drawings.render as render
 
-char_anno_dir, motion_cfg_fn, retarget_cfg_fn, output_mp4_path, use_mesa_flag = sys.argv[1:6]
+char_anno_dir, motion_cfg_fn, retarget_cfg_fn, output_mp4_path, use_mesa_flag, camera_pos_str, camera_fwd_str = sys.argv[1:8]
+
+
+def parse_vec3(s: str):
+    parts = [p for p in s.replace(',', ' ').split() if p]
+    if len(parts) != 3:
+        raise SystemExit(f"CAMERA_POS/CAMERA_FWD must have 3 components (x,y,z). Got: {s!r}")
+    return [float(p) for p in parts]
+
 
 mvc_cfg = {
     'scene': {
@@ -129,8 +149,8 @@ mvc_cfg = {
         }]
     },
     'view': {
-        'CAMERA_POS': [2.0, 0.7, 8.0],
-        'CAMERA_FWD': [0.0, 0.5, 8.0],
+        'CAMERA_POS': parse_vec3(camera_pos_str),
+        'CAMERA_FWD': parse_vec3(camera_fwd_str),
     },
     'controller': {
         'MODE': 'video_render',
