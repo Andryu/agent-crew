@@ -164,7 +164,7 @@ python image_to_annotations.py \
 - `char_cfg.yaml`（16関節の骨格）・`mask.png`・`texture.png`・`joint_overlay.png`が生成され、関節位置は頭から足先まで妥当な位置に配置されていた。
 - 標準出力に `WARNING:root:point [...] not inside or on edge of any triangle in mesh. Skipping it` という警告が複数出た。これは眉・目などマスクのシルエット外にある細部の点がテクスチャメッシュの三角形に含まれずスキップされる、というもので、**レンダリング自体は問題なく完走する**（後述のMP4化で確認済み）。手描きの線がキャラのマスク輪郭からはみ出している場合に出やすい。
 - 生成したアノテーションを `animate.sh` に渡し、waveモーションでMP4化まで成功した（839フレーム、約12秒処理）。
-- ただし出力されたMP4では、キャラが**画面の左下に小さく表示**された。これは `export_mp4_example.yaml` 由来のデフォルトカメラ設定（`CAMERA_POS: [2.0, 0.7, 8.0]` / `CAMERA_FWD: [0.0, 0.5, 8.0]`）が同梱サンプルキャラ（char1、height=602px）向けにチューニングされたものであり、EP01キャラ（height=312px、体格やアスペクト比が異なる）ではフレーミングが合わないため。**本番投入時はキャラごとに `CAMERA_POS`/`CAMERA_FWD` を調整するか、`char_cfg.yaml` の `height` に応じて自動計算するロジックを追加する必要がある。**
+- 初回検証時、`export_mp4_example.yaml` 由来のカメラ設定（`CAMERA_POS: [2.0, 0.7, 8.0]`、zombieモーション向けにチューニングされた値）をそのまま流用したところキャラが画面の隅に小さく表示される問題があったが、**これは解決済み**。`animate.sh` のデフォルトカメラを AnimatedDrawings本体のデフォルト値に近い胸像構図（`CAMERA_POS: [0, 0.55, 2.2]` / `CAMERA_FWD: [0, 0.35, 2.2]`）に変更し、EP01の実キャラ（kareshi）でフレームの63〜66%を占める良好な構図を確認済み（詳細は5章）。
 
 ### ビルドに失敗する/時間がかかりすぎる場合の代替手段
 
@@ -202,6 +202,8 @@ video-studio/scripts/animate.sh <char_anno_dir> <motion_name> <output_mp4_path> 
 - `output_mp4_path`: 出力先MP4パス
 - `retarget_cfg`: 省略時は `examples/config/retarget/fair1_spf.yaml`（同梱の全サンプルキャラ char1〜char6 と同じ骨格に対応）
 
+カメラは `CAMERA_POS`/`CAMERA_FWD` 環境変数（`"x,y,z"` 形式）で上書きできる。デフォルトは胸から上がフレームの6割以上を占める胸像構図（`CAMERA_POS=0,0.55,2.2` / `CAMERA_FWD=0,0.35,2.2`）にチューニング済み。AnimatedDrawings本体は自動アノテーションで胴体・腕までしかマスクに含まれないことが多く（脚が別の輪郭として除外されるため。6章の既知の問題表参照）、全身が写る前提のカメラ距離にするとキャラが小さく見切れて写るための対応。
+
 ### 動作確認済みの実行例
 
 ```bash
@@ -236,7 +238,9 @@ video-studio/scripts/animate.sh \
 | TorchServe Dockerビルドが遅い/メモリ不足で落ちる | Colimaのデフォルトリソース（CPU2/メモリ2GB）が不足 | `colima stop && colima start --cpu 4 --memory 8 --disk 60` |
 | 組み込みモーションに「walk」が無い | サンプルセットの都合 | `zombie` で代用、または自前BVHを用意 |
 | 自前キャラで自動アノテーション実行時に `point [...] not inside or on edge of any triangle in mesh` 警告が出る | 手描きの線（眉・アクセサリ等）がマスク輪郭からはみ出している | レンダリングへの影響は軽微（該当点がスキップされるのみ）。気になる場合は `fix_annotations.py` でマスクや関節を手動修正 |
-| 自前キャラのMP4でキャラが画面の隅に小さく表示される | `export_mp4_example.yaml` 由来のデフォルトカメラ（`CAMERA_POS`/`CAMERA_FWD`）は同梱サンプル（char1, height=602px）向けの値 | キャラの `char_cfg.yaml` の `height`・体格に応じて `view.CAMERA_POS`/`CAMERA_FWD` を個別調整する |
+| 自前キャラのMP4でキャラが画面の隅に小さく表示される | `export_mp4_example.yaml` 由来のデフォルトカメラ（`CAMERA_POS`/`CAMERA_FWD`）は同梱サンプル（char1, height=602px）向けの値 | 解決済み。`animate.sh` のデフォルトカメラを胸像構図（`CAMERA_POS=0,0.55,2.2`）に変更した。個別調整が必要な場合は `CAMERA_POS`/`CAMERA_FWD` 環境変数で上書き |
+| 自前キャラで脚が胴体と線でつながっていない絵（手足が離れて描かれた落書き）だと、MP4上で脚が丸ごと消える | `examples/image_to_annotations.py` の `segment()` と `animated_drawings/model/animated_drawing.py` の `_generate_mesh()` の両方に「マスク中の最大の連結輪郭のみ採用し、他は破棄する」ロジックがあり、胴体と繋がっていない脚がノイズ扱いで除外される | 実用上は「胸から上の胸像アニメーション」として割り切るのが手早い（wave/jump等の上半身主体の演出とは相性が良い）。脚まで含めたい場合は両ファイルの当該ロジックを「一定サイズ以上の輪郭は全て採用する」よう変更する必要があるが、脚のような細い線画パーツは面積が小さく、閾値次第で一部の輪郭だけ復元されて「浮いた線」のような不自然な見た目になりやすいので要注意（本検証では最終的に見送った） |
+| 特定のキャラ（体格プロポーションが誇張されたキャラ、例: 肩幅が腰幅の約2倍あるkanojo_body.png）でモーション適用時に頭部〜首が白鳥の首のように不自然に伸びて歪む | リターゲティング時の骨格変形（ARAP、`animated_drawings/model/arap.py` / `retargeter.py`）が、そのキャラの関節プロポーションに対して不安定な回転を起こしていると推測される。カメラ・モーション種別・retarget設定（fair1_spf⇄fair1_ppf）・関節座標（neck位置/肩幅）の手動調整・マスクの穴埋め/平滑化のいずれを試しても解消しなかった。一方、変形前（レスト状態）のメッシュ単体を再現テストすると顔を含む全身が正しく三角形分割されており、マスク/メッシュ生成自体は問題ないことを切り分け済み | 未解決のまま今回は当該キャラのモーション化を見送り、静止＋簡易な揺れ・口パクで対応する運用とした。今後再挑戦する場合の候補: (1) `fix_annotations.py` のWeb UI（`python fix_annotations.py <annoディレクトリ>` → `http://127.0.0.1:5050`）で人間が関節位置を手動補正する、(2) 誇張された巻き毛・ループ状のディテールを簡略化した絵に描き直して再アノテーションする、(3) `arap.py`/`retargeter.py` の回転計算をさらに調査する |
 
 ## 7. 参考リンク
 
