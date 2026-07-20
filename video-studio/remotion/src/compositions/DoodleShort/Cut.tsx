@@ -118,14 +118,16 @@ export const Cut: React.FC<{
                   <OffthreadVideo
                     src={staticFile(`${episodeId}/${currentImage}`)}
                     muted
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    // 動画はcoverだとモーションクリップ内の動きで画面外に見切れることがあるため
+                    // containにして全身が常に収まるようにする（上下左右の余白は白背景と馴染む前提）
+                    style={{ width: "100%", height: "100%", objectFit: "contain" }}
                   />
                 </Loop>
               ) : (
                 <OffthreadVideo
                   src={staticFile(`${episodeId}/${currentImage}`)}
                   muted
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  style={{ width: "100%", height: "100%", objectFit: "contain" }}
                 />
               )
             ) : (
