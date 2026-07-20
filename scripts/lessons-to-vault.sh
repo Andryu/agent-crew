@@ -5,11 +5,15 @@
 # 高優先度（priority_score >= MIN_PRIORITY）の教訓をスプリント単位でグループ化し、
 # $VAULT_DIR/inbox/agent-crew-lessons-<sprint>.md として書き出す。
 # 出力ファイルが既に存在するスプリントはスキップする（再実行しても重複生成しない）。
+# sprint-23 以前の教訓は knowledge/agent-crew-failure-patterns.md に統合済みのため、
+# MIN_SPRINT のデフォルトで転記対象から除外する（inbox への重複ノイズ投入を防ぐ）。
 #
 # 環境変数:
 #   VAULT_DIR      知識vaultのルート (default: $HOME/Workspace/Obsidian)
 #   LESSONS_FILE   教訓ファイルパス (default: $HOME/.claude/_lessons.json)
 #   MIN_PRIORITY   転記対象の最小 priority_score (default: 4)
+#   MIN_SPRINT     転記対象の最小スプリント番号。sprint 名末尾の数値でフィルタする。
+#                  数値をパースできない sprint 名は安全側で転記対象に含める (default: 24)
 #
 # フックチェーン（SubagentStop 等）から呼ばれても他の処理に影響しないよう、
 # 前提条件が満たされない場合も含め、いかなる場合も exit 0 とする。
@@ -19,6 +23,7 @@ set -uo pipefail
 VAULT_DIR="${VAULT_DIR:-$HOME/Workspace/Obsidian}"
 LESSONS_FILE="${LESSONS_FILE:-$HOME/.claude/_lessons.json}"
 MIN_PRIORITY="${MIN_PRIORITY:-4}"
+MIN_SPRINT="${MIN_SPRINT:-24}"
 
 warn() {
   echo "WARN: lessons-to-vault.sh: $*" >&2
@@ -46,8 +51,25 @@ if ! [[ "$MIN_PRIORITY" =~ ^[0-9]+$ ]]; then
   exit 0
 fi
 
+if ! [[ "$MIN_SPRINT" =~ ^[0-9]+$ ]]; then
+  warn "MIN_SPRINT は数値で指定してください（got: '$MIN_SPRINT'）。スキップします。"
+  exit 0
+fi
+
 INBOX_DIR="$VAULT_DIR/inbox"
 mkdir -p "$INBOX_DIR" 2>/dev/null || { warn "$INBOX_DIR を作成できません。スキップします。"; exit 0; }
+
+# sprint 名の末尾数値が MIN_SPRINT 未満なら除外する。
+# 末尾が数値でない sprint 名は安全側（未知の命名を黙って捨てない）で対象に含める。
+sprint_included() {
+  local sprint="$1"
+  if [[ "$sprint" =~ ([0-9]+)$ ]]; then
+    local n=$((10#${BASH_REMATCH[1]}))
+    [[ "$n" -ge "$MIN_SPRINT" ]]
+    return
+  fi
+  return 0
+}
 
 # ---------- 対象スプリントの抽出 ----------
 
@@ -66,9 +88,15 @@ fi
 TODAY=$(date +%Y-%m-%d)
 GENERATED=0
 SKIPPED=0
+EXCLUDED=0
 
 while IFS= read -r SPRINT; do
   [[ -z "$SPRINT" ]] && continue
+
+  if ! sprint_included "$SPRINT"; then
+    EXCLUDED=$((EXCLUDED + 1))
+    continue
+  fi
 
   OUT_FILE="$INBOX_DIR/agent-crew-lessons-${SPRINT}.md"
 
@@ -123,6 +151,6 @@ while IFS= read -r SPRINT; do
   GENERATED=$((GENERATED + 1))
 done <<< "$SPRINTS"
 
-echo "lessons-to-vault: 生成 ${GENERATED} 件 / スキップ（既存） ${SKIPPED} 件"
+echo "lessons-to-vault: 生成 ${GENERATED} 件 / スキップ（既存） ${SKIPPED} 件 / 除外（MIN_SPRINT未満） ${EXCLUDED} 件"
 
 exit 0
