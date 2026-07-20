@@ -44,6 +44,15 @@ OUT_FILE="${2:-${OUT_DIR}/${EPISODE_ID}.mp4}"
 
 mkdir -p "${OUT_DIR}"
 
+# OUT_FILEが相対パスの場合、この時点のカレントディレクトリ基準で絶対パス化する。
+# この後 cd "${REMOTION_DIR}" するため、相対パスのままだとRemotion側の書き込み先が
+# video-studio/remotion/ 以下にずれてしまう（実際に遭遇したバグ）。
+case "${OUT_FILE}" in
+  /*) : ;;
+  *) OUT_FILE="$(pwd)/${OUT_FILE}" ;;
+esac
+mkdir -p "$(dirname "${OUT_FILE}")"
+
 if [ ! -d "${REMOTION_DIR}/node_modules" ]; then
   echo "node_modules がありません。先に (cd ${REMOTION_DIR} && npm install) を実行してください。" >&2
   exit 1

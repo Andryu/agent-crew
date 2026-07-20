@@ -51,6 +51,14 @@ export type EpisodeCut = {
   /** このカットの表示秒数 */
   durationSec: number;
   /**
+   * 全画面フルブリードで最背面に描画する背景画像1枚（episode.json ディレクトリからの相対パス、省略可）。
+   * 既存の images/placeholder はこの上に今まで通り重ねて描画する。
+   * 背景・前景とも白背景の線画である前提で、前景側に mix-blend-mode: multiply を適用して合成する
+   * （白同士は透過的に振る舞い、線画だけが両方残る。マスク等の凝った合成はしない）。
+   * idleSway は前景とは別位相で背景にも適用する。
+   */
+  background?: string;
+  /**
    * 画像 or 動画パス（episode.json のあるディレクトリからの相対パス）。
    * - 拡張子が .mp4 / .webm の場合は OffthreadVideo で埋め込み表示（Animated Drawings 等のモーションクリップ用）。
    * - それ以外（png/jpg等）: 1枚=静止表示。2枚=toggleFpsの速さで交互表示（目パチ・口パク風）。

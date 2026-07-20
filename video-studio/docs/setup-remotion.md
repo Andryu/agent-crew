@@ -23,8 +23,9 @@ video-studio/
       Root.tsx              # "doodle-short" コンポジションを登録
       compositions/DoodleShort/
         DoodleShort.tsx     # メインコンポーネント + calculateMetadata
-        Cut.tsx              # 1カット分の描画（画像/動画・カメラ演出・ゆらぎ・字幕・セリフ音声・口パク）
+        Cut.tsx              # 1カット分の描画（背景+前景・画像/動画・カメラ演出・ゆらぎ・字幕・セリフ音声・口パク）
         Caption.tsx          # 画面下部1/3の字幕
+        DialogueCaption.tsx   # v2: セリフ再生ウィンドウ中だけ表示する話者色分け字幕
         Credit.tsx            # 画面右下の小さなクレジット表記（VOICEVOX等）
         PlaceholderCut.tsx   # 素材未着カット用の紙テクスチャ+テキスト
         cameraEffect.ts      # zoom-in/zoom-out/pan/shake の transform計算
@@ -74,6 +75,7 @@ Config.setPublicDir(path.join(process.cwd(), "..", "episodes"));
     {
       "index": 1,                          // カット番号（絵コンテと対応）
       "durationSec": 3,                     // このカットの表示秒数
+      "background": "assets/gen/bg_street.png", // 省略可。全画面フルブリードで最背面に描画する背景1枚
       "images": ["assets/a.png", "assets/b.png"],
       // 画像0枚 = placeholder使用 / 1枚 = 静止 / 2枚 = toggleFpsの速さで交互表示（目パチ・口パク風、補間なし）
       // 拡張子が .mp4 / .webm の場合は OffthreadVideo で動画として埋め込み表示（Animated Drawings のモーションクリップ用）
@@ -96,13 +98,15 @@ Config.setPublicDir(path.join(process.cwd(), "..", "episodes"));
             "mouthClosed": "assets/kanojo_mouth_closed.png",
             "mouthOpen": "assets/kanojo_mouth_open.png",
             "toggleFps": 8                     // 省略時 8
-          }
+          },
+          "text": "初ハウステンボス来たー！"      // 省略可。再生ウィンドウ中だけ表示するセリフ字幕
         },
         {
           "speaker": "kareshi",
           "wav": "assets/voice/cut01_kareshi.wav",
           "startSec": 1.9,
-          "durationSec": 1.5
+          "durationSec": 1.5,
+          "text": "おー、なんかヨーロッパじゃん"
           // mouthLayer省略時は通常の images 表示のまま（口開き素材が無い間の後方互換動作）
         }
       ],
@@ -161,6 +165,24 @@ Remotionのヘッドレスフレーム書き出し（`still`/`render` 両方、P
 差し替えて解決した。**今後このテンプレートに新しいテクスチャ/エフェクトを追加する際は、SVGフィルターに頼らずCSSグラデーション/
 transform等のネイティブCSSプロパティで実装し、`still`コマンドでPNG書き出し→ピクセル分散をチェックする形で検証すること。**
 
+**6. セリフ字幕（`DialogueCaption.tsx`）**
+`dialogue[].text` を指定すると、そのセリフの再生ウィンドウ中だけ話者ごとに縁色を変えた字幕（吹き出しではなく丸みのあるバッジ+色ドット）を表示する。
+`cut.caption`（画面下部1/3、タイトル・演出テロップ用）とは別レイヤーで、その少し上（画面55%あたりから下向き）に重ねているため、
+両方を同時に使うカット（タイトル+セリフ、演出テロップ+セリフ等）でも通常は重ならない。同時刻に複数話者のセリフが再生中の場合
+（例: 2人同時に「うわあああ！」）は縦に積み上げて両方表示する。話者色: kanojo=ピンク、kareshi=青、mob=緑。
+
+**7. 背景レイヤー（`cut.background`）**
+`cut.background` に画像1枚を指定すると、全画面フルブリードで最背面に描画される。既存の `images`/`placeholder` はその上に
+今まで通り重ねて描画されるが、背景がある場合は前景側に `mix-blend-mode: multiply` を適用する。
+本テンプレートの素材は全て「白背景の線画」（PNG、アルファチャンネル無し）という前提があるため、multiplyブレンドにより
+白同士は透過的に振る舞い、線画（インク部分）だけが両方とも残る＝マスクや切り出し無しで自然に重なる。
+背景・前景で `idleSway` の位相をずらしており（背景は `cut.index + 100` をシードに使用）、2枚の紙が別々に揺れているように見える。
+カメラ演出（zoom/pan/shake）は背景・前景を含むシーン全体にかかる（背景だけ/前景だけに別々のカメラ効果は掛けられない設計）。
+
+> 前景画像（例: キャラクターの全身/顔）は元々オブジェクトフィットcoverで画面いっぱいに表示される設計だったため、
+> 背景を追加しても前景の表示位置・サイズは変えていない（"今まで通り"）。透明化はCSSのブレンドモードのみで実現しており、
+> マスクや複数解像度合わせ等の凝った処理はしていない。
+
 ## レンダリング
 
 ```bash
@@ -168,13 +190,24 @@ transform等のネイティブCSSプロパティで実装し、`still`コマン�
 video-studio/scripts/render.sh ep01
 # -> video-studio/episodes/ep01/out/ep01.mp4
 
-# 出力ファイル名を指定
-video-studio/scripts/render.sh ep01 /path/to/output.mp4
+# 出力ファイル名を指定（相対パスでも絶対パスでもOK。相対パスは呼び出し時のカレントディレクトリ基準で解決される）
+video-studio/scripts/render.sh ep01 episodes/ep01/out/ep01_v2.mp4
 
 # Remotion CLIを直接使う場合（video-studio/remotion がカレントディレクトリであること）
 cd video-studio/remotion
 npx remotion render doodle-short ../episodes/ep01/out/ep01.mp4 --props='{"episodeId":"ep01"}'
 ```
+
+**ハマりどころ（render.shの過去のバグ）:** `render.sh` は内部で `cd "${REMOTION_DIR}"`（`video-studio/remotion`）してから
+Remotion CLIを呼ぶ。第2引数（出力ファイル名）を相対パスで渡すと、この `cd` の後の相対パスとして解釈されてしまい、
+`video-studio/episodes/.../out/xxx.mp4` ではなく `video-studio/remotion/episodes/.../out/xxx.mp4` という意図しない場所に
+書き出されるバグがあった（Remotion CLIの実行時カレントディレクトリを基準に相対パスが解決されるため）。
+このため「レンダリングは成功して尺やffprobeの結果も正しいのに、確認しているファイルには古い内容しか反映されない」という
+非常に分かりにくい症状になった（実際には別の場所に正しいファイルができていた）。
+`render.sh` 側で第2引数が相対パスの場合は呼び出し時点のカレントディレクトリを基準に絶対パス化するよう修正済み。
+**教訓:** レンダリング結果を疑うより先に `find` で実際にファイルがどこに書かれているかを確認する。また、コード修正後に
+"ファイルサイズが前回と一致する"だけでは検証にならない（同じ古いキャッシュ相当の内容を指している可能性がある）。
+必ず更新後のファイルの mtime とフレーム内容（できれば複数カット）を確認すること。
 
 プレビュー（Remotion Studio）:
 
@@ -207,19 +240,32 @@ npm run dev
 - **紙テクスチャ**: `still`コマンドでPNG書き出しし、800x200pxの背景領域のRGB標準偏差が0.0（テクスチャ無し）から
   2.3〜2.6（テクスチャあり）に変化したことでCSSグラデーション方式の実装を検証（詳細は上記実装メモ参照）。
 
+**v3（ep01・生成素材の組み込み: 背景レイヤー・mouthLayer展開・endcard差し替え）**
+episode.jsonをセリフ劇(v2)構成へ全面組み替え（絵コンテ9カット→10カットに分割、cut6を6a/6bに分割）した上で、
+`assets/gen/` の生成素材7点（背景3種、口開き顔2種、mob_girls、endcard）を組み込み。
+- `ffprobe`: 1080x1920・30fps・h264/aac・尺37.76秒（10カット合計37.7秒と一致）
+- `ffmpeg -af volumedetect`: セリフのある9カット全てで実音声（-27〜-30dB程度）、セリフ無しのcut10(エンドカード)は
+  無音(-91dB)であることを確認
+- セリフ間の重なり無し検証: cut1/cut2/cut5(意図的な「間」)/cut7(jump)/cut8(wave)の各セリフ間ギャップ区間を切り出し、
+  -82〜-91dB（実質無音）であることを確認（cut3は2人同時発声の意図的な重ね再生のため対象外）
+- 目視確認（フレーム抽出）: cut2(顔2枚交互+街並み背景)・cut4(彼女全身+傘の通り背景)・cut6(mob_girls+傘の通り背景)で
+  multiplyブレンドによる背景/前景合成がキャラを隠さず自然に重なっていること、cut9(index9)の口パクが
+  mouthLayer指定どおり閉じ/開きでトグルしていること、cut10(エンドカード)がendcard.png+3名クレジット表記で
+  正しく表示されることを確認済み
+- **上記のrender.shバグに一度引っかかり、誤った場所（`video-studio/remotion/episodes/...`）に書き出された古い内容を
+  「正しい最新のレンダリング結果」と誤認しかけた。`find`で実際の書き込み先を特定し、バグ修正後に再レンダリングして
+  解決した。**
+
 ## 残課題 / 今後の差し替え予定
 
-- ep01 の cut1（歩行）・cut6（彼のjump反応）・cut7（wave）は Animated Drawings 側のモーション成果物が揃い次第、
-  `images` に `.mp4`（v2で対応した動画埋め込み機能）または静止画を差し替える。
-- ep01を実際にv2の `dialogue`（セリフ劇）構成へ移行する作業は本タスクのスコープ外。
-  台本v2（`docs/video/episode-01-huis-ten-bosch.md`）にセリフ・話者・speedScaleの指定がまとまっているので、
-  各セリフのVOICEVOX wav生成・口開き顔素材が揃ったら `episode.json` の `narration` を `dialogue` 配列に置き換える。
-- 口開き顔素材（彼女・彼氏各1枚）はまだ無い。揃うまでは `mouthLayer` 未指定のままで動作する（口パクなしでセリフのみ再生）。
-- SE（`assets/se_hyuu.wav` 相当・`se_tokei.wav`・`se_gaan.wav`）は VOICEVOX/効果音側の成果物が揃い次第、
-  各カットの `se` に実パスを設定する。
-- cut2（街並み背景）・cut3（VR）・cut6（女子グループ）・cut9（2人並び＋チャンネル名）の背景/構図イラストが未着手。
-  AI生成 or 手描きで用意でき次第、`images` または `placeholder` を差し替える。
-- 現在の `Cut` コンポーネントは画像/動画レイヤーを1枚しか重ねられない（背景+キャラの合成は未対応）。
-  複数レイヤー合成が必要になった場合は `Cut.tsx` の拡張が必要。
+- ep01 の cut1（歩行）・cut7=index7（彼のjump反応、既にkareshi_jump.mp4を1回再生で組み込み済みだが尺に対してクリップが
+  長いため末尾はトリミングされている）は Animated Drawings 側のモーション成果物の追加調整があれば差し替える。
+- SE（ヒュー・時計・ガーン）は音源が揃い次第、各カットの `se` に実パスを設定する。
+- cut1（歩行ポーズ）・cut3（VR、屋内のため背景無し）は依然placeholder。歩きポーズ2枚が揃い次第 `images` を差し替える。
+- `assets/gen/bg_ferris.png`（観覧車の背景）は生成済みだが今回の組み込み対象(team-lead指定)に含まれていない
+  （cut7=index7 wave のシーンで使えそうだが、動画がフルブリードのため背景が隠れる想定で見送られている）。
+  将来 wave シーンを動画でなく静止画+カメラ演出に戻す場合などに使える。
+- 現在の `Cut` コンポーネントは背景1枚+前景1枚（画像/動画）の2レイヤーまで対応（v3で背景対応済み）。
+  3枚以上のレイヤー合成が必要になった場合はさらに拡張が必要。
 - `_test-v2` はテンプレート機能検証用の使い捨てフィクスチャ（ダミー音声・ダミー動画）。本番のepisode.jsonの一部ではないので、
   不要になれば `episodes/_test-v2/` ごと削除して構わない。

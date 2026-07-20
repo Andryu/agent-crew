@@ -77,6 +77,9 @@ export const Cut: React.FC<{
     })
     .map((line) => ({ text: line.text as string, speaker: line.speaker }));
 
+  // 背景と前景で位相をずらし、機械的に同調して見えないようにする
+  const backgroundSwayTransform = getIdleSwayTransform(frame, fps, cut.index + 100);
+
   return (
     <AbsoluteFill style={{ ...paperTextureStyle("#ffffff"), overflow: "hidden" }}>
       <AbsoluteFill
@@ -85,11 +88,27 @@ export const Cut: React.FC<{
           transformOrigin: "center center",
         }}
       >
+        {cut.background ? (
+          <AbsoluteFill
+            style={{
+              transform: backgroundSwayTransform,
+              transformOrigin: "center center",
+            }}
+          >
+            <Img
+              src={staticFile(`${episodeId}/${cut.background}`)}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          </AbsoluteFill>
+        ) : null}
+
         {/* 常時ゆらゆら：手書き風の揺れ（上下±%＋微小回転）をカメラ演出とは独立に重ねがけ */}
         <AbsoluteFill
           style={{
             transform: swayTransform,
             transformOrigin: "center center",
+            // 背景がある場合、前景は白背景同士がmultiplyで馴染む（白は透過的に振る舞い、線画だけ残る）
+            mixBlendMode: cut.background ? "multiply" : "normal",
           }}
         >
           {currentImage ? (

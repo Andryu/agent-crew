@@ -40,6 +40,7 @@
     {
       "index": 2,
       "durationSec": 3.5,
+      "background": "assets/gen/bg_street.png",
       "images": ["assets/kareshi_face.png", "assets/kanojo_face.png"],
       "toggleFps": 6,
       "camera": "pan",
@@ -49,17 +50,25 @@
           "wav": "assets/voice/v2/c2_1_kanojo.wav",
           "startSec": 0.2,
           "durationSec": 1.195,
-          "text": "いい雰囲気だね〜"
+          "text": "いい雰囲気だね〜",
+          "mouthLayer": {
+            "mouthClosed": "assets/kanojo_face.png",
+            "mouthOpen": "assets/gen/kanojo_face_open.png"
+          }
         },
         {
           "speaker": "kareshi",
           "wav": "assets/voice/v2/c2_2_kareshi.wav",
           "startSec": 1.7,
           "durationSec": 1.088,
-          "text": "風車でっっか"
+          "text": "風車でっっか",
+          "mouthLayer": {
+            "mouthClosed": "assets/kareshi_face.png",
+            "mouthOpen": "assets/gen/kareshi_face_open.png"
+          }
         }
       ],
-      "note": "v2構成。絵コンテcut2。固定captionは廃止しセリフ字幕に統一。仮素材：本来は風車・レンガの街並み背景+首の角度違い2枚。背景素材が揃うまでの2枚交互表示"
+      "note": "v2構成。絵コンテcut2。固定captionは廃止しセリフ字幕に統一。背景に街並み(bg_street.png)を追加、前景の顔2枚交互表示はmix-blend-mode:multiplyで重ねる。口パク有効化済み"
     },
     {
       "index": 3,
@@ -92,6 +101,7 @@
     {
       "index": 4,
       "durationSec": 2.5,
+      "background": "assets/gen/bg_umbrella.png",
       "images": ["assets/kanojo_body.png"],
       "camera": "zoom-in",
       "dialogue": [
@@ -103,7 +113,7 @@
           "text": "傘のとこで自撮りしよ！"
         }
       ],
-      "note": "v2構成。絵コンテcut4。背景は本来カラフルな傘の通り（未生成）。彼女の全身素材で代用"
+      "note": "v2構成。絵コンテcut4。背景に傘の通り(bg_umbrella.png)を追加、彼女の全身素材をmultiplyで重ねる"
     },
     {
       "index": 5,
@@ -133,11 +143,8 @@
     {
       "index": 6,
       "durationSec": 3.2,
-      "images": [],
-      "placeholder": {
-        "color": "#F7E3E3",
-        "text": "カメラを引くと女子グループが困り顔で立っている"
-      },
+      "background": "assets/gen/bg_umbrella.png",
+      "images": ["assets/gen/mob_girls.png"],
       "camera": "zoom-out",
       "dialogue": [
         {
@@ -148,7 +155,7 @@
           "text": "あの…写真撮りたいんですけど…"
         }
       ],
-      "note": "v2構成。絵コンテcut6a（cut6を2分割した前半）。モブ女子(冥鳴ひまり)のセリフのみ。彼のリアクションは次のcut(index7=絵コンテ6b)でjumpモーションとして表現"
+      "note": "v2構成。絵コンテcut6a（cut6を2分割した前半）。placeholderを廃止しmob_girls.pngに差し替え、背景はcut4と同じ傘の通りの続き(bg_umbrella.png)。モブ女子(冥鳴ひまり)のセリフのみ。彼のリアクションは次のcut(index7=絵コンテ6b)でjumpモーションとして表現"
     },
     {
       "index": 7,
@@ -209,23 +216,23 @@
           "wav": "assets/voice/v2/c8_1_kanojo.wav",
           "startSec": 0.5,
           "durationSec": 2.613,
-          "text": "……この人と来てよかった。たぶん"
+          "text": "……この人と来てよかった。たぶん",
+          "mouthLayer": {
+            "mouthClosed": "assets/kanojo_face.png",
+            "mouthOpen": "assets/gen/kanojo_face_open.png"
+          }
         }
       ],
-      "note": "v2構成。絵コンテcut8。既存の顔絵をそのまま使用"
+      "note": "v2構成。絵コンテcut8。既存の顔絵をそのまま使用。口パク有効化済み"
     },
     {
       "index": 10,
       "durationSec": 3.0,
-      "images": [],
-      "placeholder": {
-        "color": "#EAEAEA",
-        "text": "2人並びの絵＋チャンネル名"
-      },
+      "images": ["assets/gen/endcard.png"],
       "caption": "続く／フォローで次のエピソード",
       "camera": "none",
       "credit": "VOICEVOX:波音リツ・青山龍星・冥鳴ひまり",
-      "note": "v2構成。絵コンテcut9（エンドカード）。話者確定に伴いクレジットを3名連記に更新（波音リツ=彼女、青山龍星=彼氏、冥鳴ひまり=モブ女子）。チャンネルロゴ/名称が決まり次第プレースホルダーを差し替え"
+      "note": "v2構成。絵コンテcut9（エンドカード）。placeholderを廃止しendcard.pngに差し替え。話者確定に伴いクレジットを3名連記に更新（波音リツ=彼女、青山龍星=彼氏、冥鳴ひまり=モブ女子）"
     }
   ]
 }
