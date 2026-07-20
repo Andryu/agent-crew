@@ -15,14 +15,15 @@
       "images": [],
       "placeholder": {
         "color": "#FCEFE0",
-        "text": "2人が並んで歩く（Animated Drawings 歩行ループ待ち）"
+        "text": "2人が並んで歩く（歩きポーズ2枚の交互表示＋横パン）"
       },
+      "toggleFps": 6,
       "caption": "初ハウステンボスで彼氏が天然すぎた話",
       "narrationText": "初めてハウステンボス行ったんだけど、彼氏が天然すぎた",
       "narration": null,
       "se": null,
-      "camera": "none",
-      "note": "setup-animated-drawings 側で walk モーションが揃い次第、二人が並んで歩く連番/GIFに差し替える"
+      "camera": "pan",
+      "note": "オーナー決定(2026-07-20): walkモーションは使わず「歩きポーズ違い2枚の交互表示＋横パン」で歩行表現する。歩きポーズ2枚（右足前/左足前）が揃い次第 images に指定"
     },
     {
       "index": 2,
