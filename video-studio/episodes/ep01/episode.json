@@ -1,0 +1,129 @@
+{
+  "id": "ep01",
+  "title": "初ハウステンボスで彼氏が天然すぎた話",
+  "fps": 30,
+  "width": 1080,
+  "height": 1920,
+  "audio": {
+    "bgm": null,
+    "bgmVolume": 0.35
+  },
+  "cuts": [
+    {
+      "index": 1,
+      "durationSec": 3,
+      "images": [],
+      "placeholder": {
+        "color": "#FCEFE0",
+        "text": "2人が並んで歩く（Animated Drawings 歩行ループ待ち）"
+      },
+      "caption": "初ハウステンボスで彼氏が天然すぎた話",
+      "narrationText": "初めてハウステンボス行ったんだけど、彼氏が天然すぎた",
+      "narration": null,
+      "se": null,
+      "camera": "none",
+      "note": "setup-animated-drawings 側で walk モーションが揃い次第、二人が並んで歩く連番/GIFに差し替える"
+    },
+    {
+      "index": 2,
+      "durationSec": 5,
+      "images": ["assets/kareshi_face.png", "assets/kanojo_face.png"],
+      "toggleFps": 6,
+      "caption": "いい雰囲気だね〜",
+      "narrationText": "『いい雰囲気だね〜』って、めっちゃ平和に回ってて",
+      "narration": null,
+      "se": null,
+      "camera": "pan",
+      "note": "仮素材：本来は風車・レンガの街並み背景+首の角度違い2枚。背景素材が揃うまでの2枚交互表示デモ"
+    },
+    {
+      "index": 3,
+      "durationSec": 5,
+      "images": [],
+      "placeholder": {
+        "color": "#DCEFFB",
+        "text": "VRゴーグル装着の2人がのけぞる"
+      },
+      "caption": null,
+      "narrationText": "VRのアトラクション乗ったり、ふつうに楽しんでたの",
+      "narration": null,
+      "se": null,
+      "camera": "shake",
+      "note": "SE: ヒュー（浮遊音）。用意でき次第 assets/se_hyuu.wav 等を作成し se に指定する"
+    },
+    {
+      "index": 4,
+      "durationSec": 6,
+      "images": ["assets/kanojo_body.png"],
+      "caption": "ここで自撮りしよ！",
+      "narrationText": "で、傘がいっぱいある写真スポットで、自撮りしようとしたら",
+      "narration": null,
+      "se": null,
+      "camera": "zoom-in",
+      "note": "背景は本来カラフルな傘の通り（未生成）。彼女の全身素材で代用"
+    },
+    {
+      "index": 5,
+      "durationSec": 8,
+      "images": ["assets/kareshi_face.png"],
+      "caption": "じーっ",
+      "narrationText": "彼が、据え置きの写真機みたいなのを、じーっと覗いてて／なんだろう…って数秒見てたら",
+      "narration": null,
+      "se": null,
+      "camera": "none",
+      "note": "演出メモ：本命の笑いどころ。ナレーションを止めて時計SEのみ流す「間」。用意でき次第 assets/se_tokei.wav を作成し se に指定する。目パチ用の2枚目素材が揃い次第 images に追加してtoggle表示にする"
+    },
+    {
+      "index": 6,
+      "durationSec": 7,
+      "images": [],
+      "placeholder": {
+        "color": "#F7E3E3",
+        "text": "カメラを引くと女子グループが困り顔で立っている"
+      },
+      "caption": "あの…写真撮りたいんですけど…",
+      "narrationText": "それ、別の女子たちがこれから写真撮ろうとしてたやつだった",
+      "narration": null,
+      "se": null,
+      "camera": "zoom-out",
+      "note": "SE: ガーン。用意でき次第 assets/se_gaan.wav を作成し se に指定する。彼のリアクション（jump）はAnimated Drawings担当分。揃い次第 images に差し替え"
+    },
+    {
+      "index": 7,
+      "durationSec": 6,
+      "images": ["assets/kareshi_body.png"],
+      "caption": "その後も謎行動は続く",
+      "narrationText": "ちなみにその後、観覧車の知らない人に全力で手も振ってた",
+      "narration": null,
+      "se": null,
+      "camera": "none",
+      "note": "手振りループ（wave）はAnimated Drawings担当分。揃うまでは全身素材の静止表示"
+    },
+    {
+      "index": 8,
+      "durationSec": 5,
+      "images": ["assets/kanojo_face.png"],
+      "caption": "この人と来てよかった。……たぶん",
+      "narrationText": "この人と来てよかった。……たぶん",
+      "narration": null,
+      "se": null,
+      "camera": "zoom-in",
+      "note": "絵コンテ指定どおり既存の顔絵をそのまま使用"
+    },
+    {
+      "index": 9,
+      "durationSec": 3,
+      "images": [],
+      "placeholder": {
+        "color": "#EAEAEA",
+        "text": "2人並びの絵＋チャンネル名"
+      },
+      "caption": "続く／フォローで次のエピソード",
+      "narrationText": null,
+      "narration": null,
+      "se": null,
+      "camera": "none",
+      "note": "エンドカード。チャンネルロゴ/名称が決まり次第プレースホルダーを差し替え"
+    }
+  ]
+}

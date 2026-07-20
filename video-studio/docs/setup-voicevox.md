@@ -1,0 +1,117 @@
+# VOICEVOX エンジン導入・音声合成セットアップ
+
+手描き落書き風ショート動画のナレーション音声合成に VOICEVOX engine を使う。本ドキュメントは macOS (Apple Silicon / arm64) 上でのローカル導入手順と、話者選定の結果をまとめる。
+
+## 1. 導入方法
+
+GitHub Releases の macOS arm64 CPU版（プラグインエンジン形式 `.vvpp`。中身は ZIP）を展開して使う。Docker（`voicevox/voicevox_engine:cpu-latest`）は linux/amd64 イメージを Apple Silicon 上でエミュレーション実行することになり起動・推論が大幅に遅くなるため、今回はネイティブバイナリ版を採用した。
+
+```bash
+# ダウンロード（gh CLI 使用。約1.9GB）
+mkdir -p ~/Workspace/video-tools/voicevox_engine
+cd ~/Workspace/video-tools/voicevox_engine
+gh release download 0.25.2 --repo VOICEVOX/voicevox_engine \
+  -p "voicevox_engine-macos-arm64-0.25.2.vvpp" \
+  -O voicevox_engine-macos-arm64-0.25.2.vvpp
+
+# 展開（.vvpp は ZIP 形式）
+unzip voicevox_engine-macos-arm64-0.25.2.vvpp -d extracted
+mv extracted/* .
+rmdir extracted
+rm voicevox_engine-macos-arm64-0.25.2.vvpp
+
+chmod +x run
+```
+
+導入先: `~/Workspace/video-tools/voicevox_engine/`（`run` バイナリと `model/` 以下の音声モデルを含む。エンジン本体のみで約3.5GB）
+
+バージョン: **0.25.2**（2026-07-20 時点の最新リリース）
+
+### 注意点
+- ダウンロード元によっては macOS の quarantine 属性 (`com.apple.quarantine`) が付与され、初回起動時に Gatekeeper に阻まれることがある。その場合は `xattr -dr com.apple.quarantine ~/Workspace/video-tools/voicevox_engine` で解除する（`gh release download` 経由では quarantine は付かなかった）。
+- `.7z.001` 版（7z 分割アーカイブ）も配布されているが、`.vvpp`（単一ファイル・ZIP形式）の方が `unzip` だけで展開できて扱いやすい。中身は同一。
+- `engine_internal/` に Python ランタイムと依存ライブラリが同梱されたスタンドアロン実行形式。追加のPython環境構築は不要。
+
+## 2. 起動方法（オンデマンド）
+
+常駐サービス化はせず、**必要なときにスクリプトで起動するオンデマンド運用**とした（動画制作時のみCPU・メモリを使うため）。
+
+```bash
+video-studio/scripts/voicevox-start.sh
+```
+
+- 既に `localhost:50021` が応答していれば何もせず終了（多重起動防止）
+- 起動していなければ `~/Workspace/video-tools/voicevox_engine/run --host 127.0.0.1 --port 50021` をバックグラウンド実行し、ログを `~/Workspace/video-tools/voicevox_engine/engine.log` に出力、最大30秒起動待ちする
+- 停止する場合は `pkill -f 'voicevox_engine.*run'` 等でプロセスを終了する（本セットアップでは常駐停止スクリプトは未整備。次の課題）
+
+初回起動時は形態素解析用辞書のインデックス構築が入り、疎通まで数秒〜十数秒かかる。2回目以降のプロセス起動は速い。
+
+## 3. 動作確認
+
+```bash
+curl http://localhost:50021/version
+# => "0.25.2"
+
+curl http://localhost:50021/speakers | jq 'length'
+# => 43（キャラクター数。スタイル違いを含めるとさらに多い）
+```
+
+テキスト音声合成のラッパー:
+
+```bash
+video-studio/scripts/voice.sh "<テキスト>" <話者/スタイルID> <出力wavパス>
+```
+
+内部では `audio_query`（テキスト→韻律パラメータ生成）→ `synthesis`（パラメータ→wav合成）の2段階APIを呼んでいる。出力は PCM 16bit / 24000Hz / mono の wav。
+
+テスト合成（「初めてハウステンボス行ったんだけど、彼氏が天然すぎた」、春日部つむぎ ノーマル=ID8）で動作確認済み。約4秒のwavが正常に生成された。
+
+## 4. 話者候補の比較（20〜30代女性・ナチュラルな話し声）
+
+`/speakers` の一覧43名から、落ち着いた大人の女性〜親しみやすい自然体の声質を持つ3名を選定した。同一テキストでサンプルを生成し `video-studio/episodes/_voice_samples/` に格納した。
+
+| 話者名 | スタイル/ID | 声質の傾向 | サンプルファイル |
+|---|---|---|---|
+| 九州そら | ノーマル / **16** | 気品のある大人な声。落ち着き寄りで上品な印象 | `kyushu_sora_16_normal.wav` |
+| 冥鳴ひまり | ノーマル / **14** | 柔らかく温かい声。親しみやすいナチュラル寄り | `meimei_himari_14_normal.wav` |
+| 春日部つむぎ | ノーマル / **8** | 元気で明るい声。カジュアルなVlog/あるある系動画向き | `kasukabe_tsumugi_8_normal.wav` |
+
+いずれもスタイルは「ノーマル」（各キャラの基本スタイル）を使用。九州そらのみ「あまあま／ツンツン／セクシー／ささやき」の派生スタイルも存在するため、今後演出に応じて使い分ける余地がある。
+
+「彼氏あるある」系の等身大トーンで撮る本シリーズには、**冥鳴ひまり**（自然体で聞き疲れしにくい）または**春日部つむぎ**（テンポよく感情が乗りやすい）が合いそうという印象。九州そらは落ち着きすぎてショート動画のテンポ感とはやや距離があるかもしれない。最終選定は実際の台本を読ませて比較するのが望ましい。
+
+## 5. 商用利用規約まとめ
+
+VOICEVOX は「ソフトウェア利用規約」と「キャラクターごとの利用規約」の二層構造。**両方**への準拠が必要。
+
+### ソフトウェア共通規約（[voicevox.hiroshiba.jp/term/](https://voicevox.hiroshiba.jp/term/)）
+- 商用・非商用問わず利用可能
+- VOICEVOXを利用したことがわかるクレジット表記が必須（フォーマット指定なし）
+- ソフトウェアの無断再配布・逆コンパイル等は禁止
+
+### キャラクター別規約
+
+| 話者名 | 商用利用 | クレジット表記 | 収益化 | 備考 |
+|---|---|---|---|---|
+| 九州そら | 可 | 必須（例: `VOICEVOX:九州そら`） | 可 | 東北ずん子プロジェクト系。「あんこもん音源利用規約」に準拠 |
+| 冥鳴ひまり | 可 | 必須（`VOICEVOX:冥鳴ひまり`） | 可 | 公式規約: https://www.meimeihimari.com/terms-of-use 。禁止事項: 公序良俗違反、第三者への不利益、特定思想・団体との紐付け |
+| 春日部つむぎ | 可 | 必須（`VOICEVOX:春日部つむぎ`。動画概要欄など任意の場所でよい） | 可（YouTube等で収益化動画も可） | 公式規約: https://tsumugi-official.studio.site/rule 。公式イラストを使った商品化・二次配布は禁止 |
+
+共通の注意点:
+- クレジット表記を**しない**商用利用は、キャラクター毎に別途40万円（+消費税）の契約が必要（無償利用ではクレジット必須と理解する）
+- 誹謗中傷、公序良俗違反、第三者の権利侵害、特定の思想・宗教・政治団体を代弁するような使用は全キャラ共通で禁止
+- 各キャラクターの規約は改定されうるため、実際に動画を公開する前に一次ソース（各公式ページ）を再確認すること
+
+## 6. 生成物・関連ファイル
+
+- エンジン本体: `~/Workspace/video-tools/voicevox_engine/`（このワークツリーの外・リポジトリ非管理）
+- 起動スクリプト: `video-studio/scripts/voicevox-start.sh`
+- 合成ラッパー: `video-studio/scripts/voice.sh`
+- 話者サンプル: `video-studio/episodes/_voice_samples/*.wav`
+
+## 7. 残課題
+
+- エンジンの正式な停止スクリプト（`voicevox-stop.sh`）が未整備。現状は `pkill` で手動停止
+- 台本ベースでの聞き比べ（今回はテスト用の短文のみ）による最終話者決定
+- 長文ナレーション（1分尺相当）での合成速度・安定性の検証は未実施（今回はCPU版での短文合成のみ確認）
+- `voice.sh` は現状スタイルパラメータ（話速・音高等）の調整に未対応。`audio_query` のJSONを加工すれば `speedScale` 等の調整も可能なので、必要になれば拡張する
