@@ -37,6 +37,11 @@ export type EpisodeCut = {
   se?: string | null;
   /** カメラ演出。デフォルト "none" */
   camera?: CameraEffect;
+  /**
+   * 画面右下に小さく表示するクレジット表記（例: "VOICEVOX:波音リツ"）。
+   * 規約上必須のクレジットなど、placeholder/images が差し替わっても消えてはいけない表示に使う。
+   */
+  credit?: string;
   /** 制作メモ（画面には出さない） */
   note?: string;
 };

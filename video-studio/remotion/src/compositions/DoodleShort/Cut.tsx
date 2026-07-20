@@ -1,6 +1,7 @@
 import { AbsoluteFill, Audio, Img, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import type { EpisodeCut } from "./types";
 import { Caption } from "./Caption";
+import { Credit } from "./Credit";
 import { PlaceholderCut } from "./PlaceholderCut";
 import { getCameraTransform } from "./cameraEffect";
 
@@ -55,9 +56,10 @@ export const Cut: React.FC<{
       </AbsoluteFill>
 
       {cut.caption ? <Caption text={cut.caption} /> : null}
+      {cut.credit ? <Credit text={cut.credit} /> : null}
 
       {cut.narration ? (
-        <Audio src={staticFile(`${episodeId}/${cut.narration}`)} />
+        <Audio src={staticFile(`${episodeId}/${cut.narration}`)} volume={1} />
       ) : null}
       {cut.se ? <Audio src={staticFile(`${episodeId}/${cut.se}`)} /> : null}
     </AbsoluteFill>

@@ -25,6 +25,7 @@ video-studio/
         DoodleShort.tsx     # メインコンポーネント + calculateMetadata
         Cut.tsx              # 1カット分の描画（画像・カメラ演出・字幕・音声）
         Caption.tsx          # 画面下部1/3の字幕
+        Credit.tsx            # 画面右下の小さなクレジット表記（VOICEVOX等）
         PlaceholderCut.tsx   # 素材未着カット用の単色+テキスト
         cameraEffect.ts      # zoom-in/zoom-out/pan/shake の transform計算
         loadEpisode.ts       # episode.json のfetch/検証
@@ -83,6 +84,7 @@ Config.setPublicDir(path.join(process.cwd(), "..", "episodes"));
       "narration": "assets/narration/cut01.wav", // 未生成なら null
       "se": "assets/se/hyuu.wav",                // 未生成/無音なら null
       "camera": "zoom-in",                   // "zoom-in" | "zoom-out" | "pan" | "shake" | "none"
+      "credit": "VOICEVOX:波音リツ",          // 省略可。画面右下に小さく常時表示するクレジット
       "note": "制作メモ（画面には出ない）"
     }
   ]
@@ -92,10 +94,13 @@ Config.setPublicDir(path.join(process.cwd(), "..", "episodes"));
 - 動画の総尺は `cuts` の `durationSec` 合計から自動計算される（`calculateMetadata` で算出）。
 - `narration` / `se` は wav が用意できるまで `null` にしておき、ファイル名や台本行は `note` / `narrationText` に書いておく運用。
   JSON はコメントを書けないため、この2フィールドが実質的な「コメントアウト」の代わりになる。
+- `narration` の音量は常に 1.0（`Audio` コンポーネントに明示指定）。BGMは `audio.bgmVolume`（省略時0.4）で別途調整する。
 - `images` が2枚のときの切り替えは `Math.floor(frame / round(fps/toggleFps)) % 2` によるステップ切り替えで、
   滑らかな補間は行わない（手書きアニメらしいカクカク感を優先）。
 - カメラ演出（`zoom-in` / `zoom-out` / `pan`）はCapCut風に滑らかな `interpolate`、
   `shake` のみ6パターンのジッターをフレーム単位で切り替える（こちらも補間なし）。
+- `credit` は VOICEVOX 等の規約上必須なクレジット表記用。`placeholder` や `images` を後で差し替えても消えない独立レイヤー
+  （`Credit.tsx`、画面右下）として描画されるので、規約対応のクレジットはここに入れる。
 
 ## レンダリング
 
@@ -122,14 +127,17 @@ npm run dev
 ## 動作確認済み
 
 - `video-studio/scripts/render.sh ep01` で `video-studio/episodes/ep01/out/ep01.mp4` を書き出し。
-- `ffprobe` で 1080x1920・30fps・h264/aac・尺 約48秒 を確認済み。
+- `ffprobe` で 1080x1920・30fps・h264/aac・尺 51.5秒（cut1/cut5のdurationSec拡張後）を確認済み。
+- ナレーションwav（VOICEVOX・波音リツ、cut1〜cut8）を各カットの `narration` に反映し、`ffmpeg -af volumedetect` で
+  ナレーションのあるカットは実音声（平均-28〜-29dB程度）、ナレーション/BGMなしのcut9は無音（-91dB）であることを確認済み。
+- cut9の右下クレジット「VOICEVOX:波音リツ」が単独で正しい位置に描画されることをフレーム抽出で目視確認済み。
 
 ## 残課題 / 今後の差し替え予定
 
 - ep01 の cut1（歩行）・cut6（彼のjump反応）・cut7（wave）は Animated Drawings 側のモーション成果物が揃い次第、
   `images` を差し替える（現状はプレースホルダー or 静止画）。
-- SE（`assets/se_hyuu.wav` 相当・`se_tokei.wav`・`se_gaan.wav`）とナレーションwavは VOICEVOX 側の成果物が揃い次第、
-  各カットの `se` / `narration` に実パスを設定する。
+- SE（`assets/se_hyuu.wav` 相当・`se_tokei.wav`・`se_gaan.wav`）は VOICEVOX/効果音側の成果物が揃い次第、
+  各カットの `se` に実パスを設定する（ナレーションは反映済み）。
 - cut2（街並み背景）・cut3（VR）・cut6（女子グループ）・cut9（2人並び＋チャンネル名）の背景/構図イラストが未着手。
   AI生成 or 手描きで用意でき次第、`images` または `placeholder` を差し替える。
 - 現在の `Cut` コンポーネントは画像レイヤーを1枚しか重ねられない（背景+キャラの合成は未対応）。

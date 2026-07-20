@@ -11,7 +11,7 @@
   "cuts": [
     {
       "index": 1,
-      "durationSec": 3,
+      "durationSec": 5,
       "images": [],
       "placeholder": {
         "color": "#FCEFE0",
@@ -20,10 +20,10 @@
       "toggleFps": 6,
       "caption": "初ハウステンボスで彼氏が天然すぎた話",
       "narrationText": "初めてハウステンボス行ったんだけど、彼氏が天然すぎた",
-      "narration": null,
+      "narration": "assets/voice/nar_cut1.wav",
       "se": null,
       "camera": "pan",
-      "note": "オーナー決定(2026-07-20): walkモーションは使わず「歩きポーズ違い2枚の交互表示＋横パン」で歩行表現する。歩きポーズ2枚（右足前/左足前）が揃い次第 images に指定"
+      "note": "オーナー決定(2026-07-20): walkモーションは使わず「歩きポーズ違い2枚の交互表示＋横パン」で歩行表現する。歩きポーズ2枚（右足前/左足前）が揃い次第 images に指定。durationSecは3→5秒に変更（ナレーションnar_cut1.wav実測4.10秒を収めるため）"
     },
     {
       "index": 2,
@@ -32,7 +32,7 @@
       "toggleFps": 6,
       "caption": "いい雰囲気だね〜",
       "narrationText": "『いい雰囲気だね〜』って、めっちゃ平和に回ってて",
-      "narration": null,
+      "narration": "assets/voice/nar_cut2.wav",
       "se": null,
       "camera": "pan",
       "note": "仮素材：本来は風車・レンガの街並み背景+首の角度違い2枚。背景素材が揃うまでの2枚交互表示デモ"
@@ -47,7 +47,7 @@
       },
       "caption": null,
       "narrationText": "VRのアトラクション乗ったり、ふつうに楽しんでたの",
-      "narration": null,
+      "narration": "assets/voice/nar_cut3.wav",
       "se": null,
       "camera": "shake",
       "note": "SE: ヒュー（浮遊音）。用意でき次第 assets/se_hyuu.wav 等を作成し se に指定する"
@@ -58,21 +58,21 @@
       "images": ["assets/kanojo_body.png"],
       "caption": "ここで自撮りしよ！",
       "narrationText": "で、傘がいっぱいある写真スポットで、自撮りしようとしたら",
-      "narration": null,
+      "narration": "assets/voice/nar_cut4.wav",
       "se": null,
       "camera": "zoom-in",
       "note": "背景は本来カラフルな傘の通り（未生成）。彼女の全身素材で代用"
     },
     {
       "index": 5,
-      "durationSec": 8,
+      "durationSec": 9.5,
       "images": ["assets/kareshi_face.png"],
       "caption": "じーっ",
       "narrationText": "彼が、据え置きの写真機みたいなのを、じーっと覗いてて／なんだろう…って数秒見てたら",
-      "narration": null,
+      "narration": "assets/voice/nar_cut5.wav",
       "se": null,
       "camera": "none",
-      "note": "演出メモ：本命の笑いどころ。ナレーションを止めて時計SEのみ流す「間」。用意でき次第 assets/se_tokei.wav を作成し se に指定する。目パチ用の2枚目素材が揃い次第 images に追加してtoggle表示にする"
+      "note": "台本の演出メモは『ナレーションを止めて時計SEのみ』だったが、team-lead判断でVOICEVOXナレーション(nar_cut5.wav 実測8.63秒)を実際に流す構成に変更。durationSecは8→9.5秒に拡張してナレーションを収めた。SE(時計)は引き続き未生成のため se は null のまま、用意でき次第 assets/se_tokei.wav を作成し指定する。目パチ用の2枚目素材が揃い次第 images に追加してtoggle表示にする"
     },
     {
       "index": 6,
@@ -84,7 +84,7 @@
       },
       "caption": "あの…写真撮りたいんですけど…",
       "narrationText": "それ、別の女子たちがこれから写真撮ろうとしてたやつだった",
-      "narration": null,
+      "narration": "assets/voice/nar_cut6.wav",
       "se": null,
       "camera": "zoom-out",
       "note": "SE: ガーン。用意でき次第 assets/se_gaan.wav を作成し se に指定する。彼のリアクション（jump）はAnimated Drawings担当分。揃い次第 images に差し替え"
@@ -95,7 +95,7 @@
       "images": ["assets/kareshi_body.png"],
       "caption": "その後も謎行動は続く",
       "narrationText": "ちなみにその後、観覧車の知らない人に全力で手も振ってた",
-      "narration": null,
+      "narration": "assets/voice/nar_cut7.wav",
       "se": null,
       "camera": "none",
       "note": "手振りループ（wave）はAnimated Drawings担当分。揃うまでは全身素材の静止表示"
@@ -106,7 +106,7 @@
       "images": ["assets/kanojo_face.png"],
       "caption": "この人と来てよかった。……たぶん",
       "narrationText": "この人と来てよかった。……たぶん",
-      "narration": null,
+      "narration": "assets/voice/nar_cut8.wav",
       "se": null,
       "camera": "zoom-in",
       "note": "絵コンテ指定どおり既存の顔絵をそのまま使用"
@@ -124,7 +124,8 @@
       "narration": null,
       "se": null,
       "camera": "none",
-      "note": "エンドカード。チャンネルロゴ/名称が決まり次第プレースホルダーを差し替え"
+      "credit": "VOICEVOX:波音リツ",
+      "note": "エンドカード。チャンネルロゴ/名称が決まり次第プレースホルダーを差し替え。VOICEVOXクレジット表記を規約上必須のため credit フィールドで追加（画面右下、プレースホルダー/画像に関わらず常に表示）"
     }
   ]
 }
