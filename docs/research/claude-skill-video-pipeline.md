@@ -7,7 +7,8 @@
 
 ## 1. 結論
 
-**9工程中7工程はスキル化可能。** 人間に残るのは「元絵を描く」「品質チェック」「TikTok/Instagramへの投稿ボタン」の3つだけ。
+**8工程中6工程はスキル化可能。** 人間に残るのは「元絵を描く」「品質チェック」「TikTok/Instagramへの投稿ボタン」の3つだけ。
+（※リッチ演出のimage-to-video API＝fal.ai/Kling等はオーナー判断で不採用。動きはAnimated Drawingsのミニマム表現に統一する——手書き感の維持にもコスト0円化にも寄与）
 
 | 工程 | 自動化 | 手段 | コスト |
 |---|---|---|---|
@@ -15,21 +16,22 @@
 | ② キャラ元絵 | ✗ 人間（ここが価値） | — | 0円 |
 | ③ ポーズ違い・背景生成 | ◎ 完全自動 | Gemini API（Nano Banana 2） | 約$0.045/枚、AI Studio無料枠 約500req/日 |
 | ④ 動き付け（歩く・跳ぶ・手を振る） | ◎ 完全自動 | **Animated Drawings（OSS）をローカル実行** | 0円 |
-| ⑤ 動き付け（リッチ演出） | ◎ 完全自動 | fal.ai API（Kling 2.5 Turbo $0.07/秒 等） | 10秒で約$0.7（任意） |
-| ⑥ 音声合成 | ◎ 完全自動 | **VOICEVOXエンジンのローカルREST API** | 0円 |
-| ⑦ 合成・字幕・書き出し | ◎ 完全自動 | **Remotion（Claude Code Agent Skills公式対応）** | 0円※ |
-| ⑧ YouTube投稿 | ○ 半自動 | YouTube Data API（限定公開で上げて人間が公開） | 無料（6本/日まで） |
-| ⑨ TikTok / Instagram投稿 | △ 当面手動 | 公式APIは審査制で個人には厳しい（後述） | — |
+| ⑤ 音声合成 | ◎ 完全自動 | **VOICEVOXエンジンのローカルREST API** | 0円 |
+| ⑥ 合成・字幕・書き出し | ◎ 完全自動 | **Remotion（Claude Code Agent Skills公式対応）** | 0円※ |
+| ⑦ YouTube投稿 | ○ 半自動 | YouTube Data API（限定公開で上げて人間が公開） | 無料（6本/日まで） |
+| ⑧ TikTok / Instagram投稿 | △ 当面手動 | 公式APIは審査制で個人には厳しい（後述） | — |
 
 ※ Remotionは個人・小規模チームは無料ライセンス（規模が大きくなったら要有償ライセンス確認）
 
-**1本あたりの変動費は約$1前後（リッチ演出を使わなければほぼ0円）。**
+**1本あたりの変動費は実質0円（画像生成がGemini無料枠に収まる限り）。**
 
 ---
 
 ## 2. 各工程の裏付け
 
 ### ④ Animated Drawings はOSSでローカル実行できる（今回の最重要発見）
+
+動き付けはこれ一本に統一する（リッチ演出APIは不採用）。EP01の絵コンテもwalk/jump/waveの3モーション＋静止画で成立する設計になっており、ミニマムな動きの方が手書き感も保てる。
 
 Webデモを手で操作する必要はない。[facebookresearch/AnimatedDrawings](https://github.com/facebookresearch/AnimatedDrawings) が公開されており:
 
@@ -61,12 +63,11 @@ POST /synthesis?speaker=N             → wavファイル
 
 CapCutは高機能だがAPI/CLIがなく自動化不可。**自動化パイプラインの心臓部はRemotion一択。**
 
-### ③⑤ 画像生成・リッチ動画はAPIで呼べる
+### ③ 画像生成はAPIで呼べる
 
 - **Gemini API（Nano Banana 2 = gemini-3.1-flash-image）**: 「同じ落書きタッチでポーズ違い」の画像編集がAPIで可能。約$0.045/枚、[Google AI Studio無料枠が約500リクエスト/日](https://blog.laozhang.ai/en/posts/gemini-image-api-guide-2026)あるので実質無料で回せる。※API生成画像は透かし（SynthID）の仕様に注意
-- **fal.ai**: Kling / Vidu / LTX などのimage-to-videoを従量課金REST APIで提供（[Kling 2.5 Turbo Pro $0.07/秒](https://fal.ai/pricing)）。リッチな動きが欲しいカットだけスポットで呼ぶ
 
-### ⑧⑨ 投稿APIの現実
+### ⑦⑧ 投稿APIの現実
 
 - **YouTube Data API**: 動画アップロード1本=1,600ユニット、デフォルトクォータ10,000/日 → **1日6本まで自動投稿可能**。個人でも使える。「限定公開でアップ→人間が確認して公開」の半自動が安全
 - **TikTok Content Posting API**: アプリ審査（2〜6週間）が必要で、**未審査アプリの投稿は非公開限定**。個人が今すぐ使うのは非現実的 → 当面は手動投稿（書き出しファイルを渡すところまで自動化）
@@ -98,7 +99,7 @@ agent-crew 流に、工程ごとのスキルに分割する。
 1. AnimatedDrawings のconda環境構築 + アノテーション用Docker
 2. VOICEVOXエンジン導入（アプリ or Docker、起動で localhost:50021）
 3. Remotionプロジェクト作成 + 「落書きショート」テンプレート実装（字幕スタイル・SE配置込み）
-4. Gemini APIキー取得（無料枠）、fal.aiアカウント（任意）
+4. Gemini APIキー取得（無料枠）
 5. YouTube Data API のOAuth設定
 
 セットアップは半日〜1日想定。**ここを乗り越えると、2本目以降は「ネタ1行＋不足素材の落書き」だけで動画が出てくる。**
@@ -124,8 +125,6 @@ agent-crew 流に、工程ごとのスキルに分割する。
 - [Remotion | Make videos programmatically](https://www.remotion.dev/)
 - [Remotion × Claude Code Agent Skills 完全ガイド](https://www.aquallc.jp/remotion-ai-video-guide/)
 - [【Remotion】Agent Skills × Claude Codeでプロンプトから動画生成](https://weel.co.jp/media/tech/remotion/)
-- [fal.ai Pricing（Kling/Vidu等の従量課金）](https://fal.ai/pricing)
-- [Kling 2.6 Pro image-to-video | fal](https://fal.ai/models/fal-ai/kling-video/v2.6/pro/image-to-video)
 - [Complete Gemini Image API Guide 2026（Nano Banana料金）](https://blog.laozhang.ai/en/posts/gemini-image-api-guide-2026)
 - [Nano Banana による画像生成（Google公式）](https://ai.google.dev/gemini-api/docs/image-generation)
 - [YouTube API Guide 2026: Quotas](https://zernio.com/blog/youtube-api)
