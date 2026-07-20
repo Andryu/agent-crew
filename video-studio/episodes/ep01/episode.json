@@ -11,121 +11,221 @@
   "cuts": [
     {
       "index": 1,
-      "durationSec": 5,
+      "durationSec": 5.0,
       "images": [],
       "placeholder": {
         "color": "#FCEFE0",
         "text": "2人が並んで歩く（歩きポーズ2枚の交互表示＋横パン）"
       },
-      "toggleFps": 6,
       "caption": "初ハウステンボスで彼氏が天然すぎた話",
-      "narrationText": "初めてハウステンボス行ったんだけど、彼氏が天然すぎた",
-      "narration": "assets/voice/nar_cut1.wav",
-      "se": null,
       "camera": "pan",
-      "note": "オーナー決定(2026-07-20): walkモーションは使わず「歩きポーズ違い2枚の交互表示＋横パン」で歩行表現する。歩きポーズ2枚（右足前/左足前）が揃い次第 images に指定。durationSecは3→5秒に変更（ナレーションnar_cut1.wav実測4.10秒を収めるため）"
+      "dialogue": [
+        {
+          "speaker": "kanojo",
+          "wav": "assets/voice/v2/c1_1_kanojo.wav",
+          "startSec": 0.3,
+          "durationSec": 1.504,
+          "text": "初ハウステンボス来たー！"
+        },
+        {
+          "speaker": "kareshi",
+          "wav": "assets/voice/v2/c1_2_kareshi.wav",
+          "startSec": 2.1,
+          "durationSec": 1.867,
+          "text": "おー、なんかヨーロッパじゃん"
+        }
+      ],
+      "note": "v2(セリフ劇)構成。絵コンテcut1。歩きポーズ2枚（右足前/左足前）が揃い次第 images に指定。durationSecはセリフ2本(c1_1+間+c1_2)が収まるよう5.0秒に設定"
     },
     {
       "index": 2,
-      "durationSec": 5,
+      "durationSec": 3.5,
       "images": ["assets/kareshi_face.png", "assets/kanojo_face.png"],
       "toggleFps": 6,
-      "caption": "いい雰囲気だね〜",
-      "narrationText": "『いい雰囲気だね〜』って、めっちゃ平和に回ってて",
-      "narration": "assets/voice/nar_cut2.wav",
-      "se": null,
       "camera": "pan",
-      "note": "仮素材：本来は風車・レンガの街並み背景+首の角度違い2枚。背景素材が揃うまでの2枚交互表示デモ"
+      "dialogue": [
+        {
+          "speaker": "kanojo",
+          "wav": "assets/voice/v2/c2_1_kanojo.wav",
+          "startSec": 0.2,
+          "durationSec": 1.195,
+          "text": "いい雰囲気だね〜"
+        },
+        {
+          "speaker": "kareshi",
+          "wav": "assets/voice/v2/c2_2_kareshi.wav",
+          "startSec": 1.7,
+          "durationSec": 1.088,
+          "text": "風車でっっか"
+        }
+      ],
+      "note": "v2構成。絵コンテcut2。固定captionは廃止しセリフ字幕に統一。仮素材：本来は風車・レンガの街並み背景+首の角度違い2枚。背景素材が揃うまでの2枚交互表示"
     },
     {
       "index": 3,
-      "durationSec": 5,
+      "durationSec": 3.0,
       "images": [],
       "placeholder": {
         "color": "#DCEFFB",
         "text": "VRゴーグル装着の2人がのけぞる"
       },
-      "caption": null,
-      "narrationText": "VRのアトラクション乗ったり、ふつうに楽しんでたの",
-      "narration": "assets/voice/nar_cut3.wav",
-      "se": null,
       "camera": "shake",
-      "note": "SE: ヒュー（浮遊音）。用意でき次第 assets/se_hyuu.wav 等を作成し se に指定する"
+      "dialogue": [
+        {
+          "speaker": "kanojo",
+          "wav": "assets/voice/v2/c3_1_kanojo.wav",
+          "startSec": 0.3,
+          "durationSec": 0.779,
+          "text": "うわあああ！"
+        },
+        {
+          "speaker": "kareshi",
+          "wav": "assets/voice/v2/c3_1_kareshi.wav",
+          "startSec": 0.3,
+          "durationSec": 0.672,
+          "text": "うわあああ！"
+        }
+      ],
+      "se": null,
+      "note": "v2構成。絵コンテcut3。2人同時「うわあああ！」を意図的に重ね再生（startSec同一）。SE: ヒュー（浮遊音）は未生成。用意でき次第 assets/se_hyuu.wav 等を作成し se に指定する"
     },
     {
       "index": 4,
-      "durationSec": 6,
+      "durationSec": 2.5,
       "images": ["assets/kanojo_body.png"],
-      "caption": "ここで自撮りしよ！",
-      "narrationText": "で、傘がいっぱいある写真スポットで、自撮りしようとしたら",
-      "narration": "assets/voice/nar_cut4.wav",
-      "se": null,
       "camera": "zoom-in",
-      "note": "背景は本来カラフルな傘の通り（未生成）。彼女の全身素材で代用"
+      "dialogue": [
+        {
+          "speaker": "kanojo",
+          "wav": "assets/voice/v2/c4_1_kanojo.wav",
+          "startSec": 0.3,
+          "durationSec": 1.440,
+          "text": "傘のとこで自撮りしよ！"
+        }
+      ],
+      "note": "v2構成。絵コンテcut4。背景は本来カラフルな傘の通り（未生成）。彼女の全身素材で代用"
     },
     {
       "index": 5,
-      "durationSec": 9.5,
+      "durationSec": 5.5,
       "images": ["assets/kareshi_face.png"],
       "caption": "じーっ",
-      "narrationText": "彼が、据え置きの写真機みたいなのを、じーっと覗いてて／なんだろう…って数秒見てたら",
-      "narration": "assets/voice/nar_cut5.wav",
-      "se": null,
       "camera": "none",
-      "note": "台本の演出メモは『ナレーションを止めて時計SEのみ』だったが、team-lead判断でVOICEVOXナレーション(nar_cut5.wav 実測8.63秒)を実際に流す構成に変更。durationSecは8→9.5秒に拡張してナレーションを収めた。SE(時計)は引き続き未生成のため se は null のまま、用意でき次第 assets/se_tokei.wav を作成し指定する。目パチ用の2枚目素材が揃い次第 images に追加してtoggle表示にする"
+      "dialogue": [
+        {
+          "speaker": "kanojo",
+          "wav": "assets/voice/v2/c5_1_kanojo.wav",
+          "startSec": 0.5,
+          "durationSec": 1.301,
+          "text": "……なにしてんの？"
+        },
+        {
+          "speaker": "kanojo",
+          "wav": "assets/voice/v2/c5_2_kanojo.wav",
+          "startSec": 2.5,
+          "durationSec": 2.176,
+          "text": "（機械、こわれてる…？）"
+        }
+      ],
+      "se": null,
+      "note": "v2構成。絵コンテcut5、本命の笑いどころ。c5_1とc5_2の間の0.7秒ギャップが台本上の「間」（時計SEのみ流す想定）。SE(時計)は未生成のため se は null、用意でき次第 assets/se_tokei.wav を指定する。目パチ用の2枚目素材が揃い次第 images に追加してtoggle表示にする"
     },
     {
       "index": 6,
-      "durationSec": 7,
+      "durationSec": 3.2,
       "images": [],
       "placeholder": {
         "color": "#F7E3E3",
         "text": "カメラを引くと女子グループが困り顔で立っている"
       },
-      "caption": "あの…写真撮りたいんですけど…",
-      "narrationText": "それ、別の女子たちがこれから写真撮ろうとしてたやつだった",
-      "narration": "assets/voice/nar_cut6.wav",
-      "se": null,
       "camera": "zoom-out",
-      "note": "SE: ガーン。用意でき次第 assets/se_gaan.wav を作成し se に指定する。彼のリアクション（jump）はAnimated Drawings担当分。揃い次第 images に差し替え"
+      "dialogue": [
+        {
+          "speaker": "mob",
+          "wav": "assets/voice/v2/c6_1_mobu.wav",
+          "startSec": 0.3,
+          "durationSec": 2.325,
+          "text": "あの…写真撮りたいんですけど…"
+        }
+      ],
+      "note": "v2構成。絵コンテcut6a（cut6を2分割した前半）。モブ女子(冥鳴ひまり)のセリフのみ。彼のリアクションは次のcut(index7=絵コンテ6b)でjumpモーションとして表現"
     },
     {
       "index": 7,
-      "durationSec": 6,
-      "images": ["assets/kareshi_body.png"],
-      "caption": "その後も謎行動は続く",
-      "narrationText": "ちなみにその後、観覧車の知らない人に全力で手も振ってた",
-      "narration": "assets/voice/nar_cut7.wav",
-      "se": null,
+      "durationSec": 3.5,
+      "images": ["assets/motion/kareshi_jump.mp4"],
       "camera": "none",
-      "note": "手振りループ（wave）はAnimated Drawings担当分。揃うまでは全身素材の静止表示"
+      "dialogue": [
+        {
+          "speaker": "kareshi",
+          "wav": "assets/voice/v2/c6_2_kareshi.wav",
+          "startSec": 0.2,
+          "durationSec": 0.480,
+          "text": "えっ！？"
+        },
+        {
+          "speaker": "kanojo",
+          "wav": "assets/voice/v2/c6_3_kanojo.wav",
+          "startSec": 1.0,
+          "durationSec": 1.557,
+          "text": "人のカメラ覗いてたんかい！！"
+        }
+      ],
+      "se": null,
+      "note": "v2構成。絵コンテcut6b（cut6を2分割した後半）。kareshi_jump.mp4(実測4.2秒)を1回再生（videoLoopSec未指定）。カット尺3.5秒 < クリップ長4.2秒のため末尾は自然にトリミングされる。SE: ガーンは未生成、用意でき次第 assets/se_gaan.wav を指定する"
     },
     {
       "index": 8,
-      "durationSec": 5,
-      "images": ["assets/kanojo_face.png"],
-      "caption": "この人と来てよかった。……たぶん",
-      "narrationText": "この人と来てよかった。……たぶん",
-      "narration": "assets/voice/nar_cut8.wav",
-      "se": null,
-      "camera": "zoom-in",
-      "note": "絵コンテ指定どおり既存の顔絵をそのまま使用"
+      "durationSec": 4.5,
+      "images": ["assets/motion/kareshi_wave.mp4"],
+      "caption": "その後も謎行動は続く",
+      "camera": "none",
+      "dialogue": [
+        {
+          "speaker": "kanojo",
+          "wav": "assets/voice/v2/c7_1_kanojo.wav",
+          "startSec": 0.3,
+          "durationSec": 2.507,
+          "text": "と思ったら、観覧車に手ぇ振ってるし"
+        },
+        {
+          "speaker": "kareshi",
+          "wav": "assets/voice/v2/c7_2_kareshi.wav",
+          "startSec": 3.2,
+          "durationSec": 0.672,
+          "text": "おおーい！"
+        }
+      ],
+      "note": "v2構成。絵コンテcut7。kareshi_wave.mp4(実測6.99秒)を1回再生（videoLoopSec未指定）。カット尺4.5秒 < クリップ長のため末尾は自然にトリミングされる"
     },
     {
       "index": 9,
-      "durationSec": 3,
+      "durationSec": 4.0,
+      "images": ["assets/kanojo_face.png"],
+      "camera": "zoom-in",
+      "dialogue": [
+        {
+          "speaker": "kanojo",
+          "wav": "assets/voice/v2/c8_1_kanojo.wav",
+          "startSec": 0.5,
+          "durationSec": 2.613,
+          "text": "……この人と来てよかった。たぶん"
+        }
+      ],
+      "note": "v2構成。絵コンテcut8。既存の顔絵をそのまま使用"
+    },
+    {
+      "index": 10,
+      "durationSec": 3.0,
       "images": [],
       "placeholder": {
         "color": "#EAEAEA",
         "text": "2人並びの絵＋チャンネル名"
       },
       "caption": "続く／フォローで次のエピソード",
-      "narrationText": null,
-      "narration": null,
-      "se": null,
       "camera": "none",
-      "credit": "VOICEVOX:波音リツ",
-      "note": "エンドカード。チャンネルロゴ/名称が決まり次第プレースホルダーを差し替え。VOICEVOXクレジット表記を規約上必須のため credit フィールドで追加（画面右下、プレースホルダー/画像に関わらず常に表示）"
+      "credit": "VOICEVOX:波音リツ・青山龍星・冥鳴ひまり",
+      "note": "v2構成。絵コンテcut9（エンドカード）。話者確定に伴いクレジットを3名連記に更新（波音リツ=彼女、青山龍星=彼氏、冥鳴ひまり=モブ女子）。チャンネルロゴ/名称が決まり次第プレースホルダーを差し替え"
     }
   ]
 }

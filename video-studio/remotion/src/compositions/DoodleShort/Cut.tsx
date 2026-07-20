@@ -12,6 +12,7 @@ import {
 import type { EpisodeCut } from "./types";
 import { Caption } from "./Caption";
 import { Credit } from "./Credit";
+import { DialogueCaptions } from "./DialogueCaption";
 import { PlaceholderCut } from "./PlaceholderCut";
 import { getCameraTransform } from "./cameraEffect";
 import { getIdleSwayTransform } from "./idleSway";
@@ -66,6 +67,16 @@ export const Cut: React.FC<{
   const swayTransform = getIdleSwayTransform(frame, fps, cut.index);
   const currentIsVideo = currentImage ? isVideoSrc(currentImage) : false;
 
+  // 再生ウィンドウ中で text を持つセリフを全て集める（cut3のような重ね再生も複数行スタック表示できる）
+  const activeDialogueCaptions = dialogue
+    .filter((line) => {
+      if (!line.text) return false;
+      const startFrame = Math.round(line.startSec * fps);
+      const endFrame = startFrame + Math.round(line.durationSec * fps);
+      return frame >= startFrame && frame < endFrame;
+    })
+    .map((line) => ({ text: line.text as string, speaker: line.speaker }));
+
   return (
     <AbsoluteFill style={{ ...paperTextureStyle("#ffffff"), overflow: "hidden" }}>
       <AbsoluteFill
@@ -117,6 +128,7 @@ export const Cut: React.FC<{
       </AbsoluteFill>
 
       {cut.caption ? <Caption text={cut.caption} /> : null}
+      <DialogueCaptions lines={activeDialogueCaptions} />
       {cut.credit ? <Credit text={cut.credit} /> : null}
 
       {/* 後方互換: 単一ナレーション */}

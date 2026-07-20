@@ -24,13 +24,13 @@ export type MouthLayer = {
 };
 
 export type DialogueLine = {
-  /** 話者。字幕の色分けや将来の吹き出し表示などに使う想定 */
+  /** 話者。字幕の縁色分け（DialogueCaption）に使う */
   speaker: Speaker;
   /** セリフwavパス（episode.json ディレクトリからの相対パス） */
   wav: string;
   /** カット先頭からの再生開始秒（複数セリフをこの値でシーケンス配置する） */
   startSec: number;
-  /** wav の実測秒数（口パクウィンドウや尺検証に使う） */
+  /** wav の実測秒数（口パクウィンドウ・字幕表示ウィンドウ・尺検証に使う） */
   durationSec: number;
   /**
    * 指定時、このセリフの再生中だけ対象カットの表示画像を
@@ -38,6 +38,11 @@ export type DialogueLine = {
    * 未指定なら通常の images 表示のまま（口開き素材が無い間の後方互換動作）。
    */
   mouthLayer?: MouthLayer;
+  /**
+   * このセリフの再生ウィンドウ中だけ表示するセリフ字幕（省略可）。
+   * cut.caption（タイトル・演出テロップ用）とは別レイヤーで、話者ごとに縁色を変えて重ねて表示する。
+   */
+  text?: string;
 };
 
 export type EpisodeCut = {
