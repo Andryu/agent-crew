@@ -10,6 +10,7 @@ episodes/*/out/
 # 個人の絵・音声素材はコミットしない方針
 episodes/*/assets/
 episodes/_voice_samples/
+episodes/_cleanup_compare/
 
 # OS
 .DS_Store
