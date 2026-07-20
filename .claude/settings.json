@@ -58,6 +58,16 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'スプリント計画・レトロの前に必読: ~/Workspace/Obsidian/knowledge/agent-crew-failure-patterns.md（繰り返し失敗パターン）と ~/Workspace/Obsidian/decisions/agent-crew-adr-index.md（ADR索引）'"
+          }
+        ]
+      }
     ]
   },
   "permissions": {
