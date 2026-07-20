@@ -141,6 +141,11 @@ if [[ "$INCOMPLETE" == "0" && "$QA_PENDING" == "0" ]]; then
       -H 'Content-type: application/json' \
       -d "{\"text\": \"$MESSAGE\"}" >/dev/null 2>&1
   fi
+
+  # ---------- 4. 高優先度教訓のvault転記（失敗しても以降の処理に影響させない） ----------
+  HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  REPO_ROOT="$(cd "${HOOK_DIR}/../.." && pwd)"
+  bash "${REPO_ROOT}/scripts/lessons-to-vault.sh" || true
 fi
 
 exit 0
