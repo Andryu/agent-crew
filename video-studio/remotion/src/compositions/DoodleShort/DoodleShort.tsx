@@ -53,7 +53,7 @@ export const DoodleShort: React.FC<DoodleShortProps> = ({ episode }) => {
       {episode.audio?.bgm ? (
         <Audio
           src={staticFile(`${episode.id}/${episode.audio.bgm}`)}
-          volume={episode.audio.bgmVolume ?? DEFAULT_BGM_VOLUME}
+          volume={() => episode.audio?.bgmVolume ?? DEFAULT_BGM_VOLUME}
         />
       ) : null}
 

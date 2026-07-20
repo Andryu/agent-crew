@@ -1,7 +1,8 @@
 import { AbsoluteFill } from "remotion";
+import { paperTextureStyle } from "./paperTexture";
 
 /**
- * まだ画像素材が無いカット用の単色+テキストのプレースホルダー。
+ * まだ画像素材が無いカット用の、紙テクスチャ+テキストのプレースホルダー。
  */
 export const PlaceholderCut: React.FC<{ color: string; text?: string }> = ({
   color,
@@ -10,7 +11,7 @@ export const PlaceholderCut: React.FC<{ color: string; text?: string }> = ({
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: color,
+        ...paperTextureStyle(color),
         justifyContent: "center",
         alignItems: "center",
       }}

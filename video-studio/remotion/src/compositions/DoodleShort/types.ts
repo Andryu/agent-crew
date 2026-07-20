@@ -1,15 +1,43 @@
 /**
- * episode.json のスキーマ定義。
+ * episode.json のスキーマ定義（v2: セリフ劇・口パク・動画埋め込み対応）。
  * 詳細な仕様説明は video-studio/docs/setup-remotion.md を参照。
  */
 
 export type CameraEffect = "zoom-in" | "zoom-out" | "pan" | "shake" | "none";
 
+export type Speaker = "kanojo" | "kareshi" | "mob";
+
 export type EpisodeCutPlaceholder = {
-  /** CSS色（背景色） */
+  /** CSS色（背景色。紙テクスチャのベースカラーとして使う） */
   color: string;
   /** プレースホルダー上に表示する説明テキスト（任意） */
   text?: string;
+};
+
+export type MouthLayer = {
+  /** 口を閉じた状態の画像パス（episode.json ディレクトリからの相対パス） */
+  mouthClosed: string;
+  /** 口を開けた状態の画像パス（同上） */
+  mouthOpen: string;
+  /** 口パクの切り替え速度（デフォルト 8fps）。滑らかな補間はしない */
+  toggleFps?: number;
+};
+
+export type DialogueLine = {
+  /** 話者。字幕の色分けや将来の吹き出し表示などに使う想定 */
+  speaker: Speaker;
+  /** セリフwavパス（episode.json ディレクトリからの相対パス） */
+  wav: string;
+  /** カット先頭からの再生開始秒（複数セリフをこの値でシーケンス配置する） */
+  startSec: number;
+  /** wav の実測秒数（口パクウィンドウや尺検証に使う） */
+  durationSec: number;
+  /**
+   * 指定時、このセリフの再生中だけ対象カットの表示画像を
+   * mouthClosed/mouthOpen の2枚で toggleFps トグルする（口パク）。
+   * 未指定なら通常の images 表示のまま（口開き素材が無い間の後方互換動作）。
+   */
+  mouthLayer?: MouthLayer;
 };
 
 export type EpisodeCut = {
@@ -18,21 +46,36 @@ export type EpisodeCut = {
   /** このカットの表示秒数 */
   durationSec: number;
   /**
-   * 画像パス（episode.json のあるディレクトリからの相対パス）。
-   * 1枚: 静止表示。2枚: toggleFps の速さで交互表示（目パチ・口パク風）。
+   * 画像 or 動画パス（episode.json のあるディレクトリからの相対パス）。
+   * - 拡張子が .mp4 / .webm の場合は OffthreadVideo で埋め込み表示（Animated Drawings 等のモーションクリップ用）。
+   * - それ以外（png/jpg等）: 1枚=静止表示。2枚=toggleFpsの速さで交互表示（目パチ・口パク風）。
    * 未指定 or 空の場合は placeholder を使う。
    */
   images?: string[];
   /** 2枚交互表示時の切り替え速度（デフォルト 6fps）。滑らかな補間はしない。 */
   toggleFps?: number;
-  /** 画像がまだ無いカット用の単色+テキストのプレースホルダー */
+  /**
+   * images が動画(.mp4/.webm)のときのループ単位秒。
+   * 指定時は Loop コンポーネントでこの秒数を1周として繰り返す。未指定ならループせず1回再生。
+   */
+  videoLoopSec?: number;
+  /** 画像がまだ無いカット用の単色+テキストのプレースホルダー（紙テクスチャ付きで描画） */
   placeholder?: EpisodeCutPlaceholder;
   /** 画面下部1/3に表示する字幕テキスト（省略可＝字幕なしカット） */
   caption?: string;
   /** VOICEVOX生成前でも台本行を残しておくための参考テキスト（音声には使わない） */
   narrationText?: string;
-  /** ナレーションwavパス（episode.json ディレクトリからの相対パス）。未生成なら null */
+  /**
+   * @deprecated dialogue（配列・複数話者対応）を使うこと。
+   * ナレーション型の単一音声のみの場合の後方互換フィールドとして引き続き使用可。
+   * ナレーションwavパス（episode.json ディレクトリからの相対パス）。未生成なら null
+   */
   narration?: string | null;
+  /**
+   * セリフ配列（v2）。startSec でカット内にシーケンス配置し、複数話者のセリフ劇を組み立てる。
+   * narration と併用可（通常はどちらか一方を使う）。
+   */
+  dialogue?: DialogueLine[];
   /** 効果音ファイルパス（同上）。未生成/無音なら null */
   se?: string | null;
   /** カメラ演出。デフォルト "none" */
