@@ -41,7 +41,7 @@
       "index": 2,
       "durationSec": 3.5,
       "background": "assets/gen/bg_street.png",
-      "images": ["assets/kareshi_face.png", "assets/kanojo_face.png"],
+      "images": ["assets/genB/kareshi_face.png", "assets/genB/kanojo_face.png"],
       "toggleFps": 6,
       "camera": "pan",
       "dialogue": [
@@ -52,8 +52,8 @@
           "durationSec": 1.195,
           "text": "いい雰囲気だね〜",
           "mouthLayer": {
-            "mouthClosed": "assets/kanojo_face.png",
-            "mouthOpen": "assets/gen/kanojo_face_open.png"
+            "mouthClosed": "assets/genB/kanojo_face.png",
+            "mouthOpen": "assets/genB/kanojo_face_open.png"
           }
         },
         {
@@ -63,12 +63,12 @@
           "durationSec": 1.088,
           "text": "風車でっっか",
           "mouthLayer": {
-            "mouthClosed": "assets/kareshi_face.png",
-            "mouthOpen": "assets/gen/kareshi_face_open.png"
+            "mouthClosed": "assets/genB/kareshi_face.png",
+            "mouthOpen": "assets/genB/kareshi_face_open.png"
           }
         }
       ],
-      "note": "v2構成。絵コンテcut2。固定captionは廃止しセリフ字幕に統一。背景に街並み(bg_street.png)を追加、前景の顔2枚交互表示はmix-blend-mode:multiplyで重ねる。口パク有効化済み"
+      "note": "v2構成。絵コンテcut2。固定captionは廃止しセリフ字幕に統一。背景に街並み(bg_street.png、Aスタイル線画を流用)を追加、前景はBスタイル顔2枚交互表示をmix-blend-mode:multiplyで重ねる。口パク有効化済み（genB口開き版）"
     },
     {
       "index": 3,
@@ -102,7 +102,7 @@
       "index": 4,
       "durationSec": 2.5,
       "background": "assets/gen/bg_umbrella.png",
-      "images": ["assets/kanojo_body.png"],
+      "images": ["assets/genB/kanojo_body.png"],
       "camera": "zoom-in",
       "dialogue": [
         {
@@ -118,7 +118,7 @@
     {
       "index": 5,
       "durationSec": 5.5,
-      "images": ["assets/kareshi_face.png"],
+      "images": ["assets/genB/kareshi_face.png"],
       "caption": "じーっ",
       "camera": "none",
       "dialogue": [
@@ -138,13 +138,13 @@
         }
       ],
       "se": null,
-      "note": "v2構成。絵コンテcut5、本命の笑いどころ。c5_1とc5_2の間の0.7秒ギャップが台本上の「間」（時計SEのみ流す想定）。SE(時計)は未生成のため se は null、用意でき次第 assets/se_tokei.wav を指定する。目パチ用の2枚目素材が揃い次第 images に追加してtoggle表示にする"
+      "note": "v2構成。絵コンテcut5、本命の笑いどころ。喋るのは彼女だが画面はBスタイルの彼氏の顔。c5_1とc5_2の間の0.7秒ギャップが台本上の「間」（時計SEのみ流す想定）。SE(時計)は未生成のため se は null、用意でき次第 assets/se_tokei.wav を指定する。目パチ用の2枚目素材が揃い次第 images に追加してtoggle表示にする"
     },
     {
       "index": 6,
       "durationSec": 3.2,
       "background": "assets/gen/bg_umbrella.png",
-      "images": ["assets/gen/mob_girls.png"],
+      "images": ["assets/genB/mob_girls.png"],
       "camera": "zoom-out",
       "dialogue": [
         {
@@ -160,7 +160,8 @@
     {
       "index": 7,
       "durationSec": 3.5,
-      "images": ["assets/motion/kareshi_jump.mp4"],
+      "images": ["assets/genB/kareshi_body.png", "assets/genB/kareshi_jump_pose.png"],
+      "toggleFps": 5,
       "camera": "none",
       "dialogue": [
         {
@@ -179,12 +180,13 @@
         }
       ],
       "se": null,
-      "note": "v2構成。絵コンテcut6b（cut6を2分割した後半）。kareshi_jump.mp4(実測4.2秒)を1回再生（videoLoopSec未指定）。カット尺3.5秒 < クリップ長4.2秒のため末尾は自然にトリミングされる。SE: ガーンは未生成、用意でき次第 assets/se_gaan.wav を指定する"
+      "note": "v2構成。絵コンテcut6b（cut6を2分割した後半）。kareshi_jump.mp4(実写風モーション)は廃止し、Bスタイルの通常ポーズ(kareshi_body.png)とジャンプ・驚きポーズ(kareshi_jump_pose.png)をtoggleFps=5で交互表示するポーズ切替に変更。SE: ガーンは未生成、用意でき次第 assets/se_gaan.wav を指定する"
     },
     {
       "index": 8,
       "durationSec": 4.5,
-      "images": ["assets/motion/kareshi_wave.mp4"],
+      "images": ["assets/genB/kareshi_body.png", "assets/genB/kareshi_wave_pose.png"],
+      "toggleFps": 5,
       "caption": "その後も謎行動は続く",
       "camera": "none",
       "dialogue": [
@@ -203,12 +205,12 @@
           "text": "おおーい！"
         }
       ],
-      "note": "v2構成。絵コンテcut7。kareshi_wave.mp4(実測6.99秒)を1回再生（videoLoopSec未指定）。カット尺4.5秒 < クリップ長のため末尾は自然にトリミングされる"
+      "note": "v2構成。絵コンテcut7。kareshi_wave.mp4(実写風モーション)は廃止し、Bスタイルの通常ポーズ(kareshi_body.png)と手振りポーズ(kareshi_wave_pose.png)をtoggleFps=5で交互表示するポーズ切替に変更"
     },
     {
       "index": 9,
       "durationSec": 4.0,
-      "images": ["assets/kanojo_face.png"],
+      "images": ["assets/genB/kanojo_face.png"],
       "camera": "zoom-in",
       "dialogue": [
         {
@@ -218,21 +220,21 @@
           "durationSec": 2.613,
           "text": "……この人と来てよかった。たぶん",
           "mouthLayer": {
-            "mouthClosed": "assets/kanojo_face.png",
-            "mouthOpen": "assets/gen/kanojo_face_open.png"
+            "mouthClosed": "assets/genB/kanojo_face.png",
+            "mouthOpen": "assets/genB/kanojo_face_open.png"
           }
         }
       ],
-      "note": "v2構成。絵コンテcut8。既存の顔絵をそのまま使用。口パク有効化済み"
+      "note": "v2構成。絵コンテcut8。Bスタイルの顔絵に更新。口パク有効化済み（genB口開き版）"
     },
     {
       "index": 10,
       "durationSec": 3.0,
-      "images": ["assets/gen/endcard.png"],
+      "images": ["assets/genB/endcard.png"],
       "caption": "続く／フォローで次のエピソード",
       "camera": "none",
       "credit": "VOICEVOX:波音リツ・青山龍星・冥鳴ひまり",
-      "note": "v2構成。絵コンテcut9（エンドカード）。placeholderを廃止しendcard.pngに差し替え。話者確定に伴いクレジットを3名連記に更新（波音リツ=彼女、青山龍星=彼氏、冥鳴ひまり=モブ女子）"
+      "note": "v2構成。絵コンテcut9（エンドカード）。Bスタイルのendcard.pngに差し替え。話者確定に伴いクレジットを3名連記に更新（波音リツ=彼女、青山龍星=彼氏、冥鳴ひまり=モブ女子）"
     }
   ]
 }
