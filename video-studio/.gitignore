@@ -11,6 +11,7 @@ episodes/*/out/
 episodes/*/assets/
 episodes/_voice_samples/
 episodes/_cleanup_compare/
+episodes/_style_explore/
 
 # OS
 .DS_Store

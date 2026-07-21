@@ -14,6 +14,8 @@ Gemini の image generation モデルで生成する。
 
 環境変数 GEMINI_API_KEY が必須。
 """
+from __future__ import annotations
+
 import argparse
 import base64
 import json
@@ -48,8 +50,13 @@ def build_parts(prompt: str, ref_paths: list[str]) -> list[dict]:
     return parts
 
 
-def generate(prompt: str, ref_paths: list[str], out_path: str, model: str, api_key: str) -> None:
+def generate(prompt: str, ref_paths: list[str], out_path: str, model: str, api_key: str, aspect_ratio: str | None = None) -> None:
     url = f"{API_BASE}/{model}:generateContent?key={api_key}"
+    generation_config = {
+        "responseModalities": ["IMAGE"]
+    }
+    if aspect_ratio:
+        generation_config["imageConfig"] = {"aspectRatio": aspect_ratio}
     body = {
         "contents": [
             {
@@ -57,9 +64,7 @@ def generate(prompt: str, ref_paths: list[str], out_path: str, model: str, api_k
                 "parts": build_parts(prompt, ref_paths),
             }
         ],
-        "generationConfig": {
-            "responseModalities": ["IMAGE"]
-        },
+        "generationConfig": generation_config,
     }
     req = urllib.request.Request(
         url,
@@ -108,6 +113,7 @@ def main():
     ap.add_argument("--ref", action="append", default=[], help="参照画像パス（複数指定可）")
     ap.add_argument("--out", required=True)
     ap.add_argument("--model", default=DEFAULT_MODEL)
+    ap.add_argument("--aspect-ratio", default=None, help='例: "9:16"（省略時はモデルのデフォルト）')
     args = ap.parse_args()
 
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -115,7 +121,7 @@ def main():
         print("[error] GEMINI_API_KEY が設定されていません", file=sys.stderr)
         sys.exit(1)
 
-    generate(args.prompt, args.ref, args.out, args.model, api_key)
+    generate(args.prompt, args.ref, args.out, args.model, api_key, args.aspect_ratio)
 
 
 if __name__ == "__main__":
