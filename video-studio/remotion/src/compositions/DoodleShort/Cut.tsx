@@ -107,8 +107,9 @@ export const Cut: React.FC<{
           style={{
             transform: swayTransform,
             transformOrigin: "center center",
-            // 背景がある場合、前景は白背景同士がmultiplyで馴染む（白は透過的に振る舞い、線画だけ残る）
-            mixBlendMode: cut.background ? "multiply" : "normal",
+            // 前景キャラは透過PNG(_t.png)前提のため通常合成（source-over）で重ねる。
+            // 背景はキャラの透過部分から素通しで見える
+            mixBlendMode: "normal",
           }}
         >
           {currentImage ? (
@@ -149,7 +150,7 @@ export const Cut: React.FC<{
       </AbsoluteFill>
 
       {cut.caption ? <Caption text={cut.caption} /> : null}
-      <DialogueCaptions lines={activeDialogueCaptions} />
+      <DialogueCaptions lines={activeDialogueCaptions} hasTitleCaption={Boolean(cut.caption)} />
       {cut.credit ? <Credit text={cut.credit} /> : null}
 
       {/* 後方互換: 単一ナレーション */}
