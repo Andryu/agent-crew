@@ -64,7 +64,8 @@ export const Cut: React.FC<{
   }
 
   const cameraTransform = getCameraTransform(cut.camera, frame, durationInFrames);
-  const swayTransform = getIdleSwayTransform(frame, fps, cut.index);
+  const swayEnabled = cut.sway !== false;
+  const swayTransform = swayEnabled ? getIdleSwayTransform(frame, fps, cut.index) : "none";
   const currentIsVideo = currentImage ? isVideoSrc(currentImage) : false;
 
   // 再生ウィンドウ中で text を持つセリフを全て集める（cut3のような重ね再生も複数行スタック表示できる）

@@ -3,7 +3,7 @@
  * 詳細な仕様説明は video-studio/docs/setup-remotion.md を参照。
  */
 
-export type CameraEffect = "zoom-in" | "zoom-out" | "pan" | "shake" | "none";
+export type CameraEffect = "zoom-in" | "zoom-out" | "pan" | "shake" | "kenburns" | "none";
 
 export type Speaker = "kanojo" | "kareshi" | "mob";
 
@@ -93,6 +93,11 @@ export type EpisodeCut = {
   se?: string | null;
   /** カメラ演出。デフォルト "none" */
   camera?: CameraEffect;
+  /**
+   * 常時ゆらゆら演出（idleSway）のON/OFF。省略時 true（デフォルトON、既存カットとの後方互換）。
+   * イラスト日記モードのように動きを最小限にしたいカットでは false を指定する。
+   */
+  sway?: boolean;
   /**
    * 画面右下に小さく表示するクレジット表記（例: "VOICEVOX:波音リツ"）。
    * 規約上必須のクレジットなど、placeholder/images が差し替わっても消えてはいけない表示に使う。

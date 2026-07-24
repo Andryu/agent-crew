@@ -29,6 +29,11 @@ export const getCameraTransform = (
       const x = interpolate(progress, [0, 1], [-3, 3]);
       return `scale(1.08) translateX(${x}%)`;
     }
+    case "kenburns": {
+      // イラスト日記モード用のごく控えめなKen Burns。カット全体でscale 1.0→1.05のみ、パン無し
+      const scale = interpolate(progress, [0, 1], [1.0, 1.05]);
+      return `scale(${scale})`;
+    }
     case "shake": {
       // 6パターンのジッターを frame % 6 でステップ切り替え（補間しない＝カクカク）
       const pattern: Array<[number, number]> = [

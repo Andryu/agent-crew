@@ -11,225 +11,76 @@
   "cuts": [
     {
       "index": 1,
-      "durationSec": 5.0,
+      "durationSec": 4.0,
       "images": ["assets/genB/scene_walk.png"],
-      "caption": "初ハウステンボスで彼氏が天然すぎた話",
-      "camera": "pan",
-      "dialogue": [
-        {
-          "speaker": "kanojo",
-          "wav": "assets/voice/v2/c1_1_kanojo.wav",
-          "startSec": 0.3,
-          "durationSec": 1.504,
-          "text": "初ハウステンボス来たー！"
-        },
-        {
-          "speaker": "kareshi",
-          "wav": "assets/voice/v2/c1_2_kareshi.wav",
-          "startSec": 2.1,
-          "durationSec": 1.867,
-          "text": "おー、なんかヨーロッパじゃん"
-        }
-      ],
-      "note": "v2(セリフ劇)構成。絵コンテcut1。Bスタイルの完成シーン(scene_walk.png、背景込み・不透明)を使用、pan camera(scale1.08+横パン)のみの控えめな動きで表示"
+      "caption": "初めてハウステンボス行ったんだけど",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。絵コンテcut1相当。完成イラスト1枚+下部字幕+控えめKen Burnsズームのみ。dialogue/mouthLayer/pose toggle/background/se/常時swayは不使用"
     },
     {
       "index": 2,
-      "durationSec": 3.5,
-      "images": ["assets/genB/kareshi_face_t.png", "assets/genB/kanojo_face_t.png"],
-      "toggleFps": 6,
-      "camera": "pan",
-      "dialogue": [
-        {
-          "speaker": "kanojo",
-          "wav": "assets/voice/v2/c2_1_kanojo.wav",
-          "startSec": 0.2,
-          "durationSec": 1.195,
-          "text": "いい雰囲気だね〜",
-          "mouthLayer": {
-            "mouthClosed": "assets/genB/kanojo_face_t.png",
-            "mouthOpen": "assets/genB/kanojo_face_open_t.png"
-          }
-        },
-        {
-          "speaker": "kareshi",
-          "wav": "assets/voice/v2/c2_2_kareshi.wav",
-          "startSec": 1.7,
-          "durationSec": 1.088,
-          "text": "風車でっっか",
-          "mouthLayer": {
-            "mouthClosed": "assets/genB/kareshi_face_t.png",
-            "mouthOpen": "assets/genB/kareshi_face_open_t.png"
-          }
-        }
-      ],
-      "note": "v2構成。絵コンテcut2。cut1(scene_walk)で風車を見せた前提のため背景(bg_street)は外し、紙テクスチャの白背景＋Bスタイル顔2枚交互表示(透過_t版)のみに変更。口パク有効化済み（genB口開き版）"
+      "durationSec": 4.0,
+      "images": ["assets/genB/scene_town.png"],
+      "caption": "彼氏が、天然すぎた",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。絵コンテcut2相当"
     },
     {
       "index": 3,
-      "durationSec": 3.0,
-      "images": [],
-      "placeholder": {
-        "color": "#DCEFFB",
-        "text": "VRゴーグル装着の2人がのけぞる"
-      },
-      "camera": "shake",
-      "dialogue": [
-        {
-          "speaker": "kanojo",
-          "wav": "assets/voice/v2/c3_1_kanojo.wav",
-          "startSec": 0.3,
-          "durationSec": 0.779,
-          "text": "うわあああ！"
-        },
-        {
-          "speaker": "kareshi",
-          "wav": "assets/voice/v2/c3_1_kareshi.wav",
-          "startSec": 0.3,
-          "durationSec": 0.672,
-          "text": "うわあああ！"
-        }
-      ],
-      "se": null,
-      "note": "v2構成。絵コンテcut3。2人同時「うわあああ！」を意図的に重ね再生（startSec同一）。SE: ヒュー（浮遊音）は未生成。用意でき次第 assets/se_hyuu.wav 等を作成し se に指定する"
+      "durationSec": 4.0,
+      "images": ["assets/genB/scene_vr.png"],
+      "caption": "VR乗ってはしゃいで",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。絵コンテcut3相当"
     },
     {
       "index": 4,
-      "durationSec": 2.5,
-      "background": "assets/gen/bg_umbrella.png",
-      "images": ["assets/genB/kanojo_body_t.png"],
-      "camera": "zoom-in",
-      "dialogue": [
-        {
-          "speaker": "kanojo",
-          "wav": "assets/voice/v2/c4_1_kanojo.wav",
-          "startSec": 0.3,
-          "durationSec": 1.440,
-          "text": "傘のとこで自撮りしよ！"
-        }
-      ],
-      "note": "v2構成。絵コンテcut4。背景に傘の通り(bg_umbrella.png)を追加、彼女の全身素材は透過版(_t.png)を通常合成で重ねる（背景が突き抜けないよう修正済み）"
+      "durationSec": 4.5,
+      "images": ["assets/genB/scene_selfie.png"],
+      "caption": "傘の写真スポットで自撮りしよ、ってなって",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。絵コンテcut4相当"
     },
     {
       "index": 5,
-      "durationSec": 5.5,
-      "images": ["assets/genB/kareshi_face_t.png"],
-      "caption": "じーっ",
-      "camera": "none",
-      "dialogue": [
-        {
-          "speaker": "kanojo",
-          "wav": "assets/voice/v2/c5_1_kanojo.wav",
-          "startSec": 0.5,
-          "durationSec": 1.301,
-          "text": "……なにしてんの？"
-        },
-        {
-          "speaker": "kanojo",
-          "wav": "assets/voice/v2/c5_2_kanojo.wav",
-          "startSec": 2.5,
-          "durationSec": 2.176,
-          "text": "（機械、こわれてる…？）"
-        }
-      ],
-      "se": null,
-      "note": "v2構成。絵コンテcut5、本命の笑いどころ。喋るのは彼女だが画面はBスタイルの彼氏の顔。c5_1とc5_2の間の0.7秒ギャップが台本上の「間」（時計SEのみ流す想定）。SE(時計)は未生成のため se は null、用意でき次第 assets/se_tokei.wav を指定する。目パチ用の2枚目素材が揃い次第 images に追加してtoggle表示にする"
+      "durationSec": 5.0,
+      "images": ["assets/genB/scene_camera.png"],
+      "caption": "彼が、何かの機械をじーっと覗いてて",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。絵コンテcut5〜6a相当"
     },
     {
       "index": 6,
-      "durationSec": 3.2,
-      "background": "assets/gen/bg_umbrella.png",
-      "images": ["assets/genB/mob_girls_t.png"],
-      "camera": "zoom-out",
-      "dialogue": [
-        {
-          "speaker": "mob",
-          "wav": "assets/voice/v2/c6_1_mobu.wav",
-          "startSec": 0.3,
-          "durationSec": 2.325,
-          "text": "あの…写真撮りたいんですけど…"
-        }
-      ],
-      "note": "v2構成。絵コンテcut6a（cut6を2分割した前半）。placeholderを廃止し透過版mob_girls_t.pngに差し替え、背景はcut4と同じ傘の通りの続き(bg_umbrella.png)。モブ女子(冥鳴ひまり)のセリフのみ。彼のリアクションは次のcut(index7=絵コンテ6b)でjumpモーションとして表現"
+      "durationSec": 5.5,
+      "images": ["assets/genB/scene_awkward.png"],
+      "caption": "それ、他の子たちのカメラだった",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。絵コンテ6b相当、オチのため気持ち長めの尺"
     },
     {
       "index": 7,
-      "durationSec": 3.5,
-      "images": ["assets/genB/kareshi_body_t.png", "assets/genB/kareshi_jump_pose_t.png"],
-      "toggleFps": 2,
-      "camera": "none",
-      "dialogue": [
-        {
-          "speaker": "kareshi",
-          "wav": "assets/voice/v2/c6_2_kareshi.wav",
-          "startSec": 0.2,
-          "durationSec": 0.480,
-          "text": "えっ！？"
-        },
-        {
-          "speaker": "kanojo",
-          "wav": "assets/voice/v2/c6_3_kanojo.wav",
-          "startSec": 1.0,
-          "durationSec": 1.557,
-          "text": "人のカメラ覗いてたんかい！！"
-        }
-      ],
-      "se": null,
-      "note": "v2構成。絵コンテcut6b（cut6を2分割した後半）。kareshi_jump.mp4(実写風モーション)は廃止し、Bスタイルの通常ポーズ(kareshi_body_t.png、透過版)とジャンプ・驚きポーズ(kareshi_jump_pose_t.png)をtoggleFps=2(0.5秒ごと)で交互表示するポーズ切替に変更。SE: ガーンは未生成、用意でき次第 assets/se_gaan.wav を指定する"
+      "durationSec": 5.0,
+      "images": ["assets/genB/scene_ferris.png"],
+      "caption": "そのあと観覧車の知らない人にも手振ってた",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。絵コンテcut7相当"
     },
     {
       "index": 8,
-      "durationSec": 4.5,
-      "images": ["assets/genB/kareshi_body_t.png", "assets/genB/kareshi_wave_pose_t.png"],
-      "toggleFps": 2,
-      "caption": "その後も謎行動は続く",
-      "camera": "none",
-      "dialogue": [
-        {
-          "speaker": "kanojo",
-          "wav": "assets/voice/v2/c7_1_kanojo.wav",
-          "startSec": 0.3,
-          "durationSec": 2.507,
-          "text": "と思ったら、観覧車に手ぇ振ってるし"
-        },
-        {
-          "speaker": "kareshi",
-          "wav": "assets/voice/v2/c7_2_kareshi.wav",
-          "startSec": 3.2,
-          "durationSec": 0.672,
-          "text": "おおーい！"
-        }
-      ],
-      "note": "v2構成。絵コンテcut7。kareshi_wave.mp4(実写風モーション)は廃止し、Bスタイルの通常ポーズ(kareshi_body_t.png、透過版)と手振りポーズ(kareshi_wave_pose_t.png)をtoggleFps=2(0.5秒ごと)で交互表示するポーズ切替に変更"
-    },
-    {
-      "index": 9,
       "durationSec": 4.0,
-      "images": ["assets/genB/kanojo_face_t.png"],
-      "camera": "zoom-in",
-      "dialogue": [
-        {
-          "speaker": "kanojo",
-          "wav": "assets/voice/v2/c8_1_kanojo.wav",
-          "startSec": 0.5,
-          "durationSec": 2.613,
-          "text": "……この人と来てよかった。たぶん",
-          "mouthLayer": {
-            "mouthClosed": "assets/genB/kanojo_face_t.png",
-            "mouthOpen": "assets/genB/kanojo_face_open_t.png"
-          }
-        }
-      ],
-      "note": "v2構成。絵コンテcut8。Bスタイルの顔絵(透過_t版)に更新。口パク有効化済み（genB口開き版）"
-    },
-    {
-      "index": 10,
-      "durationSec": 3.0,
-      "images": ["assets/genB/endcard_t.png"],
-      "caption": "続く／フォローで次のエピソード",
-      "camera": "none",
-      "credit": "VOICEVOX:波音リツ・青山龍星・冥鳴ひまり",
-      "note": "v2構成。絵コンテcut9（エンドカード）。Bスタイルのendcard_t.png(透過版)に差し替え。話者確定に伴いクレジットを3名連記に更新（波音リツ=彼女、青山龍星=彼氏、冥鳴ひまり=モブ女子）"
+      "images": ["assets/genB/endcard.png"],
+      "caption": "この人と来てよかった。……たぶん",
+      "credit": "フォローで次のエピソード",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。締め+エンドカード。creditフィールドを流用し、字幕の下に小さくフォロー訴求を添える"
     }
   ]
 }
