@@ -62,6 +62,7 @@ OPTIONS:
                         riku         Riku のみ
                         hooks        subagent_stop.sh
                         config       _queue.json + settings.json
+                        dashboard-hooks STONEFISH ダッシュボード hooks (7イベント) + emit_event.py
   --no-global         グローバルエージェントのインストールをスキップ
   --force             競合プロンプトをスキップして全て上書き
   --uninstall         インストール済みファイルを削除
@@ -147,6 +148,7 @@ COMP_GLOBAL_SKILLS=1
 COMP_RIKU=1
 COMP_HOOKS=1
 COMP_CONFIG=1
+COMP_DASHBOARD_HOOKS=0
 
 if [ -n "$OPT_ONLY" ]; then
   COMP_GLOBAL_AGENTS=0
@@ -154,6 +156,7 @@ if [ -n "$OPT_ONLY" ]; then
   COMP_RIKU=0
   COMP_HOOKS=0
   COMP_CONFIG=0
+  COMP_DASHBOARD_HOOKS=0
 
   # カンマ区切りを分割（bash 3.2 互換）
   IFS=',' read -r -a ONLY_LIST <<< "$OPT_ONLY"
@@ -181,9 +184,12 @@ if [ -n "$OPT_ONLY" ]; then
       global-hooks)
         OPT_GLOBAL_HOOKS=1
         ;;
+      dashboard-hooks)
+        COMP_DASHBOARD_HOOKS=1
+        ;;
       *)
         echo "エラー: 不明なコンポーネント: $comp" >&2
-        echo "有効な値: agents, global-agents, skills, global-skills, riku, hooks, config, global-hooks" >&2
+        echo "有効な値: agents, global-agents, skills, global-skills, riku, hooks, config, global-hooks, dashboard-hooks" >&2
         exit $EXIT_ARG_ERROR
         ;;
     esac
@@ -537,6 +543,82 @@ if [ $COMP_CONFIG -eq 1 ]; then
     "$REPO_DIR/templates/settings.json" \
     "$TARGET_DIR/.claude/settings.json" \
     "skip"
+  echo ""
+fi
+
+# --- dashboard hooks (STONEFISH ダッシュボード) ---
+if [ $COMP_DASHBOARD_HOOKS -eq 1 ]; then
+  echo "--- dashboard hooks ($TARGET_DIR/.claude/) ---"
+
+  DASHBOARD_FRAGMENT="$REPO_DIR/dashboard/hooks/settings-fragment.json"
+  DASHBOARD_EMIT_SRC="$REPO_DIR/dashboard/hooks/emit_event.py"
+  check_src "$DASHBOARD_FRAGMENT"
+  check_src "$DASHBOARD_EMIT_SRC"
+
+  # emit_event.py は配布先プロジェクトに実体が無いため .claude/hooks/ にコピーする
+  EMIT_DST="$TARGET_DIR/.claude/hooks/emit_event.py"
+  copy_file \
+    "$DASHBOARD_EMIT_SRC" \
+    "$EMIT_DST" \
+    "overwrite"
+
+  if [ $OPT_DRY_RUN -eq 0 ] && [ -f "$EMIT_DST" ]; then
+    chmod +x "$EMIT_DST"
+  fi
+
+  DASHBOARD_SETTINGS="$TARGET_DIR/.claude/settings.json"
+
+  if [ $OPT_DRY_RUN -eq 1 ]; then
+    echo "  [DRY-RUN] $DASHBOARD_SETTINGS に dashboard hooks (7イベント) をマージ"
+  else
+    ensure_dir "$(dirname "$DASHBOARD_SETTINGS")"
+
+    # settings-fragment.json の command パスを、コピー先の実体パスに書き換える
+    # (ADR-008: fragment の JSON を Bash 文字列で組み立て直さず jq で変換する)
+    DASHBOARD_NEW_HOOKS=$(jq --arg newcmd '$CLAUDE_PROJECT_DIR/.claude/hooks/emit_event.py' '
+      .hooks | map_values(map(.hooks |= map(.command |= sub(
+        "\\$CLAUDE_PROJECT_DIR/dashboard/hooks/emit_event\\.py"; $newcmd
+      ))))
+    ' "$DASHBOARD_FRAGMENT")
+
+    # event ごとに既存 hooks 配列へ追記マージ。同一 command が既存グループ内に
+    # 見つかれば追加をスキップする（二重登録防止・冪等）
+    DASHBOARD_MERGE_SCRIPT='
+      def add_hook_group($existing; $new_group):
+        ($existing // []) as $arr
+        | ($new_group.hooks | map(.command)) as $new_cmds
+        | (($arr | map(.hooks[]?.command // empty)) as $existing_cmds
+           | (any($existing_cmds[]; . as $c | $new_cmds | index($c) != null))) as $exists
+        | if $exists then $arr else $arr + [$new_group] end;
+      .hooks = (
+        .hooks as $h |
+        reduce ($nh | to_entries[]) as $e (
+          ($h // {});
+          .[$e.key] = add_hook_group(.[$e.key]; $e.value[0])
+        )
+      )
+    '
+
+    if [ -f "$DASHBOARD_SETTINGS" ]; then
+      # バックアップ → jq マージ → 構文検証。失敗時はバックアップから復元して WARN
+      DASHBOARD_BACKUP="$DASHBOARD_SETTINGS.bak.$(date +%Y%m%d%H%M%S)"
+      cp "$DASHBOARD_SETTINGS" "$DASHBOARD_BACKUP"
+
+      DASHBOARD_MERGED=$(jq --argjson nh "$DASHBOARD_NEW_HOOKS" "$DASHBOARD_MERGE_SCRIPT" \
+        "$DASHBOARD_SETTINGS" 2>/dev/null || echo "")
+
+      if [ -n "$DASHBOARD_MERGED" ] && echo "$DASHBOARD_MERGED" | jq empty 2>/dev/null; then
+        echo "$DASHBOARD_MERGED" > "$DASHBOARD_SETTINGS"
+        printf "  [MERGE]     %s (backup: %s)\n" "$DASHBOARD_SETTINGS" "$DASHBOARD_BACKUP"
+      else
+        cp "$DASHBOARD_BACKUP" "$DASHBOARD_SETTINGS"
+        echo "WARN: $DASHBOARD_SETTINGS のマージに失敗。バックアップから復元しました。手動で dashboard hooks を追加してください。" >&2
+      fi
+    else
+      jq -n --argjson nh "$DASHBOARD_NEW_HOOKS" '{"hooks": $nh}' > "$DASHBOARD_SETTINGS"
+      printf "  [CREATE]    %s\n" "$DASHBOARD_SETTINGS"
+    fi
+  fi
   echo ""
 fi
 
