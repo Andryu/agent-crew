@@ -1,0 +1,997 @@
+<title>STONEFISH Dashboard</title>
+<style>
+  :root {
+    --text-primary: #101318; --text-secondary: #5b6472; --text-tertiary: #97a0ae; --text-quaternary: #c2c8d2;
+    --surface: #fbfbfc; --surface-raised: #ffffff; --surface-muted: #f2f3f6;
+    --border: #e4e7ec; --dot: rgba(16, 19, 24, 0.06);
+    --accent: #2563eb; --positive: #16a34a; --warning: #d97706;
+    --hq: #7c3aed; --prod: #2563eb; --inv: #0d9488;
+    --glow-w: rgba(217, 119, 6, 0.28);
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Sans", sans-serif;
+    --font-mono: "SF Mono", Monaco, "Cascadia Mono", "Noto Sans Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --text-primary: #edf0f4; --text-secondary: #9aa4b2; --text-tertiary: #67707e; --text-quaternary: #454d5a;
+      --surface: #0b0d12; --surface-raised: #12151c; --surface-muted: #191d26;
+      --border: #262b36; --dot: rgba(237, 240, 244, 0.07);
+      --accent: #60a5fa; --positive: #4ade80; --warning: #fbbf24;
+      --hq: #a78bfa; --prod: #60a5fa; --inv: #2dd4bf;
+      --glow-w: rgba(251, 191, 36, 0.3);
+    }
+  }
+  :root[data-theme="light"] {
+    --text-primary: #101318; --text-secondary: #5b6472; --text-tertiary: #97a0ae; --text-quaternary: #c2c8d2;
+    --surface: #fbfbfc; --surface-raised: #ffffff; --surface-muted: #f2f3f6;
+    --border: #e4e7ec; --dot: rgba(16, 19, 24, 0.06);
+    --accent: #2563eb; --positive: #16a34a; --warning: #d97706;
+    --hq: #7c3aed; --prod: #2563eb; --inv: #0d9488; --glow-w: rgba(217, 119, 6, 0.28);
+  }
+  :root[data-theme="dark"] {
+    --text-primary: #edf0f4; --text-secondary: #9aa4b2; --text-tertiary: #67707e; --text-quaternary: #454d5a;
+    --surface: #0b0d12; --surface-raised: #12151c; --surface-muted: #191d26;
+    --border: #262b36; --dot: rgba(237, 240, 244, 0.07);
+    --accent: #60a5fa; --positive: #4ade80; --warning: #fbbf24;
+    --hq: #a78bfa; --prod: #60a5fa; --inv: #2dd4bf; --glow-w: rgba(251, 191, 36, 0.3);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: var(--font-sans); background: var(--surface); color: var(--text-primary);
+    line-height: 1.6; padding: 24px 20px 70px; max-width: 1240px; margin: 0 auto;
+  }
+
+  /* ---------- header ---------- */
+  .header-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .logo {
+    width: 26px; height: 26px; border-radius: 7px; flex: none;
+    background: conic-gradient(from 210deg, var(--hq), var(--prod), var(--inv), var(--hq));
+    mask: radial-gradient(circle at 50% 50%, transparent 4px, #000 4.5px);
+    -webkit-mask: radial-gradient(circle at 50% 50%, transparent 4px, #000 4.5px);
+  }
+  .page-title { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .page-subtitle { font-size: 12px; color: var(--text-tertiary); font-family: var(--font-mono); letter-spacing: 0.05em; }
+  .clock { margin-left: auto; font-family: var(--font-mono); font-size: 13px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+  .anim-btn {
+    font-size: 12px; font-weight: 500; padding: 5px 13px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface-raised); color: var(--text-secondary);
+    font-family: var(--font-mono);
+  }
+  .anim-btn:hover { color: var(--text-primary); }
+
+  .kpis { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .kpi {
+    display: flex; align-items: baseline; gap: 9px;
+    border: 1px solid var(--border); border-radius: 9px; padding: 7px 14px; background: var(--surface-raised);
+  }
+  .kpi .l { font-size: 9.5px; color: var(--text-tertiary); font-family: var(--font-mono); letter-spacing: 0.16em; }
+  .kpi .v { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .kpi .v small { font-size: 11px; font-weight: 400; color: var(--text-tertiary); }
+  .kpi.warn { border-color: color-mix(in srgb, var(--warning) 50%, transparent); box-shadow: 0 0 14px var(--glow-w); }
+  .kpi.warn .v { color: var(--warning); }
+  .kpi.quiet { box-shadow: none; }
+
+  /* ---------- approval bar ---------- */
+  .approval-bar {
+    position: sticky; top: 8px; z-index: 60;
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    padding: 9px 14px; border-radius: 12px; margin: 14px 0 0;
+    border: 1px solid var(--border); background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+    backdrop-filter: blur(8px);
+  }
+  .approval-bar.has { border-color: color-mix(in srgb, var(--warning) 55%, transparent); box-shadow: 0 4px 24px var(--glow-w); }
+  .ap-title { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.08em; color: var(--text-tertiary); margin-right: 4px; white-space: nowrap; }
+  .approval-bar.has .ap-title { color: var(--warning); }
+  .ap-chip {
+    font-size: 11.5px; font-family: inherit; cursor: pointer;
+    background: color-mix(in srgb, var(--warning) 9%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+    color: var(--text-primary); border-radius: 999px; padding: 4px 12px; transition: all .15s;
+  }
+  .ap-chip:hover { background: color-mix(in srgb, var(--warning) 18%, transparent); }
+  .ap-chip:focus-visible { outline: 2px solid var(--warning); outline-offset: 2px; }
+  .ap-panel {
+    position: fixed; right: 22px; bottom: 22px; z-index: 70; width: 320px;
+    background: var(--surface-raised); border: 1.5px solid var(--warning); border-radius: 14px;
+    padding: 16px 18px; box-shadow: 0 12px 40px rgba(0,0,0,0.3); display: none;
+  }
+  .ap-panel.open { display: block; }
+  .ap-panel .k { font-size: 9.5px; font-family: var(--font-mono); letter-spacing: 0.18em; color: var(--warning); }
+  .ap-panel h4 { font-size: 14px; font-weight: 650; margin: 4px 0 8px; }
+  .ap-panel .row { font-size: 12px; color: var(--text-secondary); display: flex; gap: 8px; padding: 2px 0; }
+  .ap-panel .row b { color: var(--text-primary); font-weight: 600; min-width: 52px; }
+  .ap-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .ap-btn { flex: 1; font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+    border-radius: 9px; padding: 8px 0; border: 1px solid var(--border); transition: all .15s; }
+  .ap-btn.ok { background: var(--positive); border-color: var(--positive); color: #fff; }
+  .ap-btn.ok:hover { filter: brightness(1.08); }
+  .ap-btn.ng { background: transparent; color: var(--text-secondary); }
+  .ap-btn.ng:hover { border-color: #dc2626; color: #dc2626; }
+  .ap-close { position: absolute; top: 10px; right: 12px; border: none; background: none; color: var(--text-tertiary); font-size: 15px; cursor: pointer; }
+
+  /* ---------- dashboard sections ---------- */
+  .sect {
+    border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px 16px;
+    background: var(--surface-raised); margin-top: 16px; position: relative;
+  }
+  .sect.dotted { background-image: radial-gradient(circle, var(--dot) 1px, transparent 1px); background-size: 22px 22px; }
+  .sect-h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .sect-h .t { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.22em; font-weight: 600; color: var(--text-secondary); }
+  .sect-h .d { font-size: 11px; color: var(--text-tertiary); }
+  .dash-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 16px; align-items: stretch; }
+  .dash-grid2 { display: grid; grid-template-columns: 1.5fr 0.9fr; gap: 16px; align-items: stretch; }
+  .dash-grid .sect, .dash-grid2 .sect { margin-top: 0; }
+  .dash-row { margin-top: 16px; }
+  @media (max-width: 980px) { .dash-grid, .dash-grid2 { grid-template-columns: 1fr; } }
+
+  /* ---------- command center ---------- */
+  .cmd-scene { position: relative; }
+  .cmd-flow-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+  .zones-row {
+    display: grid; grid-template-columns: minmax(170px, 1fr) minmax(330px, 2.3fr) minmax(150px, 1fr);
+    gap: 14px; margin-top: 14px; position: relative; z-index: 2;
+  }
+  .zones-row .zone { margin-top: 0; }
+  @media (max-width: 900px) { .zones-row { grid-template-columns: 1fr; } }
+  .zone { position: relative; z-index: 2; border-radius: 13px; padding: 12px 14px 14px; margin-top: 14px;
+    border: 1px solid color-mix(in srgb, var(--zc, var(--border)) 38%, transparent);
+    background: color-mix(in srgb, var(--zc, var(--text-tertiary)) 4.5%, var(--surface-raised)); }
+  .zone-h { display: flex; align-items: baseline; gap: 9px; margin-bottom: 10px; }
+  .zone-h .sq { width: 8px; height: 8px; border-radius: 2.5px; background: var(--zc); align-self: center; flex: none; }
+  .zone-h .zn { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.2em; color: var(--text-secondary); font-weight: 600; }
+  .zone-h .zt { font-family: var(--font-mono); font-size: 10px; color: var(--text-quaternary); }
+  .zone-h .zs { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+  .zone-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 9px; }
+  .ghost-zones { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; position: relative; z-index: 2; }
+  .zone.ghost { margin-top: 0; border-style: dashed; background: transparent; opacity: 0.6; }
+  .zone.ghost .zbody { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-quaternary); letter-spacing: 0.1em; }
+  .card {
+    background: var(--surface-raised); border: 1px solid var(--border); border-radius: 11px;
+    padding: 10px 12px; transition: border-color .25s, box-shadow .25s;
+  }
+  .card.working { border-color: color-mix(in srgb, var(--zc, var(--accent)) 65%, transparent);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--zc, var(--accent)) 14%, transparent); }
+  .card.waiting { border-color: var(--warning); box-shadow: 0 0 16px var(--glow-w); }
+  .card.dim { opacity: 0.6; }
+  .card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .avatar { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center;
+    font-size: 11px; font-weight: 700; color: #fff; flex: none; }
+  .card-name { font-size: 13px; font-weight: 600; }
+  .stt { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 10px;
+    font-family: var(--font-mono); letter-spacing: 0.06em; color: var(--text-tertiary); white-space: nowrap; }
+  .stt .d { width: 6px; height: 6px; border-radius: 50%; background: var(--text-quaternary); }
+  .stt.s-work { color: var(--accent); } .stt.s-work .d { background: var(--accent); animation: blink 1.1s infinite; }
+  .stt.s-think { color: var(--accent); } .stt.s-think .d { background: var(--accent); opacity: .6; }
+  .stt.s-wait { color: var(--warning); } .stt.s-wait .d { background: var(--warning); animation: blink .8s infinite; }
+  .stt.s-done { color: var(--positive); } .stt.s-done .d { background: var(--positive); }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.15; } }
+  .card-role { font-size: 10.5px; color: var(--text-tertiary); margin-bottom: 6px; }
+  .card-task { font-size: 11px; color: var(--text-secondary); min-height: 17px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-metrics { display: flex; gap: 10px; margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--border);
+    font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+  .zone.human { --zc: var(--text-primary);
+    border: 1.5px solid color-mix(in srgb, var(--text-primary) 55%, transparent); background: var(--surface-raised); }
+  .zone.human.hot { border-color: var(--warning); box-shadow: 0 0 24px var(--glow-w); }
+  .me-flex { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+  .me-id { min-width: 200px; }
+  .me-title { font-size: 14.5px; font-weight: 650; }
+  .me-sub { font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono); letter-spacing: 0.04em; }
+  .me-queue { flex: 1; min-width: 240px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .q-item { font-size: 11px; display: inline-flex; gap: 7px; align-items: center;
+    background: color-mix(in srgb, var(--warning) 9%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+    border-radius: 999px; padding: 4px 12px; }
+  .q-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--warning); animation: blink .8s infinite; flex: none; }
+  .q-empty { font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono); padding-top: 5px; }
+  .flow-line { stroke: var(--border); stroke-width: 1.5; fill: none; opacity: .8; }
+  .flow-line.on { stroke: var(--zlc, var(--accent)); stroke-dasharray: 6 5; animation: dashMove .8s linear infinite; opacity: 1; }
+  .flow-line.up { stroke: var(--warning); stroke-width: 2; stroke-dasharray: 6 5; animation: dashMoveR .8s linear infinite; opacity: 1; }
+  @keyframes dashMove { to { stroke-dashoffset: -11; } }
+  @keyframes dashMoveR { to { stroke-dashoffset: 11; } }
+  .arcflow { animation: dashMove 1s linear infinite; }
+  .blinklamp { animation: blink 1s infinite; }
+  :root[data-anim="off"] .stt .d, :root[data-anim="off"] .q-dot { animation: none !important; }
+  :root[data-anim="off"] .flow-line.on, :root[data-anim="off"] .flow-line.up { animation: none; }
+  :root[data-anim="off"] .arcflow, :root[data-anim="off"] .blinklamp { animation: none !important; }
+
+  /* ---------- org map / loop / office ---------- */
+  .map-scene { background: #05070D; border-radius: 12px; padding: 6px; }
+  #spaceCanvas { width: 100%; height: auto; display: block; border-radius: 8px; }
+  .space-legend { display: flex; gap: 20px; flex-wrap: wrap; padding: 10px 8px 2px;
+    font-family: var(--font-mono); font-size: 10px; color: #98A4B8; letter-spacing: 0.08em; }
+  .space-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .space-legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .space-legend b { font-weight: 400; color: #6C7688; }
+  #pipeSvg { width: 100%; height: auto; display: block; }
+  #pixCanvas { image-rendering: pixelated; width: 100%; height: auto; display: block;
+    border-radius: 10px; background: #1a1410; }
+  .feed { font-size: 11.5px; max-height: 500px; overflow-y: auto; }
+  .feed .fe { display: flex; gap: 9px; padding: 4px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); color: var(--text-secondary); }
+  .feed .ft { font-family: var(--font-mono); font-size: 10px; color: var(--text-quaternary); flex: none; padding-top: 2px; }
+  .feed .fw { font-weight: 600; color: var(--text-primary); flex: none; }
+  .footer-note { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--text-tertiary); line-height: 1.7; }
+  .footer-note code { font-family: var(--font-mono); font-size: 11px; background: var(--surface-muted);
+    padding: 1px 5px; border-radius: 4px; color: var(--text-secondary); }
+</style>
+
+<div class="header-row">
+  <div class="logo"></div>
+  <div>
+    <div class="page-title">STONEFISH Dashboard</div>
+    <div class="page-subtitle">command · org map · sprint loop · office — one screen</div>
+  </div>
+  <div class="clock" id="clock">09:00</div>
+  <button class="anim-btn" id="animBtn" title="アニメーション切替">ANIM ON</button>
+</div>
+<div class="kpis">
+  <div class="kpi"><span class="l">ACTIVE</span><span class="v" id="k-act">0<small>/11</small></span></div>
+  <div class="kpi warn quiet" id="kpiWait"><span class="l">APPROVAL</span><span class="v" id="k-wait">0</span></div>
+  <div class="kpi"><span class="l">TOKENS</span><span class="v" id="k-tok">0<small>k</small></span></div>
+  <div class="kpi"><span class="l">SEGMENTS</span><span class="v">2<small>/4</small></span></div>
+  <div class="kpi"><span class="l">DONE</span><span class="v" id="k-done">0</span></div>
+</div>
+
+<div class="approval-bar" id="apBar" role="status"></div>
+<div class="ap-panel" id="apPanel"></div>
+
+<!-- ===== command center ===== -->
+<div class="sect dotted">
+  <div class="sect-h"><span class="t">COMMAND CENTER</span><span class="d">運用 — 線は実際の委譲・承認だけが脈動する</span></div>
+  <div class="cmd-scene">
+    <svg class="cmd-flow-svg" id="cmdFlow" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="zone human" id="meZone" data-node="me" style="position:relative;z-index:2">
+      <div class="me-flex">
+        <div class="me-id">
+          <div class="me-title">あなた（オーナー / CEO）</div>
+          <div class="me-sub">gate.stonefish — go/no-go · release · payment</div>
+        </div>
+        <div class="me-queue" id="meQueue"></div>
+      </div>
+    </div>
+    <div class="zones-row">
+    <div class="zone" style="--zc: var(--hq)" id="zoneHq">
+      <div class="zone-h"><span class="sq"></span><span class="zn">HQ</span><span class="zt">hq.stonefish</span><span class="zs" id="zsHq"></span></div>
+      <div class="zone-grid" id="gridHq"></div>
+    </div>
+    <div class="zone" style="--zc: var(--prod)" id="zoneProd">
+      <div class="zone-h"><span class="sq"></span><span class="zn">PRODUCT</span><span class="zt">product.stonefish</span><span class="zs" id="zsProd"></span></div>
+      <div class="zone-grid" id="gridProd"></div>
+    </div>
+    <div class="zone" style="--zc: var(--inv)" id="zoneInv">
+      <div class="zone-h"><span class="sq"></span><span class="zn">INVEST</span><span class="zt">idle-mode</span><span class="zs" id="zsInv"></span></div>
+      <div class="zone-grid" id="gridInv"></div>
+    </div>
+    </div>
+    <div class="ghost-zones">
+      <div class="zone ghost"><div class="zone-h"><span class="zn">VIDEO</span></div><div class="zbody">NOT PROVISIONED — 横展開トリガー待ち</div></div>
+      <div class="zone ghost"><div class="zone-h"><span class="zn">GAME</span></div><div class="zbody">NOT PROVISIONED — 最終フェーズ</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== org map + sprint loop ===== -->
+<div class="dash-grid dash-row">
+  <div class="sect">
+    <div class="sect-h"><span class="t">ORG MAP</span><span class="d">組織マップ — 誰と誰が連動しているか・部門の領域</span></div>
+    <div class="map-scene"><canvas id="spaceCanvas"></canvas></div>
+    <div class="space-legend">
+      <span><i style="background:var(--hq)"></i>HQ <b id="ss-hq"></b></span>
+      <span><i style="background:var(--prod)"></i>PRODUCT <b id="ss-prod"></b></span>
+      <span><i style="background:var(--inv)"></i>INVEST <b id="ss-inv"></b></span>
+      <span style="opacity:.55"><i style="background:#5A6478"></i>未開設</span>
+    </div>
+  </div>
+  <div class="sect">
+    <div class="sect-h"><span class="t">SPRINT LOOP</span><span class="d">工程サイクル — ◇はあなただけが開けるゲート</span></div>
+    <svg id="pipeSvg" viewBox="0 0 660 540" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+</div>
+
+<!-- ===== pixel office + activity ===== -->
+<div class="dash-grid2 dash-row">
+  <div class="sect">
+    <div class="sect-h"><span class="t">PIXEL OFFICE</span><span class="d">STONEFISH Inc. — 完了が貯まると備品が増える／承認を放置するとヤニ猫が生まれる</span></div>
+    <canvas id="pixCanvas" width="840" height="470"></canvas>
+  </div>
+  <div class="sect">
+    <div class="sect-h"><span class="t">ACTIVITY</span></div>
+    <div class="feed" id="feed"></div>
+  </div>
+</div>
+
+<div class="footer-note">
+  実データ接続: Claude Code hooks（<code>SessionStart</code> / <code>PreToolUse</code> / <code>SubagentStop</code>…）→ ローカルサーバ → 全セクション共通のイベントストリーム。
+  承認キューは実装時、クリックで対象セッションへの承認・指示送信（<code>指示出し</code>）に接続する。
+</div>
+
+<script>
+(function(){
+// ================= unified data =================
+const AGENTS = [
+  { id:'yuki', name:'Yuki', role:'参謀長 / PM', dept:'hq', color:'#C26A93', body:'#2E4A7A', hair:'#26334d',
+    feat:{ hair:'bob', glasses:'clear', head:'headset', badge:true, prop:'clipboard' },
+    tasks:['意思決定キューの整備','週次計画の統合','部門ボード更新','トークン週報の作成'] },
+  { id:'miyu', name:'みゆきち', role:'レトロ / 教訓', dept:'hq', color:'#6E9A4E', body:'#CFE0D6', hair:'#D8B09A',
+    feat:{ hair:'fluffy', head:'ribbon', prop:'mug' },
+    tasks:['Sprint-24 教訓抽出','vault 転記','再発パターン照合'] },
+  { id:'kai', name:'Kai', role:'監査 / セキュリティ', dept:'hq', color:'#4E7AAB', body:'#23262E', hair:'#1a1d24',
+    feat:{ hair:'short', glasses:'sun', armband:'#c04040', prop:'magnifier' },
+    tasks:['権限監査スキャン','支出ログ照合','逸脱チェック'] },
+  { id:'alex', name:'Alex', role:'アーキテクト', dept:'product', color:'#8A66B8', body:'#C9B795', hair:'#8a8f98',
+    feat:{ hair:'part', glasses:'clear', prop:'blocks' },
+    tasks:['ADR-014 起草','ダッシュボードAPI設計','組織OS分離の設計'] },
+  { id:'riku', name:'Riku', role:'エンジニア', dept:'product', color:'#C08048', body:'#6A7280', hair:'#22262e',
+    feat:{ hair:'messy', hoodie:true, earphone:true, prop:'can' },
+    tasks:['Edit: queue.py','ccusage 集計実装','PR #125 修正'] },
+  { id:'sora', name:'Sora', role:'QA', dept:'product', color:'#3E9A88', body:'#E8E6DF', hair:'#4A3628',
+    feat:{ hair:'bun', vest:true, vestC:'#3a4250', prop:'checklist' },
+    tasks:['受け入れ基準チェック','PR #125 レビュー','回帰テスト実行'] },
+  { id:'mina', name:'Mina', role:'UX', dept:'product', color:'#B09A38', body:'#C06A4A', hair:'#7A5AA8',
+    feat:{ hair:'bob', earring:true, prop:'sketchbook' },
+    tasks:['画面仕様の更新','ユーザーフロー整理'] },
+  { id:'tomo', name:'Tomo', role:'DevOps', dept:'product', color:'#5878C0', body:'#7A7A52', hair:'#A06A3A',
+    feat:{ hair:'short', head:'cap', headC:'#4a5a3a', toolbelt:true, prop:'rack' },
+    tasks:['CI 整備','デプロイフック修正'] },
+  { id:'hana', name:'Hana', role:'ドキュメント', dept:'product', color:'#C06868', body:'#E3DDD0', hair:'#1C202A',
+    feat:{ hair:'long', glasses:'clear', prop:'books' },
+    tasks:['組織憲章の校閲','README 更新'] },
+  { id:'ren', name:'Ren', role:'データ', dept:'product', color:'#4AA858', body:'#3A8A80', hair:'#26324A',
+    feat:{ hair:'ponytail', glasses:'clear', prop:'graph' },
+    tasks:['トークン集計SQL','教訓データ分析'] },
+  { id:'tick', name:'Ticker', role:'定点観測 Bot', dept:'invest', color:'#8A93A5', body:'#8A93A5', hair:'#4a5265',
+    feat:{ robot:true, prop:'tickermon' },
+    tasks:['市況データ収集','予測ログ蓄積'] },
+];
+const LINES = {
+  yuki:{s:'タスク、整理しますね',w:'判断、お願いします',d:'引き継ぎ完了です'},
+  miyu:{s:'振り返り、始めますね〜',w:'これ、Issueにする?',d:'教訓、記録しました'},
+  kai:{s:'脆弱性、洗い出す',w:'CRITICAL、要確認',d:'穴は塞いだ'},
+  alex:{s:'構造から考えます',w:'トレードオフ、確認を',d:'設計、引き継ぎます'},
+  riku:{s:'実装します',w:'レビュー、待ってます',d:'動いた'},
+  sora:{s:'レビュー、始めます',w:'これは差し戻しです',d:'APPROVEDです'},
+  mina:{s:'フロー、描きますね',w:'ここ、確認したいです',d:'仕様、まとまりました'},
+  tomo:{s:'パイプライン、整えます',w:'影響範囲、確認して',d:'本番、動いてます'},
+  hana:{s:'読み合わせます',w:'ここ、用語が揺れてます',d:'矛盾なし、承認です'},
+  ren:{s:'まず計測します',w:'仮説、合ってますか',d:'数字で確認できました'},
+  tick:{s:'観測、開始します',w:'異常値、検出',d:'レポート、格納済み'},
+};
+const ST_LBL = { idle:'IDLE', think:'THINK', work:'RUN', wait:'HOLD', done:'DONE' };
+const state = {
+  agents: AGENTS.map(a => ({ ...a, st:'idle', task:a.tasks[0], done:0, tok:0 })),
+  feed: [], clock: 9*60, tokens: { hq:0, product:0, invest:0 }, doneTotal: 0,
+};
+const byId = Object.fromEntries(state.agents.map(a => [a.id, a]));
+let tickN = 0;
+function fmtClock(){ const h=Math.floor(state.clock/60)%24, m=state.clock%60; return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'); }
+function pushEv(who,msg){ state.feed.unshift({t:fmtClock(),who,msg}); if(state.feed.length>18) state.feed.pop(); }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function busy(a){ return a.st==='work'||a.st==='think'; }
+function setBub(a,k){ const l=LINES[a.id]; if (l && l[k]){ a.bub=l[k]; a.bubUntil=tickN+3; } }
+
+// anim toggle（OSのreduce-motionに依存せず既定ON）
+let reduced = false;
+document.documentElement.dataset.anim = 'on';
+document.getElementById('animBtn').addEventListener('click', function(){
+  reduced = !reduced;
+  document.documentElement.dataset.anim = reduced ? 'off' : 'on';
+  this.textContent = reduced ? 'ANIM OFF' : 'ANIM ON';
+});
+
+// pipeline tasks
+const STAGES=['リサーチ','戦略・戦術','開発','テスト','評価'];
+const STAGE_CREW=[['ren'],['alex','mina'],['riku','tomo'],['sora'],['kai','hana','miyu']];
+const POOL=['動画部門の市場調査','投資シグナルAPI','LP改善','ドキュメント刷新','週次レポート自動化','教訓検索ツール'];
+let poolIdx=0;
+const pipeTasks=[
+  {n:'ダッシュボードMVP',pos:2,gate:null},
+  {n:'ccusage週次集計',pos:0,gate:null},
+  {n:'組織憲章v1',pos:1,gate:'g1'},
+  {n:'queue.py移行',pos:3,gate:null},
+  {n:'PR #125',pos:4,gate:null},
+];
+
+function tick(){
+  state.clock += 2; tickN++;
+  for (const a of state.agents){
+    const r=Math.random();
+    if (a.dept==='invest'){
+      if (a.st==='work'){ a.st='idle'; setBub(a,'d'); }
+      else if (r<0.12){ a.st='work'; a.task=pick(a.tasks); setBub(a,'s'); pushEv(a.name,a.task); }
+    } else {
+      switch(a.st){
+        case 'idle': if (r<0.3){ a.st='think'; a.task=pick(a.tasks); setBub(a,'s'); } break;
+        case 'think': if (r<0.6){ a.st='work'; pushEv(a.name,a.task); } break;
+        case 'work':
+          if (r<0.055 && a.dept==='product'){ a.st='wait'; setBub(a,'w'); pushEv(a.name,'⚠ 承認待ち: '+a.task); }
+          else if (r<0.22){ a.st='done'; a.done++; state.doneTotal++; setBub(a,'d'); }
+          break;
+        case 'wait': if (r<0.16){ a.st='work'; pushEv('あなた','✔ 承認 → '+a.name+' 再開'); } break;
+        case 'done': if (r<0.5) a.st='idle'; break;
+      }
+    }
+    if (a.st==='wait'){
+      a.waitT=(a.waitT||0)+1;
+      if (a.waitT===3){ a.bub='スパー…🚬'; a.bubUntil=tickN+2; }
+      if (a.waitT===6){ a.bub='……にゃ'; a.bubUntil=tickN+2; pushEv(a.name,'待ちくたびれてヤニ猫になった🐈'); }
+    } else a.waitT=0;
+    if (busy(a)){ const t=200+Math.floor(Math.random()*700); a.tok+=t; state.tokens[a.dept]+=t; }
+  }
+  for (const t of pipeTasks){
+    if (t.gate){
+      if (Math.random()<0.10){
+        if (t.gate==='g1'){ t.gate=null; t.pos=2; pushEv('あなた','✔ Go承認: '+t.n); }
+        else { pushEv('あなた','🚀 リリース: '+t.n); t.n=POOL[poolIdx++%POOL.length]; t.pos=0; t.gate=null; }
+      }
+    } else if (Math.random()<0.25){
+      if (t.pos===1) t.gate='g1'; else if (t.pos===4) t.gate='g2'; else t.pos++;
+    }
+  }
+  renderAll();
+}
+
+// ================= top / KPI / feed =================
+function zoneStats(dept){
+  const list=state.agents.filter(a=>a.dept===dept);
+  return list.filter(busy).length+' active · '+Math.round(state.tokens[dept]/1000)+'k tok';
+}
+function renderTop(){
+  const act=state.agents.filter(busy).length;
+  const nWait=state.agents.filter(a=>a.st==='wait').length+pipeTasks.filter(t=>t.gate).length;
+  document.getElementById('clock').textContent=fmtClock();
+  document.getElementById('k-act').innerHTML=act+'<small>/'+state.agents.length+'</small>';
+  document.getElementById('k-wait').textContent=nWait;
+  document.getElementById('kpiWait').classList.toggle('quiet', nWait===0);
+  const tot=Object.values(state.tokens).reduce((s,v)=>s+v,0);
+  document.getElementById('k-tok').innerHTML=Math.round(tot/1000)+'<small>k</small>';
+  document.getElementById('k-done').textContent=state.doneTotal;
+  document.getElementById('feed').innerHTML=state.feed.map(e=>
+    `<div class="fe"><span class="ft">${e.t}</span><span class="fw">${e.who}</span><span>${e.msg}</span></div>`).join('');
+}
+
+// ================= approval queue =================
+function queueItems(){
+  const items=[];
+  for (const t of pipeTasks) if (t.gate) items.push({
+    kind:t.gate, ref:t,
+    title:(t.gate==='g1'?'Go/No-Go 判定':'リリース判定'), label:(t.gate==='g1'?'Go/No-Go':'リリース')+': '+t.n,
+    from:'Yuki（参謀長）', body: t.gate==='g1'
+      ? 'リサーチ・戦略が完了。憲章の成功指標と撤退基準を確認の上、開発着手の判断をお願いします。'
+      : '評価工程を通過。公開はあなたの専権です（L0）。リリース可否を判断してください。'
+  });
+  for (const a of state.agents) if (a.st==='wait') items.push({
+    kind:'perm', ref:a, title:'実行承認', label:a.name+': '+a.task,
+    from:a.name+'（'+a.role.split(' /')[0]+'）',
+    body:'「'+a.task+'」の実行に承認が必要です。対象と影響範囲を確認してください。'
+  });
+  return items;
+}
+let apOpen = -1;
+function renderApprovals(){
+  const bar=document.getElementById('apBar');
+  const items=queueItems();
+  bar.classList.toggle('has', items.length>0);
+  bar.innerHTML='<span class="ap-title">'+(items.length ? '⏳ APPROVAL QUEUE — '+items.length+'件' : '✓ APPROVAL QUEUE — 0件')+'</span>'
+    + items.map((it,i)=>`<button class="ap-chip" data-i="${i}">${it.label} →</button>`).join('');
+  if (apOpen>=0 && !items[apOpen]) closeApPanel();
+}
+function openApPanel(i){
+  const it=queueItems()[i]; if (!it) return;
+  apOpen=i;
+  const p=document.getElementById('apPanel');
+  p.innerHTML=`<button class="ap-close" aria-label="閉じる">×</button>
+    <div class="k">${it.title}</div><h4>${it.kind==='perm'?it.ref.task:it.ref.n}</h4>
+    <div class="row"><b>申請者</b><span>${it.from}</span></div>
+    <div class="row"><b>内容</b><span>${it.body}</span></div>
+    <div class="ap-actions"><button class="ap-btn ok">✓ 承認</button><button class="ap-btn ng">差し戻し</button></div>`;
+  p.classList.add('open');
+}
+function closeApPanel(){ apOpen=-1; document.getElementById('apPanel').classList.remove('open'); }
+function decide(ok){
+  const it=queueItems()[apOpen]; if (!it) return closeApPanel();
+  if (it.kind==='g1'){
+    if (ok){ it.ref.gate=null; it.ref.pos=2; pushEv('あなた','✔ Go承認: '+it.ref.n); }
+    else { it.ref.gate=null; it.ref.pos=1; pushEv('あなた','↩ 差し戻し（戦略再検討）: '+it.ref.n); }
+  } else if (it.kind==='g2'){
+    if (ok){ pushEv('あなた','🚀 リリース承認: '+it.ref.n); it.ref.n=POOL[poolIdx++%POOL.length]; it.ref.pos=0; it.ref.gate=null; }
+    else { it.ref.gate=null; it.ref.pos=3; pushEv('あなた','↩ 差し戻し（テストへ）: '+it.ref.n); }
+  } else {
+    if (ok){ it.ref.st='work'; it.ref.waitT=0; pushEv('あなた','✔ 実行承認 → '+it.ref.name+' 再開'); }
+    else { it.ref.st='idle'; it.ref.waitT=0; pushEv('あなた','↩ 却下 → '+it.ref.name+' 待機へ'); }
+  }
+  closeApPanel(); renderAll();
+}
+document.getElementById('apBar').addEventListener('click', e=>{
+  const c=e.target.closest('.ap-chip'); if (c) openApPanel(+c.dataset.i);
+});
+document.getElementById('apPanel').addEventListener('click', e=>{
+  if (e.target.closest('.ap-close')) return closeApPanel();
+  if (e.target.closest('.ap-btn.ok')) return decide(true);
+  if (e.target.closest('.ap-btn.ng')) return decide(false);
+});
+
+// ================= command center =================
+function agentCard(a){
+  const cls = a.st==='wait' ? 'waiting' : busy(a) ? 'working' : (a.dept==='invest'&&a.st==='idle' ? 'dim' : '');
+  return `<div class="card ${cls}" data-node="${a.id}">
+    <div class="card-top"><div class="avatar" style="background:${a.color}">${a.name[0]}</div>
+      <span class="card-name">${a.name}</span>
+      <span class="stt s-${a.st}"><span class="d"></span>${ST_LBL[a.st]}</span></div>
+    <div class="card-role">${a.role}</div>
+    <div class="card-task">${a.st==='idle' ? '<span style="color:var(--text-quaternary)">—</span>' : a.task}</div>
+    <div class="card-metrics"><span>✓ ${a.done}</span><span>${Math.round(a.tok/1000)}k tok</span></div>
+  </div>`;
+}
+function renderCmd(){
+  document.getElementById('gridHq').innerHTML=state.agents.filter(a=>a.dept==='hq').map(agentCard).join('');
+  document.getElementById('gridProd').innerHTML=state.agents.filter(a=>a.dept==='product').map(agentCard).join('');
+  document.getElementById('gridInv').innerHTML=state.agents.filter(a=>a.dept==='invest').map(agentCard).join('');
+  document.getElementById('zsHq').textContent=zoneStats('hq');
+  document.getElementById('zsProd').textContent=zoneStats('product');
+  document.getElementById('zsInv').textContent=zoneStats('invest');
+  const waits=state.agents.filter(a=>a.st==='wait');
+  const held=pipeTasks.filter(t=>t.gate);
+  document.getElementById('meZone').classList.toggle('hot', waits.length+held.length>0);
+  document.getElementById('meQueue').innerHTML=(waits.length+held.length)
+    ? `<span class="q-item"><span class="q-dot"></span>承認 ${waits.length+held.length} 件 — 上部の承認キューから処理</span>`
+    : '<span class="q-empty">queue empty — all agents autonomous</span>';
+  requestAnimationFrame(drawCmdLines);
+}
+const lineCache = new Map();
+function drawCmdLines(){
+  const scene=document.querySelector('.cmd-scene'), svg=document.getElementById('cmdFlow');
+  const sRect=scene.getBoundingClientRect();
+  svg.setAttribute('viewBox','0 0 '+sRect.width+' '+sRect.height);
+  const anchor=(el,side)=>{ const r=el.getBoundingClientRect();
+    return { x:r.left+r.width/2-sRect.left, y:(side==='top'?r.top:r.bottom)-sRect.top }; };
+  const q=id=>scene.querySelector(`[data-node="${id}"]`);
+  const me=q('me'), yuki=q('yuki');
+  if (!me||!yuki) return;
+  function link(key,fromEl,toEl,cls,zvar){
+    let el=lineCache.get(key);
+    if (!el){ el=document.createElementNS('http://www.w3.org/2000/svg','path'); svg.appendChild(el); lineCache.set(key,el); }
+    const f=anchor(fromEl,'bottom'), t=anchor(toEl,'top');
+    const my=(f.y+t.y)/2;
+    el.setAttribute('d',`M ${f.x} ${f.y} C ${f.x} ${my}, ${t.x} ${my}, ${t.x} ${t.y}`);
+    el.setAttribute('class','flow-line '+cls);
+    if (zvar) el.style.setProperty('--zlc','var(--'+zvar+')'); else el.style.removeProperty('--zlc');
+  }
+  for (const id of ['yuki','miyu','kai']){
+    const el=q(id); if (el) link('me-'+id, me, el, busy(byId[id])?'on':'', 'hq');
+  }
+  for (const a of state.agents){
+    if (a.dept==='hq') continue;
+    const el=q(a.id); if (!el) continue;
+    if (a.st==='wait') link('up-'+a.id, el, me, 'up');
+    else link('dn-'+a.id, yuki, el, busy(a)?'on':'', a.dept==='product'?'prod':'inv');
+    if (a.st!=='wait' && lineCache.has('up-'+a.id)){ lineCache.get('up-'+a.id).remove(); lineCache.delete('up-'+a.id); }
+    if (a.st==='wait' && lineCache.has('dn-'+a.id)){ lineCache.get('dn-'+a.id).remove(); lineCache.delete('dn-'+a.id); }
+  }
+}
+
+// ================= org map (sharp DPR canvas) =================
+const scv = document.getElementById('spaceCanvas'), sxc = scv.getContext('2d');
+const SPACE_W = 940, SPACE_H = 620;
+let spaceScale = 1;
+function fitSpace(){
+  const w = scv.clientWidth || 940, dpr = window.devicePixelRatio || 1;
+  scv.width = Math.round(w * dpr);
+  scv.height = Math.round(w * dpr * SPACE_H / SPACE_W);
+  scv.style.height = 'auto';
+  spaceScale = scv.width / SPACE_W;
+}
+window.addEventListener('resize', fitSpace);
+const DEPT_HUE = { hq: '#a78bfa', product: '#60a5fa', invest: '#2dd4bf' };
+const SCX = 470, SCY = 312, SECT_R = 286;
+const D2R = Math.PI / 180;
+const SECTORS = [
+  { key:'product', label:'プロダクト部門', a0:-160, a1:-80, hue:'#60a5fa' },
+  { key:'hq',      label:'本社',           a0:-80,  a1:-20, hue:'#a78bfa' },
+  { key:'invest',  label:'投資部門',       a0:-20,  a1:40,  hue:'#2dd4bf' },
+  { key:'game',    label:'ゲーム部門',     a0:40,   a1:100, hue:'#5A6478', ghost:true },
+  { key:'video',   label:'動画部門',       a0:100,  a1:160, hue:'#5A6478', ghost:true },
+  { key:'plus',    label:'関心ごとで増える ＋', a0:160, a1:200, hue:'#5A6478', ghost:true, empty:true },
+];
+const POLAR = {
+  yuki:[-62,115], kai:[-33,192], miyu:[-72,208],
+  alex:[-147,150], riku:[-124,202], sora:[-100,150], ren:[-95,220],
+  mina:[-84,258], tomo:[-152,240], hana:[-113,262],
+  tick:[8,175],
+};
+const NP = { me:[SCX, SCY] };
+for (const id in POLAR){
+  const [ad, r] = POLAR[id];
+  NP[id] = [SCX + Math.cos(ad*D2R)*r, SCY + Math.sin(ad*D2R)*r];
+}
+const GHOSTS = [
+  { x: SCX + Math.cos(70*D2R)*195, y: SCY + Math.sin(70*D2R)*195, label:'ゲーム — 未開設' },
+  { x: SCX + Math.cos(130*D2R)*195, y: SCY + Math.sin(130*D2R)*195, label:'動画 — 未開設' },
+];
+const COLLABS = [
+  ['alex','riku'], ['riku','sora'], ['riku','tomo'], ['alex','mina'],
+  ['sora','hana'], ['ren','miyu'], ['kai','tomo'], ['yuki','alex'], ['yuki','ren'],
+];
+const STARS = Array.from({length:170},(_,i)=>({x:(i*137.5)%SPACE_W, y:(i*89.7)%SPACE_H, r:0.4+(i%3)*0.45, p:i*1.37}));
+let sfr = 0;
+function nodeGlow(x, y, r, color, alpha){
+  const g = sxc.createRadialGradient(x,y,0,x,y,r);
+  g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)');
+  sxc.globalAlpha = alpha; sxc.fillStyle = g;
+  sxc.beginPath(); sxc.arc(x,y,r,0,6.29); sxc.fill(); sxc.globalAlpha = 1;
+}
+function drawSpace(){
+  sfr++;
+  sxc.setTransform(spaceScale, 0, 0, spaceScale, 0, 0);
+  const g = sxc.createRadialGradient(SPACE_W/2,SPACE_H/2,0,SPACE_W/2,SPACE_H/2,SPACE_W*0.62);
+  g.addColorStop(0,'#0B101E'); g.addColorStop(0.55,'#070A13'); g.addColorStop(1,'#04060C');
+  sxc.fillStyle=g; sxc.fillRect(0,0,SPACE_W,SPACE_H);
+  for (const s of SECTORS){
+    if (!s.ghost){
+      sxc.fillStyle = s.hue + '0A';
+      sxc.beginPath(); sxc.moveTo(SCX,SCY);
+      sxc.arc(SCX,SCY,SECT_R,s.a0*D2R,s.a1*D2R); sxc.closePath(); sxc.fill();
+    }
+    sxc.setLineDash([2,7]); sxc.strokeStyle='rgba(190,205,235,0.28)'; sxc.lineWidth=1;
+    sxc.beginPath();
+    sxc.moveTo(SCX+Math.cos(s.a0*D2R)*46, SCY+Math.sin(s.a0*D2R)*46);
+    sxc.lineTo(SCX+Math.cos(s.a0*D2R)*SECT_R, SCY+Math.sin(s.a0*D2R)*SECT_R);
+    sxc.stroke(); sxc.setLineDash([]);
+    const mid=(s.a0+s.a1)/2*D2R, lr=SECT_R-22;
+    sxc.font='600 10.5px ui-monospace,monospace'; sxc.textAlign='center';
+    sxc.fillStyle = s.ghost ? 'rgba(180,192,214,0.32)' : s.hue+'CC';
+    sxc.fillText(s.label, SCX+Math.cos(mid)*lr, SCY+Math.sin(mid)*lr);
+    if (s.empty){
+      sxc.fillStyle='rgba(180,192,214,0.2)'; sxc.font='16px ui-monospace,monospace';
+      sxc.fillText('＋', SCX+Math.cos(mid)*(lr-70), SCY+Math.sin(mid)*(lr-70));
+    }
+  }
+  sxc.textAlign='left';
+  for (const st of STARS){
+    sxc.globalAlpha = 0.16 + 0.4*(0.5+0.5*Math.sin(reduced ? st.p : sfr/44 + st.p));
+    sxc.fillStyle = '#C4D0E8';
+    sxc.beginPath(); sxc.arc(st.x, st.y, st.r, 0, 6.29); sxc.fill();
+  }
+  sxc.globalAlpha = 1;
+  const me = NP.me;
+  function edge(from, to, active, hue){
+    sxc.strokeStyle = active ? (hue||'#9FB6FF')+'66' : 'rgba(190,205,235,0.08)';
+    sxc.lineWidth = active ? 1.5 : 1;
+    sxc.beginPath(); sxc.moveTo(from[0],from[1]); sxc.lineTo(to[0],to[1]); sxc.stroke();
+    if (active){
+      for (let k=0;k<2;k++){
+        const t = ((reduced?0.5:sfr*0.011)+k*0.5)%1;
+        const tt = k===0 ? t : 1-t;
+        sxc.fillStyle = hue||'#9FB6FF'; sxc.globalAlpha = 0.9*(1-Math.abs(tt-0.5)*0.6);
+        sxc.beginPath();
+        sxc.arc(from[0]+(to[0]-from[0])*tt, from[1]+(to[1]-from[1])*tt, 2, 0, 6.29); sxc.fill();
+      }
+      sxc.globalAlpha = 1;
+    }
+  }
+  for (const [i1,i2] of COLLABS){
+    const a1=byId[i1], a2=byId[i2];
+    edge(NP[i1], NP[i2], busy(a1)&&busy(a2));
+  }
+  edge(me, NP.yuki, state.agents.some(a=>busy(a)), DEPT_HUE.hq);
+  edge(NP.yuki, NP.tick, busy(byId.tick), DEPT_HUE.invest);
+  for (const a of state.agents){
+    const p = NP[a.id]; if (!p || a.st!=='wait') continue;
+    sxc.setLineDash([4,4]);
+    sxc.strokeStyle='rgba(251,191,36,0.5)'; sxc.lineWidth=1.4;
+    sxc.beginPath(); sxc.moveTo(p[0],p[1]); sxc.lineTo(me[0],me[1]); sxc.stroke();
+    sxc.setLineDash([]);
+    for (let k=0;k<2;k++){
+      const t=((reduced?0.5:sfr*0.013)+k*0.5)%1;
+      sxc.fillStyle='#fbbf24';
+      sxc.beginPath(); sxc.arc(p[0]+(me[0]-p[0])*t, p[1]+(me[1]-p[1])*t, 2.2, 0, 6.29); sxc.fill();
+    }
+  }
+  const mePul = 0.85 + (reduced?0:0.15*Math.sin(sfr/26));
+  nodeGlow(me[0], me[1], 58, '#ffe9b8', 0.35*mePul);
+  nodeGlow(me[0], me[1], 26, '#fff3d6', 0.55);
+  sxc.fillStyle='#FFF6DF'; sxc.beginPath(); sxc.arc(me[0],me[1],7,0,6.29); sxc.fill();
+  sxc.textAlign='center';
+  sxc.fillStyle='rgba(255,240,210,0.95)'; sxc.font='600 11px "Hiragino Sans",sans-serif';
+  sxc.fillText('あなた', me[0], me[1]+44);
+  sxc.fillStyle='rgba(210,200,170,0.55)'; sxc.font='8.5px ui-monospace,monospace';
+  sxc.fillText('CEO / GATE', me[0], me[1]+56);
+  for (const a of state.agents){
+    const p=NP[a.id]; if (!p) continue;
+    const isBusy=busy(a);
+    const ph = (a.id.charCodeAt(0)*7)%20;
+    const pulse = reduced ? 1 : 0.8 + 0.2*Math.sin(sfr/24 + ph);
+    if (isBusy){ nodeGlow(p[0],p[1],30,a.color,0.5*pulse); nodeGlow(p[0],p[1],13,'#ffffff',0.25); }
+    else if (a.st==='wait'){ nodeGlow(p[0],p[1],26,'#fbbf24',0.5*pulse); }
+    else nodeGlow(p[0],p[1],14,a.color,0.16);
+    sxc.fillStyle = isBusy ? '#FFFFFF' : a.st==='wait' ? '#FBDF9E' : a.color;
+    sxc.globalAlpha = (a.st==='idle'||a.st==='done') ? 0.55 : 1;
+    sxc.beginPath(); sxc.arc(p[0],p[1], isBusy?4.6:3.6, 0, 6.29); sxc.fill();
+    sxc.globalAlpha = 1;
+    if (a.st==='wait'){
+      sxc.fillStyle='#fbbf24'; sxc.font='bold 11px ui-monospace,monospace';
+      sxc.fillText('!', p[0], p[1]-14);
+    }
+    sxc.fillStyle = isBusy ? '#E9EEF9' : a.st==='wait' ? '#FBDF9E' : 'rgba(185,196,218,0.65)';
+    sxc.font='600 10px "Hiragino Sans",sans-serif';
+    sxc.fillText(a.name, p[0], p[1]+19);
+    sxc.fillStyle = 'rgba(160,172,196,0.62)';
+    sxc.font='8.5px "Hiragino Sans",sans-serif';
+    sxc.fillText(a.role.split(' /')[0], p[0], p[1]+31);
+  }
+  for (const gh of GHOSTS){
+    sxc.setLineDash([2,3]); sxc.strokeStyle='rgba(190,205,235,0.3)'; sxc.lineWidth=1;
+    sxc.beginPath(); sxc.arc(gh.x,gh.y,5,0,6.29); sxc.stroke(); sxc.setLineDash([]);
+    sxc.fillStyle='rgba(185,196,218,0.35)'; sxc.font='9px ui-monospace,monospace';
+    sxc.fillText(gh.label, gh.x, gh.y+18);
+  }
+  sxc.textAlign='left';
+  requestAnimationFrame(drawSpace);
+}
+function updateSpaceStats(){
+  document.getElementById('ss-hq').textContent = zoneStats('hq');
+  document.getElementById('ss-prod').textContent = zoneStats('product');
+  document.getElementById('ss-inv').textContent = zoneStats('invest');
+}
+
+// ================= sprint loop (circular) =================
+const PSTOPS = [
+  { t:'stage', i:0, label:'リサーチ' },
+  { t:'stage', i:1, label:'戦略・戦術' },
+  { t:'gate', g:'g1', label:'Go/No-Go' },
+  { t:'stage', i:2, label:'開発' },
+  { t:'stage', i:3, label:'テスト' },
+  { t:'stage', i:4, label:'評価' },
+  { t:'gate', g:'g2', label:'リリース' },
+];
+const PCX=330, PCY=268, PR=190;
+function ppol(k, r){
+  const a=(-90 + k*(360/PSTOPS.length))*Math.PI/180;
+  return [PCX+Math.cos(a)*r, PCY+Math.sin(a)*r];
+}
+function stopIndexFor(t){
+  if (t.gate==='g1') return 2;
+  if (t.gate==='g2') return 6;
+  return t.pos<2 ? t.pos : t.pos+1;
+}
+function renderPipe(){
+  const held=pipeTasks.filter(t=>t.gate).length;
+  let s='';
+  for (let k=0;k<PSTOPS.length;k++){
+    const n=(k+1)%PSTOPS.length;
+    const [x1,y1]=ppol(k,PR), [x2,y2]=ppol(n,PR);
+    const stop=PSTOPS[n];
+    const hot = stop.t==='stage' && STAGE_CREW[stop.i].some(id=>busy(byId[id]));
+    s+=`<path d="M ${x1} ${y1} A ${PR} ${PR} 0 0 1 ${x2} ${y2}" fill="none" stroke="${hot?'var(--prod)':'var(--border)'}" stroke-width="${hot?2.5:1.2}" ${hot?'stroke-dasharray="6 5" class="arcflow"':''} opacity="${hot?0.9:0.7}"/>`;
+  }
+  for (let k=0;k<PSTOPS.length;k++){
+    const st=PSTOPS[k]; const [x,y]=ppol(k,PR); const [lx,ly]=ppol(k,PR+40);
+    if (st.t==='gate'){
+      const h=pipeTasks.filter(t=>t.gate===st.g).length;
+      s+=`<rect x="${x-11}" y="${y-11}" width="22" height="22" rx="6" transform="rotate(45 ${x} ${y})" fill="var(--surface-raised)" stroke="${h?'var(--warning)':'var(--border)'}" stroke-width="${h?2:1.2}"/>`;
+      s+=`<circle cx="${x}" cy="${y}" r="4" fill="${h?'var(--warning)':'var(--text-quaternary)'}" ${h?'class="blinklamp"':''}/>`;
+      s+=`<text x="${lx}" y="${ly}" text-anchor="middle" font-size="11" font-weight="600" fill="${h?'var(--warning)':'var(--text-secondary)'}">${st.label}</text>`;
+      s+=`<text x="${lx}" y="${ly+13}" text-anchor="middle" font-size="9" fill="var(--text-tertiary)" style="font-family:var(--font-mono)">HUMAN${h?' · '+h+'件':''}</text>`;
+    } else {
+      const crew=STAGE_CREW[st.i].map(id=>byId[id]);
+      const hot=crew.some(busy);
+      s+=`<circle cx="${x}" cy="${y}" r="15" fill="var(--surface-raised)" stroke="${hot?'var(--prod)':'var(--border)'}" stroke-width="${hot?2.2:1.2}"/>`;
+      s+=`<text x="${x}" y="${y+4}" text-anchor="middle" font-size="11" font-weight="700" fill="${hot?'var(--prod)':'var(--text-tertiary)'}" style="font-family:var(--font-mono)">${st.i+1}</text>`;
+      s+=`<text x="${lx}" y="${ly}" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--text-primary)">${st.label}</text>`;
+      s+=`<text x="${lx}" y="${ly+13}" text-anchor="middle" font-size="9" fill="var(--text-tertiary)">${crew.map(a=>a.name).join('·')}</text>`;
+    }
+  }
+  const byStop={};
+  for (const t of pipeTasks){ const k=stopIndexFor(t); (byStop[k]=byStop[k]||[]).push(t); }
+  for (const k in byStop){
+    byStop[k].forEach((t,j)=>{
+      const [x,y]=ppol(+k, PR-56-j*27);
+      const w=Math.min(150, t.n.length*11+16);
+      s+=`<rect x="${x-w/2}" y="${y-11}" width="${w}" height="22" rx="11" fill="var(--surface)" stroke="${t.gate?'var(--warning)':'var(--border)'}" stroke-width="${t.gate?1.6:1}"/>`;
+      s+=`<text x="${x}" y="${y+4}" text-anchor="middle" font-size="10.5" fill="var(--text-primary)">${t.n}</text>`;
+    });
+  }
+  s+=`<text x="${PCX}" y="${PCY-8}" text-anchor="middle" font-size="10" letter-spacing="3" fill="var(--text-tertiary)" style="font-family:var(--font-mono)">SPRINT LOOP</text>`;
+  s+=`<text x="${PCX}" y="${PCY+14}" text-anchor="middle" font-size="14" font-weight="650" fill="var(--text-primary)">${pipeTasks.length} tasks · ゲート待ち ${held}</text>`;
+  document.getElementById('pipeSvg').innerHTML=s;
+}
+
+// ================= pixel office =================
+const pcv = document.getElementById('pixCanvas'), pctx = pcv.getContext('2d');
+const S = 2;
+const DESKS = {
+  yuki:[55,52], miyu:[55,118], kai:[55,182],
+  alex:[135,48], riku:[205,48], sora:[275,48], mina:[135,120], tomo:[205,120], hana:[275,120], ren:[205,185],
+  tick:[352,95],
+};
+function px(x,y,w,h,c){ pctx.fillStyle=c; pctx.fillRect(x*S,y*S,w*S,h*S); }
+let frame = 0;
+function drawChar(a, dx, cy, on){
+  const f = a.feat || {};
+  if (f.robot){
+    px(dx-11,cy-1,12,10,'#9aa3b0');
+    px(dx-10,cy,10,8,'#b8c0cc');
+    px(dx-8,cy+3,2,2, on ? '#7fd0e8' : '#3a4a55');
+    px(dx-4,cy+3,2,2, on ? '#7fd0e8' : '#3a4a55');
+    px(dx-6,cy-5,1,4,'#c0c8d0');
+    px(dx-7,cy-7,3,2, (on && frame%20<10) ? '#e06060' : '#8a4040');
+    px(dx-11,cy+9,12,10,a.body);
+    px(dx-9,cy+11,8,4,'#10161e');
+    if (on){ const sft=Math.floor(frame/8)%4;
+      px(dx-8+sft,cy+12,1,1,'#50e080'); px(dx-8+((sft+2)%4),cy+13,1,1,'#e05050'); }
+    return;
+  }
+  if (f.hair==='long'){ px(dx-13,cy,3,16,a.hair); px(dx,cy,3,16,a.hair); }
+  if (f.hair==='ponytail'){ px(dx+1,cy-2,3,4,a.hair); px(dx+2,cy+2,3,10,a.hair); }
+  if (f.hoodie){ px(dx-12,cy+7,14,4,'#565e6c'); }
+  px(dx-10,cy,10,9,'#f2d0b0');
+  switch (f.hair){
+    case 'fluffy':
+      px(dx-11,cy-3,12,6,a.hair);
+      px(dx-12,cy-4,3,3,a.hair); px(dx-7,cy-5,4,3,a.hair); px(dx-2,cy-4,3,3,a.hair);
+      px(dx-12,cy+3,2,4,a.hair); px(dx,cy+3,2,4,a.hair);
+      break;
+    case 'part': px(dx-11,cy-3,12,4,a.hair); px(dx-11,cy+1,7,2,a.hair); break;
+    case 'messy':
+      px(dx-11,cy-3,12,4,a.hair);
+      px(dx-12,cy-5,3,3,a.hair); px(dx-5,cy-6,3,3,a.hair); px(dx,cy-4,3,2,a.hair);
+      break;
+    case 'bun': px(dx-11,cy-3,12,5,a.hair); px(dx-8,cy-7,5,4,a.hair); break;
+    case 'bob': px(dx-11,cy-3,12,6,a.hair); px(dx-12,cy+2,2,6,a.hair); px(dx,cy+2,2,6,a.hair); break;
+    default: px(dx-11,cy-3,12,4,a.hair);
+  }
+  if (f.glasses==='clear'){ px(dx-9,cy+3,3,2,'#2a2f3a'); px(dx-4,cy+3,3,2,'#2a2f3a'); px(dx-6,cy+3,2,1,'#2a2f3a'); }
+  if (f.glasses==='sun'){ px(dx-9,cy+3,8,2,'#14161c'); }
+  if (f.head==='headset'){ px(dx-12,cy+2,2,4,'#3a4048'); px(dx-11,cy-5,12,2,'#3a4048'); px(dx-12,cy+6,3,1,'#3a4048'); }
+  if (f.head==='ribbon'){ px(dx-13,cy-4,2,2,'#e87aa0'); px(dx-11,cy-5,2,2,'#e87aa0'); }
+  if (f.head==='cap'){ px(dx-11,cy-6,12,4,f.headC||'#5a6a4a'); px(dx+1,cy-4,4,2,f.headC||'#5a6a4a'); }
+  if (f.earring){ px(dx-11,cy+7,1,2,'#e8c060'); }
+  if (f.earphone){ px(dx-11,cy+4,2,2,'#20242c'); }
+  px(dx-11,cy+9,12,10,a.body);
+  if (f.vest){ px(dx-8,cy+9,6,10,f.vestC||'#3a4250'); }
+  if (f.armband){ px(dx-11,cy+11,2,3,f.armband); }
+  if (f.toolbelt){ px(dx-11,cy+16,12,2,'#4a3a2a'); px(dx-6,cy+16,2,2,'#c0a040'); }
+  if (f.badge){ px(dx-10,cy+10,2,2,'#f0e0a0'); }
+}
+function drawProp(a, dx, dy, on){
+  const p = (a.feat||{}).prop;
+  switch (p){
+    case 'clipboard': px(dx+22,dy+4,7,9,'#e8e4d8'); px(dx+24,dy+3,3,2,'#8a9098');
+      if (on && frame%36<18) px(dx+24,dy+7,3,1,'#c04040'); break;
+    case 'mug': px(dx+23,dy+8,5,5,'#c06a4a'); px(dx+28,dy+9,2,2,'#c06a4a');
+      if (frame%50<25) px(dx+24,dy+3,1,3,'rgba(240,240,240,0.5)');
+      else px(dx+26,dy+4,1,3,'rgba(240,240,240,0.35)'); break;
+    case 'magnifier': px(dx+23,dy+4,5,5,'#9ab0c8'); px(dx+24,dy+5,3,3,'#cfe0ee'); px(dx+27,dy+9,2,3,'#5a4a3a'); break;
+    case 'blocks': px(dx+22,dy+9,4,4,'#c06a4a'); px(dx+27,dy+9,4,4,'#4a8ac0');
+      px(dx+24,dy+5,4,4, (on && frame%44<22) ? '#c0a04a' : '#8a6a9a'); break;
+    case 'can': px(dx+24,dy+5,4,8,'#38b8c8'); px(dx+24,dy+5,4,2,'#d8d8d8'); break;
+    case 'checklist': px(dx+22,dy+4,7,9,'#f0ede2'); px(dx+23,dy+6,2,1,'#c04040');
+      if (on && frame%40<20) px(dx+23,dy+9,2,1,'#c04040'); break;
+    case 'sketchbook': px(dx+22,dy+6,8,7,'#d8c8a8'); px(dx+23,dy+8,6,1,'#8a6a4a');
+      if (on) px(dx+23+Math.floor(frame/12)%5, dy+10,1,1,'#5a4a8a'); break;
+    case 'rack': px(dx+23,dy+3,7,10,'#2a2f38');
+      px(dx+24,dy+5,1,1,(on&&frame%30<15)?'#50e080':'#204030');
+      px(dx+24,dy+8,1,1,(on&&frame%30>=15)?'#50e080':'#204030');
+      px(dx+27,dy+5,1,1,'#4a90c0'); break;
+    case 'books': px(dx+22,dy+9,8,3,'#8a4a4a'); px(dx+23,dy+6,7,3,'#4a6a8a'); px(dx+28,dy+5,1,4,'#e0c060'); break;
+    case 'graph': px(dx+22,dy+3,9,9,'#1e242e');
+      { const h1=3+(Math.floor(frame/25)%3), h2=5-(Math.floor(frame/25)%3);
+        px(dx+23,dy+11-h1,2,h1,'#50c080'); px(dx+26,dy+11-h2,2,h2,'#50c080'); px(dx+29,dy+7,1,4,'#c05050'); }
+      break;
+    case 'tickermon': px(dx+22,dy+3,10,9,'#141a24');
+      { const s2=Math.floor(frame/10)%5;
+        px(dx+23+s2,dy+5,1,1,'#50e080'); px(dx+23+((s2+2)%5),dy+8,2,1,'#e05050'); }
+      break;
+  }
+}
+function drawSmoke(x, y){
+  px(x, y, 3, 1, '#e8e8e0');
+  px(x+3, y, 1, 1, (frame%16<8) ? '#e06040' : '#8a4030');
+  const sy = y - 2 - (Math.floor(frame/9) % 6);
+  px(x+4, sy, 1, 1, 'rgba(190,190,190,0.55)');
+  px(x+5, sy-2, 1, 1, 'rgba(190,190,190,0.35)');
+}
+function drawCat(a, dx, cy){
+  const tw = (frame%40<20) ? 0 : 1;
+  px(dx+2, cy+13, 5+tw, 2, '#c0a050');
+  px(dx-10, cy+8, 12, 10, '#d8b860');
+  px(dx-8, cy+11, 8, 1, '#b89a48'); px(dx-8, cy+14, 8, 1, '#b89a48');
+  px(dx-9, cy, 10, 8, '#e0c268');
+  px(dx-9, cy-3, 2, 3, '#e0c268'); px(dx-3, cy-3, 2, 3, '#e0c268');
+  px(dx-9, cy-2, 1, 2, '#c07a8a'); px(dx-3, cy-2, 1, 2, '#c07a8a');
+  px(dx-7, cy+3, 2, 1, '#2a2620'); px(dx-3, cy+3, 2, 1, '#2a2620');
+  px(dx-5, cy+5, 1, 1, '#8a6a50');
+  drawSmoke(dx-1, cy+6);
+  px(dx-8, cy+8, 8, 1, a.body);
+}
+const FURN = [
+  { n:'観葉植物', d(){ px(14,218,8,12,'#3a6a34'); px(12,228,12,5,'#6a4a2a'); } },
+  { n:'コーヒーマシン', d(){ px(70,218,12,14,'#4a4f58'); px(73,221,6,4,'#20242c'); px(74,229,4,2,'#c06a4a'); } },
+  { n:'トロフィー', d(){ px(129,224,2,6,'#a08030'); px(126,220,8,5,'#e0c050'); px(127,230,6,2,'#6a5a30'); } },
+  { n:'STONEFISH水槽', d(){ px(250,219,22,13,'#1a3a4a'); px(251,220,20,11,'#2a5a70');
+      const fx = 251 + (Math.floor(frame/16) % 16); px(fx,225,3,2,'#e8a040'); } },
+  { n:'アートポスター', d(){ px(240,18,14,10,'#e8e0c8'); px(242,20,10,2,'#c05050'); px(242,24,10,1,'#4a6a8a'); } },
+  { n:'社旗', d(){ px(300,214,1,18,'#8a8f98'); const fl=(frame%36<18)?0:1; px(301,214,9+fl,6,'#4a8ac0'); } },
+];
+let shownUnlock = 0, furnToast = null;
+function drawOffice(){
+  frame++;
+  pctx.clearRect(0,0,pcv.width,pcv.height);
+  px(0,0,420,235,'#2a2118');
+  for(let i=0;i<420;i+=20) for(let j=0;j<235;j+=20) if((i+j)%40===0) px(i,j,20,20,'#2e251b');
+  px(118,0,3,235,'#171310');
+  px(318,0,3,235,'#171310');
+  pctx.fillStyle='#8a7a5a'; pctx.font='bold 15px ui-monospace,monospace';
+  pctx.fillText('本社', 28*S, 13*S);
+  pctx.fillText('プロダクト部門', 160*S, 13*S);
+  pctx.fillStyle='#5a5a6a';
+  pctx.fillText('投資部門', 340*S, 13*S);
+  px(321,0,99,235,'rgba(8,8,16,0.35)');
+  px(108,205,8,12,'#3a5a30'); px(106,215,12,5,'#6a4a2a');
+  px(308,18,8,12,'#3a5a30'); px(306,28,12,5,'#6a4a2a');
+  const unlocked = Math.min(FURN.length, Math.floor(state.doneTotal / 5));
+  if (unlocked > shownUnlock){
+    shownUnlock = unlocked;
+    furnToast = { text: '📦 ' + FURN[unlocked-1].n + ' がオフィスに追加されました', until: frame + 260 };
+    pushEv('オフィス', '📦 備品が増えた: ' + FURN[unlocked-1].n);
+  }
+  for (let fi = 0; fi < shownUnlock; fi++) FURN[fi].d();
+  const nWait = state.agents.filter(x=>x.st==='wait').length;
+  const standIdx = Math.floor(frame/36) % state.agents.length;
+  state.agents.forEach((a, ai) => {
+    const [dx,dy] = DESKS[a.id];
+    px(dx-16,dy+16,52,22,'#5a4630'); px(dx-16,dy+14,52,4,'#6f5738');
+    const on = a.st==='work'||a.st==='think';
+    px(dx+4,dy+2,14,10, on ? '#7fd0e8' : '#20242c'); px(dx+9,dy+12,4,3,'#3a3a3a');
+    drawProp(a, dx, dy, on);
+    const bob = (!reduced && on && frame%24<12) ? -1 : 0;
+    const cy = dy+18+bob;
+    if (a.st==='wait' && (a.waitT||0) >= 6){
+      drawCat(a, dx, cy);
+    } else {
+      drawChar(a, dx, cy, on);
+      if (a.st==='wait' && (a.waitT||0) >= 3) drawSmoke(dx-1, cy+6);
+    }
+    pctx.font='bold 14px ui-monospace,monospace';
+    if (a.st==='wait'){ pctx.fillStyle = (frame%20<10)?'#E8B54A':'#8a6a20'; pctx.fillText('!', (dx-7)*S, (cy-8)*S); }
+    else if (a.st==='idle'||a.st==='done'){ pctx.fillStyle='#5a6375'; pctx.fillText('z', (dx-6)*S, (cy-8)*S); }
+    else if (a.st==='think'){ pctx.fillStyle='#9A8CF5'; pctx.fillText('…', (dx-9)*S, (cy-8)*S); }
+    pctx.fillStyle='#c8cdd8'; pctx.font='10px ui-monospace,monospace';
+    pctx.fillText(a.name, (dx-12)*S, (cy+28)*S);
+    let bub=null, bc='#f5f2e8', tc='#2a2620';
+    if (a.bub && tickN <= a.bubUntil) bub=a.bub;
+    else if (nWait>=2 && a.st!=='wait' && ai===standIdx){ bub='確認お願いします'; bc='#e8b54a'; tc='#3a2a10'; }
+    if (bub){
+      pctx.font='10px "Hiragino Sans",sans-serif';
+      const bw=bub.length*10+12, bx=(dx-5)*S-bw/2, by=(cy-19)*S;
+      pctx.fillStyle=bc; pctx.fillRect(bx,by,bw,15);
+      pctx.fillRect((dx-8)*S,by+15,4,3);
+      pctx.fillStyle=tc; pctx.textAlign='center';
+      pctx.fillText(bub,(dx-5)*S,by+11); pctx.textAlign='left';
+    }
+  });
+  if (nWait>=2){
+    pctx.fillStyle='rgba(232,181,74,0.95)'; pctx.font='bold 13px "Hiragino Sans",sans-serif'; pctx.textAlign='center';
+    pctx.fillText('⚠ 承認 '+nWait+'件 — 全員があなたの判断を待っています', pcv.width/2, pcv.height-10);
+    pctx.textAlign='left';
+  }
+  if (furnToast && frame < furnToast.until){
+    pctx.fillStyle='rgba(160,220,170,0.95)'; pctx.font='bold 12px "Hiragino Sans",sans-serif'; pctx.textAlign='center';
+    pctx.fillText(furnToast.text, pcv.width/2, 38);
+    pctx.textAlign='left';
+  }
+  pctx.fillStyle='#8a93a5'; pctx.font='bold 12px ui-monospace,monospace';
+  pctx.fillText(fmtClock() + '  STONEFISH Inc.', 300*S, 226*S);
+  requestAnimationFrame(drawOffice);
+}
+
+// ================= boot =================
+function renderAll(){ renderTop(); renderApprovals(); renderCmd(); updateSpaceStats(); renderPipe(); }
+window.addEventListener('resize', ()=>requestAnimationFrame(drawCmdLines));
+pushEv('Yuki','スプリント開始 — 本日の計画を配布');
+fitSpace();
+renderAll();
+setInterval(tick, 1800);
+requestAnimationFrame(drawSpace);
+requestAnimationFrame(drawOffice);
+})();
+</script>
