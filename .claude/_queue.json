@@ -295,7 +295,7 @@
     {
       "slug": "sprint24-retro",
       "title": "Sprint-24 レトロスペクティブ実施（みゆきち）",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "みゆきち",
       "complexity": "S",
       "risk_level": "low",
@@ -305,17 +305,23 @@
       ],
       "qa_mode": "—",
       "created_at": "2026-08-01T00:00:00+09:00",
-      "updated_at": "2026-08-01T00:00:00+09:00",
+      "updated_at": "2026-08-01T18:00:00+09:00",
       "notes": "sprint24-qa完了後、Soraの完了報告に@retroを含めて即起動（agent-crew-sprint-11-process-001準拠）。_lessons.json記録、pm-learned-rules.md更新（priority_score>=3のみ）、Issue化（issue_url重複チェック必須）。レトロ強制のStopフック化は別Issue起票を推奨事項として残す。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "Sprint-24レトロ完了。ルーブリック: 仕様明確度0.89/QA合格率1.0/ブロック率0.0 PASS、負荷分散2.22 FAIL（Fable先行完了4タスク集中）。lesson 7件記録、5件がゲート通過も gh issue create が auto mode 分類器にブロックされIssue化保留（docs/sprints/sprint-24-retro.mdのIssue起票推奨節に列挙）。pm-learned-rules.mdに5件反映。",
       "events": [
         {
           "ts": "2026-08-01T00:00:00+09:00",
           "agent": "Yuki",
           "action": "created",
           "msg": "Sprint-24 キュー登録"
+        },
+        {
+          "ts": "2026-08-01T18:00:00+09:00",
+          "agent": "みゆきち",
+          "action": "done",
+          "msg": "レトロ完了。docs/sprints/sprint-24-retro.md 作成、_lessons.jsonに7件記録、pm-learned-rules.mdに5件反映。"
         }
       ]
     }
