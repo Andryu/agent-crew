@@ -62,6 +62,8 @@ OPTIONS:
                         riku         Riku のみ
                         hooks        subagent_stop.sh
                         config       _queue.json + settings.json
+                        hq-agents    本社機能（Rin/みゆきち/Kai/Hana + docs/org/）
+                                     を symlink 配布（ADR-014 Phase2、既定で無効）
   --no-global         グローバルエージェントのインストールをスキップ
   --force             競合プロンプトをスキップして全て上書き
   --uninstall         インストール済みファイルを削除
@@ -137,6 +139,19 @@ TARGET_DIR="$(cd "$TARGET_DIR" 2>/dev/null && pwd)" || {
   exit $EXIT_ARG_ERROR
 }
 
+# TARGET_DIR が agent-crew リポジトリ自身（REPO_DIR）と同一または配下を
+# 指す場合は自己参照事故防止のため拒否する（TARGET_DIR 未指定時の既定値
+# "." がリポジトリ自身のカレントディレクトリに解決され、symlink/copy 処理が
+# リポジトリ自身のファイルを書き換えてしまう事故を防ぐ）
+case "$TARGET_DIR" in
+  "$REPO_DIR"|"$REPO_DIR"/*)
+    echo "エラー: TARGET_DIR が agent-crew リポジトリ自身と同一または配下を指しています: $TARGET_DIR" >&2
+    echo "        (REPO_DIR: $REPO_DIR)" >&2
+    echo "        インストール/配布先には別のプロジェクト・部門リポジトリを指定してください。" >&2
+    exit $EXIT_ARG_ERROR
+    ;;
+esac
+
 # ---------------------------------------------------------------------------
 # コンポーネント選択ヘルパー
 # ---------------------------------------------------------------------------
@@ -147,6 +162,10 @@ COMP_GLOBAL_SKILLS=1
 COMP_RIKU=1
 COMP_HOOKS=1
 COMP_CONFIG=1
+# hq-agents（本社機能配布, ADR-014 Phase2）は他コンポーネントと異なり既定で無効。
+# --only=hq-agents を明示指定した場合のみ有効になる（通常インストールの
+# 既存挙動を変えないため。部門テンプレート複製時に明示利用する想定）。
+COMP_HQ_AGENTS=0
 
 if [ -n "$OPT_ONLY" ]; then
   COMP_GLOBAL_AGENTS=0
@@ -154,6 +173,7 @@ if [ -n "$OPT_ONLY" ]; then
   COMP_RIKU=0
   COMP_HOOKS=0
   COMP_CONFIG=0
+  COMP_HQ_AGENTS=0
 
   # カンマ区切りを分割（bash 3.2 互換）
   IFS=',' read -r -a ONLY_LIST <<< "$OPT_ONLY"
@@ -181,9 +201,12 @@ if [ -n "$OPT_ONLY" ]; then
       global-hooks)
         OPT_GLOBAL_HOOKS=1
         ;;
+      hq-agents)
+        COMP_HQ_AGENTS=1
+        ;;
       *)
         echo "エラー: 不明なコンポーネント: $comp" >&2
-        echo "有効な値: agents, global-agents, skills, global-skills, riku, hooks, config, global-hooks" >&2
+        echo "有効な値: agents, global-agents, skills, global-skills, riku, hooks, config, global-hooks, hq-agents" >&2
         exit $EXIT_ARG_ERROR
         ;;
     esac
@@ -243,6 +266,36 @@ if [ $OPT_UNINSTALL -eq 1 ]; then
       done
     else
       echo "  [SKIP] $GLOBAL_SKILLS_DIR (存在しない)"
+    fi
+    echo ""
+  fi
+
+  if [ $COMP_HQ_AGENTS -eq 1 ]; then
+    echo "--- 本社機能 (hq-agents) 削除 ---"
+    for hq_agent in coo.md retro.md security.md doc-reviewer.md; do
+      f="$TARGET_DIR/.claude/agents/$hq_agent"
+      if [ -L "$f" ]; then
+        if [ $OPT_DRY_RUN -eq 1 ]; then
+          echo "  [DRY-RUN] 削除予定: $f"
+        else
+          rm "$f"
+          echo "  [REMOVED] $f"
+        fi
+      else
+        echo "  [SKIP]    $f (シンボリックリンクなし)"
+      fi
+    done
+
+    ORG_DST="$TARGET_DIR/docs/org"
+    if [ -L "$ORG_DST" ]; then
+      if [ $OPT_DRY_RUN -eq 1 ]; then
+        echo "  [DRY-RUN] 削除予定: $ORG_DST"
+      else
+        rm "$ORG_DST"
+        echo "  [REMOVED] $ORG_DST"
+      fi
+    else
+      echo "  [SKIP]    $ORG_DST (シンボリックリンクなし)"
     fi
     echo ""
   fi
@@ -431,6 +484,64 @@ symlink_skill() {
   fi
 }
 
+# 単一ファイルを symlink する（本社機能配布用、ADR-014 Phase2）
+# 引数: <src_file> <dst_file>
+symlink_file() {
+  local src="$1"
+  local dst="$2"
+
+  check_src "$src"
+
+  # dst が通常ファイル（symlinkでない）として既に存在する場合は
+  # 事故防止のためスキップする（既存の実ファイルを誤って symlink で
+  # 上書きしてしまう事故を避ける。symlink_dir と同様の保護方針）
+  if [ -f "$dst" ] && [ ! -L "$dst" ]; then
+    printf "  [SKIP]      %s (通常ファイルが既存のため保護)\n" "$dst"
+    return 0
+  fi
+
+  if [ $OPT_DRY_RUN -eq 1 ]; then
+    printf "  [SYMLINK]   %s\n" "$dst"
+    return 0
+  fi
+
+  ensure_dir "$(dirname "$dst")"
+  # 既存リンクを削除してから再作成
+  [ -L "$dst" ] && rm "$dst"
+  ln -sf "$src" "$dst"
+  printf "  [SYMLINK]   %s\n" "$dst"
+}
+
+# ディレクトリ全体を symlink する（組織文書 docs/org/ 配布用、ADR-014 Phase2）
+# 引数: <src_dir> <dst_dir>
+symlink_dir() {
+  local src="$1"
+  local dst="$2"
+
+  if [ ! -d "$src" ]; then
+    echo "エラー: ソースディレクトリが見つかりません: $src" >&2
+    exit $EXIT_SRC_MISSING
+  fi
+
+  # dst が通常ディレクトリ（symlinkでない）として既に存在する場合は
+  # 事故防止のためスキップする（中身を持つ実ディレクトリを誤って
+  # symlink に置き換えてしまう事故を避ける）
+  if [ -d "$dst" ] && [ ! -L "$dst" ]; then
+    printf "  [SKIP]      %s (通常ディレクトリが既存のため保護)\n" "$dst"
+    return 0
+  fi
+
+  if [ $OPT_DRY_RUN -eq 1 ]; then
+    printf "  [SYMLINK]   %s\n" "$dst"
+    return 0
+  fi
+
+  ensure_dir "$(dirname "$dst")"
+  [ -L "$dst" ] && rm "$dst"
+  ln -sf "$src" "$dst"
+  printf "  [SYMLINK]   %s\n" "$dst"
+}
+
 # ---------------------------------------------------------------------------
 # メイン処理
 # ---------------------------------------------------------------------------
@@ -503,6 +614,25 @@ if [ $COMP_RIKU -eq 1 ]; then
     "$RIKU_SRC" \
     "$TARGET_DIR/.claude/agents/riku.md" \
     "conflict"
+  echo ""
+fi
+
+# --- 本社機能 (hq-agents, ADR-014 Phase2) ---
+if [ $COMP_HQ_AGENTS -eq 1 ]; then
+  echo "--- 本社機能 (hq-agents) ($TARGET_DIR) ---"
+  echo "# 部門非依存の機能を symlink 配布します（複数マシン運用時は"
+  echo "# agent-crew を同じパスに clone してください）"
+
+  HQ_AGENTS_DST="$TARGET_DIR/.claude/agents"
+  for hq_agent in coo.md retro.md security.md doc-reviewer.md; do
+    symlink_file \
+      "$REPO_DIR/.claude/agents/$hq_agent" \
+      "$HQ_AGENTS_DST/$hq_agent"
+  done
+
+  symlink_dir \
+    "$REPO_DIR/docs/org" \
+    "$TARGET_DIR/docs/org"
   echo ""
 fi
 
