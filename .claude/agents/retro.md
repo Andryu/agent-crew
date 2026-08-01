@@ -352,6 +352,29 @@ LOAD_RATIO_TASKCOUNT=$(echo "$LOAD_BALANCE" | jq '.load_balance.by_task_count.sc
 
 スコアが合格基準を下回った軸は、次スプリントの改善優先事項として lesson に記録する。
 
+### ステップ 6.5: enforce-retro-stop.sh 実戦検証（スプリント中1回・完了条件）
+
+Issue #128 / Sprint-25レトロ「次スプリントへの改善優先事項」対応。
+Stop フック（`scripts/enforce-retro-stop.sh`）が実運用の起動経路で機能するかを、
+本ステップ（レトロタスク着手時点）までにスプリント中1回確認することを完了条件とする。
+
+- **確認内容**: レトロタスクが未 DONE（またはレトロ未実施を模した状態）で、
+  「全実装タスク DONE・レトロ未実施」の条件下で Stop フックの警告が実際に
+  stderr へ出力されることを、以下の両方の起動方法で確認する。
+  - 引数なし起動: `bash scripts/enforce-retro-stop.sh`
+  - Claude Code が Stop フックへ渡す stdin JSON 形式を模した起動:
+    `echo '{"session_id":"...","transcript_path":"...","hook_event_name":"Stop","stop_hook_active":false}' | bash scripts/enforce-retro-stop.sh`
+- **確認方法**: 本番リポジトリの `.claude/_queue.json` を直接操作せず、
+  一時ディレクトリに疑似 git リポジトリ＋疑似 `_queue.json`（実装タスク DONE・
+  レトロタスク TODO）を用意した隔離環境で実行する。
+- **誤検知チェック**: 同じタイミングで、現在進行中の実リポジトリ（レトロタスク以外に
+  未 DONE タスクが残っている状態）でも実行し、警告が出力されない（誤検知なし）ことを
+  あわせて確認する。
+- 確認結果（発動可否・誤検知有無・発見事項）は、ステップ7の完了報告と
+  `docs/sprints/<sprint>-retro.md` の双方に記録する。
+- 既に当該スプリント中に別タスクとして実戦検証済みの場合は、再実行せずその結果を
+  そのまま引用してよい。未確認のままレトロを完了しないこと。
+
 ### ステップ 7: Yuki への完了報告
 
 以下のフォーマットで完了報告を返す：
@@ -369,6 +392,11 @@ LOAD_RATIO_TASKCOUNT=$(echo "$LOAD_BALANCE" | jq '.load_balance.by_task_count.sc
 | 負荷分散 | [0.xx] | <= 2.0 | [PASS / FAIL] |
 
 > FAIL 軸: [軸名]（次スプリントの改善優先事項）
+
+### enforce-retro-stop.sh 実戦検証（ステップ6.5）
+- 発動確認（隔離環境）: [PASS / 未確認]
+- 誤検知チェック（実リポジトリ）: [なし / あり]
+- 発見事項: [あれば記載、なければ「なし」]
 
 ### 記録した lesson
 - [lesson-id]: [description の冒頭30文字] (priority: [score])

@@ -772,5 +772,24 @@ retro.md（やその他エージェント定義）にjqクエリ等の実行手�
 retro.mdステップ6の負荷分散スコアjqクエリが `.tasks[].agent` を参照していたが、_queue.jsonの実フィールド名は `.assigned_to` であり、常にLOAD_RATIO=1（偽陽性PASS）を返す不具合がSprint-25レトロで発覚した。過去のレトロでは字面通り実行せず手計算していたため実害は顕在化していなかったと推定される（agent-crew-sprint-25-tooling-002）。
 
 ---
+
+## [全エージェント] 品質ゲートの検証クエリ・チェックスクリプトは導入時に実データで実行し期待値と突合する（Issue #141）
+
+- lesson_id: agent-crew-sprint-26-process-002
+- priority: 5 / sprint: sprint-26
+
+**やること**
+
+`retro.md` のjqクエリに限らず、品質ゲート判定に使う検証クエリ・チェックスクリプト全般（例: `audit-scan.sh`、`sprint-points.sh`、各種フック内のjq集計等）を新規導入・変更する際は、必ず対象の実データ（`_queue.json` / `_signals.jsonl` / `.claude/settings.json` 等）に対して一度実行し、出力が期待値と一致することを確認してから確定させる。フィールド名・構造を記憶や想像で書いたクエリ・チェックロジックを、実行検証なしにドキュメント・スクリプトへ確定させてはならない。
+
+**やってはいけないこと**
+
+品質ゲートの合否判定に使うクエリ・スクリプトを、実データに対する実行検証なしに「動くはず」で確定させる。常にPASSを返す（偽陽性）クエリ・チェックを見逃したまま運用する。
+
+**エビデンス**
+
+`agent-crew-sprint-25-tooling-002` でretro.mdのjqクエリが `.tasks[].agent` を参照していたが実フィールド名は `.assigned_to` であり、常にLOAD_RATIO=1（偽陽性PASS）を返す不具合が発覚した。これはretro.md固有の事例として記録されていたが、同種の「未検証クエリ・スクリプトによる偽陽性」はSprint-26で新設する`audit-scan.sh`等、今後追加されるあらゆる品質ゲートスクリプトで起こりうる一般的リスクであるため、Sprint-25レトロの積み残し（Issue #141）として汎用ルールに格上げした（agent-crew-sprint-26-process-002。agent-crew-sprint-25-tooling-002の一般化）。
+
+---
 *このファイルは retro エージェント（みゆきち）が `priority_score >= 3` の新規 lesson を追加するたびに更新されます。*
-*最終更新: sprint-25 / 2026-08-01*
+*最終更新: sprint-26 / 2026-08-02*

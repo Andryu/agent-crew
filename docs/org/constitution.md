@@ -40,7 +40,8 @@
 
 **Enforcement**: `permissions.allow` への追加はスプリント計画書に記載されたもののみ。
 逸脱検知は現状、スプリント計画時の差分確認（Yuki）と QA（Sora）による手動確認で担保する。
-Kai（監査）による定常スキャンは**将来整備**（次スプリント以降で Kai に定常スキャン機能を追加後に運用開始。ADR-014 の推奨事項と同期）。
+Kai（監査）は `scripts/audit-scan.sh` による定常スキャンを、①週次経営会議の準備時（Rin依頼、`docs/org/weekly-council.md`）②スプリント開始時（Yuki依頼、`pm.md` ステップ2.6）の2タイミングで実行する。
+スキャン結果（Markdownレポート）は意思決定キュー／スプリント計画書に転記され、`permissions.allow` 逸脱・symlink破損・hooks構文/生存異常を機械的に検知する（Sprint-26 `audit-scan-design`/`audit-scan-impl` で実装、ADR-014 の推奨事項に対応）。
 
 ---
 

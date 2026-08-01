@@ -113,3 +113,44 @@
 {"ts":"2026-08-01T13:27:34+0000","type":"task.done","sprint":"sprint-25","slug":"sprint25-qa","agent":"Sora","detail":{"summary":"APPROVED。CRITICAL3件・MAJOR1件・MINOR1件すべて修正確認、実機再検証済み。"}}
 {"ts":"2026-08-01T13:38:39+0000","type":"task.start","sprint":"sprint-25","slug":"sprint25-retro","agent":"みゆきち","detail":{}}
 {"ts":"2026-08-01T13:38:39+0000","type":"task.done","sprint":"sprint-25","slug":"sprint25-retro","agent":"みゆきち","detail":{"summary":"Sprint-25レトロスペクティブ完了。lesson6件記録（うち3件は本レトロ内で即座に修正: install.sh自己参照ガード欠如lessonのstatus管理・mkdirロックtrap修正・retro.md自身の.agent誤参照バグ修正）。pm-learned-rules.mdへ5件反映。docs/sprints/sprint-25-retro.md作成。Issue化はteam-lead指示によりオーナー確認後の起票推奨として文書内に列挙、gh issue createは実行せず。"}}
+{"ts":"2026-08-01T17:28:03+0000","type":"task.start","sprint":"sprint-26","slug":"loadbalance-formula-doc","agent":"Riku","detail":{}}
+{"ts":"2026-08-01T17:28:32+0000","type":"task.start","sprint":"sprint-26","slug":"retro-stop-hook-live-check","agent":"みゆきち","detail":{}}
+{"ts":"2026-08-01T17:28:54+0000","type":"task.done","sprint":"sprint-26","slug":"loadbalance-formula-doc","agent":"Riku","detail":{"summary":"pm-estimation.mdに負荷分散スコア節を追加（ポイントベース公式/タスク数ベース補助）、sprint-points.shのJSON/MD出力にofficialフラグと（公式）（補助）表記を追加。bash -n・実データ実行で検証済み"}}
+{"ts":"2026-08-01T17:29:56+0000","type":"task.start","sprint":"sprint-26","slug":"sdd-adr-design","agent":"Alex","detail":{}}
+{"ts":"2026-08-01T17:30:03+0000","type":"task.done","sprint":"sprint-26","slug":"retro-stop-hook-live-check","agent":"みゆきち","detail":{"summary":"enforce-retro-stop.shの実戦検証完了。隔離環境で全実装タスクDONE状態を作り引数なし/stdin JSON両方の起動方式で警告stderr出力を確認。実リポジトリ(sprint-26進行中、13件未DONE)では誤検知なしを確認。stdin依存なし（判定はgit toplevel+ファイル読取のみ）。"}}
+{"ts":"2026-08-01T17:33:12+0000","type":"task.done","sprint":"sprint-26","slug":"sdd-adr-design","agent":"Alex","detail":{"summary":"ADR-015新規作成(Accepted)、feature-specテンプレート、docs/spec/features/作成、Riku適用指示書(engineer3種+qa.md+pm.md)を同梱。旧sdd-quality-loop-adr.mdはRejected化しADR-015へ誘導"}}
+{"ts":"2026-08-01T17:33:12+0000","type":"task.handoff","sprint":"sprint-26","slug":"sdd-templates-impl","agent":"Riku","detail":{"to_agent":"Riku","next_slug":"sdd-templates-impl"}}
+{"ts":"2026-08-01T17:33:12+0000","type":"task.start","sprint":"sprint-26","slug":"audit-scan-design","agent":"Alex","detail":{}}
+{"ts":"2026-08-01T17:35:15+0000","type":"task.done","sprint":"sprint-26","slug":"audit-scan-design","agent":"Alex","detail":{"summary":"audit-scan.sh設計書作成(docs/spec/audit-scan-design.md)。4チェック項目+実行タイミング(Rin経営会議/Yukiスプリント開始)+Kai職務追記+憲章第3条更新文言を同梱"}}
+{"ts":"2026-08-01T17:35:15+0000","type":"task.handoff","sprint":"sprint-26","slug":"audit-scan-impl","agent":"Riku","detail":{"to_agent":"Riku","next_slug":"audit-scan-impl"}}
+{"ts":"2026-08-01T17:35:15+0000","type":"task.start","sprint":"sprint-26","slug":"subagent-stop-enforce-design","agent":"Alex","detail":{}}
+{"ts":"2026-08-01T17:37:45+0000","type":"task.done","sprint":"sprint-26","slug":"subagent-stop-enforce-design","agent":"Alex","detail":{"summary":"SubagentStop用enforce-queue-done-stop.sh設計(docs/spec/subagent-stop-enforce-design.md)。bash -n検証済みコード同梱、jqマージ手順を実settings.jsonコピーで動作検証済み"}}
+{"ts":"2026-08-01T17:37:47+0000","type":"task.handoff","sprint":"sprint-26","slug":"subagent-stop-enforce-impl","agent":"Riku","detail":{"to_agent":"Riku","next_slug":"subagent-stop-enforce-impl"}}
+{"ts":"2026-08-01T17:37:47+0000","type":"task.start","sprint":"sprint-26","slug":"verify-query-rule-doc","agent":"Alex","detail":{}}
+{"ts":"2026-08-01T17:43:10+0000","type":"task.done","sprint":"sprint-26","slug":"verify-query-rule-doc","agent":"Alex","detail":{"summary":"pm-learned-rules.mdへ汎用ルール追記(agent-crew-sprint-26-process-002, sprint-25-tooling-002の一般化)。qa.mdの実用性チェックリストに検証クエリ実行検証項目を追記。Issue #141解消"}}
+{"ts":"2026-08-01T17:45:06+0000","type":"task.start","sprint":"sprint-26","slug":"sdd-templates-impl","agent":"Riku","detail":{}}
+{"ts":"2026-08-01T17:45:58+0000","type":"task.done","sprint":"sprint-26","slug":"sdd-templates-impl","agent":"Riku","detail":{"summary":"engineer-go/next/vue.md・qa.md・pm.mdの5ファイルにADR-015 Appendix diffを適用。feature-spec.mdとfeatures/.gitkeepは作成済みのため実在確認のみ"}}
+{"ts":"2026-08-01T17:46:02+0000","type":"task.start","sprint":"sprint-26","slug":"audit-scan-impl","agent":"Riku","detail":{}}
+{"ts":"2026-08-01T17:49:53+0000","type":"task.done","sprint":"sprint-26","slug":"audit-scan-impl","agent":"Riku","detail":{"summary":"scripts/audit-scan.sh実装（permissions.allow/symlink/hooksの3チェック）。weekly-council.md/coo.md/pm.md/security.md/constitution.mdへdiff適用。bash -n通過、実リポジトリ実行でPASS/WARNING確認、ダミーリンク切れsymlinkでFAIL検知・exit1確認・後始末済み"}}
+{"ts":"2026-08-01T17:49:56+0000","type":"task.start","sprint":"sprint-26","slug":"subagent-stop-enforce-impl","agent":"Riku","detail":{}}
+{"ts":"2026-08-01T17:52:16+0000","type":"task.done","sprint":"sprint-26","slug":"subagent-stop-enforce-impl","agent":"Riku","detail":{"summary":"scripts/enforce-queue-done-stop.sh新規実装（設計書のQUEUE_FILE環境変数非対応バグを修正しSora QA検証と整合）。settings.jsonのhooks.SubagentStopへバックアップ→jqマージ→構文検証→既存hooks無傷確認の手順で追加。バイパス5条件+検知ケースを隔離環境でテスト済み、全てexit0"}}
+{"ts":"2026-08-01T17:58:06+0000","type":"task.start","sprint":"sprint-26","slug":"sdd-qa","agent":"Sora","detail":{}}
+{"ts":"2026-08-01T17:58:06+0000","type":"task.start","sprint":"sprint-26","slug":"audit-scan-qa","agent":"Sora","detail":{}}
+{"ts":"2026-08-01T17:58:07+0000","type":"task.start","sprint":"sprint-26","slug":"subagent-stop-enforce-qa","agent":"Sora","detail":{}}
+{"ts":"2026-08-01T17:58:23+0000","type":"qa.approved","sprint":"sprint-26","slug":"sdd-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
+{"ts":"2026-08-01T17:58:24+0000","type":"qa.approved","sprint":"sprint-26","slug":"audit-scan-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
+{"ts":"2026-08-01T17:58:24+0000","type":"qa.approved","sprint":"sprint-26","slug":"subagent-stop-enforce-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
+{"ts":"2026-08-01T17:58:30+0000","type":"task.done","sprint":"sprint-26","slug":"sdd-qa","agent":"Sora","detail":{"summary":"APPROVED_WITH_COMMENTS。MINOR2件（design/proposal誘導文欠如、Issue化明記なし）を除き整合性問題なし"}}
+{"ts":"2026-08-01T17:58:31+0000","type":"task.done","sprint":"sprint-26","slug":"audit-scan-qa","agent":"Sora","detail":{"summary":"APPROVED_WITH_COMMENTS。実機実行・異常系再現済み。MAJOR1件（新設hookが自身の生存確認をすり抜ける自己参照課題）をsprint26-qaへ横断課題として引き継ぎ"}}
+{"ts":"2026-08-01T17:58:31+0000","type":"task.done","sprint":"sprint-26","slug":"subagent-stop-enforce-qa","agent":"Sora","detail":{"summary":"APPROVED。検知1ケース+バイパス5条件を実機再検証、settings.json無傷確認、Rikuの設計逸脱2件は妥当と判定"}}
+{"ts":"2026-08-01T17:58:35+0000","type":"task.start","sprint":"sprint-26","slug":"sprint26-qa","agent":"Sora","detail":{}}
+{"ts":"2026-08-01T18:00:17+0000","type":"qa.changes_requested","sprint":"sprint-26","slug":"sprint26-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"CHANGES_REQUESTED"}}
+{"ts":"2026-08-01T18:01:15+0000","sprint":"sprint-26","slug":"sprint26-qa","agent":"Sora","event":"task_completed","tool_use_id":"unknown"}
+{"ts":"2026-08-01T18:01:15+0000","sprint":"sprint-26","slug":"sprint26-qa","agent":"Sora","event":"task_completed","tool_use_id":"unknown"}
+{"ts":"2026-08-01T18:01:15+0000","sprint":"sprint-26","slug":"sprint26-qa","agent":"Sora","event":"task_completed","tool_use_id":"unknown"}
+{"ts":"2026-08-01T18:01:16+0000","sprint":"sprint-26","slug":"sprint26-qa","agent":"Sora","event":"task_completed","tool_use_id":"unknown"}
+{"ts":"2026-08-01T18:04:12+0000","type":"task.done","sprint":"sprint-26","slug":"sprint26-qa","agent":"Sora","detail":{"summary":"APPROVED。横断整合性・実機検証とも問題なし。全指摘解消済み"}}
+{"ts":"2026-08-01T18:04:47+0000","type":"task.retry","sprint":"sprint-26","slug":"sprint26-qa","agent":"system","detail":{"retry_count":1}}
+{"ts":"2026-08-01T18:04:58+0000","type":"task.start","sprint":"sprint-26","slug":"sprint26-qa","agent":"Sora","detail":{}}
+{"ts":"2026-08-01T18:04:58+0000","type":"qa.approved","sprint":"sprint-26","slug":"sprint26-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
+{"ts":"2026-08-01T18:04:58+0000","type":"task.done","sprint":"sprint-26","slug":"sprint26-qa","agent":"Sora","detail":{"summary":"APPROVED。横断整合性・実機検証とも問題なし。全指摘解消済み(retry 1回、queue.py仕様上の再記録)"}}
