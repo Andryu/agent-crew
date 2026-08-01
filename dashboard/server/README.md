@@ -1,7 +1,8 @@
-# STONEFISH ダッシュボード — イベント受信サーバ（M1）
+# STONEFISH ダッシュボード — イベント受信サーバ（M1 + M2サーバ拡張）
 
 Claude Code の hooks から送られてくるイベントを受け取り、JSONL に永続化しつつ
-WebSocket 経由でダッシュボード SPA（M2 で実装予定）へ配信するサーバ。
+WebSocket 経由でダッシュボード SPA へ配信するサーバ。M2 でトークン会計
+（`tokens.py`）・承認キュー監視・SPA配信（`GET /`）を追加した。
 
 ## 起動方法
 
@@ -23,9 +24,38 @@ uv run --group dashboard python dashboard/server/server.py
   形式の JSON を受け取り、部門（`dept`）・ペルソナ（`persona`）を付与してから
   `<data-dir>/events.jsonl` に1行 append し、接続中の WebSocket クライアントへ配信する。
   成功時は `202`。JSON として不正・1MB 超は `400`。
-- `GET /ws` — WebSocket。接続直後に直近200件を `{"type":"init","events":[...]}` で送り、
-  以後は新規イベントを `{"type":"event","event":{...}}` で live 配信する。
+  - `payload.transcript_path` があれば、トークン集計器（`tokens.TranscriptAggregator`）に
+    その transcript を監視対象として登録する（部門は enrich 済みの `dept` を使う）。
+  - `cwd` があれば、承認キュー監視対象を `<cwd>/.claude/_queue.json` に更新する
+    （複数セッションが混在する場合は最新イベントの cwd を優先し、常に1つだけ監視する）。
+- `GET /ws` — WebSocket。接続直後に直近200件のイベント・現在のトークン集計・現在の承認キュー
+  状態をまとめた `init` メッセージを送り、以後は live 配信する（メッセージ型は下記参照）。
 - `GET /health` — `{"ok":true,"clients":N,"events":N}`。死活監視用。
+- `GET /` — `dashboard/app/index.html` が存在すれば `text/html` で返す（SPA は別トラックで
+  実装中のため存在チェックのみ。無ければ `404`）。
+
+## バックグラウンドポーリング
+
+`POLL_INTERVAL_SEC`（既定3秒）周期で以下を確認し、変化があれば全 WebSocket クライアントへ
+配信する。
+
+- 登録済み transcript の増分読み（`TranscriptAggregator.poll()`）で新規/更新 usage があれば
+  `tokens` メッセージ
+- 監視中の `_queue.json` の mtime が変化していれば `queue` メッセージ
+  （ファイルが無い・JSON が壊れている場合は `{"tasks": []}` を送る）
+
+## WebSocket メッセージ型
+
+| type | 送信タイミング | 形状 |
+|---|---|---|
+| `init` | 接続直後に1回 | `{"type":"init","events":[...],"tokens":{...},"queue":{...}}` |
+| `event` | `POST /events` を受けるたび | `{"type":"event","event":{...}}` |
+| `tokens` | ポーリングでトークン集計に変化があったとき | `{"type":"tokens","depts":{"product":{"input":N,"output":N,"cache":N,"total":N}, ...}}` |
+| `queue` | ポーリングで `_queue.json` の mtime が変化したとき | `{"type":"queue","queue":{"sprint":"...","tasks":[{"slug":...,"title":...,"status":...,"assigned_to":...}],"updated_ts":<epoch秒>}}`（ファイル不在/不正時は `{"tasks":[]}`） |
+
+`tokens` の集計規則は `scripts/token-report.py` と同一（同一 `message.id` は最新timestampの
+行のみ採用し、ストリーミング途中経過の合算による水増しを防ぐ）。詳細は `tokens.py` の
+docstring を参照。
 
 ## 手動送信の例
 
