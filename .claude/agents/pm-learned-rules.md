@@ -587,5 +587,95 @@ Sprint-23 の build_retry_message 実装で、Yuki 系エージェントのみ r
 
 ---
 
+## [Yuki] メインセッションの先行完了タスクは即座に_queue.jsonへ反映する
+
+- lesson_id: agent-crew-sprint-24-planning-001
+- priority: 4 / sprint: sprint-24
+
+**やること**
+
+メインセッション（Fable）が計画立案と並行してタスクを実装する場合は、着手・完了のタイミングで `_queue.json` の該当タスクへ `assigned_to`・`status` を即時反映する。Yukiは計画生成の最初のステップで `_queue.json` の既存状態（進行中/完了マーク）を必ず確認してから担当割当を行う。
+
+**やってはいけないこと**
+
+`_queue.json` の既存状態を確認せずに担当者ドラフトを作成し、既に完了済みのタスクを他エージェントへ再割当する。
+
+**エビデンス**
+
+Sprint-24 でFableが計画立案と並行して4タスクを先行完了させたが、Yukiはこれを把握せずcoo-personaをRikuに割り当てる担当割衝突が発生し、後追い修正のコストが生じた（agent-crew-sprint-24-planning-001）。
+
+---
+
+## [Yuki] 負荷分散スコアは計画外の先行完了タスクを含めた全体で計算する
+
+- lesson_id: agent-crew-sprint-24-planning-002
+- priority: 4 / sprint: sprint-24
+
+**やること**
+
+負荷分散スコア（最多担当数 / 平均担当数）は、計画外の先行完了タスクを含むスプリント内の全タスク・全エージェントを対象に計算する。特定タスクを除外して計算する場合は、除外理由とともに除外前後両方のスコアを併記する。
+
+**やってはいけないこと**
+
+計画外の先行完了タスクを除外した「残タスクのみ」のスコアだけでPASS判定を確定させる。
+
+**エビデンス**
+
+Sprint-24 で残タスクのみの負荷分散スコアは1.6（PASS）と算出されたが、Fableの先行完了分を含む全体（9タスク・5エージェント）で再計算すると2.22（FAIL）だった（agent-crew-sprint-24-planning-002）。
+
+---
+
+## [全エージェント / Sora] 複数文書にまたがる整合性はQAが横断的に確認する
+
+- lesson_id: agent-crew-sprint-24-design-001
+- priority: 6 / sprint: sprint-24
+
+**やること**
+
+文書に「〜している」「〜で稼働中」等の現在形で仕組みの稼働を示唆する記述を書く場合、著者は該当の仕組みが実際に実装・稼働しているかを確認する。QAは関連する全文書を横断して読み、Enforcement等の記述の実在性と、文書間の連携（一方が規定した伝達に対向文書に受け口があるか）を確認するチェック項目を持つ。
+
+**やってはいけないこと**
+
+単一文書のみをレビューして、複数文書にまたがる整合性（実在性・対向文書の受け口）の確認を省略する。
+
+**エビデンス**
+
+Sprint-24 の sprint24-qa で、constitution.md第3条のEnforcementに実在しない仕組みを稼働中として記載していた点と、weekly-council.mdの伝達規定にpm.md側の受け口がなく片方向連携になっていた点がMAJOR指摘として検出された。いずれも著者本人には気づきにくく、QAで初めて発見された（agent-crew-sprint-24-design-001）。
+
+---
+
+## [全エージェント] ストリーミング形式データの集計は実データで重複パターンを先に確認する
+
+- lesson_id: agent-crew-sprint-24-tooling-001
+- priority: 4 / sprint: sprint-24
+
+**やること**
+
+JSONLやログなど、ストリーミング形式で書き出されるデータを集計するスクリプトは、実装前に実データのフィールド構造・重複パターンを確認してからスキーマを設計する。実装後は必ず実データで実行し、レコードの重複（途中経過行の重複合算等）による水増しが発生していないかを検証する。
+
+**エビデンス**
+
+Sprint-24 でRenがtoken-report-scriptの実データ調査により、JSONLのストリーミング途中経過行を単純合算するとトークン消費が2〜5倍水増しされる落とし穴を発見し、message.id重複排除で回避した。想像でスキーマを設計せず実データを先に確認したことが功を奏した（agent-crew-sprint-24-tooling-001）。
+
+---
+
+## [みゆきち] macOS環境ではflockの代わりにmkdirロックを使う
+
+- lesson_id: agent-crew-sprint-24-tooling-002
+- priority: 6 / sprint: sprint-24
+
+**やること**
+
+`_lessons.json` への書き込み時、実行環境がmacOS（darwin）の場合は `flock` コマンドが存在しないため、`mkdir` による排他ロック（ロック取得: `mkdir ~/.claude/_lessons.json.lockdir`、解放: `rmdir`）にフォールバックする。事前に `which flock` で存在確認してから手順を選択する。
+
+**やってはいけないこと**
+
+`flock` コマンドの存在を確認せずにレトロ手順をそのまま実行し、ロック取得失敗を放置する。
+
+**エビデンス**
+
+Sprint-24 のレトロで `flock -x -w 10 200` 実行時に `flock: command not found` が発生した。darwin標準環境にはflockが同梱されておらず、brewにも未インストールだった（agent-crew-sprint-24-tooling-002）。
+
+---
 *このファイルは retro エージェント（みゆきち）が `priority_score >= 3` の新規 lesson を追加するたびに更新されます。*
-*最終更新: sprint-23 / 2026-06-18*
+*最終更新: sprint-24 / 2026-08-01*

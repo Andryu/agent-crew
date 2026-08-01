@@ -99,6 +99,8 @@
       "Bash(bash *)",
       "Bash(scripts/privacy-check.sh *)",
       "Bash(~/.claude/hooks/*)",
+      "Bash(python3 *)",
+      "Bash(scripts/token-report.py *)",
       "Write(**)"
     ]
   }
