@@ -677,5 +677,100 @@ Sprint-24 でRenがtoken-report-scriptの実データ調査により、JSONLの�
 Sprint-24 のレトロで `flock -x -w 10 200` 実行時に `flock: command not found` が発生した。darwin標準環境にはflockが同梱されておらず、brewにも未インストールだった（agent-crew-sprint-24-tooling-002）。
 
 ---
+
+## [Riku] symlink/ファイル配布系の新関数は自己参照ガードと上書き防止を実装し、実機実行でQAする
+
+- lesson_id: agent-crew-sprint-25-reliability-001
+- priority: 6 / sprint: sprint-25
+
+**やること**
+
+install.sh 等でシンボリックリンクを生成する新規関数を書く場合、①配布先が自分自身（呼び出し元リポジトリ）のパスと一致しないかの自己参照ガード、②配布先に同名ファイル/ディレクトリが既に存在する場合の上書き前チェック、の2点を必ず実装する。実装後は必ず実機実行（scratchpad等への疑似配布先複製 + 実際のコマンド実行）でQAし、コードレビューのみで済ませない。
+
+**やってはいけないこと**
+
+symlink生成・ファイル配布系のコードをコードレビューのみでAPPROVEし、実際にコマンドを実行した検証を省略する。
+
+**エビデンス**
+
+Sora QAがscratchpadにtemplates/department/を複製しinstall.shを実際に実行したところ、自己参照ガード欠如とsymlink_file相当の関数の上書き無防備という2件のCRITICALバグが検出された。コードレビューだけでは気づかれていなかった（agent-crew-sprint-25-reliability-001）。
+
+---
+
+## [みゆきち] mkdir等のディレクトリロックは、trapをリソース取得成功後に設定し、解放時は所有権チェックを行う
+
+- lesson_id: agent-crew-sprint-25-tooling-001
+- priority: 6 / sprint: sprint-25
+
+**やること**
+
+mkdirベースの排他ロックを実装する際は、①`trap release_lock EXIT INT TERM` は `acquire_lock` が成功した後にのみ設定する、②`release_lock` 内で `$LOCKDIR/pid` 等の所有権情報が自分の `$$` と一致する場合のみ削除する二重防御を組み込む。
+
+**やってはいけないこと**
+
+ロック取得の成否が確定する前にtrapで解放処理を仕込む。これをやると、取得タイムアウト時にtrapが発火し、他プロセスが正当に保持しているロックを削除してしまう。
+
+**エビデンス**
+
+Sora QAが2プロセス競合（Aがロック保持中にBが取得を試みてtimeoutする）を実機再現し、Bのtimeout後にAのロックが削除されることを確認した。trapをacquire_lock成功後に移動し、release_lockに所有権チェックを追加した修正後は同シナリオで正しく動作することをみゆきちが再現テストで確認した（agent-crew-sprint-25-tooling-001。agent-crew-sprint-24-tooling-002のflock→mkdir移行を完了させる過程で発覚）。
+
+---
+
+## [全エージェント] タスク完了後は scripts/queue.sh done を即時実行する（再発防止の再徹底）
+
+- lesson_id: agent-crew-sprint-25-process-001
+- priority: 6 / sprint: sprint-25
+
+**やること**
+
+実装タスクが完了したら、次の作業や完了報告に進む前に必ず `scripts/queue.sh done <slug> <agent> "<summary>"` を実行し、`_queue.json` を実態に即時同期させる。完了報告には「queue.sh done 実行済み」であることを明記する。
+
+**やってはいけないこと**
+
+タスク実装完了後、queue更新を後回しにしたままteam-leadへの完了報告のみで済ませる。他タスクの `depends_on` チェックがブロックされ、後続のQAタスク着手が止まる。
+
+**エビデンス**
+
+Sprint-25でRiku（hq-install-distribution・hq-template-dir）とみゆきち（retro-mkdir-lock・retro-stop-hook）がqueue.sh done未実行のまま完了報告し、Soraのscripts/queue.sh startが依存タスク未完了エラーでブロックされた。agent-crew-sprint-24-planning-001で同様のルールが既に記載されていたにもかかわらず再発した（agent-crew-sprint-25-process-001。agent-crew-sprint-24-planning-001の再発）。
+
+---
+
+## [Yuki] 負荷分散スコアはポイントベース（complexity加重）を公式指標とする
+
+- lesson_id: agent-crew-sprint-25-planning-001
+- priority: 4 / sprint: sprint-25
+
+**やること**
+
+スプリント計画時・レトロ時の負荷分散スコアは `scripts/sprint-points.sh` が出力する `load_balance.by_points.score`（最多担当ポイント / 平均ポイント、complexity S=1/M=3/L=5換算）を公式指標として合否判定に用いる。タスク数ベース（`by_task_count.score`）は補助指標として併記するに留める。
+
+**やってはいけないこと**
+
+タスク数ベースのスコアのみを算出して合否判定を確定する。complexityの異なるタスクの負荷差を見落とす。
+
+**エビデンス**
+
+Ren（sprint-points-script実装時）が2つの定義の併存を発見した。Sprint-25計画書のタスク数ベーススコアは1.67（PASS）だったが、ポイントベースでは2.0（合格基準ちょうど）だった。Sora QAがポイントベースを公式指標とすることを推奨し、Sprint-25レトロで正式決定した（agent-crew-sprint-25-planning-001）。
+
+---
+
+## [みゆきち] retro.md内のjqスニペットは必ず実データに対して一度実行してから確定する
+
+- lesson_id: agent-crew-sprint-25-tooling-002
+- priority: 4 / sprint: sprint-25
+
+**やること**
+
+retro.md（やその他エージェント定義）にjqクエリ等の実行手順を記載・変更する際は、必ず実際の `_queue.json`（または対象データ）に対して一度実行し、出力が期待通りであることを確認してから確定させる。
+
+**やってはいけないこと**
+
+フィールド名などを記憶や想像で書いたjqクエリを、実行検証なしにドキュメントへ確定させる。
+
+**エビデンス**
+
+retro.mdステップ6の負荷分散スコアjqクエリが `.tasks[].agent` を参照していたが、_queue.jsonの実フィールド名は `.assigned_to` であり、常にLOAD_RATIO=1（偽陽性PASS）を返す不具合がSprint-25レトロで発覚した。過去のレトロでは字面通り実行せず手計算していたため実害は顕在化していなかったと推定される（agent-crew-sprint-25-tooling-002）。
+
+---
 *このファイルは retro エージェント（みゆきち）が `priority_score >= 3` の新規 lesson を追加するたびに更新されます。*
-*最終更新: sprint-24 / 2026-08-01*
+*最終更新: sprint-25 / 2026-08-01*

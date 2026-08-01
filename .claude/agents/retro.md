@@ -328,15 +328,17 @@ BLOCK_RATE=$(jq -n --argjson b "$BLOCKED" --argjson t "$TOTAL" '
   if $t > 0 then ($b / $t) else 0 end
 ')
 
-# --- 負荷分散: 最多担当数 / 平均担当数 ---
-LOAD_RATIO=$(jq '
-  [.tasks[].agent // "unassigned"] |
-  group_by(.) |
-  map(length) |
-  if length > 0 then
-    (max / ((add) / length))
-  else 1 end
-' "$QUEUE")
+# --- 負荷分散: scripts/sprint-points.sh を使う（Issue #135 / agent-crew-sprint-25-planning-001） ---
+# 公式指標はポイントベース（complexity加重: S=1/M=3/L=5）、タスク数ベースは補助指標。
+# 理由: complexity（作業量）の違いをタスク数のみでは反映できないため
+# （Sprint-25レトロで正式決定。以前はタスク数ベースのみだったが本決定で切り替え）。
+#
+# 注意: 過去バージョンの本手順は `.tasks[].agent` を参照していたが、
+# _queue.json の実フィールド名は `.assigned_to` であり誤りだった
+# （常に load_ratio=1 を返す偽陽性PASSバグ。agent-crew-sprint-25-tooling-002 で検出・修正）。
+LOAD_BALANCE=$(bash scripts/sprint-points.sh)
+LOAD_RATIO=$(echo "$LOAD_BALANCE" | jq '.load_balance.by_points.score')
+LOAD_RATIO_TASKCOUNT=$(echo "$LOAD_BALANCE" | jq '.load_balance.by_task_count.score')  # 補助指標として併記
 ```
 
 #### スコアの判定基準
@@ -346,7 +348,7 @@ LOAD_RATIO=$(jq '
 | 仕様明確度 | `1 - (retry_count合計 / タスク数)` | >= 0.8 |
 | QA合格率 | `APPROVED数 / QA対象タスク数` | >= 0.9 |
 | ブロック率 | `BLOCKED数 / 総タスク数` | <= 0.1 |
-| 負荷分散 | `最多担当数 / 平均担当数` | <= 2.0 |
+| 負荷分散 | `最多担当ポイント / 平均ポイント`（ポイントベース・公式。補助: タスク数ベース） | <= 2.0 |
 
 スコアが合格基準を下回った軸は、次スプリントの改善優先事項として lesson に記録する。
 

@@ -316,7 +316,7 @@
     {
       "slug": "sprint25-retro",
       "title": "Sprint-25 レトロスペクティブ実施（みゆきち）",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "みゆきち",
       "complexity": "S",
       "risk_level": "low",
@@ -326,17 +326,29 @@
       ],
       "qa_mode": "—",
       "created_at": "2026-08-01T22:01:12+09:00",
-      "updated_at": "2026-08-01T22:01:12+09:00",
+      "updated_at": "2026-08-01",
       "notes": "着手条件: sprint25-qa完了後、Soraの完了報告に@retroを含めて即起動（オーナー確認不要）。_lessons.json記録・pm-learned-rules.md更新（priority_score>=3のみ）・Issue化（issue_url重複チェック必須）。retro-stop-hookタスク自身がこのレトロを強制する仕組みになるため、初回動作でみゆきち自身が誤検知なく起動できるかも観察対象に含める。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "",
+      "summary": "Sprint-25レトロスペクティブ完了。lesson6件記録（うち3件は本レトロ内で即座に修正: install.sh自己参照ガード欠如lessonのstatus管理・mkdirロックtrap修正・retro.md自身の.agent誤参照バグ修正）。pm-learned-rules.mdへ5件反映。docs/sprints/sprint-25-retro.md作成。Issue化はteam-lead指示によりオーナー確認後の起票推奨として文書内に列挙、gh issue createは実行せず。",
       "events": [
         {
           "ts": "2026-08-01T22:01:12+09:00",
           "agent": "Yuki",
           "action": "created",
           "msg": "Sprint-25 キュー登録"
+        },
+        {
+          "ts": "2026-08-01T13:38:39+0000",
+          "agent": "みゆきち",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-08-01T13:38:39+0000",
+          "agent": "みゆきち",
+          "action": "done",
+          "msg": "Sprint-25レトロスペクティブ完了。lesson6件記録（うち3件は本レトロ内で即座に修正: install.sh自己参照ガード欠如lessonのstatus管理・mkdirロックtrap修正・retro.md自身の.agent誤参照バグ修正）。pm-learned-rules.mdへ5件反映。docs/sprints/sprint-25-retro.md作成。Issue化はteam-lead指示によりオーナー確認後の起票推奨として文書内に列挙、gh issue createは実行せず。"
         }
       ]
     }

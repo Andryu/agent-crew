@@ -111,3 +111,5 @@
 {"ts":"2026-08-01T13:27:19+0000","type":"task.start","sprint":"sprint-25","slug":"sprint25-qa","agent":"Sora","detail":{}}
 {"ts":"2026-08-01T13:27:25+0000","type":"qa.approved","sprint":"sprint-25","slug":"sprint25-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
 {"ts":"2026-08-01T13:27:34+0000","type":"task.done","sprint":"sprint-25","slug":"sprint25-qa","agent":"Sora","detail":{"summary":"APPROVED。CRITICAL3件・MAJOR1件・MINOR1件すべて修正確認、実機再検証済み。"}}
+{"ts":"2026-08-01T13:38:39+0000","type":"task.start","sprint":"sprint-25","slug":"sprint25-retro","agent":"みゆきち","detail":{}}
+{"ts":"2026-08-01T13:38:39+0000","type":"task.done","sprint":"sprint-25","slug":"sprint25-retro","agent":"みゆきち","detail":{"summary":"Sprint-25レトロスペクティブ完了。lesson6件記録（うち3件は本レトロ内で即座に修正: install.sh自己参照ガード欠如lessonのstatus管理・mkdirロックtrap修正・retro.md自身の.agent誤参照バグ修正）。pm-learned-rules.mdへ5件反映。docs/sprints/sprint-25-retro.md作成。Issue化はteam-lead指示によりオーナー確認後の起票推奨として文書内に列挙、gh issue createは実行せず。"}}
