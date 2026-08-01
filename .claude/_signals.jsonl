@@ -154,3 +154,5 @@
 {"ts":"2026-08-01T18:04:58+0000","type":"task.start","sprint":"sprint-26","slug":"sprint26-qa","agent":"Sora","detail":{}}
 {"ts":"2026-08-01T18:04:58+0000","type":"qa.approved","sprint":"sprint-26","slug":"sprint26-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
 {"ts":"2026-08-01T18:04:58+0000","type":"task.done","sprint":"sprint-26","slug":"sprint26-qa","agent":"Sora","detail":{"summary":"APPROVED。横断整合性・実機検証とも問題なし。全指摘解消済み(retry 1回、queue.py仕様上の再記録)"}}
+{"ts":"2026-08-01T18:06:29+0000","type":"task.start","sprint":"sprint-26","slug":"sprint26-retro","agent":"みゆきち","detail":{}}
+{"ts":"2026-08-01T18:15:51+0000","type":"task.done","sprint":"sprint-26","slug":"sprint26-retro","agent":"みゆきち","detail":{"summary":"Sprint-26レトロ完了。ルーブリック全4軸PASS(仕様明確度0.93/QA合格率1.0/ブロック率0.0/負荷分散1.43)。lesson5件記録(ID衝突をprocess-002→003に修正)、pm-learned-rules.md4件追記、docs/sprints/sprint-26-retro.md作成。gh issue create権限拒否のためIssue化はteam-lead代行依頼。過去sprint23-25の未issue化12件を報告事項として記載。"}}
