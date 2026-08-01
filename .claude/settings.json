@@ -57,6 +57,14 @@
             "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null)\" && bash scripts/privacy-check.sh 2>/dev/null || true'"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null)\" && scripts/enforce-retro-stop.sh || true'"
+          }
+        ]
       }
     ],
     "SessionStart": [
@@ -101,6 +109,8 @@
       "Bash(~/.claude/hooks/*)",
       "Bash(python3 *)",
       "Bash(scripts/token-report.py *)",
+      "Bash(scripts/enforce-retro-stop.sh *)",
+      "Bash(scripts/sprint-points.sh *)",
       "Write(**)"
     ]
   }

@@ -95,3 +95,21 @@
 {"ts":"2026-08-01T12:19:09+0000","type":"task.retry","sprint":"sprint-24","slug":"sprint24-qa","agent":"system","detail":{"retry_count":1}}
 {"ts":"2026-08-01T12:19:09+0000","type":"qa.approved","sprint":"sprint-24","slug":"sprint24-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
 {"ts":"2026-08-01T12:19:09+0000","type":"task.done","sprint":"sprint-24","slug":"sprint24-qa","agent":"Sora","detail":{"summary":"Sprint-24 最終QA完了。APPROVED_WITH_NOTE。"}}
+{"ts":"2026-08-01T13:09:49+0000","type":"task.start","sprint":"sprint-25","slug":"sprint-points-script","agent":"Ren","detail":{}}
+{"ts":"2026-08-01T13:09:53+0000","type":"task.done","sprint":"sprint-25","slug":"sprint-points-script","agent":"Ren","detail":{"summary":"scripts/sprint-points.sh 新規作成。合計15pt・負荷分散1.67(タスク数ベース)を計画書と一致確認。ポイントベース負荷分散2.0を新規指標として追加。"}}
+{"ts":"2026-08-01T13:22:52+0000","type":"task.start","sprint":"sprint-25","slug":"hq-install-distribution","agent":"Riku","detail":{}}
+{"ts":"2026-08-01T13:22:52+0000","type":"task.done","sprint":"sprint-25","slug":"hq-install-distribution","agent":"Riku","detail":{"summary":"install.shにhq-agentsコンポーネント追加。CRITICAL修正2件（TARGET_DIR自己参照ガード、symlink_file既存ファイル保護）反映済み"}}
+{"ts":"2026-08-01T13:22:57+0000","type":"task.start","sprint":"sprint-25","slug":"hq-template-dir","agent":"Riku","detail":{}}
+{"ts":"2026-08-01T13:22:57+0000","type":"task.done","sprint":"sprint-25","slug":"hq-template-dir","agent":"Riku","detail":{"summary":"templates/department/を新規作成。本社機能symlinkは複製後にinstall.sh --only=hq-agentsで生成する運用に設計"}}
+{"ts":"2026-08-01T13:23:20+0000","type":"task.start","sprint":"sprint-25","slug":"retro-mkdir-lock","agent":"みゆきち","detail":{}}
+{"ts":"2026-08-01T13:23:20+0000","type":"task.done","sprint":"sprint-25","slug":"retro-mkdir-lock","agent":"みゆきち","detail":{"summary":"mkdirベースのアトミックロックへ置換完了（Issue #133）。QA差し戻し対応: release_lockに所有権チェック(pid照合)を追加、trapはacquire_lock成功後にのみ設定するよう修正。2プロセス競合の再現テスト(A保持中にBがtimeout)で他プロセスのロックが誤削除されないことを確認済み。"}}
+{"ts":"2026-08-01T13:23:27+0000","type":"task.start","sprint":"sprint-25","slug":"retro-stop-hook","agent":"みゆきち","detail":{}}
+{"ts":"2026-08-01T13:23:28+0000","type":"task.done","sprint":"sprint-25","slug":"retro-stop-hook","agent":"みゆきち","detail":{"summary":"Stopフック scripts/enforce-retro-stop.sh を新規作成（Issue #128）。バイパス条件3種（キュー不在/レトロタスクDONE/レトロ完了マーカー実在）で常にexit 0、警告のみでブロックしない設計。settings.jsonのhooks.Stopへ追記マージ・permissions.allow登録済み。5パターンのテストで誤検知なしを確認済み。"}}
+{"ts":"2026-08-01T13:27:09+0000","type":"task.start","sprint":"sprint-25","slug":"hq-distribution-qa","agent":"Sora","detail":{}}
+{"ts":"2026-08-01T13:27:16+0000","type":"qa.approved","sprint":"sprint-25","slug":"hq-distribution-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
+{"ts":"2026-08-01T13:27:19+0000","type":"task.done","sprint":"sprint-25","slug":"hq-distribution-qa","agent":"Sora","detail":{"summary":"APPROVED。symlink5本生成・readlink -f実体解決・uninstall対称性・自己参照ガード・symlink_file保護を実機で確認。"}}
+{"ts":"2026-08-01T13:27:19+0000","type":"task.start","sprint":"sprint-25","slug":"sprint25-qa","agent":"Sora","detail":{}}
+{"ts":"2026-08-01T13:27:25+0000","type":"qa.approved","sprint":"sprint-25","slug":"sprint25-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED"}}
+{"ts":"2026-08-01T13:27:34+0000","type":"task.done","sprint":"sprint-25","slug":"sprint25-qa","agent":"Sora","detail":{"summary":"APPROVED。CRITICAL3件・MAJOR1件・MINOR1件すべて修正確認、実機再検証済み。"}}
+{"ts":"2026-08-01T13:38:39+0000","type":"task.start","sprint":"sprint-25","slug":"sprint25-retro","agent":"みゆきち","detail":{}}
+{"ts":"2026-08-01T13:38:39+0000","type":"task.done","sprint":"sprint-25","slug":"sprint25-retro","agent":"みゆきち","detail":{"summary":"Sprint-25レトロスペクティブ完了。lesson6件記録（うち3件は本レトロ内で即座に修正: install.sh自己参照ガード欠如lessonのstatus管理・mkdirロックtrap修正・retro.md自身の.agent誤参照バグ修正）。pm-learned-rules.mdへ5件反映。docs/sprints/sprint-25-retro.md作成。Issue化はteam-lead指示によりオーナー確認後の起票推奨として文書内に列挙、gh issue createは実行せず。"}}
