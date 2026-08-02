@@ -10,7 +10,7 @@
 | 部門 | モード | 実体 | 軸足スキル（部門専属） |
 |------|--------|------|------------------------|
 | プロダクト | **アクティブ** | `agent-crew`（本リポジトリ, stonefish） | `travel-itinerary-artifact` / `travel-plan-review` / `life-planner` / `life-plan-review` / `privacy-audit` |
-| 投資 | **アイドル** | `alpha-predict-jp` + 投資系スキル群 | 銘柄分析・相場データ蓄積系スキル（`alpha-predict-jp` 側で管理） |
+| 投資 | **アクティブ**（2026-08-02 範囲限定Go・Phase1=レポート基盤構築） | `alpha-predict-jp` + 投資系スキル群 | 銘柄分析・相場データ蓄積系スキル（`alpha-predict-jp` 側で管理） |
 | 動画制作 | 未開設 | なし | なし |
 | ゲーム | 未開設 | なし | なし |
 
