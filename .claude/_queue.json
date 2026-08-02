@@ -215,7 +215,7 @@
       "qa_result": null,
       "qa_history": [],
       "close_issue": null,
-      "summary": "Issue#144(qa --force/doneQAガード)+Issue#152(auto_close_issueのissue_ref参照方式化)を実装。pytest 5件追加+既存7件修正、計37件全パス。scripts/queue.sh ヘッダーコメントも更新",
+      "summary": "Issue #144（qa --force / done QAガード）+ Issue #152（close_issue専用フィールド + close_linked_issue関数への置き換え、done --close-issueオプション）を実装。pytest 40件全パス。scripts/queue.sh ヘッダーコメントも更新。【監査証跡訂正・2026-08-02】初回summaryは実装途中版（issue_ref/auto_close_issue、pytest37件）の文言のまま記録されていたが、その後Alexの設計書に合わせてclose_issue方式へリネームされた最終実装と不一致だったため、Sora QA（queue-qa-reguard-qa）の指摘を受けYukiが本文言に是正した（実装内容自体はSora QA時点で既に最終版、文言のみの訂正）。",
       "events": [
         {
           "ts": "2026-08-02T01:21:11+0000",
@@ -293,7 +293,7 @@
     {
       "slug": "queue-qa-reguard-qa",
       "title": "queue.py QA再判定経路 実装QA（Issue #144）",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "medium",
@@ -306,10 +306,10 @@
       "updated_at": "2026-08-02",
       "notes": "pytest実行結果を確認。実際にCHANGES_REQUESTED→修正→APPROVEDのQA再判定シナリオを隔離環境で再現し、retry_countが汚染されないことを実機確認する。",
       "retry_count": 0,
-      "qa_result": null,
+      "qa_result": "APPROVED",
       "qa_history": [],
       "close_issue": 144,
-      "summary": null,
+      "summary": "APPROVED。実装は設計書に忠実、pytest40件全パス、隔離環境での実機シナリオ検証済み。close_issue:144によりIssue #144を自動クローズ。",
       "events": [
         {
           "ts": "2026-08-02T01:21:11+0000",
@@ -322,6 +322,18 @@
           "agent": "Sora",
           "action": "start",
           "msg": "着手"
+        },
+        {
+          "ts": "2026-08-02T01:50:51+0000",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: 設計書(docs/spec/queue-qa-reguard-design.md)8章チェックリストに沿って全項目実装済みを確認(qa_history/close_issue field, qa --force/--reason, done --skip-qa-guard/--close-issue, close_linked_issue関数, import re削除, queue.shヘッダー更新)。pytest 40件全パス(uv run pytest tests/test_queue_py.py -v)。CHANGES_REQUESTED→修正→APPROVEDの再判定シナリオを隔離環境(isolated_queue.json)で実機再現しretry_count非汚染(0のまま)・qa_history退避を確認。QA実施中にissue_ref/close_issueの命名不一致(Rikuのsummary文言・Yukiの当初理解が実装と不一致)を発見したが、_queue.json側は既にチームによりclose_issue:144へ是正済み(commit 3e760bf)であることを確認。MINOR: queue-qa-reguard-implタスクのsummary文言(issue_ref/auto_close_issue表記、pytest件数37との記載)が実装(close_issue/close_linked_issue、実際40件)と不一致のまま残っており監査証跡の正確性の観点で是正が望ましい。MINOR: .claude/agents/qa.mdへのqa --force運用ガイダンス追記(設計書8章の申し送り事項)が未実施。両MINORともブロッカーではないためAPPROVED。"
+        },
+        {
+          "ts": "2026-08-02T01:50:51+0000",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "APPROVED。実装は設計書に忠実、pytest40件全パス、隔離環境での実機シナリオ検証済み。close_issue:144によりIssue #144を自動クローズ。"
         }
       ]
     },
