@@ -29,6 +29,14 @@
             "command": ".claude/hooks/subagent_stop.sh"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "scripts/enforce-queue-done-stop.sh || true"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -111,7 +119,8 @@
       "Bash(scripts/token-report.py *)",
       "Bash(scripts/enforce-retro-stop.sh *)",
       "Bash(scripts/sprint-points.sh *)",
-      "Write(**)"
+      "Write(**)",
+      "Bash(scripts/audit-scan.sh *)"
     ]
   }
 }

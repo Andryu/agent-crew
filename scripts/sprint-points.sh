@@ -18,8 +18,9 @@
 #   by_complexity         : complexity別内訳（件数×換算）
 #   by_agent              : 担当者別タスク数・ポイント（ポイント降順）
 #   load_balance          : 負荷分散スコア（タスク数ベース／ポイントベースの両方）
-#     by_task_count.score : 最多担当タスク数 ÷ 平均タスク数（計画書の従来指標）
-#     by_points.score     : 最多担当ポイント ÷ 平均ポイント（ポイントベースの新指標）
+#     by_task_count.score    : 最多担当タスク数 ÷ 平均タスク数（補助指標。official: false）
+#     by_points.score        : 最多担当ポイント ÷ 平均ポイント（公式指標。official: true。
+#                              Sprint-25レトロで公式化、pm-estimation.md参照。基準 <= 2.0）
 
 set -euo pipefail
 
@@ -104,12 +105,14 @@ def cpx_points:
       by_task_count: {
         max: $max_task_count,
         avg: $avg_task_count,
-        score: $score_by_count
+        score: $score_by_count,
+        official: false
       },
       by_points: {
         max: $max_agent_points,
         avg: $avg_agent_points,
-        score: $score_by_points
+        score: $score_by_points,
+        official: true
       }
     }
   }
@@ -137,9 +140,9 @@ if [[ "$OUTPUT_MD" -eq 1 ]]; then
     "\n\n総タスク数=" + (.total_tasks|tostring) + "、稼働担当数=" + (.load_balance.distinct_agents|tostring) +
     "、平均タスク数=" + (.load_balance.by_task_count.avg|tostring) +
     "、最多担当タスク数=" + (.load_balance.by_task_count.max|tostring) + "。\n" +
-    "**負荷分散スコア（タスク数）= " + (.load_balance.by_task_count.max|tostring) + " / " + (.load_balance.by_task_count.avg|tostring) + " = " + (.load_balance.by_task_count.score|tostring) + "**\n\n" +
+    "**負荷分散スコア（タスク数ベース・補助）= " + (.load_balance.by_task_count.max|tostring) + " / " + (.load_balance.by_task_count.avg|tostring) + " = " + (.load_balance.by_task_count.score|tostring) + "**\n\n" +
     "平均ポイント=" + (.load_balance.by_points.avg|tostring) + "、最多担当ポイント=" + (.load_balance.by_points.max|tostring) + "。\n" +
-    "**負荷分散スコア（ポイント）= " + (.load_balance.by_points.max|tostring) + " / " + (.load_balance.by_points.avg|tostring) + " = " + (.load_balance.by_points.score|tostring) + "**"
+    "**負荷分散スコア（ポイントベース・公式）= " + (.load_balance.by_points.max|tostring) + " / " + (.load_balance.by_points.avg|tostring) + " = " + (.load_balance.by_points.score|tostring) + "**（基準 <= 2.0）"
   ' <<< "$RESULT_JSON"; then
     echo "ERROR: Markdown断片の生成に失敗しました" >&2
     exit 1

@@ -174,6 +174,8 @@ jq -r '.tasks[] | select(.status == "DONE") |
 - 設計タスク（Alex担当）に対応する実装タスクが DONE になっているか
 - start → done が 60秒未満のタスクがある場合、計画重複を疑って調査する
 
+**feature-spec 参照の明記（ADR-015）**: 計画対象タスクが既存機能の変更を含む場合、対応する `docs/spec/features/<機能名>.md` が存在するかを確認し、存在すればタスクの `notes` に参照パスを記載する。存在しない場合は新規作成が必要である旨を `notes` に記載する（新規作成の強制はRiku DoD側で担保するため、pm.md側は「気づかせる」役割に留める）。
+
 ### ステップ2: DECISIONS.md の確認
 
 ```bash
@@ -198,6 +200,12 @@ jq '.permissions.allow' .claude/settings.json
 
 権限が不足している場合は、タスク着手前に `settings.json` へ追記してからスプリントを開始する。
 登録漏れはフック実装タスクがブロックされる主因（lesson #agent-crew-sprint-17-tooling-001 参照）。
+
+### ステップ2.6: 定常監査スキャン（Kai, 憲章第3条 Enforcement）
+
+`scripts/audit-scan.sh --sprint <sprint-name>` を実行する（Kaiに委譲、またはKai不在の場合はYukiが代行実行）。
+FAILがあれば計画書提出前に是正するか、是正できない場合はブロッカーとして計画書の「確認事項」に明記した上で提出する。
+実行結果（PASS/FAILの別）をスプリント計画書の「事前チェック結果」セクションに1行追記する。
 
 ### ステップ3: 確認結果をスプリント計画案に明記する
 
