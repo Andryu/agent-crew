@@ -16,6 +16,8 @@
       "notes": "docs/org/templates/project-charter.md に基づき投資部門の憲章を起案する。MVP定義は docs/org/strategy-2026H2.md（PR #151, feat/strategy-2026h2, 未マージ）の『投資部門MVP』節（月次成績レポート自動生成→経営会議自動掲載、撤退基準: 3ヶ月連続で判断に使われなければアイドルに戻す）を仮置きする。ヘッダーに『オーナーの戦略レビューでMVP確定後に有効化（Draft）』と明記すること。憲章テンプレート§5の事前検証チェック（競合AI機能確認・撤退基準合意・権限/コスト概算）も埋めること。qa_modeはinlineのため、テンプレートの必須項目が全て埋まっているか自己チェックしてからdoneすること。",
       "retry_count": 0,
       "qa_result": null,
+      "qa_history": [],
+      "issue_ref": null,
       "summary": "投資部門プロジェクト憲章をDraftで起案（docs/org/charters/invest-dept-charter.md）。MVPはstrategy-2026H2ドラフトの月次成績レポート自動掲載を仮置き、Status: DraftヘッダーとGo/No-Go未定・売買執行L0不変を明記。テンプレート§1-5全項目埋め済み・自己チェック完了",
       "events": [
         {
@@ -53,6 +55,8 @@
       "notes": "Issue144。scripts/queue.py の qa コマンドは qa_result 上書き不可（L287-289）のため、QA再判定の正規経路が retry のみになり retry_count が『QA再判定回数』で汚染される（sprint26-qaで実害確認済み）。設計方針候補: (a) qa --force オプション追加（既存qa_resultを上書き、eventsに再判定である旨を記録）、(b) done コマンド側でqa_resultがNoneのままdoneしようとした場合にエラーとするガード。どちらか一方または両方を選定し設計書を作成する。pytest追加方針も含めること。\n\n【緊急追記・Issue152対応】Sprint-27実行中に発生した実インシデント（invest-dept-charter完了時、auto_close_issueがnotes内の『PR151』を誤ってIssue番号と認識しPR151を誤クローズ。Alexが即時reopenで復旧、詳細はIssue152）を受け、本タスクのスコープに auto_close_issue関数の是正（issue_urlフィールドやissue_ref等の専用フィールドからのみ取得する方式への変更、または明示的な--close-issueオプション化）も含める。qa_result/retry_count問題とauto_close_issue問題は同一ファイル(queue.py)・同一done処理フローの関連課題のため、設計書に両方の是正方針を記載すること。",
       "retry_count": 0,
       "qa_result": null,
+      "qa_history": [],
+      "issue_ref": null,
       "summary": "Issue #144設計完了（docs/spec/queue-qa-reguard-design.md）。qa --force（--reason必須・qa_history退避）+ done側QAガード（--skip-qa-guard）の両方を設計。retry_countは実装差し戻し回数のみに整合。自己チェックで既存pytest 7件がdoneガードと衝突する矛盾を発見し、diff付きで修正方針を明記済み",
       "events": [
         {
@@ -90,6 +94,8 @@
       "notes": "Issue149: .claude/agents/pm.md の『スプリント計画フォーマット』節に『タスク分解直後の担当ドラフト段階で scripts/sprint-points.sh --md を実行し負荷分散スコアを確認する』ことを明記する（現状は完了後の集計のみ明文化されている）。Issue150: .claude/agents/architect.md に設計完了時のセルフチェック項目（条件分岐の網羅性・文書内§間の整合性）を追加する。2件セットで1タスクとして扱う。",
       "retry_count": 0,
       "qa_result": null,
+      "qa_history": [],
+      "issue_ref": null,
       "summary": "Issue #149/#150反映完了。pm.mdのスプリント計画フォーマット節に「担当ドラフト直後にsprint-points.sh --mdを実行し負荷分散スコアを計画書へ転記」を義務化（Issue #149）。architect.mdの完了の定義(DoD)節に設計完了時セルフチェック（条件分岐の網羅性・文書内§間の整合性）を追加（Issue #150）",
       "events": [
         {
@@ -127,6 +133,8 @@
       "notes": "対象パス: ~/Workspace/claude-agent-teams/finace/alpha-predict-jp（別リポジトリへの書込みタスク・要最小権限）。手順: (1) templates/department/ のうちalpha-predict-jpに未存在のファイルのみコピー（.claude/agents/pm.md, .claude/_queue.json, docs/sprints/ を新規作成。docs/adr/は既存ADR群があるためコピーしない。.claude/skills/は既存3スキルに触れない）。(2) bash <agent-crewの絶対パス>/install.sh --dry-run --only=hq-agents go ~/Workspace/claude-agent-teams/finace/alpha-predict-jp を必ず先に実行し生成予定物（.claude/agents/{coo,retro,security,doc-reviewer}.md symlink, docs/org symlink）が新規作成であって既存ファイルの上書きでないことを確認する（agent-crew-sprint-25-reliability-001準拠）。(3) 問題なければ--dry-runを外して実行。(4) install.shの自己参照ガード（配布先がagent-crew自身のパスと一致する場合にエラー停止する既存実装）が誤発火/不発火していないか目視確認。(5) alpha-predict-jp内で触るのは新規作成ファイル・symlinkのみ。git addは新規作成ファイルを個別指定し、untrackedのsrc/config.py.bakを巻き込まないこと。作業前にgit statusの出力をnotesまたはsummaryに記録する。(6) コミットはalpha-predict-jp側のローカルブランチ（例: feat/hq-agents-deploy）に留め、originへのpushはオーナー確認後に行う（agent-crew側の自動push運用は他プロダクトリポジトリには適用しない）。(7) 失敗時の復元は作成したファイル・symlinkをrmするのみ（既存ファイル上書きが発生しない設計のため）。",
       "retry_count": 0,
       "qa_result": null,
+      "qa_history": [],
+      "issue_ref": null,
       "summary": "alpha-predict-jpへhq-agents symlink5本+pm.md/_queue.json/docs/sprintsを新規導入。origin未push（ローカルブランチfeat/hq-agents-deployのみ）。readlink -fがmacOS標準では非対応（BSD readlink）の手順不備を発見、python realpathで代替検証。全symlink正常・既存ファイル無変更を確認。",
       "events": [
         {
@@ -164,6 +172,8 @@
       "notes": "~/.claude/_lessons.json で issue_url == null だが実際にはGitHub Issueが起票済みのlesson_idを特定しissue_urlを書き戻す。特定方法: gh issue list の本文（『lesson: <lesson_id>』の記述）と_lessons.jsonのlesson_idを突合する（想像で決め打ちしない）。sprint-26-retro.mdが列挙したsprint-23〜25の12件のうち、経営会議2026-08-02時点で10件は既に129番〜141番として起票済みと判定されている（未起票のsprint-23の2件はIssue149・Issue150として本スプリント計画時点で既に起票済み）。あわせて.claude/agents/retro.mdに『Issue化時は_lessons.jsonのissue_urlをその場で書き戻す』手順を明記し再発防止する。",
       "retry_count": 0,
       "qa_result": null,
+      "qa_history": [],
+      "issue_ref": null,
       "summary": "16件のissue_url同期是正完了。gate query(priority>=4かつevidenceありかつissue_url==null)で真の未起票0件を確認。retro.mdに書き戻し即時化の手順追記済み",
       "events": [
         {
@@ -189,7 +199,7 @@
     {
       "slug": "queue-qa-reguard-impl",
       "title": "queue.py QA再判定経路 実装（Issue #144）",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "medium",
@@ -203,13 +213,27 @@
       "notes": "queue-qa-reguard-design の設計書に従い実装する。pytest追加必須。既存のqa/retry/doneコマンドの後方互換（既存テスト・既存呼び出し元）を壊さないこと。\n\n【実装追加スコープ・Issue152（設計書未反映のため実装時に直接対応）】docs/spec/queue-qa-reguard-design.md はIssue144（qa --force / doneQAガード）のみを設計しており、Issue152（auto_close_issueの誤爆）には触れていない（Alexが着手した後にYukiが本notesへ追記したため設計時点で認識されなかった）。設計をやり直さず、以下の具体的な修正方針をこのまま実装すること: (1) Taskモデルに `issue_ref: Optional[int] = None` フィールドを追加する。(2) `auto_close_issue` 関数を、notesへの正規表現マッチ(`re.search(r'#(\\d+)', task.notes or \"\")`)ではなく `task.issue_ref` を直接参照する方式に変更する（issue_refがNoneならクローズしない）。(3) 複数フェーズ(design→impl→qa)に分かれるタスク群では、最終フェーズのタスクのみ `issue_ref` を設定する運用とする（design段階のタスクでは設定しない。過去Sprint-26でsubagent-stop-enforce-design完了時にIssue139が設計段階で時期尚早クローズされた事例があるため）。(4) 既存の `_queue.json` タスクにはissue_refフィールドが存在しないため、Pydanticのデフォルト値(None)で後方互換を保つこと。(5) pytest追加: notes内に無関係な#数字があってもissue_refが未設定ならクローズされないこと、issue_refが設定されていれば正しくクローズされること、の2ケースを検証する。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "qa_history": [],
+      "issue_ref": null,
+      "summary": "Issue#144(qa --force/doneQAガード)+Issue#152(auto_close_issueのissue_ref参照方式化)を実装。pytest 5件追加+既存7件修正、計37件全パス。scripts/queue.sh ヘッダーコメントも更新",
       "events": [
         {
           "ts": "2026-08-02T01:21:11+0000",
           "agent": "Yuki",
           "action": "created",
           "msg": "Sprint-27 キュー登録"
+        },
+        {
+          "ts": "2026-08-02T01:39:06+0000",
+          "agent": "Riku",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-08-02T01:43:46+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "Issue#144(qa --force/doneQAガード)+Issue#152(auto_close_issueのissue_ref参照方式化)を実装。pytest 5件追加+既存7件修正、計37件全パス。scripts/queue.sh ヘッダーコメントも更新"
         }
       ]
     },
@@ -230,6 +254,8 @@
       "notes": "コードレビューのみで済ませず実機実行で確認する（agent-crew-sprint-25-reliability-001準拠）。確認項目: (a) dry-runと実実行の出力差分が期待通りか、(b) 生成されたsymlinkが実際にagent-crew（本リポジトリ）側の実体を指しているか（readlinkで確認）、(c) alpha-predict-jpの既存ファイル（3スキル・settings.json・settings.local.json・CLAUDE.md等）が一切変更されていないか（git status/git diffで確認）、(d) 自己参照ガードが今回発火していないことの確認、(e) alpha-predict-jp側の変更がpushされずローカルブランチに留まっていることの確認。",
       "retry_count": 0,
       "qa_result": "APPROVED",
+      "qa_history": [],
+      "issue_ref": null,
       "summary": "APPROVED。実機実行(symlink実体解決・diff範囲・push状況)で全項目確認、CRITICAL/MAJORなし。readlink -f手順不備のレトロ教訓化を推奨として明記。",
       "events": [
         {
@@ -281,6 +307,8 @@
       "notes": "pytest実行結果を確認。実際にCHANGES_REQUESTED→修正→APPROVEDのQA再判定シナリオを隔離環境で再現し、retry_countが汚染されないことを実機確認する。",
       "retry_count": 0,
       "qa_result": null,
+      "qa_history": [],
+      "issue_ref": 144,
       "summary": null,
       "events": [
         {
@@ -312,6 +340,8 @@
       "notes": "agent-crew-sprint-24-design-001準拠：project-charter.md/departments.md/ADR-014/pm.md/architect.md/retro.md間の相互参照・実在性を横断確認する。invest-dept-charterがテンプレート必須項目を全て埋めているか、governance-doc-149-150がpm.md/architect.mdに正しく反映されているか、lessons-issue-sync-fixのissue_url更新が実際のgh issueと一致しているかを確認する。",
       "retry_count": 0,
       "qa_result": null,
+      "qa_history": [],
+      "issue_ref": null,
       "summary": null,
       "events": [
         {
@@ -339,6 +369,8 @@
       "notes": "ルーブリック4軸算出。DECISIONS.md本体への転記漏れ（sprint-26分が未転記）をあわせて解消すること。",
       "retry_count": 0,
       "qa_result": null,
+      "qa_history": [],
+      "issue_ref": null,
       "summary": null,
       "events": [
         {
