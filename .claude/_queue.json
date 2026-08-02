@@ -41,7 +41,7 @@
     {
       "slug": "queue-qa-reguard-design",
       "title": "queue.py QA再判定経路 設計（Issue #144）",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "assigned_to": "Alex",
       "complexity": "S",
       "risk_level": "high",
@@ -53,7 +53,7 @@
       "notes": "Issue144。scripts/queue.py の qa コマンドは qa_result 上書き不可（L287-289）のため、QA再判定の正規経路が retry のみになり retry_count が『QA再判定回数』で汚染される（sprint26-qaで実害確認済み）。設計方針候補: (a) qa --force オプション追加（既存qa_resultを上書き、eventsに再判定である旨を記録）、(b) done コマンド側でqa_resultがNoneのままdoneしようとした場合にエラーとするガード。どちらか一方または両方を選定し設計書を作成する。pytest追加方針も含めること。\n\n【緊急追記・Issue152対応】Sprint-27実行中に発生した実インシデント（invest-dept-charter完了時、auto_close_issueがnotes内の『PR151』を誤ってIssue番号と認識しPR151を誤クローズ。Alexが即時reopenで復旧、詳細はIssue152）を受け、本タスクのスコープに auto_close_issue関数の是正（issue_urlフィールドやissue_ref等の専用フィールドからのみ取得する方式への変更、または明示的な--close-issueオプション化）も含める。qa_result/retry_count問題とauto_close_issue問題は同一ファイル(queue.py)・同一done処理フローの関連課題のため、設計書に両方の是正方針を記載すること。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "Issue #144設計完了（docs/spec/queue-qa-reguard-design.md）。qa --force（--reason必須・qa_history退避）+ done側QAガード（--skip-qa-guard）の両方を設計。retry_countは実装差し戻し回数のみに整合。自己チェックで既存pytest 7件がdoneガードと衝突する矛盾を発見し、diff付きで修正方針を明記済み",
       "events": [
         {
           "ts": "2026-08-02T01:21:11+0000",
@@ -66,13 +66,19 @@
           "agent": "Alex",
           "action": "start",
           "msg": "着手"
+        },
+        {
+          "ts": "2026-08-02T01:31:18+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "Issue #144設計完了（docs/spec/queue-qa-reguard-design.md）。qa --force（--reason必須・qa_history退避）+ done側QAガード（--skip-qa-guard）の両方を設計。retry_countは実装差し戻し回数のみに整合。自己チェックで既存pytest 7件がdoneガードと衝突する矛盾を発見し、diff付きで修正方針を明記済み"
         }
       ]
     },
     {
       "slug": "governance-doc-149-150",
       "title": "Issue #149・#150 の文書反映（計画時ポイント集計義務化 + architect設計セルフチェック）",
-      "status": "READY_FOR_ALEX",
+      "status": "DONE",
       "assigned_to": "Alex",
       "complexity": "S",
       "risk_level": "low",
@@ -84,13 +90,25 @@
       "notes": "Issue149: .claude/agents/pm.md の『スプリント計画フォーマット』節に『タスク分解直後の担当ドラフト段階で scripts/sprint-points.sh --md を実行し負荷分散スコアを確認する』ことを明記する（現状は完了後の集計のみ明文化されている）。Issue150: .claude/agents/architect.md に設計完了時のセルフチェック項目（条件分岐の網羅性・文書内§間の整合性）を追加する。2件セットで1タスクとして扱う。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "Issue #149/#150反映完了。pm.mdのスプリント計画フォーマット節に「担当ドラフト直後にsprint-points.sh --mdを実行し負荷分散スコアを計画書へ転記」を義務化（Issue #149）。architect.mdの完了の定義(DoD)節に設計完了時セルフチェック（条件分岐の網羅性・文書内§間の整合性）を追加（Issue #150）",
       "events": [
         {
           "ts": "2026-08-02T01:21:11+0000",
           "agent": "Yuki",
           "action": "created",
           "msg": "Sprint-27 キュー登録"
+        },
+        {
+          "ts": "2026-08-02T01:31:18+0000",
+          "agent": "Alex",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-08-02T01:35:45+0000",
+          "agent": "Alex",
+          "action": "done",
+          "msg": "Issue #149/#150反映完了。pm.mdのスプリント計画フォーマット節に「担当ドラフト直後にsprint-points.sh --mdを実行し負荷分散スコアを計画書へ転記」を義務化（Issue #149）。architect.mdの完了の定義(DoD)節に設計完了時セルフチェック（条件分岐の網羅性・文書内§間の整合性）を追加（Issue #150）"
         }
       ]
     },
@@ -134,7 +152,7 @@
     {
       "slug": "lessons-issue-sync-fix",
       "title": "_lessons.json の issue_url 同期是正",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "assigned_to": "Riku",
       "complexity": "S",
       "risk_level": "low",
@@ -146,7 +164,7 @@
       "notes": "~/.claude/_lessons.json で issue_url == null だが実際にはGitHub Issueが起票済みのlesson_idを特定しissue_urlを書き戻す。特定方法: gh issue list の本文（『lesson: <lesson_id>』の記述）と_lessons.jsonのlesson_idを突合する（想像で決め打ちしない）。sprint-26-retro.mdが列挙したsprint-23〜25の12件のうち、経営会議2026-08-02時点で10件は既に129番〜141番として起票済みと判定されている（未起票のsprint-23の2件はIssue149・Issue150として本スプリント計画時点で既に起票済み）。あわせて.claude/agents/retro.mdに『Issue化時は_lessons.jsonのissue_urlをその場で書き戻す』手順を明記し再発防止する。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "16件のissue_url同期是正完了。gate query(priority>=4かつevidenceありかつissue_url==null)で真の未起票0件を確認。retro.mdに書き戻し即時化の手順追記済み",
       "events": [
         {
           "ts": "2026-08-02T01:21:11+0000",
@@ -159,6 +177,12 @@
           "agent": "Riku",
           "action": "start",
           "msg": "着手"
+        },
+        {
+          "ts": "2026-08-02T01:31:29+0000",
+          "agent": "Riku",
+          "action": "done",
+          "msg": "16件のissue_url同期是正完了。gate query(priority>=4かつevidenceありかつissue_url==null)で真の未起票0件を確認。retro.mdに書き戻し即時化の手順追記済み"
         }
       ]
     },
@@ -176,7 +200,7 @@
       "qa_mode": "—",
       "created_at": "2026-08-02T01:21:11+0000",
       "updated_at": "2026-08-02",
-      "notes": "queue-qa-reguard-design の設計書に従い実装する。pytest追加必須。既存のqa/retry/doneコマンドの後方互換（既存テスト・既存呼び出し元）を壊さないこと。",
+      "notes": "queue-qa-reguard-design の設計書に従い実装する。pytest追加必須。既存のqa/retry/doneコマンドの後方互換（既存テスト・既存呼び出し元）を壊さないこと。\n\n【実装追加スコープ・Issue152（設計書未反映のため実装時に直接対応）】docs/spec/queue-qa-reguard-design.md はIssue144（qa --force / doneQAガード）のみを設計しており、Issue152（auto_close_issueの誤爆）には触れていない（Alexが着手した後にYukiが本notesへ追記したため設計時点で認識されなかった）。設計をやり直さず、以下の具体的な修正方針をこのまま実装すること: (1) Taskモデルに `issue_ref: Optional[int] = None` フィールドを追加する。(2) `auto_close_issue` 関数を、notesへの正規表現マッチ(`re.search(r'#(\\d+)', task.notes or \"\")`)ではなく `task.issue_ref` を直接参照する方式に変更する（issue_refがNoneならクローズしない）。(3) 複数フェーズ(design→impl→qa)に分かれるタスク群では、最終フェーズのタスクのみ `issue_ref` を設定する運用とする（design段階のタスクでは設定しない。過去Sprint-26でsubagent-stop-enforce-design完了時にIssue139が設計段階で時期尚早クローズされた事例があるため）。(4) 既存の `_queue.json` タスクにはissue_refフィールドが存在しないため、Pydanticのデフォルト値(None)で後方互換を保つこと。(5) pytest追加: notes内に無関係な#数字があってもissue_refが未設定ならクローズされないこと、issue_refが設定されていれば正しくクローズされること、の2ケースを検証する。",
       "retry_count": 0,
       "qa_result": null,
       "summary": null,
@@ -192,7 +216,7 @@
     {
       "slug": "invest-dept-hq-deploy-qa",
       "title": "投資部門デプロイ実機QA",
-      "status": "READY_FOR_SORA",
+      "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "M",
       "risk_level": "high",
@@ -205,8 +229,8 @@
       "updated_at": "2026-08-02",
       "notes": "コードレビューのみで済ませず実機実行で確認する（agent-crew-sprint-25-reliability-001準拠）。確認項目: (a) dry-runと実実行の出力差分が期待通りか、(b) 生成されたsymlinkが実際にagent-crew（本リポジトリ）側の実体を指しているか（readlinkで確認）、(c) alpha-predict-jpの既存ファイル（3スキル・settings.json・settings.local.json・CLAUDE.md等）が一切変更されていないか（git status/git diffで確認）、(d) 自己参照ガードが今回発火していないことの確認、(e) alpha-predict-jp側の変更がpushされずローカルブランチに留まっていることの確認。",
       "retry_count": 0,
-      "qa_result": null,
-      "summary": null,
+      "qa_result": "APPROVED",
+      "summary": "APPROVED。実機実行(symlink実体解決・diff範囲・push状況)で全項目確認、CRITICAL/MAJORなし。readlink -f手順不備のレトロ教訓化を推奨として明記。",
       "events": [
         {
           "ts": "2026-08-02T01:21:11+0000",
@@ -219,6 +243,24 @@
           "agent": "Sora",
           "action": "handoff",
           "msg": "next: READY_FOR_SORA"
+        },
+        {
+          "ts": "2026-08-02T01:30:40+0000",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-08-02T01:32:33+0000",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: symlink5本すべてpython3 realpathで実体解決確認(agent-crew本体を正しく指す)。git diff --statで変更範囲は計画通り8ファイルのみ、docs/adr・skills・src/config.py.bak(untracked)は無傷。pm.md/_queue.jsonはテンプレートと完全一致。自己参照ガード非発火は設計上正しい(TARGET_DIR!=REPO_DIR)。ローカルブランチfeat/hq-agents-deployのみでpush未実施。Tomoが発見したreadlink -f非対応(macOS BSD readlink)の手順不備をsora側でも再現・python3 realpathで代替検証済み。sprint27-retroでの教訓化(手順書へのmacOS差異明記)を推奨事項として記録。"
+        },
+        {
+          "ts": "2026-08-02T01:32:33+0000",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "APPROVED。実機実行(symlink実体解決・diff範囲・push状況)で全項目確認、CRITICAL/MAJORなし。readlink -f手順不備のレトロ教訓化を推奨として明記。"
         }
       ]
     },
