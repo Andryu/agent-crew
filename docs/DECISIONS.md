@@ -133,3 +133,59 @@
 - `propose-lesson-rules.sh` 実行後にブランチが fix/lesson-rules-YYYYMMDD に切り替わり、feat/sprint-XX ブランチに戻る必要がある（スクリプトは自動で戻るが確認が必要）。次回実行時も同様の挙動を想定すること。
 
 ---
+
+## sprint-26 — 2026-08-02
+
+### アーキテクチャ判断
+
+- **軽量機能仕様書ADR（SDD仕様積層）の制度化**: `docs/spec/*.md` による設計→実装のブリッジ工程を正式なワークフローとして確立し、Kai定常スキャン（`scripts/audit-scan.sh`）と queue.sh done漏れの構造的対策（SubagentStopフック `enforce-queue-done-stop.sh`）を同一スプリントで実装した。
+- **queue.py の qa_result 上書き不可仕様に伴う retry_count 汚染を発見**: QA再判定（CHANGES_REQUESTED→修正→APPROVED）を記録する正規経路が `retry` コマンドしかなく、意味の異なる2種類のリトライが同一カウンタに混在する構造的問題を特定（`agent-crew-sprint-26-tooling-001`）。
+- **負荷分散スコアのポイントベース公式化を pm-estimation.md に反映完了**（Issue #140）。
+
+### 学び
+
+- Alex作成の設計書内不整合（`QUEUE_FILE` 参照方法の齟齬）をRikuが実装時に能動的に検知・是正し、CRITICAL/MAJORなしでAPPROVEDとなった。設計→実装の橋渡しで実装者が受動的に転記せず矛盾を是正する成功パターンを確認（`agent-crew-sprint-26-design-001`）。
+- vault側のADR索引（`~/Workspace/Obsidian/decisions/agent-crew-adr-index.md`）が実リポジトリの状態とズレており、未コミット文書を「実在する」と誤判定するリスクが顕在化した（`agent-crew-sprint-26-process-001`）。
+
+### 失敗パターン
+
+- 新設した `audit-scan.sh` が、同一スプリントで新設されたSubagentStopフックを判定パターンにマッチさせられず自己参照的にすり抜ける問題がsprint26-qaでMAJORとして検出された（`agent-crew-sprint-26-reliability-001`）。
+- みゆきち自身が `retro-stop-hook-live-check` タスクのnotesに明記された「retro.mdへの手順追記」要求を見落とし、実戦検証のみで完了報告した（`agent-crew-sprint-26-process-003`）。
+- `gh issue create` がAuto Mode分類器によりブロックされ、team-leadへの代行依頼で対応した（原因調査は継続課題）。
+
+### 次スプリントへの推奨
+
+- queue.py に `qa --force` オプション、または done側の再QA記録ガード改善を実装する（Sprint-27で対応・Issue #144としてクローズ済み）。
+- sprint-23〜25の未Issue化lesson12件の棚卸しを行う（Sprint-27で対応・issue_url同期是正として解消済み）。
+- DECISIONS.md本体への本スプリント分の転記（本追記で解消）。
+
+---
+
+## sprint-27 — 2026-08-02
+
+### アーキテクチャ判断
+
+- **queue.py の QA再判定経路とauto_close_issue誤爆の是正（Issue #144 + #152 統合実装）**: `qa --force`（既存qa_resultを上書き、qa_historyへ退避）と `done --skip-qa-guard` によるQA再判定の正規経路を追加し、同時に `close_issue` 専用フィールド＋`close_linked_issue`関数への置き換えでnotes正規表現参照を完全廃止した。pytest 40件全パス。設計→実装→QAが1スプリント内で完結。
+- **投資部門テンプレート複製の実地初運用（ADR-014 Phase3前半）**: `alpha-predict-jp` へhq-agents symlink5本・pm.md・`_queue.json`・`docs/sprints/`を新規導入。origin未push（ローカルブランチのみ）で既存資産は無傷。
+- **`_lessons.json` の issue_url 同期是正**: sprint-23〜25の未Issue化lesson16件を`gh issue list`との突合で是正し、真の未起票0件を確認。retro.mdにIssue化時の即時書き戻し手順を追記した。
+- **Issue #149・#150 の文書反映**: pm.mdへ計画時ポイント集計の義務化、architect.mdへ設計完了時セルフチェック項目を追加。
+
+### 学び
+
+- `governance-doc-149-150` で導入したばかりのarchitect.mdセルフチェック制度が、同一スプリント内の`queue-qa-reguard-design`で即日効果を発揮し、Alexが既存pytest 7件とdoneガードの矛盾を自力検出した（`agent-crew-sprint-27-design-001`）。
+- Riku（`lessons-issue-sync-fix`）の16件機械突合、Sora（`invest-dept-hq-deploy-qa`）の実機QA、Yukiのインシデント時の全タスク機械点検（誤爆リスク3件を事前無害化）など、機械的な突合・点検が有効に機能した。
+
+### 失敗パターン
+
+- **auto_close_issueによるPR誤クローズ（インシデント）**: `invest-dept-charter`完了時、notes内「PR #151」を誤認しオーナー戦略レビュー待ちのPR #151を誤クローズ（即時reopenで復旧、実害なし）。調査でSprint-26中にもIssue #139/#140/#141が同機構で早期クローズされていたことが判明（最終状態は妥当）。同スプリント内でIssue #144の実装に統合し恒久対応済み（`agent-crew-sprint-27-reliability-001`、Issue #152）。
+- **二重指揮の衝突**: team-leadがPMを経由せずRikuへ直接タスク指示を出し、チーム合意と衝突。PMが2回差し戻し、実装者が板挟みになった（`agent-crew-sprint-27-process-001`、Issue #155）。
+- **命名往復**: 設計と実装の並行時にissue_ref/close_issueの命名が2往復し、summary文言の訂正が必要になった（`agent-crew-sprint-27-process-002`）。
+- **macOS readlink -f非対応**: symlink実体解決の検証手順でTomo・Soraが独立に同一問題を発見し、重複して回避策を導出した（`agent-crew-sprint-27-reliability-002`、Issue #156）。
+
+### 次スプリントへの推奨
+
+- 「スプリント進行中のタスクレベル指示はPM経由に一本化、team-leadは方針決定のみ」の運用ルールを明文化する（Issue #155）。
+- symlink検証手順書へのmacOS(BSD readlink)非対応の明記を横展開する（Issue #156）。
+- pm.mdステップ0.7のsource_repo URL正規化（SSH/HTTPS両対応）を実装する（`agent-crew-sprint-27-tooling-001`）。
+
+---

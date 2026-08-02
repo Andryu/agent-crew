@@ -208,6 +208,33 @@ Yuki は最終報告前に `scripts/queue.sh show` で両方を確認してく�
 - `retry_count` が `MAX_RETRY`（デフォルト3）を超えたら自動で `BLOCKED` に遷移
 - `BLOCKED` になったタスクはオーナー（人間）の判断待ち
 
+### QA再判定（`qa --force`）の使い所（Issue #144）
+
+`qa_result` は一度記録すると通常は上書きできない（`ERROR: already has qa_result=...`）。ただし以下のように
+「一度 `qa` を記録した後、同一QAサイクル内で判定を訂正する必要がある」ケースでは `qa --force` を使う。
+
+```bash
+scripts/queue.sh qa <slug> APPROVED "<新しいサマリー>" --force --reason "<なぜ判定を変更するか>"
+```
+
+- `--force` は `--reason` とセットでのみ使える（理由なき上書きは監査価値がないため必須）。
+- 旧 `qa_result` は `qa_history` に退避されるため、判定の変遷は追跡可能。
+- **`retry` との違い**: `retry` は「Rikuが実装をやり直す」フロー（`retry_count` が増える）。
+  `qa --force` は「QA自身の判定記録を訂正する」フローで `retry_count` には一切触れない。
+  実装のやり直しが必要なら `retry`、QA記録の訂正だけなら `qa --force` を使い分けること。
+
+### Issueクローズ運用（`close_issue` フィールド, Issue #152）
+
+タスクが特定のGitHub Issueの解決そのものを表す場合、計画時に `_queue.json` の当該タスクへ
+`close_issue: <Issue番号>` を設定する（Yukiの計画運用判断。Sora自身が設定することはない）。
+`close_issue` が設定されたタスクを `done` すると、該当Issueが自動的にクローズされる。
+
+- `close_issue` が未設定のタスクは `done` してもどのIssueもクローズされない（安全側デフォルト）。
+- 1回限り別のIssueをクローズしたい場合は `scripts/queue.sh done <slug> Sora "<summary>" --close-issue <番号>`
+  （`task.close_issue` より優先される一回限りの上書き）。
+- notes内の自由記述（`#123`等）は一切参照されない。これは旧 `auto_close_issue` がnotes内の
+  無関係な `#数字` を誤ってIssue/PRとしてクローズした事故（Sprint-27, Issue #152）を受けた設計。
+
 ---
 
 ## 環境チェック（preflight）

@@ -12,7 +12,6 @@ import contextlib
 import fcntl
 import json
 import os
-import re
 import subprocess
 import sys
 import tempfile
@@ -42,6 +41,13 @@ class TaskEvent(BaseModel):
     msg: str
 
 
+class QaHistoryEntry(BaseModel):
+    ts: str
+    previous_result: str          # 上書き前の qa_result（APPROVED または CHANGES_REQUESTED）
+    previous_summary: Optional[str] = None  # 上書き前に記録されていた qa イベントの summary（events から逆引き）
+    reason: str                   # --force 実行時に必須で渡す再判定理由
+
+
 class Task(BaseModel):
     slug: str
     title: str
@@ -57,6 +63,13 @@ class Task(BaseModel):
     notes: Optional[str] = None
     retry_count: int = 0
     qa_result: Optional[str] = None
+    qa_history: list[QaHistoryEntry] = Field(default_factory=list)
+    # Issue #152: 旧 auto_close_issue が notes 内の任意の "#数字" を誤って Issue 番号とみなし
+    # 無関係な Issue/PR を誤クローズする事故が複数件発生した。close_issue に明示的に紐付けられた
+    # 番号のみをクローズ対象とする（未設定なら None のままでよく、既存 _queue.json との後方互換を
+    # Pydantic のデフォルト値で保つ）。複数フェーズ（design→impl→qa）に分かれるタスク群では、
+    # 最終フェーズのタスクのみ close_issue を設定する運用とする。
+    close_issue: Optional[int] = None
     summary: Optional[str] = None
     events: list[TaskEvent] = Field(default_factory=list)
 
@@ -175,20 +188,25 @@ def calculate_risk(task: Task) -> None:
     typer.echo(f"  retry_count: {retry}", err=True)
 
 
-def auto_close_issue(q: QueueFile, slug: str, agent: str, summary: str) -> None:
+def close_linked_issue(
+    q: QueueFile, slug: str, agent: str, summary: str, override_issue: Optional[int] = None
+) -> None:
+    """task.close_issue（または --close-issue による一回限りの上書き）が明示設定されている
+    場合のみ対応する Issue/PR を close する。notes の自由記述からの推測は一切行わない
+    （Issue #152 再発防止）。"""
     task = get_task(q, slug)
-    m = re.search(r'#(\d+)', task.notes or "")
-    if not m:
+    issue_num = override_issue if override_issue is not None else task.close_issue
+    if issue_num is None:
         return
-    issue_num = m.group(1)
+    typer.echo(f"INFO: closing linked issue #{issue_num} for {slug} (close_issue field)", err=True)
     try:
         subprocess.run(
-            ["gh", "issue", "close", issue_num, "--comment", f"✅ {agent}: {slug} 完了 — {summary}"],
+            ["gh", "issue", "close", str(issue_num), "--comment", f"✅ {agent}: {slug} 完了 — {summary}"],
             check=True, capture_output=True
         )
         typer.echo(f"OK: Issue #{issue_num} closed")
-    except Exception:
-        pass
+    except Exception as e:
+        typer.echo(f"WARN: failed to close issue #{issue_num}: {e}", err=True)
 
 # ---------- コマンド: init ----------
 
@@ -241,13 +259,26 @@ def start(slug: str) -> None:
 # ---------- コマンド: done ----------
 
 @app.command()
-def done(slug: str, agent: str, summary: str = typer.Argument(default="完了")) -> None:
+def done(
+    slug: str,
+    agent: str,
+    summary: str = typer.Argument(default="完了"),
+    skip_qa_guard: bool = typer.Option(False, "--skip-qa-guard", help="qa_result未設定でもdoneを許可する（設計/QA対象外タスク用）"),
+    close_issue: Optional[int] = typer.Option(None, "--close-issue", help="task.close_issueを一回限り上書きしてクローズするIssue番号"),
+) -> None:
     """タスクを DONE に遷移する"""
     with queue_lock(QUEUE_FILE):
         q = load_queue()
         task = get_task(q, slug)
         if task.status == "DONE":
             typer.echo(f"ERROR: {slug} is already DONE.", err=True); raise typer.Exit(15)
+        if task.qa_mode in ("inline", "end_of_sprint") and task.qa_result is None and not skip_qa_guard:
+            typer.echo(
+                f"ERROR: {slug} has qa_mode={task.qa_mode} but qa_result is not set. "
+                f"Run 'qa' first, or pass --skip-qa-guard to bypass explicitly.",
+                err=True,
+            )
+            raise typer.Exit(17)
         task.status = "DONE"
         task.updated_at = today()
         task.summary = summary
@@ -255,7 +286,7 @@ def done(slug: str, agent: str, summary: str = typer.Argument(default="完了"))
         save_queue(q)
     typer.echo(f"OK: {slug} → DONE")
     emit_signal("task.done", slug, agent, {"summary": summary})
-    auto_close_issue(q, slug, agent, summary)
+    close_linked_issue(q, slug, agent, summary, override_issue=close_issue)
 
 # ---------- コマンド: handoff ----------
 
@@ -276,7 +307,13 @@ def handoff(slug: str, next_agent: str) -> None:
 # ---------- コマンド: qa ----------
 
 @app.command()
-def qa(slug: str, result: str, summary: str = typer.Argument(default="")) -> None:
+def qa(
+    slug: str,
+    result: str,
+    summary: str = typer.Argument(default=""),
+    force: bool = typer.Option(False, "--force", help="既存のqa_resultを上書きする（再判定）"),
+    reason: str = typer.Option("", "--reason", help="--force使用時の再判定理由（必須）"),
+) -> None:
     """qa_result を記録する"""
     if result not in ("APPROVED", "CHANGES_REQUESTED"):
         typer.echo("ERROR: result must be APPROVED or CHANGES_REQUESTED", err=True)
@@ -285,15 +322,28 @@ def qa(slug: str, result: str, summary: str = typer.Argument(default="")) -> Non
         q = load_queue()
         task = get_task(q, slug)
         if task.qa_result is not None:
-            typer.echo(f"ERROR: {slug} already has qa_result={task.qa_result}.", err=True)
-            raise typer.Exit(14)
+            if not force:
+                typer.echo(f"ERROR: {slug} already has qa_result={task.qa_result}. Use --force to re-judge.", err=True)
+                raise typer.Exit(14)
+            if not reason.strip():
+                typer.echo("ERROR: --force requires --reason (再判定理由を必須にする)", err=True)
+                raise typer.Exit(16)
+            # 旧判定の summary を events から逆引きして退避する
+            prev_qa_events = [e for e in task.events if e.action in ("qa", "qa_force")]
+            prev_summary = prev_qa_events[-1].msg if prev_qa_events else None
+            task.qa_history.append(QaHistoryEntry(
+                ts=now_iso(), previous_result=task.qa_result,
+                previous_summary=prev_summary, reason=reason,
+            ))
         task.qa_result = result
         task.updated_at = today()
-        task.events.append(TaskEvent(ts=now_iso(), agent="Sora", action="qa", msg=f"{result}: {summary}"))
+        action = "qa_force" if force else "qa"
+        msg = f"{result}: {summary}" if not force else f"{result} (再判定, reason={reason}): {summary}"
+        task.events.append(TaskEvent(ts=now_iso(), agent="Sora", action=action, msg=msg))
         save_queue(q)
-    typer.echo(f"OK: {slug} qa_result = {result}")
+    typer.echo(f"OK: {slug} qa_result = {result}" + (" (forced re-judgment)" if force else ""))
     signal_type = "qa.approved" if result == "APPROVED" else "qa.changes_requested"
-    emit_signal(signal_type, slug, "Sora", {"reviewer": "Sora", "result": result})
+    emit_signal(signal_type, slug, "Sora", {"reviewer": "Sora", "result": result, "forced": force})
 
 # ---------- コマンド: block ----------
 

@@ -75,14 +75,28 @@ def tmp_queue(tmp_path: Path) -> Path:
     return queue_file
 
 
-def run_queue(args: list[str], queue_file: Path) -> subprocess.CompletedProcess:
+def run_queue(args: list[str], queue_file: Path, extra_env: dict | None = None) -> subprocess.CompletedProcess:
     """uv run scripts/queue.py <args> を環境変数 QUEUE_FILE 付きで実行する"""
     uv = str(Path.home() / ".local/bin/uv")
-    env = {**os.environ, "QUEUE_FILE": str(queue_file)}
+    env = {**os.environ, "QUEUE_FILE": str(queue_file), **(extra_env or {})}
     return subprocess.run(
         [uv, "run", "scripts/queue.py"] + args,
         capture_output=True, text=True, env=env
     )
+
+
+def make_fake_gh(tmp_path: Path, exit_code: int = 0) -> tuple[dict, Path]:
+    """PATH の先頭にフェイクの gh コマンドを仕込み、呼び出し引数をログファイルへ記録する。
+    実際に GitHub へリクエストを送らずに close_linked_issue の呼び出し有無・引数を検証するため。
+    戻り値: (run_queue に渡す extra_env, 呼び出しログファイルのパス)"""
+    fake_bin = tmp_path / "fakebin"
+    fake_bin.mkdir(exist_ok=True)
+    log_file = tmp_path / "gh_calls.log"
+    fake_gh = fake_bin / "gh"
+    fake_gh.write_text(f'#!/bin/sh\necho "$@" >> "{log_file}"\nexit {exit_code}\n')
+    fake_gh.chmod(0o755)
+    extra_env = {"PATH": f"{fake_bin}:{os.environ.get('PATH', '')}"}
+    return extra_env, log_file
 
 
 # ---------- Pydantic モデルテスト ----------
@@ -158,7 +172,7 @@ def test_start_invalid_complexity(tmp_path):
 def test_done_normal(tmp_queue):
     """start → done で DONE に遷移し summary が記録される"""
     run_queue(["start", "task-a"], tmp_queue)
-    result = run_queue(["done", "task-a", "Riku", "実装完了"], tmp_queue)
+    result = run_queue(["done", "task-a", "Riku", "実装完了", "--skip-qa-guard"], tmp_queue)
     assert result.returncode == 0, result.stderr
     assert "DONE" in result.stdout
     data = json.loads(tmp_queue.read_text())
@@ -171,15 +185,113 @@ def test_done_normal(tmp_queue):
 def test_done_duplicate(tmp_queue):
     """DONE タスクを再度 done するとエラー"""
     run_queue(["start", "task-a"], tmp_queue)
-    run_queue(["done", "task-a", "Riku", "完了"], tmp_queue)
+    run_queue(["done", "task-a", "Riku", "完了", "--skip-qa-guard"], tmp_queue)
     result = run_queue(["done", "task-a", "Riku", "再完了"], tmp_queue)
     assert result.returncode == 15
+
+# ---------- close_linked_issue (close_issue方式) テスト（Issue #152） ----------
+
+def test_close_issue_not_set_skips_gh_call(tmp_path):
+    """close_issue が未設定なら、notes に無関係な #数字（例: 他タスクやPRへの言及）があっても
+    gh issue close は一切呼ばれない（Issue #152: notes正規表現マッチによる誤爆の再発防止）"""
+    queue_file = tmp_path / "_queue.json"
+    data = json.loads(json.dumps(MINIMAL_QUEUE))
+    data["tasks"][0]["notes"] = "PR #99 のレビュー待ち。無関係な #42 にも言及。"
+    queue_file.write_text(json.dumps(data, ensure_ascii=False))
+    extra_env, log_file = make_fake_gh(tmp_path)
+
+    run_queue(["start", "task-a"], queue_file, extra_env)
+    run_queue(["qa", "task-a", "APPROVED", "ok"], queue_file, extra_env)
+    result = run_queue(["done", "task-a", "Riku", "実装完了"], queue_file, extra_env)
+    assert result.returncode == 0, result.stderr
+    assert not log_file.exists(), f"gh が呼ばれてはいけない場面で呼ばれた: {log_file.read_text() if log_file.exists() else ''}"
+
+
+def test_notes_with_hash_number_does_not_trigger_close(tmp_path):
+    """notesに#<数字>が含まれていても、close_issue未設定ならgh issueは呼ばれない
+    （Issue #152 回帰テスト。旧実装のnotes正規表現マッチが再導入されていないことの確認）"""
+    queue_file = tmp_path / "_queue.json"
+    data = json.loads(json.dumps(MINIMAL_QUEUE))
+    data["tasks"][0]["notes"] = "PR #999 との関連メモ、本タスクの主題とは無関係な参照"
+    queue_file.write_text(json.dumps(data, ensure_ascii=False))
+    extra_env, log_file = make_fake_gh(tmp_path)
+
+    run_queue(["start", "task-a"], queue_file, extra_env)
+    run_queue(["qa", "task-a", "APPROVED", "ok"], queue_file, extra_env)
+    run_queue(["done", "task-a", "Riku", "完了"], queue_file, extra_env)
+    assert not log_file.exists()
+
+
+def test_close_issue_field_triggers_gh_close(tmp_path):
+    """task.close_issue が設定されていれば done 時に gh issue close <close_issue> が呼ばれる"""
+    queue_file = tmp_path / "_queue.json"
+    data = json.loads(json.dumps(MINIMAL_QUEUE))
+    data["tasks"][0]["notes"] = "無関係な #42 にも言及するが close_issue を優先すること"
+    data["tasks"][0]["close_issue"] = 144
+    queue_file.write_text(json.dumps(data, ensure_ascii=False))
+    extra_env, log_file = make_fake_gh(tmp_path)
+
+    run_queue(["start", "task-a"], queue_file, extra_env)
+    run_queue(["qa", "task-a", "APPROVED", "ok"], queue_file, extra_env)
+    result = run_queue(["done", "task-a", "Riku", "実装完了"], queue_file, extra_env)
+    assert result.returncode == 0, result.stderr
+    assert log_file.exists(), "close_issue 設定時は gh issue close が呼ばれるはず"
+    call_args = log_file.read_text()
+    assert "close 144" in call_args
+    assert "#42" not in call_args  # notes内の無関係な数字ではなくclose_issueの値が使われている
+
+
+def test_close_issue_cli_override_takes_precedence(tmp_path):
+    """--close-issue は task.close_issue より優先される（一回限りの上書き運用）"""
+    queue_file = tmp_path / "_queue.json"
+    data = json.loads(json.dumps(MINIMAL_QUEUE))
+    data["tasks"][0]["close_issue"] = 999
+    queue_file.write_text(json.dumps(data, ensure_ascii=False))
+    extra_env, log_file = make_fake_gh(tmp_path)
+
+    run_queue(["start", "task-a"], queue_file, extra_env)
+    run_queue(["qa", "task-a", "APPROVED", "ok"], queue_file, extra_env)
+    run_queue(["done", "task-a", "Riku", "完了", "--close-issue", "777"], queue_file, extra_env)
+    assert log_file.exists()
+    log_content = log_file.read_text()
+    assert "close 777" in log_content
+    assert "close 999" not in log_content
+
+
+def test_close_issue_gh_failure_does_not_fail_done(tmp_path):
+    """gh issue close が失敗しても done 自体は成功扱いのまま（WARNは出るがexitは0、
+    Issueクローズはベストエフォートの副作用でありdoneの主目的である状態遷移を失敗させない）"""
+    queue_file = tmp_path / "_queue.json"
+    data = json.loads(json.dumps(MINIMAL_QUEUE))
+    data["tasks"][0]["close_issue"] = 999
+    queue_file.write_text(json.dumps(data, ensure_ascii=False))
+    extra_env, _ = make_fake_gh(tmp_path, exit_code=1)
+
+    run_queue(["start", "task-a"], queue_file, extra_env)
+    run_queue(["qa", "task-a", "APPROVED", "ok"], queue_file, extra_env)
+    result = run_queue(["done", "task-a", "Riku", "完了"], queue_file, extra_env)
+    assert result.returncode == 0, result.stderr
+    assert "WARN" in result.stderr
+
+
+def test_close_issue_defaults_to_none_for_backward_compat(tmp_path):
+    """close_issue フィールドを持たない既存 _queue.json（後方互換）も close_issue=None として読み込める"""
+    queue_file = tmp_path / "_queue.json"
+    data = json.loads(json.dumps(MINIMAL_QUEUE))
+    # MINIMAL_QUEUE 自体に close_issue キーは含まれていない（=既存 _queue.json の旧フォーマットそのもの）
+    assert "close_issue" not in data["tasks"][0]
+    queue_file.write_text(json.dumps(data, ensure_ascii=False))
+    result = run_queue(["show", "task-a"], queue_file)
+    assert result.returncode == 0, result.stderr
+    out = json.loads(result.stdout)
+    assert out["close_issue"] is None
 
 # ---------- handoff コマンドテスト ----------
 
 def test_handoff_sets_ready_for(tmp_queue):
     """handoff で READY_FOR_SORA に遷移する"""
     run_queue(["start", "task-a"], tmp_queue)
+    run_queue(["qa", "task-a", "APPROVED", "問題なし"], tmp_queue)
     run_queue(["done", "task-a", "Riku", "完了"], tmp_queue)
     result = run_queue(["handoff", "task-b", "Sora"], tmp_queue)
     assert result.returncode == 0
@@ -192,7 +304,6 @@ def test_handoff_sets_ready_for(tmp_queue):
 def test_qa_approved(tmp_queue):
     """qa APPROVED が正しく記録される"""
     run_queue(["start", "task-a"], tmp_queue)
-    run_queue(["done", "task-a", "Riku", "完了"], tmp_queue)
     result = run_queue(["qa", "task-a", "APPROVED", "問題なし"], tmp_queue)
     assert result.returncode == 0
     data = json.loads(tmp_queue.read_text())
@@ -203,7 +314,6 @@ def test_qa_approved(tmp_queue):
 def test_qa_changes_requested(tmp_queue):
     """qa CHANGES_REQUESTED が正しく記録される"""
     run_queue(["start", "task-a"], tmp_queue)
-    run_queue(["done", "task-a", "Riku", "完了"], tmp_queue)
     result = run_queue(["qa", "task-a", "CHANGES_REQUESTED", "修正必要"], tmp_queue)
     assert result.returncode == 0
     data = json.loads(tmp_queue.read_text())
@@ -218,19 +328,99 @@ def test_qa_invalid_result(tmp_queue):
 
 
 def test_qa_idempotency_guard(tmp_queue):
-    """qa_result が既に設定済みの場合は exit 14 で拒否する"""
+    """qa_result が既に設定済みの場合は exit 14 で拒否する（--forceなし）"""
     run_queue(["start", "task-a"], tmp_queue)
-    run_queue(["done", "task-a", "Riku", "完了"], tmp_queue)
     run_queue(["qa", "task-a", "APPROVED", "初回"], tmp_queue)
     result = run_queue(["qa", "task-a", "APPROVED", "重複"], tmp_queue)
     assert result.returncode == 14
     assert "already has qa_result" in result.stderr
+
+
+def test_qa_force_requires_reason(tmp_queue):
+    """--force はあるが --reason が空の場合 exit 16 で拒否する"""
+    run_queue(["start", "task-a"], tmp_queue)
+    run_queue(["qa", "task-a", "APPROVED", "初回"], tmp_queue)
+    result = run_queue(["qa", "task-a", "CHANGES_REQUESTED", "再判定", "--force"], tmp_queue)
+    assert result.returncode == 16
+    assert "--reason" in result.stderr
+
+
+def test_qa_force_overwrites_and_archives_history(tmp_queue):
+    """--force + --reason で qa_result が上書きされ、旧値が qa_history に退避される"""
+    run_queue(["start", "task-a"], tmp_queue)
+    run_queue(["qa", "task-a", "APPROVED", "見落とし"], tmp_queue)
+    result = run_queue(
+        ["qa", "task-a", "CHANGES_REQUESTED", "再確認の結果差し戻し",
+         "--force", "--reason", "初回レビューで見落としがあった"],
+        tmp_queue,
+    )
+    assert result.returncode == 0, result.stderr
+    data = json.loads(tmp_queue.read_text())
+    task = next(t for t in data["tasks"] if t["slug"] == "task-a")
+    assert task["qa_result"] == "CHANGES_REQUESTED"
+    assert len(task["qa_history"]) == 1
+    assert task["qa_history"][0]["previous_result"] == "APPROVED"
+    assert task["qa_history"][0]["reason"] == "初回レビューで見落としがあった"
+    assert any(e["action"] == "qa_force" for e in task["events"])
+
+
+def test_qa_force_does_not_touch_retry_count(tmp_queue):
+    """qa --force は retry_count を増やさない（R5: 意味の非汚染）"""
+    run_queue(["start", "task-a"], tmp_queue)
+    run_queue(["qa", "task-a", "APPROVED", "初回"], tmp_queue)
+    run_queue(
+        ["qa", "task-a", "CHANGES_REQUESTED", "再判定", "--force", "--reason", "テスト"],
+        tmp_queue,
+    )
+    data = json.loads(tmp_queue.read_text())
+    task = next(t for t in data["tasks"] if t["slug"] == "task-a")
+    assert task["retry_count"] == 0
+
+# ---------- done QAガードテスト ----------
+
+def test_done_blocks_when_qa_mode_inline_and_qa_result_missing(tmp_queue):
+    """qa_mode: inline で qa_result 未設定のタスクは done できない（exit 17）"""
+    # MINIMAL_QUEUE の task-a は qa_mode: inline 済み
+    run_queue(["start", "task-a"], tmp_queue)
+    result = run_queue(["done", "task-a", "Riku", "実装完了"], tmp_queue)
+    assert result.returncode == 17
+    assert "qa_mode" in result.stderr
+
+
+def test_done_blocks_when_qa_mode_end_of_sprint_and_qa_result_missing(tmp_path):
+    """qa_mode: end_of_sprint でも qa_result 未設定なら done できない（exit 17）"""
+    queue_file = tmp_path / "_queue.json"
+    data = json.loads(json.dumps(MINIMAL_QUEUE))
+    data["tasks"][0]["qa_mode"] = "end_of_sprint"
+    queue_file.write_text(json.dumps(data, ensure_ascii=False))
+    run_queue(["start", "task-a"], queue_file)
+    result = run_queue(["done", "task-a", "Riku", "実装完了"], queue_file)
+    assert result.returncode == 17
+
+
+def test_done_allows_skip_qa_guard(tmp_queue):
+    """--skip-qa-guard を渡せば qa_result 未設定でも done できる"""
+    run_queue(["start", "task-a"], tmp_queue)
+    result = run_queue(["done", "task-a", "Riku", "実装完了", "--skip-qa-guard"], tmp_queue)
+    assert result.returncode == 0, result.stderr
+
+
+def test_done_guard_not_applied_when_qa_mode_none(tmp_path):
+    """qa_mode: None のタスク（設計・QA自身のタスク等）はガード対象外で従来通り done できる"""
+    queue_file = tmp_path / "_queue.json"
+    data = json.loads(json.dumps(MINIMAL_QUEUE))
+    data["tasks"][0]["qa_mode"] = None  # task-a を qa_mode: None にした独立フィクスチャ
+    queue_file.write_text(json.dumps(data, ensure_ascii=False))
+    run_queue(["start", "task-a"], queue_file)
+    result = run_queue(["done", "task-a", "Riku", "実装完了"], queue_file)
+    assert result.returncode == 0, result.stderr
 
 # ---------- retry コマンドテスト ----------
 
 def test_retry_increments_count(tmp_queue):
     """retry で retry_count が増加し READY_FOR_RIKU になる"""
     run_queue(["start", "task-a"], tmp_queue)
+    run_queue(["qa", "task-a", "APPROVED", "問題なし"], tmp_queue)
     run_queue(["done", "task-a", "Riku", "完了"], tmp_queue)
     result = run_queue(["retry", "task-a"], tmp_queue)
     assert result.returncode == 0

@@ -6,10 +6,14 @@
 #
 # 使い方:
 #   queue.sh start <slug>                                        # タスクを IN_PROGRESS へ（depends_on 全 DONE チェックあり）
-#   queue.sh done <slug> <agent> "<summary>"                     # タスクを DONE へ + events追記
+#   queue.sh done <slug> <agent> "<summary>" [--skip-qa-guard] [--close-issue <n>]
+#                                                                 # タスクを DONE へ + events追記
+#                                                                 # （qa_modeがinline/end_of_sprintでqa_result未設定だとエラー。バイパスは--skip-qa-guard）
+#                                                                 # close_issue未設定でもtask.close_issue経由でIssueをclose可（--close-issueで一回限り上書き）
 #   queue.sh handoff <slug> <next-agent>                         # 次のタスクを READY_FOR_<agent> へ解放
 #   queue.sh parallel-handoff <slug1>:<agent1> <slug2>:<agent2>  # 複数タスクを単一ロック内で一括ハンドオフ
-#   queue.sh qa <slug> <APPROVED|CHANGES_REQUESTED> "<summary>"  # qa_result を記録
+#   queue.sh qa <slug> <APPROVED|CHANGES_REQUESTED> "<summary>" [--force --reason "<reason>"]
+#                                                                 # qa_result を記録（--forceで再判定・旧値はqa_historyへ退避）
 #   queue.sh block <slug> <agent> "<reason>"                     # BLOCKED に遷移
 #   queue.sh retry <slug>                                        # retry_count++ し READY_FOR_RIKU へ戻す
 #   queue.sh show [<slug>]                                       # 状態を表示
