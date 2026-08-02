@@ -162,8 +162,35 @@ sprint-23〜25 の12件のうち、経営会議2026-08-02時点で「10件は既
   - hooks 構文・生存確認: WARNING 1件（`enforce-retro-stop.sh` 内の `echo` コマンドが未知形式として
     検知されたのみで、既知の偽陽性。sprint-26でも同様のWARNINGが出ており実害なし）
 
+## インシデント記録（Sprint-27実行中・2026-08-02）
+
+**#1 queue.py auto_close_issue によるPR誤クローズ**
+
+Alexが `invest-dept-charter` タスクを `queue.sh done` した際、`scripts/queue.py` の
+`auto_close_issue` 関数がタスク notes 内の参照テキスト「PR151」（本編集前は「PR #151」表記）を
+Issue番号だと誤認し、`gh issue close 151` を実行してオーナーの戦略レビュー待ちだった PR151
+（feat/strategy-2026h2）を誤ってクローズした。Alexが即座に `gh pr reopen 151` で復旧し、
+状況説明コメントを追加。実害はレビュー体験への一時的な混乱のみで、レビュー内容自体への影響はなし。
+
+根本原因: `re.search(r'#(\d+)', task.notes or "")` が notes 内で最初に出現する任意の
+「#数字」に無条件でマッチし、Issue/PRの区別なく `gh issue close` を実行する設計。
+Issue152として起票し、`queue-qa-reguard-design`（Issue144設計）のスコープに是正方針を統合した
+（risk_levelをmediumからhighへ引き上げ）。
+
+**再発防止（本スプリント内で即時対応済み）**: `_queue.json` の残タスク（当時IN_PROGRESS/未着手だった
+`queue-qa-reguard-design` / `governance-doc-149-150` / `lessons-issue-sync-fix`）のnotesを
+点検したところ、同型の誤爆リスク（Issue144の時期尚早クローズ、Issue149のみクローズされ
+Issue150が取り残される非対称挙動、無関係なIssue129の誤クローズ）が実際に存在することを確認し、
+`#<数字>` 表記を安全な表記（例: `Issue144`）に置換して恒久修正までのブリッジとした。
+
+**教訓化の申し送り**: sprint27-retro にて lesson として記録すること。特に「サブエージェントへの
+指示文・notes内の自由記述に含まれる `#<数字>` 表記が、実行系のパターンマッチによって意図しない
+副作用（自動クローズ等）を引き起こしうる」という一般化可能な教訓であり、pm-learned-rules.md への
+反映を検討する。
+
 ---
 
 | バージョン | 日付 | 変更 |
 |-----------|------|------|
 | v1.0 | 2026-08-02 | Sprint-27 計画初版（Yuki） |
+| v1.1 | 2026-08-02 | インシデント記録追加（auto_close_issue誤爆、Issue152起票、_queue.json是正）（Yuki） |
