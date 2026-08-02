@@ -2,27 +2,42 @@
 """
 server.py — STONEFISH ダッシュボードのイベント受信サーバ
 
-Claude Code hooks（dashboard/hooks/emit_event.py）から POST されるイベントを受け取り、
-JSONL へ永続化しつつ、接続中の WebSocket クライアントへリアルタイム配信する。
-disler/claude-code-hooks-multi-agent-observability の構成（hooks → HTTP → サーバ → WS → SPA）
-を踏襲した M1（イベントパイプライン）の実装に、M2（トークン会計・承認キュー配信・SPA配信）
-を追加したもの。
+## ADR-016: transcript 監視方式への転換（2026-08-02）
+当初は Claude Code hooks（dashboard/hooks/emit_event.py）から POST されるイベントを主軸に
+していたが、「リポジトリごとに hooks を配線するのが運用の手間」というオーナー指摘を受け、
+サーバが自ら `~/.claude/projects/` 配下を横断ポーリングしてアクティブセッションを自動発見する
+方式（B案縮小版）へ転換した。決定の経緯・却下した代替案・エスカレーション条件は
+`docs/adr/ADR-016-dashboard-transcript-monitoring.md` を参照。
+`POST /events`（hooks経由の受信）は後方互換のため当面残置するが、主経路は discovery.py に
+よる自動発見であり、リポジトリ側の設定は不要。
 
 ## エンドポイント
-- POST /events : イベント受信。enrich → id/received_ts 付与 → JSONL append → WS ブロードキャスト。
-  payload.transcript_path があればトークン集計器（tokens.TranscriptAggregator）に監視登録し、
-  cwd があれば承認キュー（<cwd>/.claude/_queue.json）監視対象を更新する（最新イベントの cwd優先）。
-- GET  /ws     : WebSocket。接続直後に直近200件のイベント・トークン集計・承認キュー状態を
-  {"type":"init", "events":[...], "tokens":{...}, "queue":{...}} で送り、以後 live 配信する。
+- POST /events : （後方互換）hooksからのイベント受信。enrich → id/received_ts 付与 →
+  JSONL append → WS ブロードキャスト。payload.transcript_path があればトークン集計器に、
+  cwd があれば承認キュー監視対象に登録する。
+- GET  /ws     : WebSocket。接続直後に直近200件のイベント・トークン集計・承認キューの
+  現在状態を
+  {"type":"init", "events":[...], "tokens":{...}, "queue":{...}, "queues":{...}, "pending":[...]}
+  で送り、以後 live 配信する。`queue`（単数）は直近アクティブなプロジェクト1件分で、
+  既存SPA（dashboard/app/index.html）との後方互換のために維持している。`queues`（複数、
+  ラベル→キューのdict）は複数プロジェクトを横断表示したい将来のSPA拡張向けに追加した。
 - GET  /health : 死活監視用 {"ok": true, "clients": N, "events": N}
-- GET  /       : dashboard/app/index.html が存在すればそれを返す（SPA は並行実装中のため
-  存在チェックのみ。無ければ404）
+- GET  /       : dashboard/app/index.html が存在すればそれを返す（無ければ404）
 
 ## バックグラウンドポーリング
-POLL_INTERVAL_SEC 周期で以下を確認し、変化があれば全 WS クライアントへブロードキャストする。
+POLL_INTERVAL_SEC 周期で以下を行い、変化があれば全 WS クライアントへブロードキャストする。
+- discovery.find_active_sessions() で `~/.claude/projects/` を横断スキャンし、アクティブな
+  transcript をトークン集計器・承認キュー監視対象に自動登録する（hooks配線不要）。発見した
+  セッションのうち最も新しく更新された transcript のプロジェクトを「直近アクティブな
+  プロジェクト」として `queue`（単数）に反映する
 - トークン集計器の poll() が True を返せば {"type":"tokens","depts":{...}}
-- 承認キューファイルの mtime が変化していれば {"type":"queue","queue":{...}}
-  （ファイルが無い/壊れている場合は {"tasks": []}）
+- 監視中のいずれかの `_queue.json` の mtime が変化していれば、
+  {"type":"queue","queue":{...}}（直近アクティブなプロジェクト1件、既存SPA向け）と
+  {"type":"queues","queues":{<label>: {...}, ...}}（既知の全プロジェクト分）の両方を配信する
+  （ファイルが無い/壊れている場合は該当分が {"tasks": []}）
+- pending.find_pending_approvals() のヒューリスティック（tool_use後にtool_resultが一定時間
+  無いセッション）の結果が変化していれば {"type":"pending","pending":[...]}（現行SPAは未使用。
+  将来のNotificationフック代替の配信チャネルとして追加）
 
 ## 永続化
 <data-dir>/events.jsonl に1行1イベントで append する（都度 flush）。
@@ -37,6 +52,7 @@ import json
 import os
 import sys
 from collections import deque
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -44,13 +60,20 @@ from typing import Optional
 from aiohttp import web, WSMsgType
 
 sys.path.insert(0, str(Path(__file__).parent))
+from discovery import ActiveSession, find_active_sessions  # noqa: E402
 from enrich import enrich  # noqa: E402
+from pending import DEFAULT_PENDING_THRESHOLD_SECONDS, find_pending_approvals  # noqa: E402
 from tokens import TranscriptAggregator  # noqa: E402
 
 MAX_BODY_BYTES = 1024 * 1024  # 1MB
 RING_BUFFER_SIZE = 1000
 INIT_EVENT_COUNT = 200
 POLL_INTERVAL_SEC = 3.0
+
+# ADR-016: transcript 監視方式のパラメータ
+PROJECTS_ROOT = Path.home() / ".claude" / "projects"
+DISCOVERY_ACTIVE_WINDOW_SEC = 600.0  # 10分以内に更新された transcript をアクティブとみなす
+PENDING_THRESHOLD_SEC = DEFAULT_PENDING_THRESHOLD_SECONDS
 
 DEFAULT_PORT = 8787
 DEFAULT_DATA_DIR = Path.home() / ".claude" / "stonefish"
@@ -186,12 +209,92 @@ def _read_queue(queue_path: Optional[Path]) -> dict:
     return {"sprint": raw.get("sprint"), "tasks": tasks, "updated_ts": updated_ts}
 
 
+def _queue_label(cwd: str) -> str:
+    """承認キュー監視対象を識別するラベル。cwdのディレクトリ名（basename）を使う。
+
+    既知の制約: 同名の worktree が複数あると同一ラベルに衝突する（例: 別の
+    親ディレクトリ配下に同名 `dashboard/` が複数存在するケース）。個人開発のMVP規模では
+    実害が小さいため許容し、問題化した場合はラベルをフルパスベースに拡張する。
+    """
+    name = Path(cwd).name
+    return name or cwd
+
+
+def _register_queue_target(queue_states: dict, cwd: str) -> None:
+    """cwd から承認キュー（_queue.json）の監視対象を登録・更新する。
+
+    新規ラベル、またはパスが変わった（同名ラベルで別プロジェクトを指すようになった）場合は
+    mtime を None に戻し、次回ポーリングで必ず現在の状態を配信させる。
+    """
+    if not cwd:
+        return
+    label = _queue_label(cwd)
+    path = Path(cwd) / ".claude" / "_queue.json"
+    entry = queue_states.get(label)
+    if entry is None or entry.get("path") != path:
+        queue_states[label] = {"path": path, "mtime": None}
+
+
+def _all_queues(queue_states: dict) -> dict:
+    return {label: _read_queue(state.get("path")) for label, state in queue_states.items()}
+
+
+def _primary_queue(app: web.Application) -> dict:
+    """既存SPA（dashboard/app/index.html）が読む `queue`（単数）用に、
+    「直近アクティブな1プロジェクト」分のキューだけを取り出す。
+
+    discovery.py 経由では「最も新しく更新された transcript のプロジェクト」、
+    POST /events 経由では「最新イベントの cwd」が primary_queue_label として更新される
+    （旧: 単一 queue_state 方式の「最新イベントの cwd 優先」という挙動を維持するため）。
+    """
+    queue_states: dict = app["queue_states"]
+    label = app["primary_queue_state"]["label"]
+    if label is None:
+        return {"tasks": []}
+    state = queue_states.get(label)
+    if state is None:
+        return {"tasks": []}
+    return _read_queue(state.get("path"))
+
+
+def _pending_to_dict(p) -> dict:
+    d = asdict(p)
+    d["waiting_seconds"] = round(d["waiting_seconds"], 1)
+    return d
+
+
+def _discover_and_register(app: web.Application) -> list[ActiveSession]:
+    """~/.claude/projects/ を横断スキャンし、見つかったアクティブセッションをトークン集計器・
+    承認キュー監視対象へ登録する（ADR-016の中核。hooks配線がなくても機能する）。
+
+    見つかったセッションのうち最も新しく更新された transcript のプロジェクトを
+    `primary_queue_label` として記録する（`queue`単数キーの後方互換用）。
+    """
+    aggregator: TranscriptAggregator = app["aggregator"]
+    queue_states: dict = app["queue_states"]
+    try:
+        sessions = find_active_sessions(PROJECTS_ROOT, DISCOVERY_ACTIVE_WINDOW_SEC)
+    except Exception as e:
+        _log(f"セッション自動発見中にエラー: {e}")
+        return []
+
+    for session in sessions:
+        aggregator.register(session.transcript_path, session.dept)
+        _register_queue_target(queue_states, session.cwd)
+
+    if sessions:
+        latest = max(sessions, key=lambda s: s.mtime)
+        app["primary_queue_state"]["label"] = _queue_label(latest.cwd)
+
+    return sessions
+
+
 @routes.post("/events")
 async def handle_post_event(request: web.Request) -> web.Response:
     store: EventStore = request.app["store"]
     clients: set[web.WebSocketResponse] = request.app["ws_clients"]
     aggregator: TranscriptAggregator = request.app["aggregator"]
-    queue_state: dict = request.app["queue_state"]
+    queue_states: dict = request.app["queue_states"]
 
     body = await request.read()
     if len(body) > MAX_BODY_BYTES:
@@ -212,20 +315,21 @@ async def handle_post_event(request: web.Request) -> web.Response:
 
     store.append(enriched)
 
-    # payload.transcript_path があればトークン集計器に監視対象として登録する
+    # 後方互換: payload.transcript_path があればトークン集計器に監視対象として登録する
+    # （ADR-016以降の主経路は discovery.py による自動発見だが、hooksがまだ動いている
+    # 環境でも二重登録は問題なく、register() は同一パスなら冪等）
     payload = enriched.get("payload")
     transcript_path = payload.get("transcript_path") if isinstance(payload, dict) else None
     if isinstance(transcript_path, str) and transcript_path:
         aggregator.register(transcript_path, enriched.get("dept", "other"))
 
-    # cwd があれば承認キュー監視対象を更新する（最新イベントの cwd を優先）
+    # 後方互換: cwd があれば承認キュー監視対象に追加し、primary（queue単数用）も
+    # 最新イベントのcwd優先で更新する（discovery.py が発見できていない場合の保険。
+    # 既に discovery 側で同じラベルが登録済みなら _register_queue_target は何もしない）
     cwd = enriched.get("cwd")
     if isinstance(cwd, str) and cwd:
-        new_queue_path = Path(cwd) / ".claude" / "_queue.json"
-        if queue_state.get("path") != new_queue_path:
-            queue_state["path"] = new_queue_path
-            # 監視対象切替時は次回ポーリングで必ず変化ありと判定させ、新対象の状態を送らせる
-            queue_state["mtime"] = None
+        _register_queue_target(queue_states, cwd)
+        request.app["primary_queue_state"]["label"] = _queue_label(cwd)
 
     await _broadcast(clients, {"type": "event", "event": enriched})
 
@@ -237,7 +341,7 @@ async def handle_ws(request: web.Request) -> web.WebSocketResponse:
     store: EventStore = request.app["store"]
     clients: set[web.WebSocketResponse] = request.app["ws_clients"]
     aggregator: TranscriptAggregator = request.app["aggregator"]
-    queue_state: dict = request.app["queue_state"]
+    queue_states: dict = request.app["queue_states"]
 
     ws = web.WebSocketResponse()
     await ws.prepare(request)
@@ -245,12 +349,27 @@ async def handle_ws(request: web.Request) -> web.WebSocketResponse:
     _log(f"WS接続: クライアント数={len(clients)}")
 
     try:
+        # 接続直後に最新状態を送るため、バックグラウンドポーリングを待たず同期的に
+        # 一度スキャン・pollしておく（discovery.pyでの自動発見はhooks不要のため常に可能）
+        sessions = _discover_and_register(request.app)
+        try:
+            aggregator.poll()
+        except Exception as e:
+            _log(f"init用トークンpollでエラー: {e}")
+        try:
+            pending_list = find_pending_approvals(sessions, threshold_seconds=PENDING_THRESHOLD_SEC)
+        except Exception as e:
+            _log(f"init用承認待ち検知でエラー: {e}")
+            pending_list = []
+
         init_message = json.dumps(
             {
                 "type": "init",
                 "events": store.recent(INIT_EVENT_COUNT),
                 "tokens": aggregator.totals(),
-                "queue": _read_queue(queue_state.get("path")),
+                "queue": _primary_queue(request.app),
+                "queues": _all_queues(queue_states),
+                "pending": [_pending_to_dict(p) for p in pending_list],
             },
             ensure_ascii=False,
         )
@@ -298,13 +417,23 @@ async def handle_index(request: web.Request) -> web.Response:
 
 
 async def _background_poll_task(app: web.Application) -> None:
-    """POLL_INTERVAL_SEC 周期でトークン集計・承認キューの変化を検知し、WSクライアントへ配信する。"""
+    """POLL_INTERVAL_SEC 周期で以下を行い、変化があれば WSクライアントへ配信する（ADR-016）。
+
+    1. discovery.py で ~/.claude/projects/ を横断スキャンし、アクティブセッションを
+       トークン集計器・承認キュー監視対象へ自動登録する（hooks配線不要）
+    2. トークン集計の変化を配信
+    3. 監視中のいずれかの _queue.json の変化を検知したら、既知の全プロジェクト分をまとめて配信
+    4. 承認待ちヒューリスティックの結果が変化したら配信
+    """
     aggregator: TranscriptAggregator = app["aggregator"]
-    queue_state: dict = app["queue_state"]
+    queue_states: dict = app["queue_states"]
     clients: set[web.WebSocketResponse] = app["ws_clients"]
+    pending_state: dict = app["pending_state"]
 
     while True:
         await asyncio.sleep(POLL_INTERVAL_SEC)
+
+        sessions = _discover_and_register(app)
 
         try:
             if aggregator.poll():
@@ -313,16 +442,31 @@ async def _background_poll_task(app: web.Application) -> None:
             # ポーリングの1周期での失敗でループ自体は止めない
             _log(f"トークン集計ポーリング中にエラー: {e}")
 
-        queue_path = queue_state.get("path")
-        if queue_path is None:
-            continue
+        any_queue_changed = False
+        for state in queue_states.values():
+            queue_path = state.get("path")
+            try:
+                mtime = queue_path.stat().st_mtime if queue_path is not None else None
+            except OSError:
+                mtime = None
+            if mtime != state.get("mtime"):
+                state["mtime"] = mtime
+                any_queue_changed = True
+        if any_queue_changed:
+            # 既存SPA（dashboard/app/index.html）は "queue"（単数）しか処理しないため、
+            # 後方互換のため両方配信する（"queues" は将来の複数プロジェクト対応SPA向け）
+            await _broadcast(clients, {"type": "queue", "queue": _primary_queue(app)})
+            await _broadcast(clients, {"type": "queues", "queues": _all_queues(queue_states)})
+
         try:
-            mtime = queue_path.stat().st_mtime
-        except OSError:
-            mtime = None
-        if mtime != queue_state.get("mtime"):
-            queue_state["mtime"] = mtime
-            await _broadcast(clients, {"type": "queue", "queue": _read_queue(queue_path)})
+            pending_list = find_pending_approvals(sessions, threshold_seconds=PENDING_THRESHOLD_SEC)
+        except Exception as e:
+            _log(f"承認待ち検知中にエラー: {e}")
+            pending_list = []
+        current_ids = {p.tool_use_id for p in pending_list}
+        if current_ids != pending_state.get("ids"):
+            pending_state["ids"] = current_ids
+            await _broadcast(clients, {"type": "pending", "pending": [_pending_to_dict(p) for p in pending_list]})
 
 
 async def _start_background_tasks(app: web.Application) -> None:
@@ -343,7 +487,9 @@ def build_app(data_dir: Path) -> web.Application:
     app["store"] = EventStore(data_dir)
     app["ws_clients"] = set()
     app["aggregator"] = TranscriptAggregator()
-    app["queue_state"] = {"path": None, "mtime": None}
+    app["queue_states"] = {}
+    app["primary_queue_state"] = {"label": None}
+    app["pending_state"] = {"ids": set()}
     app.add_routes(routes)
     app.on_startup.append(_start_background_tasks)
     app.on_cleanup.append(_cleanup_background_tasks)

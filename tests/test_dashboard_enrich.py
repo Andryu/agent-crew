@@ -91,6 +91,48 @@ def test_persona_for_all_mapped_roles():
         assert persona_for({"agent_type": role}) == persona
 
 
+# ---------- persona_for: "<ペルソナ>-<タスク識別子>" 形式（実データで発覚した不具合の再発防止） ----------
+# team-lead（オーケストレーション側）はタスク単位でサブエージェントに動的な agent_type
+# （例: "riku-m2a"）を付けることがあり、これが _PERSONA_EXACT / _PERSONA_PREFIX の
+# どちらにも一致せず persona が常に None になっていた（2026-08-02、実データ接続時に発覚）。
+
+
+def test_persona_for_dynamic_task_suffix_riku():
+    assert persona_for({"agent_type": "riku-m2a"}) == "riku"
+    assert persona_for({"agent_type": "riku-m2b"}) == "riku"
+
+
+def test_persona_for_dynamic_task_suffix_other_personas():
+    assert persona_for({"agent_type": "tomo-m3"}) == "tomo"
+    assert persona_for({"agent_type": "alex-sprint26"}) == "alex"
+    assert persona_for({"agent_type": "miyu-sprint26"}) == "miyu"
+    assert persona_for({"agent_type": "yuki-sprint26"}) == "yuki"
+    assert persona_for({"agent_type": "sora-qa1"}) == "sora"
+    assert persona_for({"agent_type": "kai-audit"}) == "kai"
+    assert persona_for({"agent_type": "mina-ux1"}) == "mina"
+    assert persona_for({"agent_type": "hana-review"}) == "hana"
+    assert persona_for({"agent_type": "ren-data1"}) == "ren"
+
+
+def test_persona_for_bare_persona_id_without_suffix():
+    """ハイフン無しでペルソナidそのものが渡された場合も一致する。"""
+    assert persona_for({"agent_type": "riku"}) == "riku"
+
+
+def test_persona_for_similar_but_unrelated_name_does_not_false_match():
+    """ペルソナidを含むが単語境界が異なる無関係な名前には誤マッチしない
+    （ハイフン必須の前方一致のため）。"""
+    assert persona_for({"agent_type": "kaiser-x"}) is None
+    assert persona_for({"agent_type": "renewal-task"}) is None
+
+
+def test_persona_for_dynamic_suffix_priority_after_exact_and_prefix():
+    """_PERSONA_EXACT・_PERSONA_PREFIX の既存規則が先に評価されることに影響しない
+    （engineer- 前方一致は引き続き riku にマッピングされる）。"""
+    assert persona_for({"agent_type": "engineer-go"}) == "riku"
+    assert persona_for({"agent_type": "qa"}) == "sora"
+
+
 # ---------- enrich ----------
 
 
