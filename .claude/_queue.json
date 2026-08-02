@@ -44,13 +44,13 @@
       "status": "IN_PROGRESS",
       "assigned_to": "Alex",
       "complexity": "S",
-      "risk_level": "medium",
+      "risk_level": "high",
       "parallel_group": "phase-1-design",
       "depends_on": [],
       "qa_mode": "—",
       "created_at": "2026-08-02T01:21:11+0000",
       "updated_at": "2026-08-02",
-      "notes": "Issue144。scripts/queue.py の qa コマンドは qa_result 上書き不可（L287-289）のため、QA再判定の正規経路が retry のみになり retry_count が『QA再判定回数』で汚染される（sprint26-qaで実害確認済み）。設計方針候補: (a) qa --force オプション追加（既存qa_resultを上書き、eventsに再判定である旨を記録）、(b) done コマンド側でqa_resultがNoneのままdoneしようとした場合にエラーとするガード。どちらか一方または両方を選定し設計書を作成する。pytest追加方針も含めること。",
+      "notes": "Issue144。scripts/queue.py の qa コマンドは qa_result 上書き不可（L287-289）のため、QA再判定の正規経路が retry のみになり retry_count が『QA再判定回数』で汚染される（sprint26-qaで実害確認済み）。設計方針候補: (a) qa --force オプション追加（既存qa_resultを上書き、eventsに再判定である旨を記録）、(b) done コマンド側でqa_resultがNoneのままdoneしようとした場合にエラーとするガード。どちらか一方または両方を選定し設計書を作成する。pytest追加方針も含めること。\n\n【緊急追記・Issue152対応】Sprint-27実行中に発生した実インシデント（invest-dept-charter完了時、auto_close_issueがnotes内の『PR151』を誤ってIssue番号と認識しPR151を誤クローズ。Alexが即時reopenで復旧、詳細はIssue152）を受け、本タスクのスコープに auto_close_issue関数の是正（issue_urlフィールドやissue_ref等の専用フィールドからのみ取得する方式への変更、または明示的な--close-issueオプション化）も含める。qa_result/retry_count問題とauto_close_issue問題は同一ファイル(queue.py)・同一done処理フローの関連課題のため、設計書に両方の是正方針を記載すること。",
       "retry_count": 0,
       "qa_result": null,
       "summary": null,
@@ -97,7 +97,7 @@
     {
       "slug": "invest-dept-hq-deploy",
       "title": "alpha-predict-jp への組織OSデプロイ実地初運用（ADR-014 Phase3前半）",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "assigned_to": "Tomo",
       "complexity": "M",
       "risk_level": "high",
@@ -109,7 +109,7 @@
       "notes": "対象パス: ~/Workspace/claude-agent-teams/finace/alpha-predict-jp（別リポジトリへの書込みタスク・要最小権限）。手順: (1) templates/department/ のうちalpha-predict-jpに未存在のファイルのみコピー（.claude/agents/pm.md, .claude/_queue.json, docs/sprints/ を新規作成。docs/adr/は既存ADR群があるためコピーしない。.claude/skills/は既存3スキルに触れない）。(2) bash <agent-crewの絶対パス>/install.sh --dry-run --only=hq-agents go ~/Workspace/claude-agent-teams/finace/alpha-predict-jp を必ず先に実行し生成予定物（.claude/agents/{coo,retro,security,doc-reviewer}.md symlink, docs/org symlink）が新規作成であって既存ファイルの上書きでないことを確認する（agent-crew-sprint-25-reliability-001準拠）。(3) 問題なければ--dry-runを外して実行。(4) install.shの自己参照ガード（配布先がagent-crew自身のパスと一致する場合にエラー停止する既存実装）が誤発火/不発火していないか目視確認。(5) alpha-predict-jp内で触るのは新規作成ファイル・symlinkのみ。git addは新規作成ファイルを個別指定し、untrackedのsrc/config.py.bakを巻き込まないこと。作業前にgit statusの出力をnotesまたはsummaryに記録する。(6) コミットはalpha-predict-jp側のローカルブランチ（例: feat/hq-agents-deploy）に留め、originへのpushはオーナー確認後に行う（agent-crew側の自動push運用は他プロダクトリポジトリには適用しない）。(7) 失敗時の復元は作成したファイル・symlinkをrmするのみ（既存ファイル上書きが発生しない設計のため）。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": null,
+      "summary": "alpha-predict-jpへhq-agents symlink5本+pm.md/_queue.json/docs/sprintsを新規導入。origin未push（ローカルブランチfeat/hq-agents-deployのみ）。readlink -fがmacOS標準では非対応（BSD readlink）の手順不備を発見、python realpathで代替検証。全symlink正常・既存ファイル無変更を確認。",
       "events": [
         {
           "ts": "2026-08-02T01:21:11+0000",
@@ -122,6 +122,12 @@
           "agent": "Tomo",
           "action": "start",
           "msg": "着手"
+        },
+        {
+          "ts": "2026-08-02T01:29:10+0000",
+          "agent": "Tomo",
+          "action": "done",
+          "msg": "alpha-predict-jpへhq-agents symlink5本+pm.md/_queue.json/docs/sprintsを新規導入。origin未push（ローカルブランチfeat/hq-agents-deployのみ）。readlink -fがmacOS標準では非対応（BSD readlink）の手順不備を発見、python realpathで代替検証。全symlink正常・既存ファイル無変更を確認。"
         }
       ]
     },
@@ -186,7 +192,7 @@
     {
       "slug": "invest-dept-hq-deploy-qa",
       "title": "投資部門デプロイ実機QA",
-      "status": "TODO",
+      "status": "READY_FOR_SORA",
       "assigned_to": "Sora",
       "complexity": "M",
       "risk_level": "high",
@@ -207,6 +213,12 @@
           "agent": "Yuki",
           "action": "created",
           "msg": "Sprint-27 キュー登録"
+        },
+        {
+          "ts": "2026-08-02T01:29:18+0000",
+          "agent": "Sora",
+          "action": "handoff",
+          "msg": "next: READY_FOR_SORA"
         }
       ]
     },
