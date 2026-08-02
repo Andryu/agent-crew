@@ -865,5 +865,62 @@ notesに複数の実施事項が含まれるタスクで、片方（実施しや
 Sprint-26のretro-stop-hook-live-checkで、みゆきち自身がnotesの「retro.mdの完了条件への手順追記」を見落とし、実戦検証のみで完了報告した。sprint26-qaでMAJORとして差し戻された（agent-crew-sprint-26-process-003）。
 
 ---
+## [Riku / Alex] 自由記述フィールドへの正規表現マッチで自動アクションを実行する設計を避ける
+
+- lesson_id: agent-crew-sprint-27-reliability-001
+- priority: 6 / sprint: sprint-27
+
+**やること**
+
+notes等の自由記述フィールドから自動アクション（Issue自動クローズ等）のトリガーとなるIDを取得する機能を設計・実装する際は、専用の構造化フィールド（例: close_issue）から明示的に取得する方式を用いる。
+
+**やってはいけないこと**
+
+自由記述フィールドに対して正規表現マッチ（`#<数字>` 等）を行い、無条件に自動アクションのトリガーとして扱う。
+
+**エビデンス**
+
+Sprint-27で `queue.py` の `auto_close_issue` が notes内の参考記述「PR #151」を誤ってIssue番号と認識し、オーナーの戦略レビュー待ちだったPR #151を誤クローズした。調査の結果、Sprint-26中にもIssue #139/#140/#141が同機構で早期クローズされていたことが判明した。Issue #144の実装に統合し、close_issue専用フィールドへの置き換えで是正済み（agent-crew-sprint-27-reliability-001、Issue #152）。
+
+---
+
+## [Yuki / team-lead] スプリント進行中のタスクレベル指示はPM経由に一本化する
+
+- lesson_id: agent-crew-sprint-27-process-001
+- priority: 9 / sprint: sprint-27
+
+**やること**
+
+スプリント進行中のタスクレベルの実装指示（着手指示・差分実装依頼等）は、必ずPM（Yuki）を経由して行う。team-lead は方針決定・スプリントゴールの提示に徹し、個別タスクの担当者へ直接指示を出さない。
+
+**やってはいけないこと**
+
+team-lead がPMを経由せずに実装担当者へ直接タスク指示を出し、PMやチームが既に合意した方針と衝突する指示を出す。
+
+**エビデンス**
+
+Sprint-27実行中、team-lead(Fable)がYukiを経由せずRikuへR11差分実装の直接着手指示を出し、チーム合意（R11はフォローアップとして別途扱う）と衝突した。Yukiが2回差し戻し、Rikuが板挟みになった。原因はteam-leadの越権であることを本人が承認済み。最終的にR11はIssue #154として追補化され決着した（agent-crew-sprint-27-process-001、Issue #155）。今後、明文化先（pm.mdの起動プロトコル節か、team-lead向け組織文書か）を確定させることが次スプリントの検討事項。
+
+---
+
+## [全エージェント] symlink検証手順ではmacOS(BSD readlink)の非対応を前提にする
+
+- lesson_id: agent-crew-sprint-27-reliability-002
+- priority: 6 / sprint: sprint-27
+
+**やること**
+
+symlinkの実体解決を伴う手順書（install.sh検証手順・デプロイQA手順等）を書く、または実行する際は、macOS標準のBSD readlinkが `-f` オプションに非対応であることを前提とし、`python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))"` を代替コマンドとして使用する。
+
+**やってはいけないこと**
+
+`readlink -f` がGNU coreutils環境と同様にmacOSでも動作すると想定したまま手順書に記載し、実行時のコマンド不在エラーを個別に都度回避する。
+
+**エビデンス**
+
+Sprint-27でTomo（invest-dept-hq-deploy）とSora（invest-dept-hq-deploy-qa）の両方が独立に `readlink -f` の非対応を発見し、それぞれ python3 の realpath で代替検証を行う重複コストが発生した（agent-crew-sprint-27-reliability-002、Issue #156）。
+
+---
+
 *このファイルは retro エージェント（みゆきち）が `priority_score >= 3` の新規 lesson を追加するたびに更新されます。*
-*最終更新: sprint-26 / 2026-08-02*
+*最終更新: sprint-27 / 2026-08-02*

@@ -391,7 +391,7 @@
     {
       "slug": "sprint27-retro",
       "title": "Sprint-27 レトロスペクティブ",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "みゆきち",
       "complexity": "S",
       "risk_level": "low",
@@ -407,13 +407,25 @@
       "qa_result": null,
       "qa_history": [],
       "close_issue": null,
-      "summary": null,
+      "summary": "レトロ完了。ルーブリック4軸全PASS(仕様明確度1.00/QA合格率1.00/ブロック率0.00/負荷分散1.94)。lesson6件記録(process-001はpriority9で最重要=team-lead越権によるPM経由指揮の欠如)、Issue化2件(#155/#156)、Issue#152(auto_close_issue誤爆)は#144統合実装済みのためクローズ。pm-learned-rules.md3件追記。DECISIONS.mdにsprint-26分(申し送り解消)+sprint-27分を追記。docs/sprints/sprint-27-retro.md作成。",
       "events": [
         {
           "ts": "2026-08-02T01:21:11+0000",
           "agent": "Yuki",
           "action": "created",
           "msg": "Sprint-27 キュー登録"
+        },
+        {
+          "ts": "2026-08-02T02:01:12+0000",
+          "agent": "みゆきち",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-08-02T02:09:43+0000",
+          "agent": "みゆきち",
+          "action": "done",
+          "msg": "レトロ完了。ルーブリック4軸全PASS(仕様明確度1.00/QA合格率1.00/ブロック率0.00/負荷分散1.94)。lesson6件記録(process-001はpriority9で最重要=team-lead越権によるPM経由指揮の欠如)、Issue化2件(#155/#156)、Issue#152(auto_close_issue誤爆)は#144統合実装済みのためクローズ。pm-learned-rules.md3件追記。DECISIONS.mdにsprint-26分(申し送り解消)+sprint-27分を追記。docs/sprints/sprint-27-retro.md作成。"
         }
       ]
     }

@@ -178,3 +178,5 @@
 {"ts":"2026-08-02T01:53:29+0000","type":"task.start","sprint":"sprint-27","slug":"sprint27-qa","agent":"Sora","detail":{}}
 {"ts":"2026-08-02T01:54:36+0000","type":"qa.approved","sprint":"sprint-27","slug":"sprint27-qa","agent":"Sora","detail":{"reviewer":"Sora","result":"APPROVED","forced":false}}
 {"ts":"2026-08-02T01:54:36+0000","type":"task.done","sprint":"sprint-27","slug":"sprint27-qa","agent":"Sora","detail":{"summary":"横断QA APPROVED。憲章・ガバナンス文書・lessons同期・queue.py実装/QA・qa.md運用ドキュメントすべて整合性確認済み。"}}
+{"ts":"2026-08-02T02:01:12+0000","type":"task.start","sprint":"sprint-27","slug":"sprint27-retro","agent":"みゆきち","detail":{}}
+{"ts":"2026-08-02T02:09:43+0000","type":"task.done","sprint":"sprint-27","slug":"sprint27-retro","agent":"みゆきち","detail":{"summary":"レトロ完了。ルーブリック4軸全PASS(仕様明確度1.00/QA合格率1.00/ブロック率0.00/負荷分散1.94)。lesson6件記録(process-001はpriority9で最重要=team-lead越権によるPM経由指揮の欠如)、Issue化2件(#155/#156)、Issue#152(auto_close_issue誤爆)は#144統合実装済みのためクローズ。pm-learned-rules.md3件追記。DECISIONS.mdにsprint-26分(申し送り解消)+sprint-27分を追記。docs/sprints/sprint-27-retro.md作成。"}}
