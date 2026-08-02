@@ -179,13 +179,18 @@
 
 - **auto_close_issueによるPR誤クローズ（インシデント）**: `invest-dept-charter`完了時、notes内「PR #151」を誤認しオーナー戦略レビュー待ちのPR #151を誤クローズ（即時reopenで復旧、実害なし）。調査でSprint-26中にもIssue #139/#140/#141が同機構で早期クローズされていたことが判明（最終状態は妥当）。同スプリント内でIssue #144の実装に統合し恒久対応済み（`agent-crew-sprint-27-reliability-001`、Issue #152）。
 - **二重指揮の衝突**: team-leadがPMを経由せずRikuへ直接タスク指示を出し、チーム合意と衝突。PMが2回差し戻し、実装者が板挟みになった（`agent-crew-sprint-27-process-001`、Issue #155）。
-- **命名往復**: 設計と実装の並行時にissue_ref/close_issueの命名が2往復し、summary文言の訂正が必要になった（`agent-crew-sprint-27-process-002`）。
+- **命名往復**: 設計と実装の並行時にissue_ref/close_issueの命名が往復し、summary文言の訂正が必要になった。根本原因はAlexが実装完了後に設計書を拡張した際、実装コードを直接確認せずnotesの古い表記を頼りに書き換えたこと、およびエージェント間メッセージの非同期性（送信済みメッセージが相手の現在の作業を即座に止められない）（`agent-crew-sprint-27-process-002`、Issue #158）。
 - **macOS readlink -f非対応**: symlink実体解決の検証手順でTomo・Soraが独立に同一問題を発見し、重複して回避策を導出した（`agent-crew-sprint-27-reliability-002`、Issue #156）。
+- **完了・QA承認済みタスクへの無断な仕様追加**: Issue #144クローズ済み・QA APPROVED後のqueue-qa-reguard-implに対し、design.mdのフォローアップ節記載のR11をRikuが無断で追加実装しようとする動きが2回発生し、Yukiがその都度停止を依頼した（`agent-crew-sprint-27-process-003`、Issue #159）。
+- **未コミット作業の放置**: `_queue.json`側はdone更新されていたが、Alex・Rikuの実装成果物が長時間git commitされないまま作業ツリーに残存していた（`agent-crew-sprint-27-reliability-003`、Issue #160）。
 
 ### 次スプリントへの推奨
 
 - 「スプリント進行中のタスクレベル指示はPM経由に一本化、team-leadは方針決定のみ」の運用ルールを明文化する（Issue #155）。
 - symlink検証手順書へのmacOS(BSD readlink)非対応の明記を横展開する（Issue #156）。
 - pm.mdステップ0.7のsource_repo URL正規化（SSH/HTTPS両対応）を実装する（`agent-crew-sprint-27-tooling-001`）。
+- 設計書更新時は実装コードを直接確認するルールをarchitect.md等へ明記する（Issue #158）。
+- 完了・QA承認済みタスクへの追加実装は新規タスク起票を必須化する運用をengineer各種.mdへ明記する（Issue #159）。
+- PMがタスクdone後に定期的にgit statusを確認し中間コミットを促す運用を徹底する（Issue #160）。
 
 ---
