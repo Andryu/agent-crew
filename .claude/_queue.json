@@ -1,607 +1,267 @@
 {
-  "sprint": "sprint-26",
+  "sprint": "sprint-27",
   "tasks": [
     {
-      "slug": "sdd-adr-design",
-      "title": "既存3文書（ADR/design/proposal）を軽量機能仕様書方式に改訂・Accepted化",
-      "status": "DONE",
+      "slug": "invest-dept-charter",
+      "title": "投資部門プロジェクト憲章の起案（Draft）",
+      "status": "READY_FOR_ALEX",
       "assigned_to": "Alex",
-      "complexity": "M",
+      "complexity": "S",
       "risk_level": "low",
       "parallel_group": "phase-1-design",
       "depends_on": [],
-      "qa_mode": "—",
-      "created_at": "2026-08-01T17:24:18+0000",
-      "updated_at": "2026-08-01",
-      "notes": "既存3文書（docs/adr/sdd-quality-loop-adr.md【Status:Proposed】/ docs/spec/sdd-quality-loop-design.md / docs/spec/sdd-quality-loop-proposal.md）が実在（マスターワークツリーに未コミットのまま置かれていたものをteam-leadがfeat/sprint-26にコピー済み、2026-08-02）。内容は『Kiro 3点セット(requirements/design/tasks)前提+/spec-postmortemスキルによる品質改善還流ループ（postmortem→根因分析→テンプレ/agent定義への改善PR還流）』のADR/設計/提案書。オーナー決定（3点セット不採用・軽量機能仕様書方式）に沿って、Contextの前提記述を『3点セット』から『docs/spec/<機能名>.md の軽量機能仕様書（living document）』に改訂する。Decision本体（postmortem→根因タクソノミー分類→改善diff提案→真実源リポへのPR還流という仕組み自体）は方式に関わらず有効なため維持し、fix_target_fileの対応関係のみ軽量仕様書運用に合わせて更新する。Statusを Proposed→Accepted に変更。旧3点セット前提の記述は削除せず『改訂履歴』セクションを新設して残す。design.md/proposal.mdの前提部分も同様に整合を取る（更新要否はAlexの設計判断に委ねる）。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "ADR-015新規作成(Accepted)、feature-specテンプレート、docs/spec/features/作成、Riku適用指示書(engineer3種+qa.md+pm.md)を同梱。旧sdd-quality-loop-adr.mdはRejected化しADR-015へ誘導",
-      "events": [
-        {
-          "ts": "2026-08-01T17:24:18+0000",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-26 キュー登録"
-        },
-        {
-          "ts": "2026-08-01T17:29:56+0000",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T17:33:12+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "ADR-015新規作成(Accepted)、feature-specテンプレート、docs/spec/features/作成、Riku適用指示書(engineer3種+qa.md+pm.md)を同梱。旧sdd-quality-loop-adr.mdはRejected化しADR-015へ誘導"
-        }
-      ]
-    },
-    {
-      "slug": "sdd-templates-impl",
-      "title": "機能仕様書テンプレート実装＋Riku/Soraチェックリスト追記",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "M",
-      "risk_level": "low",
-      "parallel_group": "phase-2-impl",
-      "depends_on": [
-        "sdd-adr-design"
-      ],
       "qa_mode": "inline",
-      "created_at": "2026-08-01T17:24:18+0000",
-      "updated_at": "2026-08-01",
-      "notes": "docs/spec/templates/feature-spec-template.md（概要/ユースケース/仕様（現在の正）/変更履歴）を新規作成し、templates/department/docs/spec/ にも同梱する。.claude/agents/engineer-go.md の実装完了チェックリストに『変更した機能の仕様書を更新したか』を追加。Sora（QAエージェント定義）のチェックリストに『仕様書と実装の差分がないか』を追加。既存機能のうち仕様書が無い主要機能の初期作成は本スプリントでは対応せずバックログ化（Issue化を検討）。",
+      "created_at": "2026-08-02T01:21:11+0000",
+      "updated_at": "2026-08-02",
+      "notes": "docs/org/templates/project-charter.md に基づき投資部門の憲章を起案する。MVP定義は docs/org/strategy-2026H2.md（PR #151, feat/strategy-2026h2, 未マージ）の『投資部門MVP』節（月次成績レポート自動生成→経営会議自動掲載、撤退基準: 3ヶ月連続で判断に使われなければアイドルに戻す）を仮置きする。ヘッダーに『オーナーの戦略レビューでMVP確定後に有効化（Draft）』と明記すること。憲章テンプレート§5の事前検証チェック（競合AI機能確認・撤退基準合意・権限/コスト概算）も埋めること。qa_modeはinlineのため、テンプレートの必須項目が全て埋まっているか自己チェックしてからdoneすること。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "engineer-go/next/vue.md・qa.md・pm.mdの5ファイルにADR-015 Appendix diffを適用。feature-spec.mdとfeatures/.gitkeepは作成済みのため実在確認のみ",
+      "summary": null,
       "events": [
         {
-          "ts": "2026-08-01T17:24:18+0000",
+          "ts": "2026-08-02T01:21:11+0000",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-26 キュー登録"
-        },
-        {
-          "ts": "2026-08-01T17:33:12+0000",
-          "agent": "Riku",
-          "action": "handoff",
-          "msg": "next: READY_FOR_RIKU"
-        },
-        {
-          "ts": "2026-08-01T17:45:06+0000",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T17:45:58+0000",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "engineer-go/next/vue.md・qa.md・pm.mdの5ファイルにADR-015 Appendix diffを適用。feature-spec.mdとfeatures/.gitkeepは作成済みのため実在確認のみ"
+          "msg": "Sprint-27 キュー登録"
         }
       ]
     },
     {
-      "slug": "sdd-qa",
-      "title": "機能仕様書テンプレート・ADR整合性QA",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-3-qa",
-      "depends_on": [
-        "sdd-templates-impl"
-      ],
-      "qa_mode": "—",
-      "created_at": "2026-08-01T17:24:18+0000",
-      "updated_at": "2026-08-01",
-      "notes": "ADR-015と機能仕様書テンプレートの整合、Rikuチェックリスト・Soraチェックリストへの追記が実際に反映されているか確認。バックログ化した既存機能の初期作成タスクがIssue化候補として明記されているか確認する。",
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "APPROVED_WITH_COMMENTS。MINOR2件（design/proposal誘導文欠如、Issue化明記なし）を除き整合性問題なし",
-      "events": [
-        {
-          "ts": "2026-08-01T17:24:18+0000",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-26 キュー登録"
-        },
-        {
-          "ts": "2026-08-01T17:58:06+0000",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T17:58:23+0000",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: ADR-015とfeature-specテンプレート・5ファイル(engineer-go/next/vue.md, qa.md, pm.md)の追記をdiff確認、Appendix通りで既存項目削除なし。features/.gitkeep実在確認。旧sdd-quality-loop 3文書はRejected化されADR-015へ誘導済み。MINOR2件: (1) design.md/proposal.md本体にはADR-015への誘導文がなくADR本体経由でしか到達できない (2) ADR-015に既存機能バックログ化の記述はあるがIssue起票推奨の明記がない"
-        },
-        {
-          "ts": "2026-08-01T17:58:30+0000",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "APPROVED_WITH_COMMENTS。MINOR2件（design/proposal誘導文欠如、Issue化明記なし）を除き整合性問題なし"
-        }
-      ]
-    },
-    {
-      "slug": "audit-scan-design",
-      "title": "Kai定常スキャン設計（permissions.allow差分検知・symlink健全性・権限逸脱チェック）",
-      "status": "DONE",
+      "slug": "queue-qa-reguard-design",
+      "title": "queue.py QA再判定経路 設計（Issue #144）",
+      "status": "READY_FOR_ALEX",
       "assigned_to": "Alex",
-      "complexity": "M",
+      "complexity": "S",
       "risk_level": "medium",
       "parallel_group": "phase-1-design",
       "depends_on": [],
       "qa_mode": "—",
-      "created_at": "2026-08-01T17:24:18+0000",
-      "updated_at": "2026-08-01",
-      "notes": "scripts/audit-scan.sh設計。Claude CodeにCronフックは存在しない（agent-crew-sprint-21-tooling-001）ため、Stopフック相当のトリガーまたは手動実行コマンドとして設計すること。permissions.allowの差分検知はスプリント計画書記載パターンとの照合方式とする。Kai(security.md)への定常スキャン職務追記案、constitution第3条の『将来整備』注記解除文言案を含める。",
+      "created_at": "2026-08-02T01:21:11+0000",
+      "updated_at": "2026-08-02",
+      "notes": "Issue #144。scripts/queue.py の qa コマンドは qa_result 上書き不可（L287-289）のため、QA再判定の正規経路が retry のみになり retry_count が『QA再判定回数』で汚染される（sprint26-qaで実害確認済み）。設計方針候補: (a) qa --force オプション追加（既存qa_resultを上書き、eventsに再判定である旨を記録）、(b) done コマンド側でqa_resultがNoneのままdoneしようとした場合にエラーとするガード。どちらか一方または両方を選定し設計書を作成する。pytest追加方針も含めること。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "audit-scan.sh設計書作成(docs/spec/audit-scan-design.md)。4チェック項目+実行タイミング(Rin経営会議/Yukiスプリント開始)+Kai職務追記+憲章第3条更新文言を同梱",
+      "summary": null,
       "events": [
         {
-          "ts": "2026-08-01T17:24:18+0000",
+          "ts": "2026-08-02T01:21:11+0000",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-26 キュー登録"
-        },
-        {
-          "ts": "2026-08-01T17:33:12+0000",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T17:35:15+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "audit-scan.sh設計書作成(docs/spec/audit-scan-design.md)。4チェック項目+実行タイミング(Rin経営会議/Yukiスプリント開始)+Kai職務追記+憲章第3条更新文言を同梱"
+          "msg": "Sprint-27 キュー登録"
         }
       ]
     },
     {
-      "slug": "audit-scan-impl",
-      "title": "scripts/audit-scan.sh実装＋Kai職務追記＋憲章第3条更新",
-      "status": "DONE",
+      "slug": "governance-doc-149-150",
+      "title": "Issue #149・#150 の文書反映（計画時ポイント集計義務化 + architect設計セルフチェック）",
+      "status": "READY_FOR_ALEX",
+      "assigned_to": "Alex",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-1-design",
+      "depends_on": [],
+      "qa_mode": "inline",
+      "created_at": "2026-08-02T01:21:11+0000",
+      "updated_at": "2026-08-02",
+      "notes": "Issue #149: .claude/agents/pm.md の『スプリント計画フォーマット』節に『タスク分解直後の担当ドラフト段階で scripts/sprint-points.sh --md を実行し負荷分散スコアを確認する』ことを明記する（現状は完了後の集計のみ明文化されている）。Issue #150: .claude/agents/architect.md に設計完了時のセルフチェック項目（条件分岐の網羅性・文書内§間の整合性）を追加する。2件セットで1タスクとして扱う。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
+        {
+          "ts": "2026-08-02T01:21:11+0000",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-27 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "invest-dept-hq-deploy",
+      "title": "alpha-predict-jp への組織OSデプロイ実地初運用（ADR-014 Phase3前半）",
+      "status": "READY_FOR_TOMO",
+      "assigned_to": "Tomo",
+      "complexity": "M",
+      "risk_level": "high",
+      "parallel_group": "phase-2-impl",
+      "depends_on": [],
+      "qa_mode": "—",
+      "created_at": "2026-08-02T01:21:11+0000",
+      "updated_at": "2026-08-02",
+      "notes": "対象パス: ~/Workspace/claude-agent-teams/finace/alpha-predict-jp（別リポジトリへの書込みタスク・要最小権限）。手順: (1) templates/department/ のうちalpha-predict-jpに未存在のファイルのみコピー（.claude/agents/pm.md, .claude/_queue.json, docs/sprints/ を新規作成。docs/adr/は既存ADR群があるためコピーしない。.claude/skills/は既存3スキルに触れない）。(2) bash <agent-crewの絶対パス>/install.sh --dry-run --only=hq-agents go ~/Workspace/claude-agent-teams/finace/alpha-predict-jp を必ず先に実行し生成予定物（.claude/agents/{coo,retro,security,doc-reviewer}.md symlink, docs/org symlink）が新規作成であって既存ファイルの上書きでないことを確認する（agent-crew-sprint-25-reliability-001準拠）。(3) 問題なければ--dry-runを外して実行。(4) install.shの自己参照ガード（配布先がagent-crew自身のパスと一致する場合にエラー停止する既存実装）が誤発火/不発火していないか目視確認。(5) alpha-predict-jp内で触るのは新規作成ファイル・symlinkのみ。git addは新規作成ファイルを個別指定し、untrackedのsrc/config.py.bakを巻き込まないこと。作業前にgit statusの出力をnotesまたはsummaryに記録する。(6) コミットはalpha-predict-jp側のローカルブランチ（例: feat/hq-agents-deploy）に留め、originへのpushはオーナー確認後に行う（agent-crew側の自動push運用は他プロダクトリポジトリには適用しない）。(7) 失敗時の復元は作成したファイル・symlinkをrmするのみ（既存ファイル上書きが発生しない設計のため）。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
+        {
+          "ts": "2026-08-02T01:21:11+0000",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-27 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "lessons-issue-sync-fix",
+      "title": "_lessons.json の issue_url 同期是正",
+      "status": "READY_FOR_RIKU",
+      "assigned_to": "Riku",
+      "complexity": "S",
+      "risk_level": "low",
+      "parallel_group": "phase-2-impl",
+      "depends_on": [],
+      "qa_mode": "inline",
+      "created_at": "2026-08-02T01:21:11+0000",
+      "updated_at": "2026-08-02",
+      "notes": "~/.claude/_lessons.json で issue_url == null だが実際にはGitHub Issueが起票済みのlesson_idを特定しissue_urlを書き戻す。特定方法: gh issue list の本文（『lesson: <lesson_id>』の記述）と_lessons.jsonのlesson_idを突合する（想像で決め打ちしない）。sprint-26-retro.mdが列挙したsprint-23〜25の12件のうち、経営会議2026-08-02時点で10件は既に#129〜#141として起票済みと判定されている（未起票のsprint-23の2件は#149・#150として本スプリント計画時点で既に起票済み）。あわせて.claude/agents/retro.mdに『Issue化時は_lessons.jsonのissue_urlをその場で書き戻す』手順を明記し再発防止する。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
+        {
+          "ts": "2026-08-02T01:21:11+0000",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-27 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "queue-qa-reguard-impl",
+      "title": "queue.py QA再判定経路 実装（Issue #144）",
+      "status": "TODO",
       "assigned_to": "Riku",
       "complexity": "M",
       "risk_level": "medium",
       "parallel_group": "phase-2-impl",
       "depends_on": [
-        "audit-scan-design"
+        "queue-qa-reguard-design"
       ],
-      "qa_mode": "inline",
-      "created_at": "2026-08-01T17:24:18+0000",
-      "updated_at": "2026-08-01",
-      "notes": "bash -n scripts/audit-scan.sh でのバリデーション必須（agent-crew-sprint-08-tooling-001）。.claude/agents/security.mdに定常スキャン職務を追記。docs/org/constitution.md第3条の『将来整備』注記を解除し実際の運用方法に置換。",
+      "qa_mode": "—",
+      "created_at": "2026-08-02T01:21:11+0000",
+      "updated_at": "2026-08-02",
+      "notes": "queue-qa-reguard-design の設計書に従い実装する。pytest追加必須。既存のqa/retry/doneコマンドの後方互換（既存テスト・既存呼び出し元）を壊さないこと。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "scripts/audit-scan.sh実装（permissions.allow/symlink/hooksの3チェック）。weekly-council.md/coo.md/pm.md/security.md/constitution.mdへdiff適用。bash -n通過、実リポジトリ実行でPASS/WARNING確認、ダミーリンク切れsymlinkでFAIL検知・exit1確認・後始末済み",
+      "summary": null,
       "events": [
         {
-          "ts": "2026-08-01T17:24:18+0000",
+          "ts": "2026-08-02T01:21:11+0000",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-26 キュー登録"
-        },
-        {
-          "ts": "2026-08-01T17:35:15+0000",
-          "agent": "Riku",
-          "action": "handoff",
-          "msg": "next: READY_FOR_RIKU"
-        },
-        {
-          "ts": "2026-08-01T17:46:02+0000",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T17:49:53+0000",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "scripts/audit-scan.sh実装（permissions.allow/symlink/hooksの3チェック）。weekly-council.md/coo.md/pm.md/security.md/constitution.mdへdiff適用。bash -n通過、実リポジトリ実行でPASS/WARNING確認、ダミーリンク切れsymlinkでFAIL検知・exit1確認・後始末済み"
+          "msg": "Sprint-27 キュー登録"
         }
       ]
     },
     {
-      "slug": "audit-scan-qa",
-      "title": "audit-scan.sh実機実行QA",
-      "status": "DONE",
+      "slug": "invest-dept-hq-deploy-qa",
+      "title": "投資部門デプロイ実機QA",
+      "status": "TODO",
+      "assigned_to": "Sora",
+      "complexity": "M",
+      "risk_level": "high",
+      "parallel_group": "phase-3-qa",
+      "depends_on": [
+        "invest-dept-hq-deploy"
+      ],
+      "qa_mode": "—",
+      "created_at": "2026-08-02T01:21:11+0000",
+      "updated_at": "2026-08-02",
+      "notes": "コードレビューのみで済ませず実機実行で確認する（agent-crew-sprint-25-reliability-001準拠）。確認項目: (a) dry-runと実実行の出力差分が期待通りか、(b) 生成されたsymlinkが実際にagent-crew（本リポジトリ）側の実体を指しているか（readlinkで確認）、(c) alpha-predict-jpの既存ファイル（3スキル・settings.json・settings.local.json・CLAUDE.md等）が一切変更されていないか（git status/git diffで確認）、(d) 自己参照ガードが今回発火していないことの確認、(e) alpha-predict-jp側の変更がpushされずローカルブランチに留まっていることの確認。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
+      "events": [
+        {
+          "ts": "2026-08-02T01:21:11+0000",
+          "agent": "Yuki",
+          "action": "created",
+          "msg": "Sprint-27 キュー登録"
+        }
+      ]
+    },
+    {
+      "slug": "queue-qa-reguard-qa",
+      "title": "queue.py QA再判定経路 実装QA（Issue #144）",
+      "status": "TODO",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "medium",
       "parallel_group": "phase-3-qa",
       "depends_on": [
-        "audit-scan-impl"
+        "queue-qa-reguard-impl"
       ],
       "qa_mode": "—",
-      "created_at": "2026-08-01T17:24:18+0000",
-      "updated_at": "2026-08-01",
-      "notes": "コードレビューのみで済ませず実機実行（agent-crew-sprint-25-reliability-001準拠）。permissions.allowへ意図的に未計画の差分を追加した状態で検知できるか実際に実行して確認する。",
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "APPROVED_WITH_COMMENTS。実機実行・異常系再現済み。MAJOR1件（新設hookが自身の生存確認をすり抜ける自己参照課題）をsprint26-qaへ横断課題として引き継ぎ",
-      "events": [
-        {
-          "ts": "2026-08-01T17:24:18+0000",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-26 キュー登録"
-        },
-        {
-          "ts": "2026-08-01T17:58:06+0000",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T17:58:24+0000",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 実機実行3回(通常PASS/WARNING、symlinkリンク切れ→FAIL exit1、permissions.allow未計画差分→FAIL exit1)を確認、いずれも後始末済み。bash -n OK。constitution第3条/coo.md/security.md/weekly-council.mdの相互整合を確認。MAJOR1件: 新規追加されたSubagentStopフック(scripts/enforce-queue-done-stop.sh || true)がaudit-scan.shのhooks判定パターン(.claude/hooks/*.sh または bash -c '...')のいずれにも一致せずUNKNOWN/WARNING扱いになり生存確認をすり抜ける。設計書の許容範囲内(FAILにしない仕様)だが同一スプリントで新設した監査対象の実効性が一部欠ける自己参照的な問題としてsprint26-qaで横断課題化"
-        },
-        {
-          "ts": "2026-08-01T17:58:31+0000",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "APPROVED_WITH_COMMENTS。実機実行・異常系再現済み。MAJOR1件（新設hookが自身の生存確認をすり抜ける自己参照課題）をsprint26-qaへ横断課題として引き継ぎ"
-        }
-      ]
-    },
-    {
-      "slug": "subagent-stop-enforce-design",
-      "title": "queue.sh done実行漏れ構造対策 設計（Issue #139）",
-      "status": "DONE",
-      "assigned_to": "Alex",
-      "complexity": "M",
-      "risk_level": "high",
-      "parallel_group": "phase-1-design",
-      "depends_on": [],
-      "qa_mode": "—",
-      "created_at": "2026-08-01T17:24:18+0000",
-      "updated_at": "2026-08-01",
-      "notes": "Issue #139。既存のTaskCompleted/SubagentStop hook（docs/spec/hook-taskcompleted-design.md, .claude/hooks/subagent_stop.sh, .claude/hooks/task_completed.sh）を踏まえ、IN_PROGRESSタスクがDONE相当の完了報告後もqueue.sh done未実行のまま放置された場合に検知・警告する方式を設計する。enforce-retro-stop.shと同様『ブロックしない・stderr警告のみ』方針を踏襲するか要検討。過去に2回連続再発したパターンのためrisk_level high。",
+      "created_at": "2026-08-02T01:21:11+0000",
+      "updated_at": "2026-08-02",
+      "notes": "pytest実行結果を確認。実際にCHANGES_REQUESTED→修正→APPROVEDのQA再判定シナリオを隔離環境で再現し、retry_countが汚染されないことを実機確認する。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "SubagentStop用enforce-queue-done-stop.sh設計(docs/spec/subagent-stop-enforce-design.md)。bash -n検証済みコード同梱、jqマージ手順を実settings.jsonコピーで動作検証済み",
+      "summary": null,
       "events": [
         {
-          "ts": "2026-08-01T17:24:18+0000",
+          "ts": "2026-08-02T01:21:11+0000",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-26 キュー登録"
-        },
-        {
-          "ts": "2026-08-01T17:35:15+0000",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T17:37:45+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "SubagentStop用enforce-queue-done-stop.sh設計(docs/spec/subagent-stop-enforce-design.md)。bash -n検証済みコード同梱、jqマージ手順を実settings.jsonコピーで動作検証済み"
+          "msg": "Sprint-27 キュー登録"
         }
       ]
     },
     {
-      "slug": "subagent-stop-enforce-impl",
-      "title": "queue.sh done実行漏れ構造対策 実装（Issue #139）",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "M",
-      "risk_level": "high",
-      "parallel_group": "phase-2-impl",
-      "depends_on": [
-        "subagent-stop-enforce-design"
-      ],
-      "qa_mode": "inline",
-      "created_at": "2026-08-01T17:24:18+0000",
-      "updated_at": "2026-08-01",
-      "notes": "bash -n での構文バリデーション必須。既存のsubagent_stop.sh/task_completed.shへの影響範囲を最小化すること。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "scripts/enforce-queue-done-stop.sh新規実装（設計書のQUEUE_FILE環境変数非対応バグを修正しSora QA検証と整合）。settings.jsonのhooks.SubagentStopへバックアップ→jqマージ→構文検証→既存hooks無傷確認の手順で追加。バイパス5条件+検知ケースを隔離環境でテスト済み、全てexit0",
-      "events": [
-        {
-          "ts": "2026-08-01T17:24:18+0000",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-26 キュー登録"
-        },
-        {
-          "ts": "2026-08-01T17:37:47+0000",
-          "agent": "Riku",
-          "action": "handoff",
-          "msg": "next: READY_FOR_RIKU"
-        },
-        {
-          "ts": "2026-08-01T17:49:56+0000",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T17:52:16+0000",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "scripts/enforce-queue-done-stop.sh新規実装（設計書のQUEUE_FILE環境変数非対応バグを修正しSora QA検証と整合）。settings.jsonのhooks.SubagentStopへバックアップ→jqマージ→構文検証→既存hooks無傷確認の手順で追加。バイパス5条件+検知ケースを隔離環境でテスト済み、全てexit0"
-        }
-      ]
-    },
-    {
-      "slug": "subagent-stop-enforce-qa",
-      "title": "queue.sh done強制フックQA（Issue #139）",
-      "status": "DONE",
-      "assigned_to": "Sora",
-      "complexity": "S",
-      "risk_level": "high",
-      "parallel_group": "phase-3-qa",
-      "depends_on": [
-        "subagent-stop-enforce-impl"
-      ],
-      "qa_mode": "—",
-      "created_at": "2026-08-01T17:24:18+0000",
-      "updated_at": "2026-08-01",
-      "notes": "queue.sh done未実行のまま完了報告するシナリオを実機再現し、警告が実際に出るか確認する。",
-      "retry_count": 0,
-      "qa_result": "APPROVED",
-      "summary": "APPROVED。検知1ケース+バイパス5条件を実機再検証、settings.json無傷確認、Rikuの設計逸脱2件は妥当と判定",
-      "events": [
-        {
-          "ts": "2026-08-01T17:24:18+0000",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-26 キュー登録"
-        },
-        {
-          "ts": "2026-08-01T17:58:07+0000",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T17:58:24+0000",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 検知1ケース(startのみ→警告出力)+バイパス5条件(jq不在/queue.json不在/JSON破損/.sprintなし/IN_PROGRESSなし)を隔離環境で全て実機再検証、全てexit0を確認。settings.jsonのdiffで既存hooks(Stop4件・TaskCompleted・PreToolUse・SessionStart・既存SubagentStop)が無傷であることを確認。Rikuの設計逸脱2件は妥当: (1)QUEUE_FILE環境変数化は設計書自体の内部矛盾(コード本体未対応なのに§7QA手順は前提)をRikuが実装時に解消した正しい判断、Alexへ設計書修正フィードバック推奨 (2)pm.md挿入位置は実ファイル確認の結果ステップ2.5直後・ステップ3直前の正しい位置に収まっている"
-        },
-        {
-          "ts": "2026-08-01T17:58:31+0000",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "APPROVED。検知1ケース+バイパス5条件を実機再検証、settings.json無傷確認、Rikuの設計逸脱2件は妥当と判定"
-        }
-      ]
-    },
-    {
-      "slug": "loadbalance-formula-doc",
-      "title": "負荷分散ポイントベース公式化の反映（Issue #140）",
-      "status": "DONE",
-      "assigned_to": "Riku",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-2-impl",
-      "depends_on": [],
-      "qa_mode": "inline",
-      "created_at": "2026-08-01T17:24:18+0000",
-      "updated_at": "2026-08-01",
-      "notes": "Issue #140。pm-estimation.mdへポイントベース=公式・タスク数ベース=補助の区別を明記。scripts/sprint-points.shの出力ラベルにも同区別を反映する。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "pm-estimation.mdに負荷分散スコア節を追加（ポイントベース公式/タスク数ベース補助）、sprint-points.shのJSON/MD出力にofficialフラグと（公式）（補助）表記を追加。bash -n・実データ実行で検証済み",
-      "events": [
-        {
-          "ts": "2026-08-01T17:24:18+0000",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-26 キュー登録"
-        },
-        {
-          "ts": "2026-08-01T17:28:03+0000",
-          "agent": "Riku",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T17:28:54+0000",
-          "agent": "Riku",
-          "action": "done",
-          "msg": "pm-estimation.mdに負荷分散スコア節を追加（ポイントベース公式/タスク数ベース補助）、sprint-points.shのJSON/MD出力にofficialフラグと（公式）（補助）表記を追加。bash -n・実データ実行で検証済み"
-        }
-      ]
-    },
-    {
-      "slug": "verify-query-rule-doc",
-      "title": "検証クエリ・チェックロジックの実行検証必須化ルール明文化（Issue #141）",
-      "status": "DONE",
-      "assigned_to": "Alex",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-1-design",
-      "depends_on": [],
-      "qa_mode": "inline",
-      "created_at": "2026-08-01T17:24:18+0000",
-      "updated_at": "2026-08-01",
-      "notes": "Issue #141。retro.md・pm.md等の品質ゲート関連ドキュメントに『検証クエリ・チェックスクリプトは導入時に実データで1回実行し期待値と突合する』ルールを明記する。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "pm-learned-rules.mdへ汎用ルール追記(agent-crew-sprint-26-process-002, sprint-25-tooling-002の一般化)。qa.mdの実用性チェックリストに検証クエリ実行検証項目を追記。Issue #141解消",
-      "events": [
-        {
-          "ts": "2026-08-01T17:24:18+0000",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-26 キュー登録"
-        },
-        {
-          "ts": "2026-08-01T17:37:47+0000",
-          "agent": "Alex",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T17:43:10+0000",
-          "agent": "Alex",
-          "action": "done",
-          "msg": "pm-learned-rules.mdへ汎用ルール追記(agent-crew-sprint-26-process-002, sprint-25-tooling-002の一般化)。qa.mdの実用性チェックリストに検証クエリ実行検証項目を追記。Issue #141解消"
-        }
-      ]
-    },
-    {
-      "slug": "retro-stop-hook-live-check",
-      "title": "enforce-retro-stop.shの実戦検証をレトロ完了条件に組み込む",
-      "status": "DONE",
-      "assigned_to": "みゆきち",
-      "complexity": "S",
-      "risk_level": "low",
-      "parallel_group": "phase-2-impl",
-      "depends_on": [],
-      "qa_mode": "inline",
-      "created_at": "2026-08-01T17:24:18+0000",
-      "updated_at": "2026-08-01",
-      "notes": "sprint-25-retro『次スプリントへの改善優先事項4』対応。retro.mdの完了条件に『レトロ未実施のままセッション終了を試み、Stopフックの警告が実際に出力されることを本スプリント中に1回確認する』手順を追記する。",
-      "retry_count": 0,
-      "qa_result": null,
-      "summary": "enforce-retro-stop.shの実戦検証完了。隔離環境で全実装タスクDONE状態を作り引数なし/stdin JSON両方の起動方式で警告stderr出力を確認。実リポジトリ(sprint-26進行中、13件未DONE)では誤検知なしを確認。stdin依存なし（判定はgit toplevel+ファイル読取のみ）。",
-      "events": [
-        {
-          "ts": "2026-08-01T17:24:18+0000",
-          "agent": "Yuki",
-          "action": "created",
-          "msg": "Sprint-26 キュー登録"
-        },
-        {
-          "ts": "2026-08-01T17:28:32+0000",
-          "agent": "みゆきち",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T17:30:03+0000",
-          "agent": "みゆきち",
-          "action": "done",
-          "msg": "enforce-retro-stop.shの実戦検証完了。隔離環境で全実装タスクDONE状態を作り引数なし/stdin JSON両方の起動方式で警告stderr出力を確認。実リポジトリ(sprint-26進行中、13件未DONE)では誤検知なしを確認。stdin依存なし（判定はgit toplevel+ファイル読取のみ）。"
-        }
-      ]
-    },
-    {
-      "slug": "sprint26-qa",
-      "title": "Sprint-26 横断QA（複数文書整合性・憲章相互参照）",
-      "status": "DONE",
+      "slug": "sprint27-qa",
+      "title": "Sprint-27 横断QA（憲章・部門文書・queue.py整合）",
+      "status": "TODO",
       "assigned_to": "Sora",
       "complexity": "M",
       "risk_level": "medium",
       "parallel_group": "phase-4-final",
       "depends_on": [
-        "sdd-qa",
-        "audit-scan-qa",
-        "subagent-stop-enforce-qa",
-        "loadbalance-formula-doc",
-        "retro-stop-hook-live-check"
+        "invest-dept-charter",
+        "governance-doc-149-150",
+        "lessons-issue-sync-fix",
+        "invest-dept-hq-deploy-qa",
+        "queue-qa-reguard-qa"
       ],
       "qa_mode": "—",
-      "created_at": "2026-08-01T17:24:18+0000",
-      "updated_at": "2026-08-01",
-      "notes": "agent-crew-sprint-24-design-001準拠：constitution.md/departments.md/security.md/pm.md/pm-estimation.md/retro.md間の相互参照・実在性を横断確認する。",
-      "retry_count": 1,
-      "qa_result": "APPROVED",
-      "summary": "APPROVED。横断整合性・実機検証とも問題なし。全指摘解消済み(retry 1回、queue.py仕様上の再記録)",
+      "created_at": "2026-08-02T01:21:11+0000",
+      "updated_at": "2026-08-02",
+      "notes": "agent-crew-sprint-24-design-001準拠：project-charter.md/departments.md/ADR-014/pm.md/architect.md/retro.md間の相互参照・実在性を横断確認する。invest-dept-charterがテンプレート必須項目を全て埋めているか、governance-doc-149-150がpm.md/architect.mdに正しく反映されているか、lessons-issue-sync-fixのissue_url更新が実際のgh issueと一致しているかを確認する。",
+      "retry_count": 0,
+      "qa_result": null,
+      "summary": null,
       "events": [
         {
-          "ts": "2026-08-01T17:24:18+0000",
+          "ts": "2026-08-02T01:21:11+0000",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-26 キュー登録"
-        },
-        {
-          "ts": "2026-08-01T17:58:35+0000",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T18:00:17+0000",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "CHANGES_REQUESTED: 横断整合チェックは概ね良好(constitution/coo/security/weekly-council/pm.md相互参照OK、番号繰り下げ正しい、全シェルスクリプトbash -n OK、_queue.json状態整合OK、検証クエリ実行検証ルールの自己適用確認済み)。ただしMAJOR1件を検出: retro-stop-hook-live-check(#12)のnotesが要求した『retro.mdの完了条件への手順追記(レトロ未実施のままセッション終了を試み、Stopフックの警告出力を本スプリント中に1回確認する旨)』が実施されていない。.claude/agents/retro.mdを確認したが該当記述なし。実戦検証自体(stderr警告出力の確認)はsummaryに記録され実施済みだが、ドキュメントへの反映が欠落しており、今後のスプリントでこの手順が定着しない再発リスクがある。加えてaudit-scan-qaで検出したMAJOR(新設SubagentStopフックがaudit-scan.shのhooks判定パターンにマッチせずUNKNOWN/WARNING扱いになる自己参照課題)を横断課題として引き継ぐ"
-        },
-        {
-          "ts": "2026-08-01T18:04:12+0000",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "APPROVED。横断整合性・実機検証とも問題なし。全指摘解消済み"
-        },
-        {
-          "ts": "2026-08-01T18:04:47+0000",
-          "agent": "system",
-          "action": "retry",
-          "msg": "retry 1/3"
-        },
-        {
-          "ts": "2026-08-01T18:04:58+0000",
-          "agent": "Sora",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T18:04:58+0000",
-          "agent": "Sora",
-          "action": "qa",
-          "msg": "APPROVED: 再判定APPROVED(2回目)。全指摘解消を確認: (1)audit-scan.shのhooks判定パターンが先頭トークン*.sh全般への一般化に修正され、実機再実行でenforce-queue-done-stop.shのWARNING消滅・PASS扱いを確認、echo系WARNINGは挙動不変、存在しないスクリプト参照での意図的FAIL検知(exit1)もリグレッションなしを確認(後始末済み)。(2)retro.mdにステップ6.5「enforce-retro-stop.sh実戦検証(スプリント中1回・完了条件)」が新設されステップ7報告フォーマットにも反映されていることを確認。(3)sdd-quality-loop-design.md/proposal.md冒頭にRejected明記とADR-015への誘導文を確認。(4)ADR-015移行方針節に「Issue として起票することを推奨」の明記を確認。(5)subagent-stop-enforce-design.md §4のコード内コメントがQUEUE_FILE環境変数優先の実装意図と整合していることを確認。CRITICAL/MAJORはゼロ。前回(1回目)のqa記録はqueue.py仕様によりqa_result上書き不可のためretryでリセットして再記録"
-        },
-        {
-          "ts": "2026-08-01T18:04:58+0000",
-          "agent": "Sora",
-          "action": "done",
-          "msg": "APPROVED。横断整合性・実機検証とも問題なし。全指摘解消済み(retry 1回、queue.py仕様上の再記録)"
+          "msg": "Sprint-27 キュー登録"
         }
       ]
     },
     {
-      "slug": "sprint26-retro",
-      "title": "Sprint-26 レトロスペクティブ",
-      "status": "DONE",
+      "slug": "sprint27-retro",
+      "title": "Sprint-27 レトロスペクティブ",
+      "status": "TODO",
       "assigned_to": "みゆきち",
       "complexity": "S",
       "risk_level": "low",
       "parallel_group": "phase-4-final",
       "depends_on": [
-        "sprint26-qa"
+        "sprint27-qa"
       ],
       "qa_mode": "—",
-      "created_at": "2026-08-01T17:24:18+0000",
-      "updated_at": "2026-08-01",
-      "notes": "レトロ教訓候補（team-lead指摘、2026-08-02）: vaultのADR索引（~/Workspace/Obsidian/decisions/agent-crew-adr-index.md）が実態とズレていた。sdd-quality-loop-adr関連3文書がマスターワークツリー（~/Workspace/agent-crew/docs/adr/, docs/spec/）に未コミットのまま存在し、vault索引には記載があったがリポジトリ本体には反映されていなかった。索引と実体（未コミットファイル）の同期漏れがSprint-26計画時の前提相違（実在しないと誤判定）を引き起こした根因。lesson化を検討すること。",
+      "created_at": "2026-08-02T01:21:11+0000",
+      "updated_at": "2026-08-02",
+      "notes": "ルーブリック4軸算出。DECISIONS.md本体への転記漏れ（sprint-26分が未転記）をあわせて解消すること。",
       "retry_count": 0,
       "qa_result": null,
-      "summary": "Sprint-26レトロ完了。ルーブリック全4軸PASS(仕様明確度0.93/QA合格率1.0/ブロック率0.0/負荷分散1.43)。lesson5件記録(ID衝突をprocess-002→003に修正)、pm-learned-rules.md4件追記、docs/sprints/sprint-26-retro.md作成。gh issue create権限拒否のためIssue化はteam-lead代行依頼。過去sprint23-25の未issue化12件を報告事項として記載。",
+      "summary": null,
       "events": [
         {
-          "ts": "2026-08-01T17:24:18+0000",
+          "ts": "2026-08-02T01:21:11+0000",
           "agent": "Yuki",
           "action": "created",
-          "msg": "Sprint-26 キュー登録"
-        },
-        {
-          "ts": "2026-08-01T18:06:29+0000",
-          "agent": "みゆきち",
-          "action": "start",
-          "msg": "着手"
-        },
-        {
-          "ts": "2026-08-01T18:15:51+0000",
-          "agent": "みゆきち",
-          "action": "done",
-          "msg": "Sprint-26レトロ完了。ルーブリック全4軸PASS(仕様明確度0.93/QA合格率1.0/ブロック率0.0/負荷分散1.43)。lesson5件記録(ID衝突をprocess-002→003に修正)、pm-learned-rules.md4件追記、docs/sprints/sprint-26-retro.md作成。gh issue create権限拒否のためIssue化はteam-lead代行依頼。過去sprint23-25の未issue化12件を報告事項として記載。"
+          "msg": "Sprint-27 キュー登録"
         }
       ]
     }
