@@ -41,6 +41,15 @@ _PERSONA_PREFIX: list[tuple[str, str]] = [
     ("engineer-", "riku"),
 ]
 
+# ペルソナ id そのもの。オーケストレーション側（team-lead）がタスク単位でサブエージェントに
+# "<ペルソナ>-<タスク識別子>"（例: "riku-m2a", "riku-m2b", "tomo-m3", "alex-sprint26",
+# "miyu-sprint26"）という動的な agent_type を付けるケースがあり、これは _PERSONA_EXACT
+# （固定の役割名との完全一致）にも _PERSONA_PREFIX（役割名の前方一致）にもマッチしない。
+# 実データ確認（2026-08-02, dashboard実データ接続時に発覚）: このケースを見落とすと
+# persona が常に None になり、SPA側のフォールバックで全員が Yuki に集約されてしまう
+# （「Yukiしか動いていないように見える」不具合の原因）。
+_PERSONA_IDS: list[str] = ["yuki", "alex", "riku", "sora", "miyu", "kai", "mina", "tomo", "hana", "ren"]
+
 
 def department_for(cwd: str) -> str:
     """cwd（プロジェクトディレクトリパス）から部門名を判定する。"""
@@ -87,6 +96,13 @@ def persona_for(payload: dict) -> str | None:
     for prefix, persona in _PERSONA_PREFIX:
         if subagent_type.startswith(prefix):
             return persona
+
+    # "<ペルソナ>-<タスク識別子>" 形式の動的な agent_type に対応する
+    # （例: "riku-m2a" -> "riku"、"miyu-sprint26" -> "miyu"）。
+    # ハイフン必須で前方一致させ、"kaiser-x" のような無関係な名前への誤マッチを避ける。
+    for persona_id in _PERSONA_IDS:
+        if subagent_type == persona_id or subagent_type.startswith(persona_id + "-"):
+            return persona_id
 
     return None
 
