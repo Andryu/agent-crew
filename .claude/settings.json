@@ -119,7 +119,7 @@
       "Bash(scripts/token-report.py *)",
       "Bash(scripts/enforce-retro-stop.sh *)",
       "Bash(scripts/sprint-points.sh *)",
-      "Write(**)",
+      "Edit(**)",
       "Bash(scripts/audit-scan.sh *)"
     ]
   }
