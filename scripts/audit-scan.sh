@@ -22,6 +22,12 @@
 #   1. permissions.allow 整合性（スプリント計画書に記載のない新規追加を検知）
 #   2. symlink 健全性（リンク切れ・自己参照）
 #   3. .claude/settings.json hooks の構文・生存確認
+#   4. サーキットブレーカー健全性（retry_countが上限到達なのにBLOCKEDでないタスクを検知）
+#   5. トークン予算超過（週次トークンレポートの前週比が閾値超過）
+#   6. 禁止コマンドチェック（permissions.allowが禁止パターンに抵触していないか）
+#
+# チェック4〜6は docs/org/guardrails.md（組織憲章第5条）の Enforcement 実装
+# （Sprint-26以降, オーナー指示 2026-08-02「ガードレール制度化」）。
 #
 # 終了コード:
 #   0 : 全チェック PASS（SKIP・WARNINGのみは0で問題ない）
@@ -63,6 +69,8 @@ for cmd in jq git find readlink; do
     exit 2
   fi
 done
+
+: "${MAX_RETRY:=3}"
 
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 if [[ -z "$REPO_ROOT" ]]; then
@@ -232,6 +240,135 @@ else
 fi
 
 # ========================================================================
+# 3.4 サーキットブレーカー健全性チェック（ガードレール第2条）
+# ========================================================================
+# retry_count が complexity 別上限（queue.py と同一: S=2 / M=3 / L=5、不明は
+# MAX_RETRY）に達しているのに status が BLOCKED へ遷移していないタスクを検知する。
+# 本チェックは「サーキットブレーカーが実際に発火したか」の事後検証であり、
+# 発火そのものは queue.py / queue.sh 側の既存自動遷移が担う。
+
+CIRCUIT_RESULT="PASS"
+CIRCUIT_FAIL_COUNT=0
+CIRCUIT_DETAIL_LINES=()
+
+if [[ ! -f "$QUEUE_FILE" ]] || ! jq -e . "$QUEUE_FILE" >/dev/null 2>&1; then
+  CIRCUIT_RESULT="SKIP"
+  CIRCUIT_DETAIL_LINES+=("SKIP: ${QUEUE_FILE} が存在しないか読み取れません")
+else
+  while IFS=$'\t' read -r slug status complexity retry_count; do
+    [[ -z "$slug" ]] && continue
+    case "$status" in
+      DONE|BLOCKED|ON_HOLD) continue ;;
+    esac
+    case "$complexity" in
+      S) cap=2 ;;
+      M) cap=3 ;;
+      L) cap=5 ;;
+      *) cap="$MAX_RETRY" ;;
+    esac
+    if [[ "$retry_count" =~ ^[0-9]+$ ]] && [[ "$retry_count" -ge "$cap" ]]; then
+      CIRCUIT_DETAIL_LINES+=("[FAIL] ${slug} — retry_count=${retry_count}（上限${cap}）に達しているが status=${status}（BLOCKEDへ未遷移）")
+      CIRCUIT_FAIL_COUNT=$((CIRCUIT_FAIL_COUNT + 1))
+    fi
+  done < <(jq -r '.tasks[]? | [.slug, .status, (.complexity // "M"), (.retry_count // 0)] | @tsv' "$QUEUE_FILE" 2>/dev/null)
+
+  if [[ "$CIRCUIT_FAIL_COUNT" -gt 0 ]]; then
+    CIRCUIT_RESULT="FAIL (${CIRCUIT_FAIL_COUNT}件)"
+  else
+    CIRCUIT_DETAIL_LINES+=("該当なし")
+  fi
+fi
+
+# ========================================================================
+# 3.5 トークン予算超過チェック（ガードレール第3条）
+# ========================================================================
+# docs/org/council/token-report-*.md の「部門別トークン消費」表を突合し、
+# 前期間比が +50%以上でWARNING、+100%以上でFAILとする。
+
+TOKEN_RESULT="PASS"
+TOKEN_WARN_COUNT=0
+TOKEN_FAIL_COUNT=0
+TOKEN_DETAIL_LINES=()
+
+LATEST_TOKEN_REPORT=$(find "$REPO_ROOT/docs/org/council" -maxdepth 1 -name 'token-report-*.md' 2>/dev/null | sort | tail -n1 || true)
+
+if [[ -z "$LATEST_TOKEN_REPORT" ]]; then
+  TOKEN_RESULT="SKIP"
+  TOKEN_DETAIL_LINES+=("SKIP: token-report-*.md が見つかりません（docs/org/council/）")
+else
+  SECTION=$(awk '/^## 部門別トークン消費/{flag=1; next} /^## /{if (flag) exit} flag' "$LATEST_TOKEN_REPORT" 2>/dev/null || true)
+
+  while IFS='|' read -r _ dept _ _ _ _ pct _; do
+    dept=$(echo "$dept" | xargs)
+    pct=$(echo "$pct" | xargs)
+    [[ -z "$dept" ]] && continue
+    if [[ "$pct" =~ ^[+-]?[0-9]+(\.[0-9]+)?%$ ]]; then
+      num="${pct%\%}"
+      num="${num#+}"
+      if awk "BEGIN{exit !($num >= 100)}" 2>/dev/null; then
+        TOKEN_DETAIL_LINES+=("[FAIL] ${dept}: 前週比 ${pct}（閾値+100%以上）")
+        TOKEN_FAIL_COUNT=$((TOKEN_FAIL_COUNT + 1))
+      elif awk "BEGIN{exit !($num >= 50)}" 2>/dev/null; then
+        TOKEN_DETAIL_LINES+=("[WARNING] ${dept}: 前週比 ${pct}（閾値+50%以上）")
+        TOKEN_WARN_COUNT=$((TOKEN_WARN_COUNT + 1))
+      fi
+    fi
+  done <<< "$SECTION"
+
+  if [[ "$TOKEN_FAIL_COUNT" -gt 0 ]]; then
+    TOKEN_RESULT="FAIL (${TOKEN_FAIL_COUNT}件)"
+  elif [[ "$TOKEN_WARN_COUNT" -gt 0 ]]; then
+    TOKEN_RESULT="WARNING (${TOKEN_WARN_COUNT}件)"
+  fi
+
+  if [[ ${#TOKEN_DETAIL_LINES[@]} -eq 0 ]]; then
+    TOKEN_DETAIL_LINES+=("該当なし（${LATEST_TOKEN_REPORT#"$REPO_ROOT"/}）")
+  fi
+fi
+
+# ========================================================================
+# 3.6 禁止コマンドチェック（ガードレール第4条）
+# ========================================================================
+# permissions.allow が L0（人間専権: 公開・リリース・支払い・対外送信・破壊的操作）
+# に該当する禁止パターンを含んでいないか突合する。
+
+FORBIDDEN_RESULT="PASS"
+FORBIDDEN_FAIL_COUNT=0
+FORBIDDEN_DETAIL_LINES=()
+
+FORBIDDEN_PATTERNS=(
+  "publish"
+  "release create"
+  "--force"
+  "force-with-lease"
+  "stripe"
+  "paypal"
+  "terraform apply"
+  "kubectl apply"
+)
+
+ALLOW_ENTRIES=$(jq -r '.permissions.allow[]? // empty' "$SETTINGS_FILE" 2>/dev/null || true)
+
+if [[ -n "$ALLOW_ENTRIES" ]]; then
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    lower_entry=$(echo "$entry" | tr '[:upper:]' '[:lower:]')
+    for pat in "${FORBIDDEN_PATTERNS[@]}"; do
+      if [[ "$lower_entry" == *"$pat"* ]]; then
+        FORBIDDEN_DETAIL_LINES+=("[FAIL] \"${entry}\" — 禁止パターン「${pat}」に抵触（docs/org/guardrails.md 第4条）")
+        FORBIDDEN_FAIL_COUNT=$((FORBIDDEN_FAIL_COUNT + 1))
+      fi
+    done
+  done <<< "$ALLOW_ENTRIES"
+fi
+
+if [[ "$FORBIDDEN_FAIL_COUNT" -gt 0 ]]; then
+  FORBIDDEN_RESULT="FAIL (${FORBIDDEN_FAIL_COUNT}件)"
+else
+  FORBIDDEN_DETAIL_LINES+=("該当なし")
+fi
+
+# ========================================================================
 # レポート生成
 # ========================================================================
 
@@ -239,7 +376,8 @@ REPORT_DATE=$(date "+%Y-%m-%d %H:%M")
 SHORT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 OVERALL="PASS"
-if [[ "$PERM_RESULT" == "FAIL" || "$SYMLINK_RESULT" == FAIL* || "$HOOKS_RESULT" == FAIL* ]]; then
+if [[ "$PERM_RESULT" == "FAIL" || "$SYMLINK_RESULT" == FAIL* || "$HOOKS_RESULT" == FAIL* \
+   || "$CIRCUIT_RESULT" == FAIL* || "$TOKEN_RESULT" == FAIL* || "$FORBIDDEN_RESULT" == FAIL* ]]; then
   OVERALL="FAIL"
 fi
 
@@ -256,6 +394,9 @@ REPORT=$(
   echo "| permissions.allow 整合性 | ${PERM_RESULT} |"
   echo "| symlink 健全性 | ${SYMLINK_RESULT} |"
   echo "| hooks 構文・生存確認 | ${HOOKS_RESULT} |"
+  echo "| サーキットブレーカー健全性 | ${CIRCUIT_RESULT} |"
+  echo "| トークン予算超過 | ${TOKEN_RESULT} |"
+  echo "| 禁止コマンド | ${FORBIDDEN_RESULT} |"
   echo ""
   echo "## 詳細"
   echo ""
@@ -271,6 +412,21 @@ REPORT=$(
   echo ""
   echo "### hooks"
   for line in "${HOOKS_DETAIL_LINES[@]}"; do
+    echo "- ${line}"
+  done
+  echo ""
+  echo "### サーキットブレーカー健全性（ガードレール第2条）"
+  for line in "${CIRCUIT_DETAIL_LINES[@]}"; do
+    echo "- ${line}"
+  done
+  echo ""
+  echo "### トークン予算超過（ガードレール第3条）"
+  for line in "${TOKEN_DETAIL_LINES[@]}"; do
+    echo "- ${line}"
+  done
+  echo ""
+  echo "### 禁止コマンド（ガードレール第4条）"
+  for line in "${FORBIDDEN_DETAIL_LINES[@]}"; do
     echo "- ${line}"
   done
   echo ""

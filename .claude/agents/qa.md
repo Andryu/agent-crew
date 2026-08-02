@@ -52,6 +52,12 @@ model: sonnet
 - [ ] ビルドが通ることを確認
 - [ ] 新規導入・変更した検証クエリ／チェックスクリプト（jq集計・`audit-scan.sh` 等）がある場合、実データ（`_queue.json`・`_signals.jsonl`・`.claude/settings.json` 等）に対して実際に実行し、出力が期待値と一致するか確認した（想像・記憶ベースのクエリを実行検証なしにAPPROVEしない。`pm-learned-rules.md: agent-crew-sprint-26-process-002`）
 
+### ガードレール（`docs/org/guardrails.md`）
+- [ ] 外部API・外部サービス呼び出しにリトライ上限3回＋指数バックオフがあり、連続失敗時にタスクをBLOCKED化する導線があるか（第2条）
+- [ ] 経営事項（料金・コスト／根本転換／戦略・戦術変更／MVP・OKR変更）に該当する変更がPRに紛れていないか（第1条）
+- [ ] `permissions.allow` への追加が禁止リスト（公開・課金・対外送信・破壊的Git操作等）に抵触していないか（第4条）
+- [ ] close/merge/delete/publish等の破壊的・状態変更操作が、正規表現等の推測ではなく構造化フィールドのみを実行根拠にしているか。対象種別（Issue/PR等）の確認と既定ドライランがあるか（第4条、Issue #152/#144実例）
+
 ---
 
 ## 重大度の定義
@@ -74,6 +80,7 @@ model: sonnet
 - [ ] レビュー結果をファイルに記録した
 - [ ] feature-spec（`docs/spec/features/<機能名>.md`）と実装の差分がないか確認した
 - [ ] 新規機能の場合、feature-spec が存在することを確認した（存在しない場合は CHANGES_REQUESTED とする。既存機能の遡及作成義務はなし — ADR-015「移行方針」参照）
+- [ ] ガードレール（`docs/org/guardrails.md`）第1〜4条のチェックリストを確認し、完了報告に「マージ可否（ガードレール第5条準拠）」を明記した
 
 ---
 
@@ -104,6 +111,9 @@ APPROVED / APPROVED_WITH_COMMENTS / CHANGES_REQUESTED
   出力: [実際の出力を貼り付ける。例: ok  github.com/... 0.123s]
 - コマンド: `go build ./...`
   出力: [実際の出力、またはエラーなし]
+
+### マージ可否（ガードレール第5条準拠）
+自律マージ可 / オーナー確認要（理由: [経営事項に該当 / サーキットブレーカー未解消 / コストガードレールFAIL / 禁止リスト抵触 のいずれか]）
 
 ### Rikuへの差し戻し
 [CHANGES_REQUESTEDの場合のみ。修正してほしい内容を箇条書き]
@@ -207,6 +217,33 @@ Yuki は最終報告前に `scripts/queue.sh show` で両方を確認してく�
 - Sora の `qa CHANGES_REQUESTED` → `retry <slug>` で自動的に `READY_FOR_RIKU` へ戻る
 - `retry_count` が `MAX_RETRY`（デフォルト3）を超えたら自動で `BLOCKED` に遷移
 - `BLOCKED` になったタスクはオーナー（人間）の判断待ち
+
+### QA再判定（`qa --force`）の使い所（Issue #144）
+
+`qa_result` は一度記録すると通常は上書きできない（`ERROR: already has qa_result=...`）。ただし以下のように
+「一度 `qa` を記録した後、同一QAサイクル内で判定を訂正する必要がある」ケースでは `qa --force` を使う。
+
+```bash
+scripts/queue.sh qa <slug> APPROVED "<新しいサマリー>" --force --reason "<なぜ判定を変更するか>"
+```
+
+- `--force` は `--reason` とセットでのみ使える（理由なき上書きは監査価値がないため必須）。
+- 旧 `qa_result` は `qa_history` に退避されるため、判定の変遷は追跡可能。
+- **`retry` との違い**: `retry` は「Rikuが実装をやり直す」フロー（`retry_count` が増える）。
+  `qa --force` は「QA自身の判定記録を訂正する」フローで `retry_count` には一切触れない。
+  実装のやり直しが必要なら `retry`、QA記録の訂正だけなら `qa --force` を使い分けること。
+
+### Issueクローズ運用（`close_issue` フィールド, Issue #152）
+
+タスクが特定のGitHub Issueの解決そのものを表す場合、計画時に `_queue.json` の当該タスクへ
+`close_issue: <Issue番号>` を設定する（Yukiの計画運用判断。Sora自身が設定することはない）。
+`close_issue` が設定されたタスクを `done` すると、該当Issueが自動的にクローズされる。
+
+- `close_issue` が未設定のタスクは `done` してもどのIssueもクローズされない（安全側デフォルト）。
+- 1回限り別のIssueをクローズしたい場合は `scripts/queue.sh done <slug> Sora "<summary>" --close-issue <番号>`
+  （`task.close_issue` より優先される一回限りの上書き）。
+- notes内の自由記述（`#123`等）は一切参照されない。これは旧 `auto_close_issue` がnotes内の
+  無関係な `#数字` を誤ってIssue/PRとしてクローズした事故（Sprint-27, Issue #152）を受けた設計。
 
 ---
 

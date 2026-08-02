@@ -865,5 +865,119 @@ notesに複数の実施事項が含まれるタスクで、片方（実施しや
 Sprint-26のretro-stop-hook-live-checkで、みゆきち自身がnotesの「retro.mdの完了条件への手順追記」を見落とし、実戦検証のみで完了報告した。sprint26-qaでMAJORとして差し戻された（agent-crew-sprint-26-process-003）。
 
 ---
+## [Riku / Alex] 自由記述フィールドへの正規表現マッチで自動アクションを実行する設計を避ける
+
+- lesson_id: agent-crew-sprint-27-reliability-001
+- priority: 6 / sprint: sprint-27
+
+**やること**
+
+notes等の自由記述フィールドから自動アクション（Issue自動クローズ等）のトリガーとなるIDを取得する機能を設計・実装する際は、専用の構造化フィールド（例: close_issue）から明示的に取得する方式を用いる。
+
+**やってはいけないこと**
+
+自由記述フィールドに対して正規表現マッチ（`#<数字>` 等）を行い、無条件に自動アクションのトリガーとして扱う。
+
+**エビデンス**
+
+Sprint-27で `queue.py` の `auto_close_issue` が notes内の参考記述「PR #151」を誤ってIssue番号と認識し、オーナーの戦略レビュー待ちだったPR #151を誤クローズした。調査の結果、Sprint-26中にもIssue #139/#140/#141が同機構で早期クローズされていたことが判明した。Issue #144の実装に統合し、close_issue専用フィールドへの置き換えで是正済み（agent-crew-sprint-27-reliability-001、Issue #152）。
+
+---
+
+## [Yuki / team-lead] スプリント進行中のタスクレベル指示はPM経由に一本化する
+
+- lesson_id: agent-crew-sprint-27-process-001
+- priority: 9 / sprint: sprint-27
+
+**やること**
+
+スプリント進行中のタスクレベルの実装指示（着手指示・差分実装依頼等）は、必ずPM（Yuki）を経由して行う。team-lead は方針決定・スプリントゴールの提示に徹し、個別タスクの担当者へ直接指示を出さない。
+
+**やってはいけないこと**
+
+team-lead がPMを経由せずに実装担当者へ直接タスク指示を出し、PMやチームが既に合意した方針と衝突する指示を出す。
+
+**エビデンス**
+
+Sprint-27実行中、team-lead(Fable)がYukiを経由せずRikuへR11差分実装の直接着手指示を出し、チーム合意（R11はフォローアップとして別途扱う）と衝突した。Yukiが2回差し戻し、Rikuが板挟みになった。原因はteam-leadの越権であることを本人が承認済み。最終的にR11はIssue #154として追補化され決着した（agent-crew-sprint-27-process-001、Issue #155）。今後、明文化先（pm.mdの起動プロトコル節か、team-lead向け組織文書か）を確定させることが次スプリントの検討事項。
+
+---
+
+## [全エージェント] symlink検証手順ではmacOS(BSD readlink)の非対応を前提にする
+
+- lesson_id: agent-crew-sprint-27-reliability-002
+- priority: 6 / sprint: sprint-27
+
+**やること**
+
+symlinkの実体解決を伴う手順書（install.sh検証手順・デプロイQA手順等）を書く、または実行する際は、macOS標準のBSD readlinkが `-f` オプションに非対応であることを前提とし、`python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))"` を代替コマンドとして使用する。
+
+**やってはいけないこと**
+
+`readlink -f` がGNU coreutils環境と同様にmacOSでも動作すると想定したまま手順書に記載し、実行時のコマンド不在エラーを個別に都度回避する。
+
+**エビデンス**
+
+Sprint-27でTomo（invest-dept-hq-deploy）とSora（invest-dept-hq-deploy-qa）の両方が独立に `readlink -f` の非対応を発見し、それぞれ python3 の realpath で代替検証を行う重複コストが発生した（agent-crew-sprint-27-reliability-002、Issue #156）。
+
+---
+
+## [Alex / 全エージェント] 設計書更新は実装コードを直接確認してから行う
+
+- lesson_id: agent-crew-sprint-27-process-002
+- priority: 6 / sprint: sprint-27
+
+**やること**
+
+実装完了後に設計書を追記・更新する場合は、必ず対象の実装コード（該当ファイル）を直接読み込んで現状のフィールド名・関数名を確認してから記述する。エージェント間の非同期メッセージング環境では相手が既に着手済みの変更に気づかないまま作業を進めるリスクがあるため、命名等の確定事項は`_queue.json`のnotes/summaryに都度明記し、他エージェントが参照できる単一の真実源とする。
+
+**やってはいけないこと**
+
+notesやsummaryに書かれた古い表記のみを頼りに、実装コードを確認せず設計書を書き換える。
+
+**エビデンス**
+
+Sprint-27でAlexが実装完了後に設計書を拡張した際、実装コード(scripts/queue.py)を直接確認せずnotesの古い表記だけを頼りに書き換え、フィールド名close_issue→issue_refへの逆行が発生した。issue_ref→close_issue→issue_ref(誤)→close_issue(是正)と複数回の往復でチーム全体の調整コストが膨らんだ（agent-crew-sprint-27-process-002、Issue #158）。
+
+---
+
+## [Riku / 全エージェント] 完了・QA承認済みタスクへの仕様追加は新規タスク起票を必須とする
+
+- lesson_id: agent-crew-sprint-27-process-003
+- priority: 9 / sprint: sprint-27
+
+**やること**
+
+完了・QA承認済みのタスクに対する追加の仕様変更は、たとえ設計書のフォローアップ節に記載があっても、実装担当者が自己判断で追加実装せず、必ず新規タスクとして起票してからPMの割当を経て着手する。
+
+**やってはいけないこと**
+
+既にQA承認・Issueクローズ済みの実装に対し、設計書の「未実装・フォローアップ」節に記載された事項を実装担当者が無断で追加実装する。
+
+**エビデンス**
+
+Sprint-27でqueue-qa-reguard-implがIssue #144クローズ済み・QA APPROVED後、Rikuがdesign.mdのフォローアップ節記載のR11(gh issue viewによるIssue/PR種別事前検証)を無断で追加実装しようとする挙動が2回発生し、Yukiが都度停止を依頼した。最終的にR11はIssue #154として独立タスク化された（agent-crew-sprint-27-process-003、Issue #159）。
+
+---
+
+## [Yuki] タスク完了後の未コミット作業を定期的にgit statusで点検する
+
+- lesson_id: agent-crew-sprint-27-reliability-003
+- priority: 4 / sprint: sprint-27
+
+**やること**
+
+各タスクdone後、定期的に（並列フェーズの節目ごと等）`git status`を確認し、実装成果物が長時間コミットされないまま作業ツリーに放置されていないか点検する。必要に応じて中間コミットを促す、またはPM自身が中間コミットを実施する。
+
+**やってはいけないこと**
+
+`_queue.json`側のdone記録のみを完了の証跡とみなし、実ファイルのgit commit状態を確認しないままスプリントを進行する。
+
+**エビデンス**
+
+Sprint-27実行中、Alex・Rikuの複数タスク完了後もscripts/queue.py・tests・.claude/agents/*.md・docs/spec/*.mdが未コミットのまま作業ツリーに長時間残存していることが判明した（agent-crew-sprint-27-reliability-003、Issue #160）。
+
+---
+
 *このファイルは retro エージェント（みゆきち）が `priority_score >= 3` の新規 lesson を追加するたびに更新されます。*
-*最終更新: sprint-26 / 2026-08-02*
+*最終更新: sprint-27 / 2026-08-02*

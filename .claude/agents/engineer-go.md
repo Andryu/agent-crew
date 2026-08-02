@@ -386,3 +386,43 @@ Yuki へは `BLOCKED` ステータスとともにキューの notes へ詳細を
 - **lesson**: Sprint-15 の retro フェーズで scripts/lessons.sh が permissions.allow に未登録であり、lesson 記録（lessons.sh add）が実行できなかった。
 - **禁止行動**: 
 - **priority**: 4 / sprint: sprint-15
+
+### agent-crew-sprint-21-tooling-001
+- **lesson**: Claude Code には Cron フック（定期実行フック）が存在しない。Sprint-21 でリサーチエージェント（Alex/Yuki/Guide）がリサーチを行った結果、この技術的制約を事前に発見し、Stop フック（セッション終了
+- **禁止行動**: 定期実行を必要とする機能を設計する際は、Claude Code の利用可能なフックタイプ（Stop/PreToolCall/PostToolCall 等）を事前にリサーチし、Cron 相当機能がないことを前提に設計する。Stop フックはセッション終了トリガーとして利用可能。
+- **priority**: 4 / sprint: sprint-21
+
+### agent-crew-sprint-22-tooling-001
+- **lesson**: Sprint-22 でグローバル学習ログフック（capture-learning.sh / aggregate-learnings.sh）を実装したが、~/.claude/settings.json への SubagentStop/Stop
+- **禁止行動**: フックの install.sh オプションを実装した場合、CI または QA タスクの notes に「実際に install.sh --only=global-hooks を実行して ~/.claude/settings.json を確認する」テスト手順を明記する。手動セットアップが必要な実装は「APPROVED_WITH_NOTE の NOTE 内容をスプリント完了条件に含める」ことで積み残し防止を図る。
+- **priority**: 4 / sprint: sprint-22
+
+### agent-crew-sprint-24-tooling-001
+- **lesson**: Renがtoken-report-scriptの実データ調査で、JSONLのストリーミング途中経過行を単純合算するとトークン消費が2〜5倍水増しされる落とし穴を発見し、message.idでの重複排除により回避した。想像でスキーマを設計せず
+- **禁止行動**: JSONLやログなど、ストリーミング形式で書き出されるデータを集計するスクリプトは、実装前に実データのフィールド構造・重複パターンを確認してからスキーマを設計する。実装後は必ず実データで実行し、レコードの重複（途中経過行の重複合算等）による水増しが発生していないかを検証する。
+- **priority**: 4 / sprint: sprint-24
+
+### agent-crew-sprint-26-tooling-001
+- **lesson**: queue.py の仕様上 qa_result は上書きできず、done 側にも重複記録のガードがない。そのためQA再判定（CHANGES_REQUESTED→修正→APPROVED）の正規の記録経路が retry コマンドしか存在せず、S
+- **禁止行動**: queue.py に qa --force（既存qa_resultを上書きしてQA再判定を記録する）オプション、または done 側に「qa_result != null かつ再QAの場合は retry を使わず再記録できる」ガード改善を追加することをバックログ化・Issue起票する。あわせて retro.md ステップ6のSPEC_CLARITY算出で「QA再判定に起因するretry」と「実装やり直しに起因するretry」を区別できるよう、queue.py側にretry理由の分類（reason: qa-reassessment / implementation-fix 等）を持たせることを検討する。
+- **priority**: 6 / sprint: sprint-26
+
+### agent-crew-sprint-26-reliability-001
+- **lesson**: sprint26-qaでMAJORとして検出: 新設した audit-scan.sh（Kai定常スキャン）が、同一スプリントで新設された SubagentStop フック（enforce-queue-done-stop.sh 等）を hoo
+- **禁止行動**: 同一スプリント内で監査機構（スキャナ・enforcementフック等）と、その監査対象となる新規コンポーネントを同時に新設するタスクがある場合、設計段階で『新設した監査対象を、新設した監査機構自身でドッグフーディング実行する』ワークフローをQAチェックリストに明記することを検討する（既にaudit-scan-qa/sprint26-qaで個別対応済みだが、恒久ルール化はバックログ）。
+- **priority**: 4 / sprint: sprint-26
+
+### agent-crew-sprint-27-reliability-001
+- **lesson**: queue.py の auto_close_issue が notes 内の自由記述テキストへの正規表現マッチ(#<数字>)でIssue/PR番号を無条件に特定しクローズする設計だったため、invest-dept-charter完了時にno
+- **禁止行動**: Issue #144の設計・実装に統合し、同スプリント内でclose_issue専用フィールド＋close_linked_issue関数への置き換えによりnotes正規表現参照を完全廃止済み（pytest 40件全パス、Issue #152はクローズ済み）。今後、自由記述フィールド(notes等)からIDを抽出して自動アクションを実行する設計を新規実装する際は、専用の構造化フィールドを使い正規表現による自由記述マッチを避けることを設計レビュー観点に加える。
+- **priority**: 6 / sprint: sprint-27
+
+### agent-crew-sprint-27-reliability-002
+- **lesson**: symlinkの実体解決に readlink -f を使う検証手順が、macOS標準のBSD readlinkでは -f オプション非対応であるため機能しない。Tomo(invest-dept-hq-deploy)とSora(invest-
+- **禁止行動**: symlink実体解決を伴う手順書(install.sh検証手順・デプロイQA手順等)に readlink -f を記載する場合、macOS標準のBSD readlinkでは -f オプションが非対応である旨を明記し、`python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))"` を代替コマンドとして併記する。pm-learned-rules.mdへ反映し、次回以降の同種手順書に適用する。
+- **priority**: 6 / sprint: sprint-27
+
+### agent-crew-sprint-27-reliability-003
+- **lesson**: Alex・Rikuの成果物（queue.py・tests・agent定義・設計書等）が、`_queue.json`の状態更新（queue.sh done実行）は行われていたにもかかわらず、git commitとしては長時間作業ツリーに未コミ
+- **禁止行動**: PMは各タスクdone後、定期的に(並列フェーズの節目ごと等)`git status`を確認し、実装成果物が長時間コミットされないまま作業ツリーに放置されていないか点検する。必要に応じて中間コミットを促す、またはPM自身が中間コミットを実施する運用を徹底する。
+- **priority**: 4 / sprint: sprint-27

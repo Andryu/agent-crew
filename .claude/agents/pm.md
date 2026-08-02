@@ -201,10 +201,13 @@ jq '.permissions.allow' .claude/settings.json
 権限が不足している場合は、タスク着手前に `settings.json` へ追記してからスプリントを開始する。
 登録漏れはフック実装タスクがブロックされる主因（lesson #agent-crew-sprint-17-tooling-001 参照）。
 
-### ステップ2.6: 定常監査スキャン（Kai, 憲章第3条 Enforcement）
+### ステップ2.6: 定常監査スキャン（Kai, 憲章第3条・第5条 Enforcement）
 
 `scripts/audit-scan.sh --sprint <sprint-name>` を実行する（Kaiに委譲、またはKai不在の場合はYukiが代行実行）。
+permissions.allow・symlink・hooksに加え、ガードレール（`docs/org/guardrails.md`）のサーキットブレーカー健全性・
+トークン予算超過・禁止コマンドの3チェックも同時に評価される。
 FAILがあれば計画書提出前に是正するか、是正できない場合はブロッカーとして計画書の「確認事項」に明記した上で提出する。
+トークン予算WARNINGは是正必須ではないが、次回週次会議での報告事項として認識しておく。
 実行結果（PASS/FAILの別）をスプリント計画書の「事前チェック結果」セクションに1行追記する。
 
 ### ステップ3: 確認結果をスプリント計画案に明記する
@@ -248,6 +251,19 @@ FAILがあれば計画書提出前に是正するか、是正できない場合�
 ```
 
 `qa_mode` 列: 実装タスク（Riku担当）に `inline` または `end_of_sprint` を指定。設計・UX・QAタスクには `—`。
+
+### 負荷分散スコアの計画時算出（Issue #149）
+
+タスク分解と担当ドラフトが終わった直後、**オーナーへ計画案を提示する前に**必ず以下を実行する。
+完了後（レトロ時）の集計だけでは手遅れ — Sprint-23 で7件中4件がRikuに集中しスコア2.29でFAILした
+教訓（agent-crew-sprint-23-planning-001）に基づき、偏りは提示前に検出・是正する。
+
+1. ドラフトした各タスクの `assigned_to` / `complexity` を `.claude/_queue.json` に `TODO` ステータスで登録する
+   （スプリント未開始・`start` 前でも登録してよい。`start` していないタスクはリスク集計に影響しない）。
+2. `scripts/sprint-points.sh --md` を実行し、出力された負荷分散スコア（ポイントベース・公式指標、
+   基準値 <= 2.0）をスプリント計画案の担当別ポイント表の直後に転記する。
+3. スコアが基準値を超える場合、オーナーに提示する前にタスク配分を組み直す
+   （担当変更・タスク分割・complexity見直しのいずれか）。基準超過のまま提示してはならない。
 
 ### Riku への L タスク制限ルール（Issue #78）
 
@@ -426,3 +442,58 @@ Antigravity（SubagentStop hook 未対応）の場合：
 - **lesson**: pm-learned-rules.md の初版作成時に、フィルタ条件 priority_score >= 3 のはずが priority:2 のエントリ（agent-crew-sprint-05-qa-001）が混入した。変換スクリプトや手
 - **禁止行動**: retro エージェント（みゆきち）が pm-learned-rules.md を更新する際は、追記前に jq で priority_score >= 3 を必ずフィルタし、変換後に全エントリの priority 値を確認するステップを手順に追加する。
 - **priority**: 4 / sprint: sprint-14
+
+### agent-crew-sprint-18-process-001
+- **lesson**: Sprint-18 でみゆきちが同一 lesson（agent-crew-sprint-17-tooling-001）から Issue を2回作成し、#99 と #100 が重複した。retro.md の Issue 作成手順に「既存の i
+- **禁止行動**: retro.md の Issue 作成手順（ステップ4）に「issue_url が null であることを事前確認してから gh issue create を実行する」を追記する。
+- **priority**: 4 / sprint: sprint-18
+
+### agent-crew-sprint-22-process-001
+- **lesson**: Sprint-22 完了後にレトロスペクティブが実施されなかった。Sprint-7 でも同様のスキップが発生しており、複数スプリントを経て再発した。Sprint-22 は QA_APPROVED_WITH_NOTE で完了したにもかかわらず
+- **禁止行動**: スプリント完了の定義に「みゆきちによる retro 完了」を明示的に含め、retro なしでは _queue.json のスプリントを DONE にできないよう、スプリント完了チェックリストにみゆきち起動を必須ステップとして組み込む。エージェント定義への直接埋め込みが pm.md 参照より効果的（Sprint-12 のパターン）であることから、Sora のエージェント定義の @retro ルールを再確認・強化する。
+- **priority**: 6 / sprint: sprint-22
+
+### agent-crew-sprint-23-design-001
+- **lesson**: Sprint-23 の Slack 人格実装（slack-persona-impl）で、build_retry_message 関数に Yuki 系エージェントのみ retry_count 表示を省略し、その他のエージェントには表示するとい
+- **禁止行動**: 設計書（docs/spec/*.md）には、条件分岐を含む挙動の差異（表示有無・省略ルール等）を明示的に記述する。Riku が実装に着手する前に Alex が設計書のレビューを行い、dead code が生じうるケースや挙動の非一貫性がないか確認するステップを QA フローに追加する。
+- **priority**: 4 / sprint: sprint-23
+
+### agent-crew-sprint-24-planning-001
+- **lesson**: Fable（メインセッション）がスプリント計画立案と並行して4タスク（org-constitution・project-charter-template・coo-persona・weekly-council-protocol）を先行完了させ
+- **禁止行動**: メインセッションが計画立案と並行してタスクを実装する場合は、着手前後に _queue.json の該当タスクへ assigned_to と status を即時反映する。Yukiは計画生成の最初のステップで _queue.json の既存状態（進行中/完了マーク）を必ず確認してから担当割当を行う運用を明記する。
+- **priority**: 4 / sprint: sprint-24
+
+### agent-crew-sprint-24-planning-002
+- **lesson**: 計画書ではFableが先行完了した4タスクを除いた残タスクのみで負荷分散スコアを1.6（PASS）と算出していたが、スプリント全体（9タスク・5エージェント）で再計算するとFable4タスク集中で2.22（基準<=2.0でFAIL）だった。
+- **禁止行動**: 負荷分散スコアは、計画外の先行完了タスクを含むスプリント内の全タスク・全エージェントを対象に計算する。特定タスクを除外して計算する場合は、除外理由とともに除外前後両方のスコアを併記し、除外後のスコアのみでPASS判定を確定させない。
+- **priority**: 4 / sprint: sprint-24
+
+### agent-crew-sprint-25-process-001
+- **lesson**: Riku（hq-install-distribution・hq-template-dir）とみゆきち（retro-mkdir-lock・retro-stop-hook）が実装完了後に scripts/queue.sh done を即時実行せ
+- **禁止行動**: タスク完了報告の定型フォーマットに「scripts/queue.sh done 実行済み」の明示チェック項目を追加する。または、team-lead（Yuki）がサブエージェントからの完了報告受領時に scripts/queue.sh done をteam-lead自身が代行実行するフローへの変更を次スプリントで検討し、担当エージェントの手動実行任せから構造的な保証へ移行する。
+- **priority**: 6 / sprint: sprint-25
+
+### agent-crew-sprint-26-process-001
+- **lesson**: vault側のADR索引（~/Workspace/Obsidian/decisions/agent-crew-adr-index.md）が実リポジトリの状態とズレていた。sdd-quality-loop-adr関連3文書（docs/adr/
+- **禁止行動**: vaultのADR索引に、コミット済みでないドキュメントを記載する場合は『未コミット（ワークツリーのみ）』である旨を明記するルールを索引運用ガイドに追加する。または、索引更新時に対象ファイルが origin/main にコミット済みかを機械チェック（git log --all --oneline -- <path> 等）してから索引に反映する運用に変更する。
+- **priority**: 4 / sprint: sprint-26
+
+### agent-crew-sprint-26-process-003
+- **lesson**: みゆきち（retroエージェント）自身が、retro-stop-hook-live-check タスクの notes に明記されていた『retro.mdの完了条件への手順追記』要求を見落とし、実戦検証（stderr警告出力の確認）のみを実施
+- **禁止行動**: notesに複数の実施事項が含まれるタスクを完了報告する際は、notes原文を再読して『実施した事項』を箇条書きでチェックしてから done を実行する運用を、みゆきち自身の作業手順（retro.mdまたはpm-learned-rules.md）に明記することを検討する。
+- **priority**: 4 / sprint: sprint-26
+
+### agent-crew-sprint-27-process-001
+- **lesson**: team-lead(Fable)がスプリント進行中にPM(Yuki)を経由せずRiku(実装担当)へ直接タスク指示（R11差分実装の着手指示）を出し、チームが既に合意していた方針（R11はフォローアップとして別途扱う）と衝突した。Yukiが
+- **禁止行動**: 『スプリント進行中のタスクレベル指示はPM(Yuki)経由に一本化し、team-leadは方針決定のみを行う』運用ルールを明文化する。明文化先（pm.mdの起動プロトコル節へ『team-leadからの指示の扱い』を追記するか、組織文書側にteam-leadの権限範囲を明記するか）は次スプリントで判断し実装する。
+- **priority**: 9 / sprint: sprint-27
+
+### agent-crew-sprint-27-process-002
+- **lesson**: queue-qa-reguard-impl実装時、issue_ref(Yukiの当初理解・Rikuの初期実装での命名)とclose_issue(Alexの設計書での最終命名)とのあいだで往復の同期修正が発生した。根本原因はAlexが実装完了
+- **禁止行動**: 設計書を実装完了後に追記・更新する場合は、必ず対象の実装コードを直接読み込んで現状のフィールド名・関数名を確認してから記述する（notesやsummaryの古い表記のみを頼りに更新しない）。加えて、エージェント間の非同期メッセージング環境では、相手が既に着手済みの変更に気づかないまま作業を進めるリスクがあるため、命名等の確定事項は_queue.jsonのnotes/summaryに都度明記し、他エージェントが参照できる単一の真実源とする運用を徹底する。実装着手後にフィールド名等の命名変更が生じた場合は、summary等の記録も含めて設計書の最終命名と即座に突合するチェックをQA項目に加える。
+- **priority**: 6 / sprint: sprint-27
+
+### agent-crew-sprint-27-process-003
+- **lesson**: 既にQA承認・Issue #144としてクローズ済みの実装(queue-qa-reguard-impl)に対し、design.mdの『未実装・フォローアップ』節に記載されていたR11(gh issue viewによるIssue/PR種別事前
+- **禁止行動**: 完了・QA承認済みのタスクに対する追加の仕様変更は、たとえ設計書のフォローアップ節に記載があっても、実装担当者が自己判断で追加実装せず、必ず新規タスクとして起票してからPMの割当を経て着手する運用を徹底する。実装担当者向けのガイドライン（engineer各種.md）に「クローズ済みIssue・QA承認済みタスクへの追加実装は新規タスク起票が必須」と明記することを検討する。
+- **priority**: 9 / sprint: sprint-27
