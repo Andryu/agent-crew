@@ -10,6 +10,7 @@
 | 頻度 | 週1回（休日）。スキップした場合は翌週冒頭で必ず「スキップした」事実を議事録に残す |
 | 参加 | オーナー + Rin（参謀長）。必要に応じて Yuki（PM）の報告を Rin が代読 |
 | 事前準備 | Rin が意思決定キュー（`docs/org/council/YYYY-MM-DD-queue.md`）を生成しておく |
+| 監査スキャン | Rin が `scripts/audit-scan.sh --out docs/org/audit/YYYY-MM-DD-audit.md` を実行し、FAILがあれば意思決定キューの「要判断」に追加する |
 
 ## 議事次第（60分）
 

@@ -677,5 +677,193 @@ Sprint-24 でRenがtoken-report-scriptの実データ調査により、JSONLの�
 Sprint-24 のレトロで `flock -x -w 10 200` 実行時に `flock: command not found` が発生した。darwin標準環境にはflockが同梱されておらず、brewにも未インストールだった（agent-crew-sprint-24-tooling-002）。
 
 ---
+
+## [Riku] symlink/ファイル配布系の新関数は自己参照ガードと上書き防止を実装し、実機実行でQAする
+
+- lesson_id: agent-crew-sprint-25-reliability-001
+- priority: 6 / sprint: sprint-25
+
+**やること**
+
+install.sh 等でシンボリックリンクを生成する新規関数を書く場合、①配布先が自分自身（呼び出し元リポジトリ）のパスと一致しないかの自己参照ガード、②配布先に同名ファイル/ディレクトリが既に存在する場合の上書き前チェック、の2点を必ず実装する。実装後は必ず実機実行（scratchpad等への疑似配布先複製 + 実際のコマンド実行）でQAし、コードレビューのみで済ませない。
+
+**やってはいけないこと**
+
+symlink生成・ファイル配布系のコードをコードレビューのみでAPPROVEし、実際にコマンドを実行した検証を省略する。
+
+**エビデンス**
+
+Sora QAがscratchpadにtemplates/department/を複製しinstall.shを実際に実行したところ、自己参照ガード欠如とsymlink_file相当の関数の上書き無防備という2件のCRITICALバグが検出された。コードレビューだけでは気づかれていなかった（agent-crew-sprint-25-reliability-001）。
+
+---
+
+## [みゆきち] mkdir等のディレクトリロックは、trapをリソース取得成功後に設定し、解放時は所有権チェックを行う
+
+- lesson_id: agent-crew-sprint-25-tooling-001
+- priority: 6 / sprint: sprint-25
+
+**やること**
+
+mkdirベースの排他ロックを実装する際は、①`trap release_lock EXIT INT TERM` は `acquire_lock` が成功した後にのみ設定する、②`release_lock` 内で `$LOCKDIR/pid` 等の所有権情報が自分の `$$` と一致する場合のみ削除する二重防御を組み込む。
+
+**やってはいけないこと**
+
+ロック取得の成否が確定する前にtrapで解放処理を仕込む。これをやると、取得タイムアウト時にtrapが発火し、他プロセスが正当に保持しているロックを削除してしまう。
+
+**エビデンス**
+
+Sora QAが2プロセス競合（Aがロック保持中にBが取得を試みてtimeoutする）を実機再現し、Bのtimeout後にAのロックが削除されることを確認した。trapをacquire_lock成功後に移動し、release_lockに所有権チェックを追加した修正後は同シナリオで正しく動作することをみゆきちが再現テストで確認した（agent-crew-sprint-25-tooling-001。agent-crew-sprint-24-tooling-002のflock→mkdir移行を完了させる過程で発覚）。
+
+---
+
+## [全エージェント] タスク完了後は scripts/queue.sh done を即時実行する（再発防止の再徹底）
+
+- lesson_id: agent-crew-sprint-25-process-001
+- priority: 6 / sprint: sprint-25
+
+**やること**
+
+実装タスクが完了したら、次の作業や完了報告に進む前に必ず `scripts/queue.sh done <slug> <agent> "<summary>"` を実行し、`_queue.json` を実態に即時同期させる。完了報告には「queue.sh done 実行済み」であることを明記する。
+
+**やってはいけないこと**
+
+タスク実装完了後、queue更新を後回しにしたままteam-leadへの完了報告のみで済ませる。他タスクの `depends_on` チェックがブロックされ、後続のQAタスク着手が止まる。
+
+**エビデンス**
+
+Sprint-25でRiku（hq-install-distribution・hq-template-dir）とみゆきち（retro-mkdir-lock・retro-stop-hook）がqueue.sh done未実行のまま完了報告し、Soraのscripts/queue.sh startが依存タスク未完了エラーでブロックされた。agent-crew-sprint-24-planning-001で同様のルールが既に記載されていたにもかかわらず再発した（agent-crew-sprint-25-process-001。agent-crew-sprint-24-planning-001の再発）。
+
+---
+
+## [Yuki] 負荷分散スコアはポイントベース（complexity加重）を公式指標とする
+
+- lesson_id: agent-crew-sprint-25-planning-001
+- priority: 4 / sprint: sprint-25
+
+**やること**
+
+スプリント計画時・レトロ時の負荷分散スコアは `scripts/sprint-points.sh` が出力する `load_balance.by_points.score`（最多担当ポイント / 平均ポイント、complexity S=1/M=3/L=5換算）を公式指標として合否判定に用いる。タスク数ベース（`by_task_count.score`）は補助指標として併記するに留める。
+
+**やってはいけないこと**
+
+タスク数ベースのスコアのみを算出して合否判定を確定する。complexityの異なるタスクの負荷差を見落とす。
+
+**エビデンス**
+
+Ren（sprint-points-script実装時）が2つの定義の併存を発見した。Sprint-25計画書のタスク数ベーススコアは1.67（PASS）だったが、ポイントベースでは2.0（合格基準ちょうど）だった。Sora QAがポイントベースを公式指標とすることを推奨し、Sprint-25レトロで正式決定した（agent-crew-sprint-25-planning-001）。
+
+---
+
+## [みゆきち] retro.md内のjqスニペットは必ず実データに対して一度実行してから確定する
+
+- lesson_id: agent-crew-sprint-25-tooling-002
+- priority: 4 / sprint: sprint-25
+
+**やること**
+
+retro.md（やその他エージェント定義）にjqクエリ等の実行手順を記載・変更する際は、必ず実際の `_queue.json`（または対象データ）に対して一度実行し、出力が期待通りであることを確認してから確定させる。
+
+**やってはいけないこと**
+
+フィールド名などを記憶や想像で書いたjqクエリを、実行検証なしにドキュメントへ確定させる。
+
+**エビデンス**
+
+retro.mdステップ6の負荷分散スコアjqクエリが `.tasks[].agent` を参照していたが、_queue.jsonの実フィールド名は `.assigned_to` であり、常にLOAD_RATIO=1（偽陽性PASS）を返す不具合がSprint-25レトロで発覚した。過去のレトロでは字面通り実行せず手計算していたため実害は顕在化していなかったと推定される（agent-crew-sprint-25-tooling-002）。
+
+---
+
+## [全エージェント] 品質ゲートの検証クエリ・チェックスクリプトは導入時に実データで実行し期待値と突合する（Issue #141）
+
+- lesson_id: agent-crew-sprint-26-process-002
+- priority: 5 / sprint: sprint-26
+
+**やること**
+
+`retro.md` のjqクエリに限らず、品質ゲート判定に使う検証クエリ・チェックスクリプト全般（例: `audit-scan.sh`、`sprint-points.sh`、各種フック内のjq集計等）を新規導入・変更する際は、必ず対象の実データ（`_queue.json` / `_signals.jsonl` / `.claude/settings.json` 等）に対して一度実行し、出力が期待値と一致することを確認してから確定させる。フィールド名・構造を記憶や想像で書いたクエリ・チェックロジックを、実行検証なしにドキュメント・スクリプトへ確定させてはならない。
+
+**やってはいけないこと**
+
+品質ゲートの合否判定に使うクエリ・スクリプトを、実データに対する実行検証なしに「動くはず」で確定させる。常にPASSを返す（偽陽性）クエリ・チェックを見逃したまま運用する。
+
+**エビデンス**
+
+`agent-crew-sprint-25-tooling-002` でretro.mdのjqクエリが `.tasks[].agent` を参照していたが実フィールド名は `.assigned_to` であり、常にLOAD_RATIO=1（偽陽性PASS）を返す不具合が発覚した。これはretro.md固有の事例として記録されていたが、同種の「未検証クエリ・スクリプトによる偽陽性」はSprint-26で新設する`audit-scan.sh`等、今後追加されるあらゆる品質ゲートスクリプトで起こりうる一般的リスクであるため、Sprint-25レトロの積み残し（Issue #141）として汎用ルールに格上げした（agent-crew-sprint-26-process-002。agent-crew-sprint-25-tooling-002の一般化）。
+
+## [みゆきち] queue.py の qa_result 上書き不可仕様に伴うretry_count汚染を認識する
+
+- lesson_id: agent-crew-sprint-26-tooling-001
+- priority: 6 / sprint: sprint-26
+
+**やること**
+
+queue.py の仕様上 `qa_result` は上書きできず、done 側にも重複記録のガードがないため、QA再判定（CHANGES_REQUESTED→修正→APPROVED）を記録する正規経路は `retry` コマンドのみである。retro.md ステップ6の仕様明確度スコア（`1 - retry_count合計/タスク数`）を算出する際、`retry_count` の増加が「実装やり直し」なのか「QA再判定の記録手段としてのretry」なのかを、対象タスクの events（qa アクションの有無・メッセージ内容）で確認してから解釈する。
+
+**やってはいけないこと**
+
+`retry_count >= 1` を機械的に「実装の不備」と解釈し、QA再判定によるretryの可能性を確認せずに仕様明確度スコアへ反映する。
+
+**エビデンス**
+
+Sprint-26の sprint26-qa で、Soraが1回目CHANGES_REQUESTED→2回目APPROVEDの再判定を記録するために retry を使わざるを得ず、retry_count=1 となった（queue.py仕様上 qa_result 上書き不可のため）。qa --force やdone側ガード改善はバックログ候補（agent-crew-sprint-26-tooling-001）。
+
+---
+
+## [Yuki] vaultのADR索引はコミット済みドキュメントのみを記載する
+
+- lesson_id: agent-crew-sprint-26-process-001
+- priority: 4 / sprint: sprint-26
+
+**やること**
+
+スプリント計画時に vault の ADR索引（`~/Workspace/Obsidian/decisions/agent-crew-adr-index.md`）を参照する際、記載文書が origin/main にコミット済みかを疑わしい場合は `git log --all --oneline -- <path>` 等で確認する。索引更新時も、未コミットのワークツリーのみに存在する文書を記載する場合は「未コミット」である旨を明記する。
+
+**やってはいけないこと**
+
+vault索引の記載を無条件に「リポジトリに実在する」と信頼し、事前チェック（ステップ0.8等）の根拠として使う。
+
+**エビデンス**
+
+Sprint-26計画時、sdd-quality-loop-adr関連3文書がマスターワークツリーに未コミットのまま存在し、vault索引には記載があったがリポジトリ本体には未反映だったため、「現行リポジトリに実在しない」という前提相違（誤判定）が発生した（agent-crew-sprint-26-process-001）。
+
+---
+
+## [Alex] 監査機構と監査対象を同一スプリントで新設する場合はドッグフーディングを設計に含める
+
+- lesson_id: agent-crew-sprint-26-reliability-001
+- priority: 4 / sprint: sprint-26
+
+**やること**
+
+同一スプリント内で新規の監査・スキャン機構（例: audit-scan.sh）と、その監査対象になり得る新規コンポーネント（例: 新設フック）を同時に設計する場合、設計書に「新設した監査対象を、新設した監査機構自身で実行して検証する」手順を明記する。
+
+**やってはいけないこと**
+
+監査機構の判定ロジックを、既存コンポーネントのみを前提に設計し、同一スプリントで新設される対象への適用可否を未検証のまま実装に進める。
+
+**エビデンス**
+
+Sprint-26で新設したaudit-scan.shが、同一スプリントで新設されたSubagentStopフック（enforce-queue-done-stop.sh）をhooks判定パターンにマッチさせられずUNKNOWN/WARNING扱いにする自己参照課題がQAで検出された。判定パターンを「先頭トークン*.sh全般」に一般化して解消した（agent-crew-sprint-26-reliability-001）。
+
+---
+
+## [みゆきち] タスクnotesに複数の実施事項がある場合は完了報告前に原文を再読し箇条書きで照合する
+
+- lesson_id: agent-crew-sprint-26-process-003
+- priority: 4 / sprint: sprint-26
+
+**やること**
+
+タスクを`queue.sh done`する前に、対象タスクの`notes`原文を再読し、記載されている実施事項（例:「検証の実施」と「その手順のドキュメント化」のように複数ある場合）をすべて箇条書きでチェックしてから完了報告する。
+
+**やってはいけないこと**
+
+notesに複数の実施事項が含まれるタスクで、片方（実施しやすい方）のみを終えた時点で完了として報告する。
+
+**エビデンス**
+
+Sprint-26のretro-stop-hook-live-checkで、みゆきち自身がnotesの「retro.mdの完了条件への手順追記」を見落とし、実戦検証のみで完了報告した。sprint26-qaでMAJORとして差し戻された（agent-crew-sprint-26-process-003）。
+
+---
 *このファイルは retro エージェント（みゆきち）が `priority_score >= 3` の新規 lesson を追加するたびに更新されます。*
-*最終更新: sprint-24 / 2026-08-01*
+*最終更新: sprint-26 / 2026-08-02*

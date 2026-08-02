@@ -99,6 +99,7 @@ describe('UserCard', () => {
 - [ ] 新規コンポーネントに JSDoc / インラインコメントがある
 - [ ] Props / Emits の型定義が明示されている
 - [ ] TODO/FIXME を残した場合は理由をコメントに書く
+- [ ] 変更した機能の feature-spec（`docs/spec/features/<機能名>.md`）を更新した（存在しない場合は新規作成した。テンプレート: `docs/spec/templates/feature-spec.md`）
 
 ### 自己レビュー（Sora handoff 前に必ず確認）
 

@@ -43,7 +43,7 @@ model: sonnet
 - 計画より時間がかかったタスク（events の start→done 間隔）
 - 全タスクが DONE になった流れ（成功パターン）
 
-### ステップ 2: `_lessons.json` への記録（flock 経由）
+### ステップ 2: `_lessons.json` への記録（mkdir ロック経由）
 
 収集した観察を lesson エントリとして `_lessons.json` に追記する。
 その際、対象の知見がどの範囲に適用可能かを判断し、`scope`・`stack`・`source_repo` フィールドを適切に付与する。
@@ -83,7 +83,7 @@ SOURCE_REPO=$(git remote get-url origin 2>/dev/null || echo "local")
 }
 ```
 
-書き込み手順：
+書き込み手順（mkdir ベースのアトミックロック。`flock` は macOS 標準では利用できないため使用しない。Issue #133）：
 
 ```bash
 SOURCE_REPO=$(git remote get-url origin 2>/dev/null || echo "local")
@@ -93,17 +93,66 @@ NEW_ENTRY=$(jq -n \
   --arg scope "$SCOPE" \
   '{ ..., source_repo: $source_repo, scope: $scope }')
 
-(
-  flock -x -w 10 200 || { echo "ERROR: lock timeout" >&2; exit 1; }
+LOCKDIR="$HOME/.claude/_lessons.json.lockdir"
+STALE_SECONDS=60   # このロックの想定最大保持時間。超過していれば前回セッションの残骸とみなし強制解除する
+MAX_WAIT=10         # ロック取得を待機する最大秒数
 
-  existing=$(cat ~/.claude/_lessons.json)
-  updated=$(echo "$existing" | jq --argjson entry "$NEW_ENTRY" '.lessons += [$entry]')
+# mkdir はディレクトリが既に存在すると失敗する = OS レベルでアトミックな排他制御に使える
+acquire_lock() {
+  local waited=0
+  while true; do
+    if mkdir "$LOCKDIR" 2>/dev/null; then
+      echo $$ > "$LOCKDIR/pid" 2>/dev/null || true
+      return 0
+    fi
 
-  tmp=$(mktemp ~/.claude/_lessons.json.tmp.XXXXXX)
-  echo "$updated" > "$tmp"
-  mv "$tmp" ~/.claude/_lessons.json
+    # 取得失敗: 既存ロックが stale（古すぎる）かどうか判定する
+    if [ -d "$LOCKDIR" ]; then
+      lock_mtime=$(stat -f %m "$LOCKDIR" 2>/dev/null || stat -c %Y "$LOCKDIR" 2>/dev/null || echo 0)
+      now=$(date +%s)
+      lock_age=$(( now - lock_mtime ))
+      if [ "$lock_age" -gt "$STALE_SECONDS" ]; then
+        echo "WARNING: stale lock検出（${lock_age}秒経過、閾値${STALE_SECONDS}秒）。強制解除します: $LOCKDIR" >&2
+        rm -rf "$LOCKDIR" 2>/dev/null || true
+        continue
+      fi
+    fi
 
-) 200>~/.claude/_lessons.json.lock
+    if [ "$waited" -ge "$MAX_WAIT" ]; then
+      echo "ERROR: lock timeout（${MAX_WAIT}秒待機）" >&2
+      return 1
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+}
+
+# release_lock: 自分が acquire_lock で取得したロックであることを pid ファイルの内容で
+# 確認してから削除する（所有権チェック）。これが無いと、他プロセスが正当に保持している
+# ロックを誤って削除してしまう（QA指摘: acquire_lock失敗時に trap 経由で release_lock が
+# 走り、他プロセスのロックを削除するバグが2プロセス競合で実証された）。
+release_lock() {
+  if [ -f "$LOCKDIR/pid" ] && [ "$(cat "$LOCKDIR/pid" 2>/dev/null)" = "$$" ]; then
+    rm -rf "$LOCKDIR" 2>/dev/null || true
+  fi
+}
+
+acquire_lock || exit 1
+
+# trap は acquire_lock 成功後にのみ設定する。失敗（タイムアウト）時に trap が
+# 発火すると、まだロックを取得していない＝自分のものではないロックに対して
+# release_lock が呼ばれてしまうため、ここより前に trap を仕込んではならない。
+trap release_lock EXIT INT TERM
+
+existing=$(cat ~/.claude/_lessons.json)
+updated=$(echo "$existing" | jq --argjson entry "$NEW_ENTRY" '.lessons += [$entry]')
+
+tmp=$(mktemp ~/.claude/_lessons.json.tmp.XXXXXX)
+echo "$updated" > "$tmp"
+mv "$tmp" ~/.claude/_lessons.json
+
+release_lock
+trap - EXIT INT TERM
 ```
 
 ### ステップ 3: エビデンスゲートの実行
@@ -146,7 +195,7 @@ gh issue create \
   --label "lessons-learned"
 ```
 
-Issue 作成後、`issue_url` を lesson エントリに書き戻す（flock 経由）。
+Issue 作成後、`issue_url` を lesson エントリに書き戻す（mkdir ロック経由、上記手順に準ずる）。
 
 ### ステップ 4.5: Plugin Feedback クロスポスト（外部リポジトリ由来の高優先度 global 教訓）
 
@@ -279,15 +328,17 @@ BLOCK_RATE=$(jq -n --argjson b "$BLOCKED" --argjson t "$TOTAL" '
   if $t > 0 then ($b / $t) else 0 end
 ')
 
-# --- 負荷分散: 最多担当数 / 平均担当数 ---
-LOAD_RATIO=$(jq '
-  [.tasks[].agent // "unassigned"] |
-  group_by(.) |
-  map(length) |
-  if length > 0 then
-    (max / ((add) / length))
-  else 1 end
-' "$QUEUE")
+# --- 負荷分散: scripts/sprint-points.sh を使う（Issue #135 / agent-crew-sprint-25-planning-001） ---
+# 公式指標はポイントベース（complexity加重: S=1/M=3/L=5）、タスク数ベースは補助指標。
+# 理由: complexity（作業量）の違いをタスク数のみでは反映できないため
+# （Sprint-25レトロで正式決定。以前はタスク数ベースのみだったが本決定で切り替え）。
+#
+# 注意: 過去バージョンの本手順は `.tasks[].agent` を参照していたが、
+# _queue.json の実フィールド名は `.assigned_to` であり誤りだった
+# （常に load_ratio=1 を返す偽陽性PASSバグ。agent-crew-sprint-25-tooling-002 で検出・修正）。
+LOAD_BALANCE=$(bash scripts/sprint-points.sh)
+LOAD_RATIO=$(echo "$LOAD_BALANCE" | jq '.load_balance.by_points.score')
+LOAD_RATIO_TASKCOUNT=$(echo "$LOAD_BALANCE" | jq '.load_balance.by_task_count.score')  # 補助指標として併記
 ```
 
 #### スコアの判定基準
@@ -297,9 +348,32 @@ LOAD_RATIO=$(jq '
 | 仕様明確度 | `1 - (retry_count合計 / タスク数)` | >= 0.8 |
 | QA合格率 | `APPROVED数 / QA対象タスク数` | >= 0.9 |
 | ブロック率 | `BLOCKED数 / 総タスク数` | <= 0.1 |
-| 負荷分散 | `最多担当数 / 平均担当数` | <= 2.0 |
+| 負荷分散 | `最多担当ポイント / 平均ポイント`（ポイントベース・公式。補助: タスク数ベース） | <= 2.0 |
 
 スコアが合格基準を下回った軸は、次スプリントの改善優先事項として lesson に記録する。
+
+### ステップ 6.5: enforce-retro-stop.sh 実戦検証（スプリント中1回・完了条件）
+
+Issue #128 / Sprint-25レトロ「次スプリントへの改善優先事項」対応。
+Stop フック（`scripts/enforce-retro-stop.sh`）が実運用の起動経路で機能するかを、
+本ステップ（レトロタスク着手時点）までにスプリント中1回確認することを完了条件とする。
+
+- **確認内容**: レトロタスクが未 DONE（またはレトロ未実施を模した状態）で、
+  「全実装タスク DONE・レトロ未実施」の条件下で Stop フックの警告が実際に
+  stderr へ出力されることを、以下の両方の起動方法で確認する。
+  - 引数なし起動: `bash scripts/enforce-retro-stop.sh`
+  - Claude Code が Stop フックへ渡す stdin JSON 形式を模した起動:
+    `echo '{"session_id":"...","transcript_path":"...","hook_event_name":"Stop","stop_hook_active":false}' | bash scripts/enforce-retro-stop.sh`
+- **確認方法**: 本番リポジトリの `.claude/_queue.json` を直接操作せず、
+  一時ディレクトリに疑似 git リポジトリ＋疑似 `_queue.json`（実装タスク DONE・
+  レトロタスク TODO）を用意した隔離環境で実行する。
+- **誤検知チェック**: 同じタイミングで、現在進行中の実リポジトリ（レトロタスク以外に
+  未 DONE タスクが残っている状態）でも実行し、警告が出力されない（誤検知なし）ことを
+  あわせて確認する。
+- 確認結果（発動可否・誤検知有無・発見事項）は、ステップ7の完了報告と
+  `docs/sprints/<sprint>-retro.md` の双方に記録する。
+- 既に当該スプリント中に別タスクとして実戦検証済みの場合は、再実行せずその結果を
+  そのまま引用してよい。未確認のままレトロを完了しないこと。
 
 ### ステップ 7: Yuki への完了報告
 
@@ -318,6 +392,11 @@ LOAD_RATIO=$(jq '
 | 負荷分散 | [0.xx] | <= 2.0 | [PASS / FAIL] |
 
 > FAIL 軸: [軸名]（次スプリントの改善優先事項）
+
+### enforce-retro-stop.sh 実戦検証（ステップ6.5）
+- 発動確認（隔離環境）: [PASS / 未確認]
+- 誤検知チェック（実リポジトリ）: [なし / あり]
+- 発見事項: [あれば記載、なければ「なし」]
 
 ### 記録した lesson
 - [lesson-id]: [description の冒頭30文字] (priority: [score])

@@ -29,6 +29,14 @@
             "command": ".claude/hooks/subagent_stop.sh"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "scripts/enforce-queue-done-stop.sh || true"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -55,6 +63,14 @@
           {
             "type": "command",
             "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null)\" && bash scripts/privacy-check.sh 2>/dev/null || true'"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null)\" && scripts/enforce-retro-stop.sh || true'"
           }
         ]
       }
@@ -101,7 +117,10 @@
       "Bash(~/.claude/hooks/*)",
       "Bash(python3 *)",
       "Bash(scripts/token-report.py *)",
-      "Write(**)"
+      "Bash(scripts/enforce-retro-stop.sh *)",
+      "Bash(scripts/sprint-points.sh *)",
+      "Write(**)",
+      "Bash(scripts/audit-scan.sh *)"
     ]
   }
 }

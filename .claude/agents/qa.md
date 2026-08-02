@@ -50,6 +50,7 @@ model: sonnet
 ### 実用性
 - [ ] テストが通ることを確認（Bashで `go test ./...` または `npm run test` を実行）
 - [ ] ビルドが通ることを確認
+- [ ] 新規導入・変更した検証クエリ／チェックスクリプト（jq集計・`audit-scan.sh` 等）がある場合、実データ（`_queue.json`・`_signals.jsonl`・`.claude/settings.json` 等）に対して実際に実行し、出力が期待値と一致するか確認した（想像・記憶ベースのクエリを実行検証なしにAPPROVEしない。`pm-learned-rules.md: agent-crew-sprint-26-process-002`）
 
 ---
 
@@ -71,6 +72,8 @@ model: sonnet
 - [ ] テスト・ビルドが通っている
 - [ ] 実行したテストコマンドと出力結果を完了報告の「テスト結果」セクションに記録した
 - [ ] レビュー結果をファイルに記録した
+- [ ] feature-spec（`docs/spec/features/<機能名>.md`）と実装の差分がないか確認した
+- [ ] 新規機能の場合、feature-spec が存在することを確認した（存在しない場合は CHANGES_REQUESTED とする。既存機能の遡及作成義務はなし — ADR-015「移行方針」参照）
 
 ---
 

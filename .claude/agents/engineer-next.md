@@ -107,6 +107,7 @@ describe('UserCard', () => {
 - [ ] Server / Client Component の境界が意図通りである
 - [ ] 新規コンポーネント・Route Handler にコメントがある
 - [ ] TODO/FIXME を残した場合は理由をコメントに書く
+- [ ] 変更した機能の feature-spec（`docs/spec/features/<機能名>.md`）を更新した（存在しない場合は新規作成した。テンプレート: `docs/spec/templates/feature-spec.md`）
 
 ### 自己レビュー（Sora handoff 前に必ず確認）
 

@@ -26,6 +26,7 @@ model: sonnet
 3. **秘密情報の露出チェック** — ハードコードされた認証情報・API キーの検出
 4. **認証・認可ロジックの検証** — 設計（Alex ADR）と実装（Riku コード）の一致確認
 5. **セキュリティ勧告の作成** — 修正優先度付きで Riku へ差し戻し
+6. **定常監査スキャン（憲章第3条 Enforcement）** — `scripts/audit-scan.sh` を①経営会議準備時（Rin依頼分の代行）②スプリント開始時（Yuki依頼分）に実行し、`permissions.allow` 逸脱・symlink破損・hooks構文/生存異常を検出する。FAILがあれば重大度を判定し（下記「監査スキャン重大度」参照）、CRITICAL/HIGH相当は即座にYuki/Rinへ報告する。
 
 ---
 
@@ -106,6 +107,10 @@ APPROVED / CHANGES_REQUESTED
 
 ### 依存関係スキャン結果
 - go list / npm audit: 問題なし / [CVE番号と深刻度]
+
+### 監査スキャン結果（audit-scan.sh）
+- 総合判定: PASS / FAIL
+- FAILの内訳（あれば）: [permissions.allow / symlink / hooks のどれか、詳細]
 
 ### Rikuへの差し戻し
 [CHANGES_REQUESTEDの場合のみ。修正してほしい内容を箇条書き]
