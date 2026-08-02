@@ -16,7 +16,11 @@ from __future__ import annotations
 # どれにも一致しない場合は DEFAULT_DEPARTMENT に分類する。
 # scripts/token-report.py の DEPARTMENTS と同一規則（QA Sprint-24 指摘: 汎用語の
 # 部分一致は誤マッチしやすいため、部門追加時はリポジトリ名など固有の文字列を使うこと）。
+# 先勝ち。より限定的なパターンを先に置くこと（ゲーム部門の探索ワークツリーは
+# "agent-crew-game-department" という名前で "agent-crew" にも一致するため）。
 DEPARTMENTS: list[tuple[str, str]] = [
+    ("game-department", "game"),
+    ("stonefish-video", "video"),
     ("agent-crew", "product"),
     ("alpha-predict", "invest"),
 ]

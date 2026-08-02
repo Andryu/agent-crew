@@ -35,6 +35,21 @@ def test_department_for_empty_cwd():
     assert department_for("") == "other"
 
 
+def test_department_for_video():
+    assert department_for("/Users/andryu/Workspace/stonefish-video") == "video"
+    assert department_for("/Users/andryu/orca/workspaces/stonefish-video/video-sprint-01") == "video"
+
+
+def test_department_for_game_worktree_is_not_product():
+    """ゲーム部門の探索ワークツリーは agent-crew 配下にあるが game に分類される。
+
+    パスが "orca/workspaces/agent-crew/game-department" のように両方のパターンを含むため、
+    DEPARTMENTS の並び順（game-department を agent-crew より前）が壊れると product に
+    誤分類され、部門別トークン会計が実態からずれる（2026-08-03 の3部門化で顕在化）。
+    """
+    assert department_for("/Users/andryu/orca/workspaces/agent-crew/game-department") == "game"
+
+
 # ---------- persona_for ----------
 
 
