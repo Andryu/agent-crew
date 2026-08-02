@@ -17,7 +17,7 @@
       "retry_count": 0,
       "qa_result": null,
       "qa_history": [],
-      "issue_ref": null,
+      "close_issue": null,
       "summary": "投資部門プロジェクト憲章をDraftで起案（docs/org/charters/invest-dept-charter.md）。MVPはstrategy-2026H2ドラフトの月次成績レポート自動掲載を仮置き、Status: DraftヘッダーとGo/No-Go未定・売買執行L0不変を明記。テンプレート§1-5全項目埋め済み・自己チェック完了",
       "events": [
         {
@@ -56,7 +56,7 @@
       "retry_count": 0,
       "qa_result": null,
       "qa_history": [],
-      "issue_ref": null,
+      "close_issue": null,
       "summary": "Issue #144設計完了（docs/spec/queue-qa-reguard-design.md）。qa --force（--reason必須・qa_history退避）+ done側QAガード（--skip-qa-guard）の両方を設計。retry_countは実装差し戻し回数のみに整合。自己チェックで既存pytest 7件がdoneガードと衝突する矛盾を発見し、diff付きで修正方針を明記済み",
       "events": [
         {
@@ -95,7 +95,7 @@
       "retry_count": 0,
       "qa_result": null,
       "qa_history": [],
-      "issue_ref": null,
+      "close_issue": null,
       "summary": "Issue #149/#150反映完了。pm.mdのスプリント計画フォーマット節に「担当ドラフト直後にsprint-points.sh --mdを実行し負荷分散スコアを計画書へ転記」を義務化（Issue #149）。architect.mdの完了の定義(DoD)節に設計完了時セルフチェック（条件分岐の網羅性・文書内§間の整合性）を追加（Issue #150）",
       "events": [
         {
@@ -134,7 +134,7 @@
       "retry_count": 0,
       "qa_result": null,
       "qa_history": [],
-      "issue_ref": null,
+      "close_issue": null,
       "summary": "alpha-predict-jpへhq-agents symlink5本+pm.md/_queue.json/docs/sprintsを新規導入。origin未push（ローカルブランチfeat/hq-agents-deployのみ）。readlink -fがmacOS標準では非対応（BSD readlink）の手順不備を発見、python realpathで代替検証。全symlink正常・既存ファイル無変更を確認。",
       "events": [
         {
@@ -173,7 +173,7 @@
       "retry_count": 0,
       "qa_result": null,
       "qa_history": [],
-      "issue_ref": null,
+      "close_issue": null,
       "summary": "16件のissue_url同期是正完了。gate query(priority>=4かつevidenceありかつissue_url==null)で真の未起票0件を確認。retro.mdに書き戻し即時化の手順追記済み",
       "events": [
         {
@@ -214,7 +214,7 @@
       "retry_count": 0,
       "qa_result": null,
       "qa_history": [],
-      "issue_ref": null,
+      "close_issue": null,
       "summary": "Issue#144(qa --force/doneQAガード)+Issue#152(auto_close_issueのissue_ref参照方式化)を実装。pytest 5件追加+既存7件修正、計37件全パス。scripts/queue.sh ヘッダーコメントも更新",
       "events": [
         {
@@ -255,7 +255,7 @@
       "retry_count": 0,
       "qa_result": "APPROVED",
       "qa_history": [],
-      "issue_ref": null,
+      "close_issue": null,
       "summary": "APPROVED。実機実行(symlink実体解決・diff範囲・push状況)で全項目確認、CRITICAL/MAJORなし。readlink -f手順不備のレトロ教訓化を推奨として明記。",
       "events": [
         {
@@ -293,7 +293,7 @@
     {
       "slug": "queue-qa-reguard-qa",
       "title": "queue.py QA再判定経路 実装QA（Issue #144）",
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "assigned_to": "Sora",
       "complexity": "S",
       "risk_level": "medium",
@@ -308,7 +308,7 @@
       "retry_count": 0,
       "qa_result": null,
       "qa_history": [],
-      "issue_ref": 144,
+      "close_issue": 144,
       "summary": null,
       "events": [
         {
@@ -316,6 +316,12 @@
           "agent": "Yuki",
           "action": "created",
           "msg": "Sprint-27 キュー登録"
+        },
+        {
+          "ts": "2026-08-02T01:46:08+0000",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
         }
       ]
     },
@@ -341,7 +347,7 @@
       "retry_count": 0,
       "qa_result": null,
       "qa_history": [],
-      "issue_ref": null,
+      "close_issue": null,
       "summary": null,
       "events": [
         {
@@ -370,7 +376,7 @@
       "retry_count": 0,
       "qa_result": null,
       "qa_history": [],
-      "issue_ref": null,
+      "close_issue": null,
       "summary": null,
       "events": [
         {

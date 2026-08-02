@@ -187,15 +187,38 @@ fi
 ```bash
 LABEL=$(assign_label "$PRIORITY_SCORE")
 
-gh issue create \
+ISSUE_URL=$(gh issue create \
   --title "[lesson] ${TITLE}" \
   --body "## 観察された問題\n\n${DESCRIPTION}\n\n## 根拠（エビデンス）\n\n${EVIDENCE_LIST}\n\n## 推奨アクション\n\n${ACTION}\n\n---\n\n*このIssueは みゆきち（retro エージェント）がエビデンスゲートを通過した lesson から自動生成しました。*\n*lesson ID: ${ID} / priority_score: ${PRIORITY_SCORE} / sprint: ${SPRINT}*" \
   --label "${LABEL}" \
   --label "retro" \
-  --label "lessons-learned"
+  --label "lessons-learned")
 ```
 
-Issue 作成後、`issue_url` を lesson エントリに書き戻す（mkdir ロック経由、上記手順に準ずる）。
+**起票成功後、返却された Issue URL を `_lessons.json` の該当エントリの `issue_url` に即時書き戻す。
+書き戻しまでが起票作業であり、`gh issue create` の成功だけでは完了とみなさない**
+（agent-crew-sprint-27 で issue_url 未書き戻しによる台帳同期漏れが16件発生した反省を反映。Issue #144〜#150）。
+
+書き戻しは mkdir ロック経由（上記ステップ2の手順に準ずる）で、1件作成するごとに即座に行う。
+複数件をまとめて後回しにしない（ループ処理中に片方が失敗しても他方が反映漏れにならないようにするため）：
+
+```bash
+if [ -n "$ISSUE_URL" ] && [ "$ISSUE_URL" != "null" ]; then
+  acquire_lock
+  jq --arg id "$ID" --arg url "$ISSUE_URL" --arg now "$(date -u +%Y-%m-%dT%H:%M:%S%z)" '
+    .lessons |= map(if .id == $id then (.issue_url = $url | .updated_at = $now) else . end)
+  ' ~/.claude/_lessons.json > ~/.claude/_lessons.json.tmp \
+    && jq -e . ~/.claude/_lessons.json.tmp > /dev/null \
+    && mv ~/.claude/_lessons.json.tmp ~/.claude/_lessons.json
+  release_lock
+else
+  echo "WARNING: gh issue create が URL を返さなかったため issue_url 書き戻しをスキップ: $ID" >&2
+fi
+```
+
+書き戻し後、その場で `jq -r --arg id "$ID" '.lessons[] | select(.id==$id) | .issue_url' ~/.claude/_lessons.json`
+を実行し、期待した URL になっているかを確認してから次のエントリに進む（想像で「書き戻し済みのはず」と
+判断しない）。
 
 ### ステップ 4.5: Plugin Feedback クロスポスト（外部リポジトリ由来の高優先度 global 教訓）
 
