@@ -340,7 +340,7 @@
     {
       "slug": "sprint27-qa",
       "title": "Sprint-27 横断QA（憲章・部門文書・queue.py整合）",
-      "status": "TODO",
+      "status": "DONE",
       "assigned_to": "Sora",
       "complexity": "M",
       "risk_level": "medium",
@@ -357,16 +357,34 @@
       "updated_at": "2026-08-02",
       "notes": "agent-crew-sprint-24-design-001準拠：project-charter.md/departments.md/ADR-014/pm.md/architect.md/retro.md間の相互参照・実在性を横断確認する。invest-dept-charterがテンプレート必須項目を全て埋めているか、governance-doc-149-150がpm.md/architect.mdに正しく反映されているか、lessons-issue-sync-fixのissue_url更新が実際のgh issueと一致しているかを確認する。",
       "retry_count": 0,
-      "qa_result": null,
+      "qa_result": "APPROVED",
       "qa_history": [],
       "close_issue": null,
-      "summary": null,
+      "summary": "横断QA APPROVED。憲章・ガバナンス文書・lessons同期・queue.py実装/QA・qa.md運用ドキュメントすべて整合性確認済み。",
       "events": [
         {
           "ts": "2026-08-02T01:21:11+0000",
           "agent": "Yuki",
           "action": "created",
           "msg": "Sprint-27 キュー登録"
+        },
+        {
+          "ts": "2026-08-02T01:53:29+0000",
+          "agent": "Sora",
+          "action": "start",
+          "msg": "着手"
+        },
+        {
+          "ts": "2026-08-02T01:54:36+0000",
+          "agent": "Sora",
+          "action": "qa",
+          "msg": "APPROVED: 横断QA完了。(1)docs/org/charters/invest-dept-charter.md: Draft見出し・オーナー戦略レビュー待ちの明記・MVP定義/成功指標/撤退基準/期限が計画notes通りに揃っていることを確認。(2)pm.md/architect.mdの差分(commit 3e760bf)がIssue #149(負荷分散スコアの計画時算出義務化)・Issue #150(設計完了時セルフチェック: 条件分岐網羅性/文書内整合性)の要求内容と一致することを確認。(3)_lessons.jsonをjqで直接検証しpriority_score>=6の全エントリでissue_url非null(0件null)を確認、sprint-23-planning-001→Issue#149・sprint-24-design-001→Issue#131をgh issue viewで実際に突合しlesson id記載と一致することを確認。retro.mdの即時書き戻し手順(mkdirロック経由+書き戻し後の確認jq)も追記済みを確認。(4)invest-dept-hq-deploy-qa・queue-qa-reguard-qaは既にAPPROVED済み(自身の実施結果)。(5)Yuki依頼のqa.md新セクション(qa --force運用・close_issue運用)を実装(queue.py)の実機挙動と突き合わせ、reason必須/qa_history退避/retry_count非汚染/close_issue安全側デフォルト/--close-issue優先順位/notes参照廃止のすべてが一致することを確認。CRITICAL/MAJORなし。"
+        },
+        {
+          "ts": "2026-08-02T01:54:36+0000",
+          "agent": "Sora",
+          "action": "done",
+          "msg": "横断QA APPROVED。憲章・ガバナンス文書・lessons同期・queue.py実装/QA・qa.md運用ドキュメントすべて整合性確認済み。"
         }
       ]
     },
