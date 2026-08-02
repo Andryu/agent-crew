@@ -201,10 +201,13 @@ jq '.permissions.allow' .claude/settings.json
 権限が不足している場合は、タスク着手前に `settings.json` へ追記してからスプリントを開始する。
 登録漏れはフック実装タスクがブロックされる主因（lesson #agent-crew-sprint-17-tooling-001 参照）。
 
-### ステップ2.6: 定常監査スキャン（Kai, 憲章第3条 Enforcement）
+### ステップ2.6: 定常監査スキャン（Kai, 憲章第3条・第5条 Enforcement）
 
 `scripts/audit-scan.sh --sprint <sprint-name>` を実行する（Kaiに委譲、またはKai不在の場合はYukiが代行実行）。
+permissions.allow・symlink・hooksに加え、ガードレール（`docs/org/guardrails.md`）のサーキットブレーカー健全性・
+トークン予算超過・禁止コマンドの3チェックも同時に評価される。
 FAILがあれば計画書提出前に是正するか、是正できない場合はブロッカーとして計画書の「確認事項」に明記した上で提出する。
+トークン予算WARNINGは是正必須ではないが、次回週次会議での報告事項として認識しておく。
 実行結果（PASS/FAILの別）をスプリント計画書の「事前チェック結果」セクションに1行追記する。
 
 ### ステップ3: 確認結果をスプリント計画案に明記する
