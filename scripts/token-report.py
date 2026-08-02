@@ -30,6 +30,11 @@ PROJECTS_ROOT = Path.home() / ".claude" / "projects"
 # プロジェクトディレクトリ名（部分一致） → 部門名。上から順に最初に一致したものを採用する。
 # どれにも一致しない場合は DEFAULT_DEPARTMENT に分類する。
 DEPARTMENTS: list[tuple[str, str]] = [
+    # 先勝ち。より限定的なパターンを先に置くこと。
+    # 例: ゲーム部門の探索ワークツリーは "orca-workspaces-agent-crew-game-department" という
+    # パス名で、"agent-crew" にも一致してしまうため product より先に判定する必要がある。
+    ("game-department", "game"),
+    ("stonefish-video", "video"),
     ("agent-crew", "product"),
     ("alpha-predict", "invest"),
     # NOTE: 汎用語の部分一致は誤マッチしやすいため、部門追加時はプロジェクト名に
