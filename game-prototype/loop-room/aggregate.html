@@ -184,6 +184,7 @@
 
   <div id="result" class="hidden">
     <p id="parse-warning" class="warning hidden"></p>
+    <p id="duplicate-warning" class="warning hidden"></p>
 
     <div class="stat-grid">
       <div class="stat-card">
@@ -219,6 +220,7 @@
   const aggregateButton = document.getElementById('aggregate-button');
   const resultEl = document.getElementById('result');
   const parseWarningEl = document.getElementById('parse-warning');
+  const duplicateWarningEl = document.getElementById('duplicate-warning');
   const statValidCountEl = document.getElementById('stat-valid-count');
   const statAvgRoundsEl = document.getElementById('stat-avg-rounds');
   const statRetentionEl = document.getElementById('stat-retention');
@@ -256,6 +258,28 @@
     return { responses, failedCount };
   }
 
+  function dedupeByTimestamp(responses) {
+    const seen = new Set();
+    const deduped = [];
+    let duplicateCount = 0;
+
+    for (const r of responses) {
+      const timestamp = r && r.timestamp;
+      if (timestamp === undefined || timestamp === null) {
+        deduped.push(r);
+        continue;
+      }
+      if (seen.has(timestamp)) {
+        duplicateCount++;
+        continue;
+      }
+      seen.add(timestamp);
+      deduped.push(r);
+    }
+
+    return { deduped, duplicateCount };
+  }
+
   function isValidResponse(r) {
     return (
       r &&
@@ -291,9 +315,10 @@
 
   aggregateButton.addEventListener('click', () => {
     const { responses, failedCount } = parseLines(inputArea.value);
+    const { deduped, duplicateCount } = dedupeByTimestamp(responses);
 
-    const validResponses = responses.filter(isValidResponse);
-    const invalidResponses = responses.filter((r) => !isValidResponse(r));
+    const validResponses = deduped.filter(isValidResponse);
+    const invalidResponses = deduped.filter((r) => !isValidResponse(r));
 
     const validCount = validResponses.length;
     const avgRounds =
@@ -331,6 +356,13 @@
       parseWarningEl.classList.remove('hidden');
     } else {
       parseWarningEl.classList.add('hidden');
+    }
+
+    if (duplicateCount > 0) {
+      duplicateWarningEl.textContent = `${duplicateCount}件の重複回答を除外しました`;
+      duplicateWarningEl.classList.remove('hidden');
+    } else {
+      duplicateWarningEl.classList.add('hidden');
     }
 
     resultEl.classList.remove('hidden');
