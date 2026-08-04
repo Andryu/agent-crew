@@ -1,0 +1,70 @@
+name: Deploy GitHub Pages (loop-room + dashboard)
+
+# Pages のデプロイはサイト全体を置換するため、コンテンツ源が複数ブランチに
+# またがる場合は必ず「全ソースを合成した1つのアーティファクト」を作る。
+# この workflow は main と research/game-department-prototype の両方に同一内容で
+# 置き、どちらのブランチへの push でも合成サイト全体を再デプロイする。
+#
+# サイト構成:
+#   /                → ゲーム「巡室」(research/game-department-prototype の game-prototype/loop-room)
+#   /dashboard/      → STONEFISH ダッシュボード実データ版 (main の dashboard/app/index.html)
+#   /dashboard/demo.html → シミュレーションデモ (main の dashboard/prototype/)
+
+on:
+  push:
+    branches:
+      - main
+      - research/game-department-prototype
+    paths:
+      - "dashboard/**"
+      - "game-prototype/loop-room/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      # トリガー元ブランチに依らず、常に両ソースを明示的にチェックアウトする
+      - name: Checkout main (dashboard)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: src-main
+
+      - name: Checkout game branch (loop-room)
+        uses: actions/checkout@v4
+        with:
+          ref: research/game-department-prototype
+          path: src-game
+
+      - name: Build combined site
+        run: |
+          mkdir -p _site/dashboard
+          cp -r src-game/game-prototype/loop-room/. _site/
+          cp src-main/dashboard/app/index.html _site/dashboard/index.html
+          cp src-main/dashboard/prototype/stonefish-dashboard.html _site/dashboard/demo.html
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
