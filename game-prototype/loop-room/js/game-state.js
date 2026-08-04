@@ -35,7 +35,7 @@ export function startNewGame() {
 }
 
 export function nextRound(state) {
-  const isVariant = drawIsVariant();
+  const isVariant = state.round <= 1 ? false : drawIsVariant();
   const currentVariantId = isVariant ? pickVariantId(state.recentVariantIds) : null;
   const recentVariantIds = isVariant
     ? [...state.recentVariantIds, currentVariantId].slice(-RECENT_HISTORY_LIMIT)

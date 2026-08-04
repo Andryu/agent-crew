@@ -6,7 +6,7 @@
 import { cloneRoomState } from './room-renderer.js';
 
 export function computeMagnitude(baseMagnitude, round) {
-  return baseMagnitude * Math.max(0.25, 1 - round * 0.03);
+  return baseMagnitude * Math.max(0.6, 1 - round * 0.03);
 }
 
 function lerp(a, b, t) {
@@ -104,7 +104,7 @@ export const VARIANTS = [
     name: '部屋の隅の影の濃さが左右で異なる',
     apply(roomState, round) {
       const next = cloneRoomState(roomState);
-      const strength = computeMagnitude(0.5, round);
+      const strength = computeMagnitude(0.9, round);
       next.wallPattern.cornerShadowBias = strength;
       return next;
     },
@@ -126,7 +126,7 @@ export const VARIANTS = [
     name: '床のタイル目地の間隔が部分的に均一すぎる/不均一すぎる',
     apply(roomState, round) {
       const next = cloneRoomState(roomState);
-      const strength = computeMagnitude(20, round);
+      const strength = computeMagnitude(40, round);
       next.wallPattern.floorTileJitter = strength;
       return next;
     },
@@ -136,7 +136,7 @@ export const VARIANTS = [
     name: '家具の角がすべて不自然に完全な直角（他は違うのに1つだけ完璧）',
     apply(roomState, round) {
       const next = cloneRoomState(roomState);
-      const strength = computeMagnitude(6, round);
+      const strength = computeMagnitude(16, round);
       next.furniture = next.furniture.map((f, i) => ({
         ...f,
         cornerRadius: i === 0 ? 0 : strength,
@@ -149,7 +149,7 @@ export const VARIANTS = [
     name: '壁の色が部分的にごくわずかに違う色調になっている',
     apply(roomState, round) {
       const next = cloneRoomState(roomState);
-      const strength = computeMagnitude(40, round);
+      const strength = computeMagnitude(90, round);
       next.wallPattern.colorPatchAlpha = strength / 255;
       return next;
     },
@@ -159,7 +159,7 @@ export const VARIANTS = [
     name: '物の輪郭線の太さが1箇所だけ違う',
     apply(roomState, round) {
       const next = cloneRoomState(roomState);
-      const strength = computeMagnitude(4, round);
+      const strength = computeMagnitude(10, round);
       next.furniture = next.furniture.map((f, i) =>
         i === 0 ? { ...f, outlineWidth: 2 + strength } : f
       );

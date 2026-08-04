@@ -4,7 +4,7 @@
 // 実行: node js/test.mjs
 
 import { VARIANTS, computeMagnitude } from './variants.js';
-import { judgeChoice } from './game-state.js';
+import { judgeChoice, nextRound, startNewGame } from './game-state.js';
 
 let failed = false;
 
@@ -67,11 +67,11 @@ console.log('--- computeMagnitude ---');
 const mag0 = computeMagnitude(100, 0);
 const mag25 = computeMagnitude(100, 25);
 check(`computeMagnitude(100, 0) が100に近い値 (実際: ${mag0})`, Math.abs(mag0 - 100) < 0.001);
-check(`computeMagnitude(100, 25) が25になる (実際: ${mag25})`, Math.abs(mag25 - 25) < 0.001);
+check(`computeMagnitude(100, 25) が下限0.6により60になる (実際: ${mag25})`, Math.abs(mag25 - 60) < 0.001);
 const mag100 = computeMagnitude(100, 100);
 check(
-  `computeMagnitude(100, 100) が下限25を下回らない (実際: ${mag100})`,
-  Math.abs(mag100 - 25) < 0.001
+  `computeMagnitude(100, 100) が下限60を下回らない (実際: ${mag100})`,
+  Math.abs(mag100 - 60) < 0.001
 );
 
 // --- apply()がroomStateを破壊的変更しないことの確認 ---
@@ -128,11 +128,11 @@ check(
 );
 check(
   `round=30では変化の発生率がround=0より明確に低い (実際: ${changedAtRound30}/${TRIALS})`,
-  changedAtRound30 < TRIALS * 0.5
+  changedAtRound30 < TRIALS * 0.8
 );
 check(
-  `computeMagnitude(1, 30)が確率の下限0.25付近になっている (実際: ${computeMagnitude(1, 30)})`,
-  Math.abs(computeMagnitude(1, 30) - 0.25) < 0.001
+  `computeMagnitude(1, 30)が確率の下限0.6付近になっている (実際: ${computeMagnitude(1, 30)})`,
+  Math.abs(computeMagnitude(1, 30) - 0.6) < 0.001
 );
 
 // --- 3. judgeChoice ---
@@ -161,6 +161,27 @@ check('異変なし + 進む = 正解 でroundが進む', case3.newState.round =
 
 const case4 = judgeChoice(makeState(false), true); // 異変なし + 戻る = 不正解
 check('異変なし + 戻る = 不正解', case4.correct === false);
+
+// --- nextRoundの導入強制（最初の2周は必ず異変なし） ---
+console.log('--- nextRound: 最初の2周は強制的に異変なし ---');
+const introState0 = startNewGame(); // round=0の周回
+check('round=0はisVariantが常にfalse', introState0.isVariant === false);
+
+const introState1 = nextRound({ ...introState0, round: 1 }); // round=1の周回
+check('round=1はisVariantが常にfalse', introState1.isVariant === false);
+
+let round2SawTrue = false;
+let round2SawFalse = false;
+for (let i = 0; i < 200; i++) {
+  const round2State = nextRound({ ...introState1, round: 2 });
+  if (round2State.isVariant) {
+    round2SawTrue = true;
+  } else {
+    round2SawFalse = true;
+  }
+}
+check('round=2以降はisVariantがtrueになることがある', round2SawTrue);
+check('round=2以降はisVariantがfalseになることもある', round2SawFalse);
 
 // --- 4. storage.js ---
 console.log('--- storage.js ---');
