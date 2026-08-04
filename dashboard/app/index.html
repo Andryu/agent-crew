@@ -1164,6 +1164,14 @@ fitSpace();
 renderAll();
 setInterval(uiTick, 1800);
 connectWs();
+// GitHub Pages（https）で閲覧時: ローカルサーバが無い訪問者向けにデモへの導線を出す
+if (location.protocol === 'https:'){
+  const cs = document.getElementById('connStatus');
+  const a = document.createElement('a');
+  a.href = 'demo.html'; a.textContent = 'DEMO';
+  a.className = 'conn-status'; a.style.textDecoration = 'underline'; a.title = 'シミュレーションデモを見る';
+  cs.after(a);
+}
 requestAnimationFrame(drawSpace);
 requestAnimationFrame(drawOffice);
 })();
