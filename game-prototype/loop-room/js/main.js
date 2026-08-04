@@ -31,6 +31,7 @@ const flashOverlay = document.getElementById('flash-overlay');
 let gameState = null;
 let inputLocked = false;
 let previousBestRound = 0;
+let lastGameOverRound = 0;
 
 if (!ctx) {
   const unsupportedMessage = document.createElement('p');
@@ -94,6 +95,7 @@ function triggerRoundTransition(callback) {
 }
 
 function showGameOverScreen() {
+  lastGameOverRound = gameState.round;
   gameoverRound.textContent = `到達周回: ${gameState.round}周`;
   const isNewBest = gameState.round > previousBestRound;
   gameoverBest.textContent = isNewBest
@@ -149,6 +151,7 @@ initSurvey({
     updateTitleBestRound();
     showScreen('title');
   },
+  getRoundsReached: () => lastGameOverRound,
 });
 
 updateTitleBestRound();

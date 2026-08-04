@@ -212,6 +212,30 @@ check(
   JSON.stringify(exportedParsed) === JSON.stringify(afterResponses)
 );
 
+// --- roundsReachedフィールドの保存・読み出し ---
+console.log('--- roundsReached ---');
+const beforeRoundsReachedCount = loadSurveyResponses().length;
+saveSurveyResponse({
+  wantToPlayAgain: 4,
+  fearLevel: 3,
+  difficultyLevel: 3,
+  goodMoment: 'e',
+  badMoment: 'f',
+  roundsReached: 6,
+  timestamp: new Date().toISOString(),
+});
+const afterRoundsReachedResponses = loadSurveyResponses();
+check(
+  'saveSurveyResponseで保存したroundsReachedが件数として蓄積される',
+  afterRoundsReachedResponses.length === beforeRoundsReachedCount + 1
+);
+const savedResponse = afterRoundsReachedResponses[afterRoundsReachedResponses.length - 1];
+check(
+  '保存したレスポンスにroundsReachedフィールドが含まれる',
+  typeof savedResponse.roundsReached === 'number'
+);
+check('roundsReachedの値が正しく読み出される', savedResponse.roundsReached === 6);
+
 // --- localStorage未定義環境でのフォールバック確認 ---
 console.log('--- localStorage未定義環境でのフォールバック ---');
 const savedLocalStorage = globalThis.localStorage;

@@ -5,9 +5,11 @@
 import { saveSurveyResponse, exportSurveyAsJSON } from './storage.js';
 
 let onBackToTitleCallback = null;
+let getRoundsReachedCallback = null;
 
-export function initSurvey({ onBackToTitle } = {}) {
+export function initSurvey({ onBackToTitle, getRoundsReached } = {}) {
   onBackToTitleCallback = onBackToTitle || null;
+  getRoundsReachedCallback = getRoundsReached || null;
 
   const form = document.getElementById('survey-form');
   const afterSubmit = document.getElementById('survey-after-submit');
@@ -24,6 +26,7 @@ export function initSurvey({ onBackToTitle } = {}) {
       difficultyLevel: Number(formData.get('difficultyLevel')),
       goodMoment: String(formData.get('goodMoment') || ''),
       badMoment: String(formData.get('badMoment') || ''),
+      roundsReached: getRoundsReachedCallback ? getRoundsReachedCallback() : 0,
       timestamp: new Date().toISOString(),
     };
     saveSurveyResponse(response);
