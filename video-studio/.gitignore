@@ -1,0 +1,17 @@
+# Remotion（node_modules・ビルド成果物はコミットしない）
+remotion/node_modules/
+remotion/.remotion/
+remotion/dist/
+remotion/out/
+
+# エピソードごとのレンダリング出力
+episodes/*/out/
+
+# 個人の絵・音声素材はコミットしない方針
+episodes/*/assets/
+episodes/_voice_samples/
+episodes/_cleanup_compare/
+episodes/_style_explore/
+
+# OS
+.DS_Store
