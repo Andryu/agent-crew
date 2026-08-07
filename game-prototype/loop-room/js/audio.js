@@ -5,7 +5,7 @@
 let audioCtx = null;
 let muted = false;
 
-let droneNodes = null; // { oscillator, gainNode }
+let droneNodes = null; // { oscillator, gainNode, oscillator2, gainNode2 }
 let heartbeatTimerId = null;
 let heartbeatIntervalMs = null;
 
@@ -19,12 +19,12 @@ function safeCreateAudioContext() {
   }
 }
 
-export function initAudio() {
+export async function initAudio() {
   if (audioCtx) return;
   try {
     audioCtx = safeCreateAudioContext();
     if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
+      await audioCtx.resume().catch(() => {});
     }
   } catch {
     audioCtx = null;
@@ -41,12 +41,23 @@ export function startAmbientDrone() {
     const oscillator = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
     oscillator.type = 'sine';
-    oscillator.frequency.value = 68;
-    gainNode.gain.value = 0.035 * currentMuteGain();
+    oscillator.frequency.value = 130;
+    gainNode.gain.value = 0.07 * currentMuteGain();
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     oscillator.start();
-    droneNodes = { oscillator, gainNode };
+
+    // うなり（ビート）を生じさせるため、わずかにずらした周波数の2本目を重ねる
+    const oscillator2 = audioCtx.createOscillator();
+    const gainNode2 = audioCtx.createGain();
+    oscillator2.type = 'sine';
+    oscillator2.frequency.value = 130 * 1.03;
+    gainNode2.gain.value = 0.035 * currentMuteGain();
+    oscillator2.connect(gainNode2);
+    gainNode2.connect(audioCtx.destination);
+    oscillator2.start();
+
+    droneNodes = { oscillator, gainNode, oscillator2, gainNode2 };
   } catch {
     droneNodes = null;
   }
@@ -58,6 +69,9 @@ export function stopAmbientDrone() {
     droneNodes.oscillator.stop();
     droneNodes.oscillator.disconnect();
     droneNodes.gainNode.disconnect();
+    droneNodes.oscillator2.stop();
+    droneNodes.oscillator2.disconnect();
+    droneNodes.gainNode2.disconnect();
   } catch {
     // 何もしない
   } finally {
@@ -68,18 +82,28 @@ export function stopAmbientDrone() {
 function playHeartbeatPulse() {
   if (!audioCtx) return;
   try {
+    playSinglePulse(1);
+    setTimeout(() => playSinglePulse(0.6), 60);
+  } catch {
+    // 何もしない
+  }
+}
+
+function playSinglePulse(gainScale) {
+  if (!audioCtx) return;
+  try {
     const oscillator = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
     const now = audioCtx.currentTime;
     oscillator.type = 'sine';
-    oscillator.frequency.value = 55;
+    oscillator.frequency.value = 95;
     gainNode.gain.setValueAtTime(0.0001, now);
-    gainNode.gain.linearRampToValueAtTime(0.3 * currentMuteGain(), now + 0.02);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+    gainNode.gain.linearRampToValueAtTime(0.45 * gainScale * currentMuteGain(), now + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     oscillator.start(now);
-    oscillator.stop(now + 0.1);
+    oscillator.stop(now + 0.15);
   } catch {
     // 何もしない
   }
@@ -160,7 +184,8 @@ export function setMuted(value) {
   muted = value;
   if (droneNodes) {
     try {
-      droneNodes.gainNode.gain.value = 0.035 * currentMuteGain();
+      droneNodes.gainNode.gain.value = 0.07 * currentMuteGain();
+      droneNodes.gainNode2.gain.value = 0.035 * currentMuteGain();
     } catch {
       // 何もしない
     }

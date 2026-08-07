@@ -148,9 +148,9 @@ function handleChoice(playerChoseBack) {
   }
 }
 
-function startGame() {
+async function startGame() {
   if (!ctx) return;
-  initAudio();
+  await initAudio();
   gameState = startNewGame();
   showScreen('playing');
   updateRoundDisplay();

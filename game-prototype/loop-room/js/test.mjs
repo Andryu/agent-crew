@@ -272,7 +272,7 @@ const {
 
 let audioThrew = false;
 try {
-  initAudio();
+  await initAudio();
   startAmbientDrone();
   startHeartbeat(3000);
   playCorrectSound();
