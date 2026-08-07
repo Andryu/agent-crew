@@ -6,6 +6,17 @@ import { buildBaseRoomState, render } from './room-renderer.js';
 import { VARIANTS } from './variants.js';
 import { loadBestRound } from './storage.js';
 import { initSurvey } from './survey.js';
+import {
+  initAudio,
+  startAmbientDrone,
+  stopAmbientDrone,
+  startHeartbeat,
+  stopHeartbeat,
+  playCorrectSound,
+  playGameOverSound,
+  setMuted,
+  isMuted,
+} from './audio.js';
 
 const screens = {
   title: document.getElementById('title-screen'),
@@ -27,6 +38,7 @@ const retryButton = document.getElementById('retry-button');
 const surveyButton = document.getElementById('survey-button');
 const titleFromGameoverButton = document.getElementById('title-from-gameover-button');
 const flashOverlay = document.getElementById('flash-overlay');
+const muteButton = document.getElementById('mute-button');
 
 let gameState = null;
 let inputLocked = false;
@@ -60,6 +72,12 @@ function renderCurrentRoom() {
     }
   }
   render(ctx, roomState);
+  updateHeartbeatForRound();
+}
+
+function updateHeartbeatForRound() {
+  const interval = Math.max(800, 3000 - gameState.round * 100);
+  startHeartbeat(interval);
 }
 
 function updateRoundDisplay() {
@@ -113,11 +131,15 @@ function handleChoice(playerChoseBack) {
   gameState = result.newState;
 
   if (isGameOver(result)) {
+    playGameOverSound();
+    stopAmbientDrone();
+    stopHeartbeat();
     triggerGameOverFlash(() => {
       showGameOverScreen();
       inputLocked = false;
     });
   } else {
+    playCorrectSound();
     triggerRoundTransition(() => {
       updateRoundDisplay();
       renderCurrentRoom();
@@ -128,10 +150,20 @@ function handleChoice(playerChoseBack) {
 
 function startGame() {
   if (!ctx) return;
+  initAudio();
   gameState = startNewGame();
   showScreen('playing');
   updateRoundDisplay();
   renderCurrentRoom();
+  startAmbientDrone();
+  startHeartbeat(3000);
+}
+
+function updateMuteButton() {
+  if (!muteButton) return;
+  const label = isMuted() ? '音声: OFF' : '音声: ON';
+  muteButton.textContent = label;
+  muteButton.setAttribute('aria-label', label);
 }
 
 startButton.addEventListener('click', startGame);
@@ -139,15 +171,27 @@ retryButton.addEventListener('click', startGame);
 backButton.addEventListener('click', () => handleChoice(true));
 forwardButton.addEventListener('click', () => handleChoice(false));
 surveyButton.addEventListener('click', () => {
+  stopAmbientDrone();
+  stopHeartbeat();
   showScreen('survey');
 });
 titleFromGameoverButton.addEventListener('click', () => {
+  stopAmbientDrone();
+  stopHeartbeat();
   updateTitleBestRound();
   showScreen('title');
 });
+if (muteButton) {
+  muteButton.addEventListener('click', () => {
+    setMuted(!isMuted());
+    updateMuteButton();
+  });
+}
 
 initSurvey({
   onBackToTitle: () => {
+    stopAmbientDrone();
+    stopHeartbeat();
     updateTitleBestRound();
     showScreen('title');
   },
@@ -155,4 +199,5 @@ initSurvey({
 });
 
 updateTitleBestRound();
+updateMuteButton();
 showScreen('title');

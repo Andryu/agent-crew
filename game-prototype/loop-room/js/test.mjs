@@ -256,6 +256,38 @@ try {
   globalThis.localStorage = savedLocalStorage;
 }
 
+// --- 5. audio.js（window/AudioContext未定義のNode環境でも安全に動作すること） ---
+console.log('--- audio.js（window未定義環境でのフォールバック） ---');
+const {
+  initAudio,
+  startAmbientDrone,
+  stopAmbientDrone,
+  startHeartbeat,
+  stopHeartbeat,
+  playCorrectSound,
+  playGameOverSound,
+  setMuted,
+  isMuted,
+} = await import('./audio.js');
+
+let audioThrew = false;
+try {
+  initAudio();
+  startAmbientDrone();
+  startHeartbeat(3000);
+  playCorrectSound();
+  playGameOverSound();
+  setMuted(true);
+  isMuted();
+  setMuted(false);
+  stopHeartbeat();
+  stopAmbientDrone();
+} catch {
+  audioThrew = true;
+}
+check('window未定義環境でaudio.jsの全関数呼び出しが例外を投げない', !audioThrew);
+check('isMuted()がbooleanを返す', typeof isMuted() === 'boolean');
+
 // --- 結果出力 ---
 console.log('---');
 if (failed) {

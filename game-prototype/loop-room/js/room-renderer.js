@@ -362,6 +362,23 @@ export function render(ctx, roomState) {
   for (const f of roomState.furniture) {
     drawFurniturePiece(ctx, f);
   }
+
+  drawVignette(ctx);
+}
+
+function drawVignette(ctx) {
+  const vignette = ctx.createRadialGradient(
+    CANVAS_W / 2,
+    CANVAS_H / 2,
+    CANVAS_H * 0.3,
+    CANVAS_W / 2,
+    CANVAS_H / 2,
+    CANVAS_H * 0.75
+  );
+  vignette.addColorStop(0, 'rgba(0,0,0,0)');
+  vignette.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 }
 
 function drawFurniturePiece(ctx, f) {
