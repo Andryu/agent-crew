@@ -5,7 +5,14 @@
 let audioCtx = null;
 let muted = false;
 
-let droneNodes = null; // { oscillator, gainNode, oscillator2, gainNode2 }
+// ルート音(130Hz)を基準にした不穏な音程比。ルート／短3度／トライトーン(増4度)／オクターブ。
+const DRONE_ROOT_FREQ = 130;
+const DRONE_INTERVAL_RATIOS = [1, 1.1892, 1.4142, 2];
+const DRONE_OSC_GAINS = [0.045, 0.03, 0.025, 0.012];
+// 音色をゆっくり揺らす対象は短3度・トライトーンのみ（ルートとオクターブは支柱として固定する）
+const DRONE_WANDER_INDEXES = [1, 2];
+
+let droneState = null; // { oscillators[], gainNodes[], masterGain, lfos[], currentRatios[], shiftTimerId }
 let heartbeatTimerId = null;
 let heartbeatIntervalMs = null;
 
@@ -35,47 +42,115 @@ function currentMuteGain() {
   return muted ? 0 : 1;
 }
 
+function scheduleDroneTimbralShift() {
+  // 30〜45秒間隔で、短3度／トライトーンのどちらか1本を3〜5秒かけて別の不穏な音程へ遷移させる
+  const delay = 30000 + Math.random() * 15000;
+  droneState.shiftTimerId = setTimeout(() => {
+    if (!droneState) return;
+    try {
+      const idx = DRONE_WANDER_INDEXES[Math.floor(Math.random() * DRONE_WANDER_INDEXES.length)];
+      const candidates = DRONE_INTERVAL_RATIOS.filter((r) => r !== droneState.currentRatios[idx]);
+      const newRatio = candidates[Math.floor(Math.random() * candidates.length)];
+      const rampDuration = 3 + Math.random() * 2;
+      const now = audioCtx.currentTime;
+      const osc = droneState.oscillators[idx];
+      osc.frequency.cancelScheduledValues(now);
+      osc.frequency.setValueAtTime(osc.frequency.value, now);
+      osc.frequency.linearRampToValueAtTime(DRONE_ROOT_FREQ * newRatio, now + rampDuration);
+      droneState.currentRatios[idx] = newRatio;
+    } catch {
+      // 何もしない
+    }
+    scheduleDroneTimbralShift();
+  }, delay);
+}
+
 export function startAmbientDrone() {
-  if (!audioCtx || droneNodes) return;
+  if (!audioCtx || droneState) return;
   try {
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    oscillator.type = 'sine';
-    oscillator.frequency.value = 130;
-    gainNode.gain.value = 0.07 * currentMuteGain();
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.start();
+    const now = audioCtx.currentTime;
 
-    // うなり（ビート）を生じさせるため、わずかにずらした周波数の2本目を重ねる
-    const oscillator2 = audioCtx.createOscillator();
-    const gainNode2 = audioCtx.createGain();
-    oscillator2.type = 'sine';
-    oscillator2.frequency.value = 130 * 1.03;
-    gainNode2.gain.value = 0.035 * currentMuteGain();
-    oscillator2.connect(gainNode2);
-    gainNode2.connect(audioCtx.destination);
-    oscillator2.start();
+    const masterGain = audioCtx.createGain();
+    masterGain.gain.setValueAtTime(0.0001, now);
+    masterGain.connect(audioCtx.destination);
 
-    droneNodes = { oscillator, gainNode, oscillator2, gainNode2 };
+    const oscillators = [];
+    const gainNodes = [];
+    const lfos = [];
+    const currentRatios = [...DRONE_INTERVAL_RATIOS];
+
+    DRONE_INTERVAL_RATIOS.forEach((ratio, i) => {
+      const freq = DRONE_ROOT_FREQ * ratio;
+
+      const oscillator = audioCtx.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = freq;
+
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.value = DRONE_OSC_GAINS[i];
+
+      oscillator.connect(gainNode);
+      gainNode.connect(masterGain);
+      oscillator.start();
+
+      // 有機的な揺らぎ（ビブラート）: LFOオシレーターでこの音のfrequencyを微変調する
+      const lfo = audioCtx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.1 + Math.random() * 0.2; // 0.1〜0.3Hz
+      const lfoDepth = audioCtx.createGain();
+      lfoDepth.gain.value = freq * 0.006; // 元周波数の1%未満の変動幅
+      lfo.connect(lfoDepth);
+      lfoDepth.connect(oscillator.frequency);
+      lfo.start();
+
+      oscillators.push(oscillator);
+      gainNodes.push(gainNode);
+      lfos.push({ oscillator: lfo, depthGain: lfoDepth });
+    });
+
+    droneState = { oscillators, gainNodes, masterGain, lfos, currentRatios, shiftTimerId: null };
+
+    // フェードイン（1.5秒かけて目標音量へ）
+    masterGain.gain.linearRampToValueAtTime(currentMuteGain(), now + 1.5);
+
+    scheduleDroneTimbralShift();
   } catch {
-    droneNodes = null;
+    droneState = null;
   }
 }
 
 export function stopAmbientDrone() {
-  if (!droneNodes) return;
+  if (!droneState || !audioCtx) return;
+  const state = droneState;
+  droneState = null;
   try {
-    droneNodes.oscillator.stop();
-    droneNodes.oscillator.disconnect();
-    droneNodes.gainNode.disconnect();
-    droneNodes.oscillator2.stop();
-    droneNodes.oscillator2.disconnect();
-    droneNodes.gainNode2.disconnect();
+    if (state.shiftTimerId !== null) clearTimeout(state.shiftTimerId);
+
+    const now = audioCtx.currentTime;
+    const fadeOutSeconds = 0.4;
+    state.masterGain.gain.cancelScheduledValues(now);
+    state.masterGain.gain.setValueAtTime(state.masterGain.gain.value, now);
+    state.masterGain.gain.linearRampToValueAtTime(0.0001, now + fadeOutSeconds);
+
+    setTimeout(() => {
+      try {
+        state.oscillators.forEach((osc) => {
+          osc.stop();
+          osc.disconnect();
+        });
+        state.gainNodes.forEach((g) => g.disconnect());
+        state.lfos.forEach((lfo) => {
+          lfo.oscillator.stop();
+          lfo.oscillator.disconnect();
+          lfo.depthGain.disconnect();
+        });
+        state.masterGain.disconnect();
+      } catch {
+        // 何もしない
+      }
+    }, fadeOutSeconds * 1000 + 50);
   } catch {
     // 何もしない
-  } finally {
-    droneNodes = null;
   }
 }
 
@@ -182,10 +257,9 @@ export function playGameOverSound() {
 
 export function setMuted(value) {
   muted = value;
-  if (droneNodes) {
+  if (droneState) {
     try {
-      droneNodes.gainNode.gain.value = 0.07 * currentMuteGain();
-      droneNodes.gainNode2.gain.value = 0.035 * currentMuteGain();
+      droneState.masterGain.gain.value = currentMuteGain();
     } catch {
       // 何もしない
     }
