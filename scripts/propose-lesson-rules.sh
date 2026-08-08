@@ -80,6 +80,9 @@ fi
 
 log "Extracting lessons with priority_score >= $MIN_PRIORITY ..."
 
+# enforcement == "code" はプロンプト書き出し対象外:
+# script/lint/hook で機械的に強制済みの教訓をエージェント .md にも書くと
+# 二重管理になるため（learning-loop-verification-proposal.md L1-4）。
 LESSONS_JSON=$(jq -c --argjson min "$MIN_PRIORITY" '
   .lessons[]
   | select(
@@ -90,6 +93,7 @@ LESSONS_JSON=$(jq -c --argjson min "$MIN_PRIORITY" '
         or .status == "proposed"
         or .status == "issue_created"
       )
+      and ((.enforcement // "prompt") != "code")
     )
 ' "$LESSONS_FILE" 2>/dev/null || echo "")
 

@@ -188,6 +188,42 @@ def calculate_risk(task: Task) -> None:
     typer.echo(f"  retry_count: {retry}", err=True)
 
 
+def warn_uncommitted_work(slug: str) -> None:
+    """タスク完了時に未コミット差分があれば stderr へ警告する（非ブロック）。
+
+    agent-crew-sprint-27-reliability-003（未コミット作業の保護漏れ）の恒久対応
+    （enforcement: code / learning-loop-verification-proposal.md L1-2）。
+    repo ルートは _queue.json の位置から明示的に解決する（CWD 依存の誤判定防止）。
+    既知の制約: git status は作業ツリー全体の差分を返すため、
+    このタスクに関係する差分だけを区別することはできない。
+    """
+    try:
+        anchor = QUEUE_FILE.resolve().parent
+        root_proc = subprocess.run(
+            ["git", "-C", str(anchor), "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if root_proc.returncode != 0:
+            return
+        repo_root = root_proc.stdout.strip()
+        status_proc = subprocess.run(
+            ["git", "-C", repo_root, "status", "--porcelain"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if status_proc.returncode != 0:
+            return
+        dirty = [line for line in status_proc.stdout.splitlines() if line.strip()]
+        if dirty:
+            typer.echo(
+                f"WARNING: {slug} 完了時点で未コミットの変更が {len(dirty)} 件あります"
+                f"（作業ツリー全体）。セッション中断で成果物が失われる前に commit してください。",
+                err=True,
+            )
+    except Exception:
+        # 警告は best-effort。done 本体の成否に影響させない
+        pass
+
+
 def close_linked_issue(
     q: QueueFile, slug: str, agent: str, summary: str, override_issue: Optional[int] = None
 ) -> None:
@@ -287,6 +323,7 @@ def done(
     typer.echo(f"OK: {slug} → DONE")
     emit_signal("task.done", slug, agent, {"summary": summary})
     close_linked_issue(q, slug, agent, summary, override_issue=close_issue)
+    warn_uncommitted_work(slug)
 
 # ---------- コマンド: handoff ----------
 
