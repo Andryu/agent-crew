@@ -8,7 +8,7 @@ let muted = false;
 // ルート音(130Hz)を基準にした不穏な音程比。ルート／短3度／トライトーン(増4度)／オクターブ。
 const DRONE_ROOT_FREQ = 130;
 const DRONE_INTERVAL_RATIOS = [1, 1.1892, 1.4142, 2];
-const DRONE_OSC_GAINS = [0.045, 0.03, 0.025, 0.012];
+const DRONE_OSC_GAINS = [0.15, 0.1, 0.08, 0.04];
 // 音色をゆっくり揺らす対象は短3度・トライトーンのみ（ルートとオクターブは支柱として固定する）
 const DRONE_WANDER_INDEXES = [1, 2];
 
@@ -110,11 +110,14 @@ export function startAmbientDrone() {
 
     droneState = { oscillators, gainNodes, masterGain, lfos, currentRatios, shiftTimerId: null };
 
-    // フェードイン（1.5秒かけて目標音量へ）
-    masterGain.gain.linearRampToValueAtTime(currentMuteGain(), now + 1.5);
+    // フェードイン（1.5秒かけて目標音量へ）。ループ処理で経過した時間を無視しないよう、ここで現在時刻を取り直す
+    const fadeStart = audioCtx.currentTime;
+    masterGain.gain.setValueAtTime(0.0001, fadeStart);
+    masterGain.gain.linearRampToValueAtTime(currentMuteGain(), fadeStart + 1.5);
 
     scheduleDroneTimbralShift();
-  } catch {
+  } catch (err) {
+    console.error('[audio] startAmbientDrone failed:', err);
     droneState = null;
   }
 }
@@ -145,12 +148,12 @@ export function stopAmbientDrone() {
           lfo.depthGain.disconnect();
         });
         state.masterGain.disconnect();
-      } catch {
-        // 何もしない
+      } catch (err) {
+        console.error('[audio] stopAmbientDrone failed:', err);
       }
     }, fadeOutSeconds * 1000 + 50);
-  } catch {
-    // 何もしない
+  } catch (err) {
+    console.error('[audio] stopAmbientDrone failed:', err);
   }
 }
 
@@ -159,8 +162,8 @@ function playHeartbeatPulse() {
   try {
     playSinglePulse(1);
     setTimeout(() => playSinglePulse(0.6), 60);
-  } catch {
-    // 何もしない
+  } catch (err) {
+    console.error('[audio] playHeartbeatPulse failed:', err);
   }
 }
 
@@ -179,8 +182,8 @@ function playSinglePulse(gainScale) {
     gainNode.connect(audioCtx.destination);
     oscillator.start(now);
     oscillator.stop(now + 0.15);
-  } catch {
-    // 何もしない
+  } catch (err) {
+    console.error('[audio] playSinglePulse failed:', err);
   }
 }
 
@@ -222,8 +225,8 @@ export function playCorrectSound() {
     gainNode.connect(audioCtx.destination);
     oscillator.start(now);
     oscillator.stop(now + 0.2);
-  } catch {
-    // 何もしない
+  } catch (err) {
+    console.error('[audio] playCorrectSound failed:', err);
   }
 }
 
@@ -250,8 +253,8 @@ export function playGameOverSound() {
     osc2.start(now);
     osc1.stop(now + 0.5);
     osc2.stop(now + 0.5);
-  } catch {
-    // 何もしない
+  } catch (err) {
+    console.error('[audio] playGameOverSound failed:', err);
   }
 }
 
