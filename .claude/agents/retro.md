@@ -51,12 +51,36 @@ model: sonnet
 #### source_repo の取得（必須）
 
 lesson を記録する前に、呼び出し元リポジトリの URL を取得して `source_repo` フィールドに設定する。
+**SSH 形式（`git@github.com:...`）は必ず HTTPS 形式へ正規化してから保存する**
+（`agent-crew-sprint-27-tooling-001` の恒久対応。`scripts/lessons.sh` 経由なら自動正規化される）：
 
 ```bash
 SOURCE_REPO=$(git remote get-url origin 2>/dev/null || echo "local")
+# SSH → HTTPS 正規化（lessons.sh add を使う場合は不要 — スクリプト側で実施される）
+SOURCE_REPO=$(echo "$SOURCE_REPO" | sed -E 's#^git@([^:]+):#https://\1/#; s#\.git$##')
 ```
 
 `source_repo` はクロスリポジトリ教訓集約（Issue #110）の基盤フィールドであり、**必ず全 lesson エントリに含める**。
+
+#### 効果検証フィールド（必須 — learning-loop-verification-proposal.md）
+
+`type: failure` かつ `priority_score >= 3`（ルール書き出し対象）の lesson には
+**`recurrence_condition`（再発検知条件）を必ず設定する**。
+「何が観測されなくなったら効いたと言えるか」を1文で書く（10文字以上）。
+例: 二重指揮の衝突 → 「PM経由でないタスク指示が発生しない」。
+条件を書けない観察はルール化に値しないため、type を observation に落とすか記録を見送る。
+
+あわせて `enforcement` を判定する:
+
+| enforcement | 判定基準 |
+|-------------|---------|
+| `code` | script/lint/hook で機械的に強制できる（→ コード化タスクを起票し、プロンプト書き出しはしない） |
+| `prompt` | エージェントの行動指針としてしか表現できない（デフォルト） |
+| `process` | 人間・運用手順の問題 |
+
+`scripts/lessons.sh add` を使えばこれらのバリデーション（recurrence_condition 必須チェック・
+source_repo 正規化・`verification_streak: 0` の初期化）が自動で適用される。手書き jq で
+記録する場合も同じフィールドを必ず含めること。
 
 #### スコープ（scope）の判断基準（必須）
 
@@ -154,6 +178,31 @@ mv "$tmp" ~/.claude/_lessons.json
 release_lock
 trap - EXIT INT TERM
 ```
+
+### ステップ 2.7: 前スプリントルールの再発チェック（効果検証・必須）
+
+今スプリントの観察記録（ステップ2）が終わったら、**過去スプリントに書き出したルールが
+効いたかどうかを再発カウントで測る**（learning-loop-verification-proposal.md L0）。
+
+1. 今スプリントで記録した failure lesson を、過去のルール書き出し対象 lesson
+   （`type: failure`, `priority_score >= 3`, status が proposed/issue_created/implemented）と
+   突合し、**同型の再発**（同じ recurrence_condition に反する事象）があるか判定する。
+2. 判定結果を渡して verify-check を実行する:
+
+```bash
+# 再発がなかった場合
+bash scripts/lessons.sh verify-check <今スプリント>
+
+# 同型再発を観察した場合（再発した過去lessonのIDを指定）
+bash scripts/lessons.sh verify-check <今スプリント> --recurred <lesson-id> [--recurred <lesson-id>]...
+```
+
+- 再発なし2スプリント連続 → 該当 lesson は `verified` に自動遷移する（ルールは効いた）
+- 再発あり → streak が 0 にリセットされ `last_recurrence_sprint` が記録される。
+  **これは「プロンプトのルールでは防げなかった」実績**なので、機械化（`enforcement: code` 化 =
+  script/lint/hook での強制）タスクの起票を Yuki への完了報告に含めること
+3. verify-check の出力（再発リセット・verified 遷移・streak 進行中の件数）は
+   ステップ7の完了報告に「効果検証結果」として添付する
 
 ### ステップ 3: エビデンスゲートの実行
 
@@ -270,12 +319,19 @@ done
 
 #### 対象教訓の抽出
 
+`enforcement: code` の lesson は **書き出し対象外**（コードで強制済みのルールを
+プロンプトにも書くと二重管理になる — learning-loop-verification-proposal.md L1-4）。
+
 ```bash
 jq '.lessons[] | select(
   (.status == "open" or .status == null) and
-  (.priority_score >= 3)
+  (.priority_score >= 3) and
+  ((.enforcement // "prompt") != "code")
 )' ~/.claude/_lessons.json
 ```
+
+`enforcement: code` と判定したが未実装の lesson は、書き出す代わりに
+コード化タスク（対象スクリプトへの実装）の起票を Yuki へ申し送る。
 
 #### 重複チェック
 
@@ -375,6 +431,16 @@ LOAD_RATIO_TASKCOUNT=$(echo "$LOAD_BALANCE" | jq '.load_balance.by_task_count.sc
 
 スコアが合格基準を下回った軸は、次スプリントの改善優先事項として lesson に記録する。
 
+#### メタ評価ルール（試験運用 — sprint-30 まで）
+
+**全4軸が PASS なのに、今スプリントで `priority_score >= 6` の lesson を2件以上記録した場合**、
+ルーブリックが測るべきものを測れていない兆候とみなし、完了報告に
+「ルーブリック改訂タスクの起票提案」を含める（sprint-27 で実際に発生したパターン:
+全軸PASSと priority 9 教訓2件の同居）。
+
+試験運用期間中は発火の有無を完了報告に毎回記録し（発火なしの場合も「メタ評価: 発火なし」と明記）、
+2スプリント分の発火頻度を見てから正式ルール化・閾値調整を判断する。
+
 ### ステップ 6.5: enforce-retro-stop.sh 実戦検証（スプリント中1回・完了条件）
 
 Issue #128 / Sprint-25レトロ「次スプリントへの改善優先事項」対応。
@@ -415,6 +481,14 @@ Stop フック（`scripts/enforce-retro-stop.sh`）が実運用の起動経路�
 | 負荷分散 | [0.xx] | <= 2.0 | [PASS / FAIL] |
 
 > FAIL 軸: [軸名]（次スプリントの改善優先事項）
+> メタ評価: [発火なし / 発火 — ルーブリック改訂タスクの起票を提案（全軸PASSかつpriority>=6が[n]件）]
+
+### 効果検証結果（ステップ2.7）
+- verify-check 実行: [今スプリント名]
+- 再発リセット: [n] 件 [→ 機械化候補: lesson-id, ...]
+- verified 遷移: [n] 件 [→ lesson-id, ...]
+- streak 進行中: [n] 件
+- 機械化タスクの起票提案: [なし / あり — 対象と実装先を記載]
 
 ### enforce-retro-stop.sh 実戦検証（ステップ6.5）
 - 発動確認（隔離環境）: [PASS / 未確認]

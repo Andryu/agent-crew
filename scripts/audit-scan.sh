@@ -63,7 +63,7 @@ done
 
 # ---------- 前提コマンドの確認（実行前提エラー = exit 2） ----------
 
-for cmd in jq git find readlink; do
+for cmd in jq git find readlink python3; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "ERROR: 前提コマンドが見つかりません: $cmd" >&2
     exit 2
@@ -168,7 +168,10 @@ if [[ -n "$SYMLINKS" ]]; then
       continue
     fi
 
-    resolved=$(readlink -f "$link" 2>/dev/null || true)
+    # readlink -f は macOS 標準（BSD readlink）非対応のため使用しない
+    # （agent-crew-sprint-27-reliability-002 / Sora指摘6: 検出器自身が同バグを抱えていた）。
+    # python3 の os.path.realpath で代替する（POSIX/macOS 両対応）。
+    resolved=$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$link" 2>/dev/null || true)
     raw_target=$(readlink "$link" 2>/dev/null || true)
     if [[ -z "$resolved" ]] || [[ "$raw_target" == "$link" ]]; then
       SYMLINK_DETAIL_LINES+=("[FAIL] ${rel_link} — 自己参照（ループ）の疑い")
@@ -369,6 +372,36 @@ else
 fi
 
 # ========================================================================
+# 3.7 readlink -f 非移植性チェック（agent-crew-sprint-27-reliability-002 / enforcement: code）
+# ========================================================================
+# macOS 標準の BSD readlink は -f オプション非対応のため、リポジトリ内の
+# シェルスクリプトでの `readlink -f` 使用を検出する。代替: python3 の os.path.realpath。
+
+PORTABILITY_RESULT="PASS"
+PORTABILITY_FAIL_COUNT=0
+PORTABILITY_DETAIL_LINES=()
+
+SELF_NAME=$(basename "$0")
+PORTABILITY_HITS=$(grep -rnE 'readlink[[:space:]]+-f' \
+  "$REPO_ROOT/scripts" "$REPO_ROOT/hooks" "$REPO_ROOT"/install*.sh "$REPO_ROOT/build.sh" \
+  2>/dev/null | grep -v "/${SELF_NAME}:" || true)
+
+if [[ -n "$PORTABILITY_HITS" ]]; then
+  while IFS= read -r hit; do
+    [[ -z "$hit" ]] && continue
+    rel_hit="${hit#"$REPO_ROOT"/}"
+    PORTABILITY_DETAIL_LINES+=("[FAIL] ${rel_hit%%:*}:$(echo "$rel_hit" | cut -d: -f2) — readlink -f は macOS(BSD readlink) 非対応。python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' で代替する")
+    PORTABILITY_FAIL_COUNT=$((PORTABILITY_FAIL_COUNT + 1))
+  done <<< "$PORTABILITY_HITS"
+fi
+
+if [[ "$PORTABILITY_FAIL_COUNT" -gt 0 ]]; then
+  PORTABILITY_RESULT="FAIL (${PORTABILITY_FAIL_COUNT}件)"
+else
+  PORTABILITY_DETAIL_LINES+=("該当なし")
+fi
+
+# ========================================================================
 # レポート生成
 # ========================================================================
 
@@ -377,7 +410,8 @@ SHORT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 OVERALL="PASS"
 if [[ "$PERM_RESULT" == "FAIL" || "$SYMLINK_RESULT" == FAIL* || "$HOOKS_RESULT" == FAIL* \
-   || "$CIRCUIT_RESULT" == FAIL* || "$TOKEN_RESULT" == FAIL* || "$FORBIDDEN_RESULT" == FAIL* ]]; then
+   || "$CIRCUIT_RESULT" == FAIL* || "$TOKEN_RESULT" == FAIL* || "$FORBIDDEN_RESULT" == FAIL* \
+   || "$PORTABILITY_RESULT" == FAIL* ]]; then
   OVERALL="FAIL"
 fi
 
@@ -397,6 +431,7 @@ REPORT=$(
   echo "| サーキットブレーカー健全性 | ${CIRCUIT_RESULT} |"
   echo "| トークン予算超過 | ${TOKEN_RESULT} |"
   echo "| 禁止コマンド | ${FORBIDDEN_RESULT} |"
+  echo "| readlink -f 非移植性 | ${PORTABILITY_RESULT} |"
   echo ""
   echo "## 詳細"
   echo ""
@@ -427,6 +462,11 @@ REPORT=$(
   echo ""
   echo "### 禁止コマンド（ガードレール第4条）"
   for line in "${FORBIDDEN_DETAIL_LINES[@]}"; do
+    echo "- ${line}"
+  done
+  echo ""
+  echo "### readlink -f 非移植性（agent-crew-sprint-27-reliability-002）"
+  for line in "${PORTABILITY_DETAIL_LINES[@]}"; do
     echo "- ${line}"
   done
   echo ""

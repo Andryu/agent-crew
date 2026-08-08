@@ -1,8 +1,10 @@
 # `_lessons.json` スキーマ設計
 
 作成日: 2026-04-21
+最終更新: 2026-08-08（v1.1.0 — 効果検証フィールド追加＋実装済みフィールドの文書反映）
 ステータス: Accepted
 対応 Issue: #21
+関連: docs/spec/learning-loop-verification-proposal.md（効果検証の導入）
 
 ---
 
@@ -170,6 +172,51 @@ priority_score = severity_score × frequency_score
           "default": null,
           "examples": ["https://github.com/owner/agent-crew/issues/34"]
         },
+        "status": {
+          "type": "string",
+          "description": "lesson のライフサイクル。verified への遷移は lessons.sh verify-check が行う",
+          "enum": ["proposed", "issue_created", "implemented", "verified", "dismissed"],
+          "default": "proposed"
+        },
+        "scope": {
+          "type": "string",
+          "description": "知見の適用範囲",
+          "enum": ["project", "global", "stack"],
+          "default": "project"
+        },
+        "stack": {
+          "type": ["string", "null"],
+          "description": "scope=stack の場合の技術スタック名（例: go, next, vue）",
+          "default": null
+        },
+        "source_repo": {
+          "type": "string",
+          "description": "由来リポジトリ URL。HTTPS 形式に正規化して保存する（SSH 形式は lessons.sh が自動変換）。ローカルのみの場合は \"local\"",
+          "examples": ["https://github.com/Andryu/agent-crew"]
+        },
+        "recurrence_condition": {
+          "type": ["string", "null"],
+          "description": "再発検知条件: 何が観測されなくなったら効いたと言えるか。type=failure かつ priority_score>=3（ルール書き出し対象）では必須（lessons.sh add がコードで強制）",
+          "default": null,
+          "examples": ["PM経由でないタスク指示が発生しない"]
+        },
+        "enforcement": {
+          "type": "string",
+          "description": "教訓の強制手段。code = script/lint/hook で機械的に強制済み（プロンプト書き出し対象外）/ prompt = エージェント .md への行動指針 / process = 人間・運用手順",
+          "enum": ["code", "prompt", "process"],
+          "default": "prompt"
+        },
+        "verification_streak": {
+          "type": "integer",
+          "description": "再発なしで経過した連続スプリント数。lessons.sh verify-check が更新し、2 に達すると status が verified へ自動遷移する。再発時は 0 にリセット",
+          "minimum": 0,
+          "default": 0
+        },
+        "last_recurrence_sprint": {
+          "type": ["string", "null"],
+          "description": "最後に同型再発が観察されたスプリント。非 null の lesson は「プロンプトのルールが効かなかった」実績であり機械化（enforcement: code）の候補",
+          "default": null
+        },
         "supersedes": {
           "type": ["string", "null"],
           "description": "この lesson が更新・改訂する旧 lesson の id（append-only 更新時に使用）",
@@ -232,6 +279,26 @@ priority_score = severity_score × frequency_score
 | 1 | 稀（このスプリントで初めて観察） | 1回 |
 | 2 | 時々（2〜3スプリントに1回程度） | 2〜3回 |
 | 3 | 頻繁（毎スプリントのように発生） | 4回以上 |
+
+### 効果検証フィールドのライフサイクル（v1.1.0）
+
+「記録したルールが行動を変えたか」を再発カウントで測る（learning-loop-verification-proposal.md）。
+
+```
+add（type=failure, priority>=3 → recurrence_condition 必須）
+     │  verification_streak = 0
+     ▼
+レトロで lessons.sh verify-check <sprint> [--recurred <id>]... を実行
+     │
+     ├─ 再発なし → streak +1 ──→ streak >= 2 で status=verified（効いた）
+     │
+     └─ --recurred 指定 → streak=0 / last_recurrence_sprint 更新
+                          verified 済みなら implemented へ差し戻し
+                          → プロンプトのルールでは防げない実績 = 機械化（enforcement: code）候補
+```
+
+`enforcement: code` になった lesson はプロンプト書き出し（retro.md ステップ5 /
+propose-lesson-rules.sh）の対象外となり、二重管理を防ぐ。
 
 ### id 命名規則
 

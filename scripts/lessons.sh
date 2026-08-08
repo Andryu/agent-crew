@@ -17,10 +17,22 @@
 #     [--evidence "<evidence1>" --evidence "<evidence2>" ...] \
 #     [--tags "<tag1>" --tags "<tag2>" ...] \
 #     [--issue-url <url>] \
-#     [--supersedes <id>]
+#     [--supersedes <id>] \
+#     [--recurrence-condition "<condition>"] \
+#     [--enforcement <code|prompt|process>] \
+#     [--source-repo <url>]
 #
 #   lessons.sh set-status <id> <proposed|issue_created|implemented|verified|dismissed>
 #   lessons.sh promote <id> <project|global|stack> [<stack>]
+#   lessons.sh verify-check <current-sprint> [--recurred <id>]...
+#
+#   verify-check: 効果検証（learning-loop-verification-proposal.md L0-2）。
+#     過去スプリントのルール書き出し対象 lesson（type=failure, priority>=3,
+#     status が proposed/issue_created/implemented）について:
+#       --recurred で指定された lesson → verification_streak を 0 にリセットし
+#         last_recurrence_sprint を現スプリントに更新（ルール無効 = 機械化候補）
+#       それ以外 → verification_streak を +1。streak >= 2 に達したら
+#         status を verified へ自動遷移する
 #
 # 環境変数:
 #   LESSONS_FILE   lessons ファイルパス (default: ~/.claude/_lessons.json)
@@ -60,6 +72,13 @@ add options:
   --tags         自由タグ (複数指定可)
   --issue-url    対応 GitHub Issue の URL
   --supersedes   改訂対象の旧 lesson ID
+  --recurrence-condition
+                 再発検知条件: 何が観測されなくなったら効いたと言えるか
+                 (type=failure かつ priority_score>=3 では必須、10文字以上)
+  --enforcement  code|prompt|process (省略時: prompt)
+                 code = script/lint/hook で強制済み。プロンプト書き出し対象外になる
+  --source-repo  由来リポジトリURL (省略時: git remote get-url origin。
+                 SSH形式は HTTPS 形式へ自動正規化される)
   --help         このヘルプを表示
 
 set-status args:
@@ -70,8 +89,26 @@ promote args:
   <id>           lesson ID (必須)
   <scope>        project|global|stack (必須)
   <stack>        スタック名 (scope=stack時に必須)
+
+verify-check args:
+  <current-sprint>  現スプリント識別子 例: sprint-28 (必須)
+  --recurred <id>   今スプリントで同型再発が観察された lesson ID (複数指定可)
 HELP_EOF
   exit 1
+}
+
+# source_repo 正規化: SSH形式 (git@github.com:owner/repo.git) を
+# HTTPS形式 (https://github.com/owner/repo) に統一する。
+# agent-crew-sprint-27-tooling-001 の恒久対応（enforcement: code）。
+normalize_source_repo() {
+  local url="$1"
+  url="${url%.git}"
+  if [[ "$url" =~ ^git@([^:]+):(.+)$ ]]; then
+    url="https://${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+  elif [[ "$url" =~ ^ssh://git@([^/]+)/(.+)$ ]]; then
+    url="https://${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+  fi
+  echo "$url"
 }
 
 die() {
@@ -105,8 +142,8 @@ if [[ "$CMD" == "--help" || "$CMD" == "-h" || -z "$CMD" ]]; then
   usage
 fi
 
-if [[ "$CMD" != "add" && "$CMD" != "set-status" && "$CMD" != "promote" ]]; then
-  die "unknown command: '$CMD'. Use 'add', 'set-status', or 'promote'."
+if [[ "$CMD" != "add" && "$CMD" != "set-status" && "$CMD" != "promote" && "$CMD" != "verify-check" ]]; then
+  die "unknown command: '$CMD'. Use 'add', 'set-status', 'promote', or 'verify-check'."
 fi
 
 SET_STATUS_ID=""
@@ -114,6 +151,8 @@ SET_STATUS_VAL=""
 PROMOTE_ID=""
 PROMOTE_SCOPE=""
 PROMOTE_STACK="null"
+VERIFY_SPRINT=""
+RECURRED_IDS=()
 
 if [[ "$CMD" == "set-status" ]]; then
   SET_STATUS_ID="${1:-}"
@@ -124,6 +163,16 @@ elif [[ "$CMD" == "promote" ]]; then
   if [[ "$PROMOTE_SCOPE" == "stack" ]]; then
     PROMOTE_STACK="\"${3:-}\""
   fi
+elif [[ "$CMD" == "verify-check" ]]; then
+  VERIFY_SPRINT="${1:-}"
+  shift || true
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --recurred) RECURRED_IDS+=("$2"); shift 2 ;;
+      --help|-h)  usage ;;
+      *) die "unknown option for verify-check: '$1'" ;;
+    esac
+  done
 fi
 
 PROJECT=""
@@ -139,6 +188,9 @@ SCOPE="project"
 STACK="null"
 ISSUE_URL="null"
 SUPERSEDES="null"
+RECURRENCE_CONDITION=""
+ENFORCEMENT="prompt"
+SOURCE_REPO=""
 EVIDENCE_ITEMS=()
 TAG_ITEMS=()
 
@@ -158,6 +210,9 @@ while [[ $# -gt 0 ]]; do
     --stack)       STACK="\"$2\"";    shift 2 ;;
     --issue-url)   ISSUE_URL="\"$2\""; shift 2 ;;
     --supersedes)  SUPERSEDES="\"$2\""; shift 2 ;;
+    --recurrence-condition) RECURRENCE_CONDITION="$2"; shift 2 ;;
+    --enforcement) ENFORCEMENT="$2";  shift 2 ;;
+    --source-repo) SOURCE_REPO="$2";  shift 2 ;;
     --evidence)    EVIDENCE_ITEMS+=("$2"); shift 2 ;;
     --tags)        TAG_ITEMS+=("$2"); shift 2 ;;
     --help|-h)     usage ;;
@@ -206,6 +261,32 @@ if [[ "$CMD" == "add" ]]; then
     || die "--description must be at least 10 characters"
   [[ ${#ACTION} -ge 5 ]] \
     || die "--action must be at least 5 characters"
+
+  [[ "$ENFORCEMENT" =~ ^(code|prompt|process)$ ]] \
+    || die "--enforcement must be code, prompt, or process, got: '$ENFORCEMENT'"
+
+  # 再発検知条件ゲート（learning-loop-verification-proposal.md L0-2 / Sora指摘3）:
+  # ルール書き出し対象（type=failure かつ priority>=3）では、
+  # 「何が観測されなくなったら効いたと言えるか」の明文化をコードで強制する。
+  if [[ "$TYPE" == "failure" && $(( SEVERITY * FREQUENCY )) -ge 3 ]]; then
+    [[ -n "$RECURRENCE_CONDITION" ]] \
+      || die "--recurrence-condition is required for failure lessons with priority_score >= 3 (何が観測されなくなったら効いたと言えるかを書く)"
+    [[ ${#RECURRENCE_CONDITION} -ge 10 ]] \
+      || die "--recurrence-condition must be at least 10 characters"
+  fi
+
+  # source_repo: 未指定なら origin から取得し、SSH形式は HTTPS へ正規化する
+  if [[ -z "$SOURCE_REPO" ]]; then
+    SOURCE_REPO=$(git remote get-url origin 2>/dev/null || echo "local")
+  fi
+  SOURCE_REPO=$(normalize_source_repo "$SOURCE_REPO")
+fi
+
+# ---------- バリデーション (verify-check) ----------
+if [[ "$CMD" == "verify-check" ]]; then
+  [[ -n "$VERIFY_SPRINT" ]] || die "verify-check requires <current-sprint> argument"
+  [[ "$VERIFY_SPRINT" =~ ^sprint-[0-9]+$ ]] \
+    || die "verify-check sprint must match 'sprint-NNN', got: '$VERIFY_SPRINT'"
 fi
 
 # ---------- バリデーション (promote) ----------
@@ -337,6 +418,11 @@ _do_add() {
     tags_json=$(printf '%s\n' "${TAG_ITEMS[@]}" | jq -R . | jq -s .)
   fi
 
+  local recurrence_json="null"
+  if [[ -n "$RECURRENCE_CONDITION" ]]; then
+    recurrence_json=$(jq -n --arg c "$RECURRENCE_CONDITION" '$c')
+  fi
+
   new_entry=$(jq -n \
     --arg id           "$id" \
     --arg project      "$PROJECT" \
@@ -356,6 +442,9 @@ _do_add() {
     --arg status       "$STATUS" \
     --argjson supersedes "$SUPERSEDES" \
     --arg created_at   "$created_at" \
+    --arg source_repo  "$SOURCE_REPO" \
+    --argjson recurrence_condition "$recurrence_json" \
+    --arg enforcement  "$ENFORCEMENT" \
     '{
       id:              $id,
       project:         $project,
@@ -374,6 +463,11 @@ _do_add() {
       status:          $status,
       supersedes:      $supersedes,
       tags:            $tags,
+      source_repo:     $source_repo,
+      recurrence_condition: $recurrence_condition,
+      enforcement:     $enforcement,
+      verification_streak: 0,
+      last_recurrence_sprint: null,
       created_at:      $created_at,
       updated_at:      null
     }'
@@ -388,6 +482,88 @@ _do_add() {
   echo "$id"
 }
 
+_do_verify_check() {
+  local current_sprint="$1"
+  shift
+  local recurred_json existing updated tmp updated_at
+
+  existing=$(cat "$LESSONS_FILE")
+  updated_at=$(date -u +"%Y-%m-%dT%H:%M:%S+0000")
+
+  # --recurred で渡された ID を JSON 配列へ
+  if [[ $# -eq 0 ]]; then
+    recurred_json="[]"
+  else
+    recurred_json=$(printf '%s\n' "$@" | jq -R . | jq -s .)
+  fi
+
+  # 指定 ID の存在チェック（typo で無言スキップしないため）
+  local missing
+  missing=$(jq -r --argjson ids "$recurred_json" '
+    ($ids - [.lessons[].id]) | .[]' <<< "$existing")
+  [[ -z "$missing" ]] || die "verify-check: lesson not found: $missing"
+
+  # 効果検証の対象 = ルール書き出し対象（type=failure, priority>=3）で
+  # 現スプリントより前に記録されたもの。
+  # - recurred に含まれる → streak を 0 リセット、last_recurrence_sprint 更新。
+  #   verified 済みだった場合は implemented へ差し戻す（検証済みルールの破れ）
+  # - 含まれない（未確定ステータスのみ）→ streak +1。streak >= 2 で
+  #   status=verified へ自動遷移
+  updated=$(jq \
+    --arg current    "$current_sprint" \
+    --arg updated_at "$updated_at" \
+    --argjson recurred "$recurred_json" \
+    '
+    def rule_target:
+      ((.type // "failure") == "failure")
+      and ((.priority_score // 0) >= 3)
+      and (.sprint != $current);
+    def open_status:
+      (.status // "proposed") | IN("proposed", "issue_created", "implemented", "open");
+    .lessons |= map(
+      if (rule_target and ([.id] | inside($recurred))) then
+        .verification_streak = 0
+        | .last_recurrence_sprint = $current
+        | (if .status == "verified" then .status = "implemented" else . end)
+        | .updated_at = $updated_at
+      elif (rule_target and open_status) then
+        .verification_streak = ((.verification_streak // 0) + 1)
+        | (if .verification_streak >= 2 then .status = "verified" else . end)
+        | .updated_at = $updated_at
+      else . end
+    )' \
+    <<< "$existing")
+
+  tmp=$(mktemp "${LESSONS_FILE}.tmp.XXXXXX")
+  echo "$updated" > "$tmp"
+  mv "$tmp" "$LESSONS_FILE"
+
+  # サマリー出力: 実行前後の diff で判定する
+  # （updated_at のタイムスタンプ比較は秒精度のため同一秒の連続実行で誤報告するリスクがある）
+  jq -rn \
+    --argjson before "$existing" \
+    --argjson after  "$updated" \
+    --arg current "$current_sprint" '
+    ($before.lessons | map({key: .id, value: .}) | from_entries) as $b
+    | [$after.lessons[]
+       | . as $l
+       | $b[$l.id] as $old
+       | select($old != null and (
+           (($l.verification_streak // 0) != ($old.verification_streak // 0))
+           or ($l.status != $old.status)
+           or ($l.last_recurrence_sprint != $old.last_recurrence_sprint)
+         ))
+      ] as $touched
+    | [$touched[] | select(.last_recurrence_sprint == $current)] as $reset
+    | [$touched[] | select(.status == "verified" and .last_recurrence_sprint != $current)] as $verified
+    | [$touched[] | select(.status != "verified" and .last_recurrence_sprint != $current)] as $progress
+    | "verify-check (\($current)):",
+      "  再発リセット: \($reset | length) 件\(if ($reset|length) > 0 then " → 機械化候補: " + ([$reset[].id] | join(", ")) else "" end)",
+      "  verified 遷移: \($verified | length) 件\(if ($verified|length) > 0 then " → " + ([$verified[].id] | join(", ")) else "" end)",
+      "  streak 進行中: \($progress | length) 件"
+  '
+}
+
 # ---------- コマンド実行 ----------
 
 execute_with_lock() {
@@ -395,34 +571,48 @@ execute_with_lock() {
   shift
   local result
   
+  # 注意: 呼び出し側が `|| exit` で受けると set -e が本関数内で無効化されるため、
+  # コマンド置換の失敗を明示的に return で伝搬させる（暗黙の set -e に頼らない）。
+  local rc=0
   if command -v flock >/dev/null 2>&1; then
     result=$(
       (
         flock -x -w "$LOCK_TIMEOUT" 200 || die "lock timeout (${LOCK_TIMEOUT}s). Another process may be writing."
         "$cmd_func" "$@"
       ) 200>"$LOCK_FILE"
-    )
+    ) || rc=$?
   else
     acquire_mkdir_lock
     trap release_mkdir_lock EXIT INT TERM
-    result=$("$cmd_func" "$@")
+    result=$("$cmd_func" "$@") || rc=$?
     trap - EXIT INT TERM
     release_mkdir_lock
   fi
+  [[ $rc -eq 0 ]] || return $rc
   echo "$result"
 }
 
+# 注意: _do_* 内の die はロック用 subshell 内で発火するため、
+# 呼び出し側で || exit を明示しないと失敗が exit 0 に化ける。
 if [[ "$CMD" == "set-status" ]]; then
-  result=$(execute_with_lock _do_set_status "$SET_STATUS_ID" "$SET_STATUS_VAL")
+  result=$(execute_with_lock _do_set_status "$SET_STATUS_ID" "$SET_STATUS_VAL") || exit $?
   echo "$result"
   exit 0
 elif [[ "$CMD" == "promote" ]]; then
-  result=$(execute_with_lock _do_promote "$PROMOTE_ID" "$PROMOTE_SCOPE" "$PROMOTE_STACK")
+  result=$(execute_with_lock _do_promote "$PROMOTE_ID" "$PROMOTE_SCOPE" "$PROMOTE_STACK") || exit $?
   echo "$result"
   exit 0
 elif [[ "$CMD" == "add" ]]; then
-  result=$(execute_with_lock _do_add)
+  result=$(execute_with_lock _do_add) || exit $?
   echo "Added lesson: $result"
+  exit 0
+elif [[ "$CMD" == "verify-check" ]]; then
+  if [[ ${#RECURRED_IDS[@]} -eq 0 ]]; then
+    result=$(execute_with_lock _do_verify_check "$VERIFY_SPRINT") || exit $?
+  else
+    result=$(execute_with_lock _do_verify_check "$VERIFY_SPRINT" "${RECURRED_IDS[@]}") || exit $?
+  fi
+  echo "$result"
   exit 0
 fi
 
