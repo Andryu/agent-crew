@@ -58,14 +58,16 @@ class TranscriptAggregator:
 
     def __init__(self) -> None:
         self._depts: dict[str, str] = {}  # transcript_path -> dept
+        self._personas: dict[str, Optional[str]] = {}  # transcript_path -> persona（無ければNone）
         self._offsets: dict[str, int] = {}  # transcript_path -> 次回読み出し開始バイト位置
-        # message.id -> (最新timestamp, (input, output, cache), dept)
-        # dept は「その message.id を記録した時点の transcript の所属部門」を保持する。
-        self._entries: dict[str, tuple[datetime, tuple[int, int, int], str]] = {}
+        # message.id -> (最新timestamp, (input, output, cache), dept, persona)
+        # dept/persona は「その message.id を記録した時点の transcript の所属」を保持する。
+        self._entries: dict[str, tuple[datetime, tuple[int, int, int], str, Optional[str]]] = {}
 
-    def register(self, transcript_path: str, dept: str) -> None:
-        """監視対象の transcript を追加する。既知の path は dept のみ更新する（オフセットは維持）。"""
+    def register(self, transcript_path: str, dept: str, persona: Optional[str] = None) -> None:
+        """監視対象の transcript を追加する。既知の path は dept/persona のみ更新する（オフセットは維持）。"""
         self._depts[transcript_path] = dept
+        self._personas[transcript_path] = persona
         self._offsets.setdefault(transcript_path, 0)
 
     def poll(self) -> bool:
@@ -79,6 +81,7 @@ class TranscriptAggregator:
     def _poll_one(self, transcript_path: str) -> bool:
         offset = self._offsets[transcript_path]
         dept = self._depts.get(transcript_path, DEFAULT_DEPARTMENT)
+        persona = self._personas.get(transcript_path)
 
         try:
             with open(transcript_path, "rb") as fh:
@@ -126,20 +129,39 @@ class TranscriptAggregator:
             totals = _usage_totals(usage)
             existing = self._entries.get(message_id)
             if existing is None or ts > existing[0]:
-                self._entries[message_id] = (ts, totals, dept)
+                self._entries[message_id] = (ts, totals, dept, persona)
                 changed = True
 
         self._offsets[transcript_path] = offset + consumed
         return changed
 
     def totals(self) -> dict:
-        """id→(ts, totals, dept) の全エントリから部門別合計を再計算して返す。
+        """id→(ts, totals, dept, persona) の全エントリから部門別合計を再計算して返す。
 
         {"product": {"input": N, "output": N, "cache": N, "total": N}, ...}
         """
         result: dict[str, dict[str, int]] = {}
-        for _ts, (input_tokens, output_tokens, cache_tokens), dept in self._entries.values():
+        for _ts, (input_tokens, output_tokens, cache_tokens), dept, _persona in self._entries.values():
             bucket = result.setdefault(dept, {"input": 0, "output": 0, "cache": 0, "total": 0})
+            bucket["input"] += input_tokens
+            bucket["output"] += output_tokens
+            bucket["cache"] += cache_tokens
+            bucket["total"] += input_tokens + output_tokens + cache_tokens
+        return result
+
+    def persona_totals(self) -> dict:
+        """id→(ts, totals, dept, persona) の全エントリから persona 別合計を再計算して返す。
+
+        persona が解決できていない（None の）エントリは集計対象外にする
+        （メインセッション自身のtranscriptなど、サブエージェント以外の消費分はここに出さない）。
+
+        {"riku": {"input": N, "output": N, "cache": N, "total": N}, ...}
+        """
+        result: dict[str, dict[str, int]] = {}
+        for _ts, (input_tokens, output_tokens, cache_tokens), _dept, persona in self._entries.values():
+            if persona is None:
+                continue
+            bucket = result.setdefault(persona, {"input": 0, "output": 0, "cache": 0, "total": 0})
             bucket["input"] += input_tokens
             bucket["output"] += output_tokens
             bucket["cache"] += cache_tokens

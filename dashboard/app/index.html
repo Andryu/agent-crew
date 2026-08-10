@@ -363,7 +363,7 @@ const LINES = {
 const ST_LBL = { idle:'IDLE', think:'THINK', work:'RUN', wait:'HOLD', done:'DONE' };
 const state = {
   agents: AGENTS.map(a => ({ ...a, st:'idle', task:null, done:0, tok:0, waitT:0, lastEventAt:0 })),
-  feed: [], clock: nowMinutes(), tokens: { hq:0, product:0, invest:0 }, doneTotal: 0,
+  feed: [], clock: nowMinutes(), tokens: { hq:0, product:0, invest:0 }, personaTokens: {}, doneTotal: 0,
   queueSprint: null, queueTasks: [], wsConnected: false,
 };
 const byId = Object.fromEntries(state.agents.map(a => [a.id, a]));
@@ -514,6 +514,16 @@ function applyTokens(depts){
   state.tokens.product = (depts.product && depts.product.total) || 0;
   state.tokens.invest = (depts.invest && depts.invest.total) || 0;
 }
+// サブエージェント個別のトークン消費（discovery.pyがagent-*.jsonlを発見できた分のみ値が入る。
+// 発見前=そのサブエージェントtranscriptがアクティブウィンドウ内に一度も書き込まれていない
+// 間はカード上0kのまま）を state.agents[].tok に同期する。
+function applyPersonaTokens(personas){
+  personas = personas || {};
+  state.personaTokens = personas;
+  for (const a of state.agents){
+    a.tok = (personas[a.id] && personas[a.id].total) || 0;
+  }
+}
 function applyQueue(queue){
   queue = queue || {};
   state.queueSprint = queue.sprint || null;
@@ -552,6 +562,7 @@ function connectWs(){
         // 逆に {"type":"tokens","depts":{...}} と depts キー配下に入るため、
         // ここは実装済みサーバの形に合わせる。
         if (msg.tokens) applyTokens(msg.tokens);
+        if (msg.personas) applyPersonaTokens(msg.personas);
         if (msg.queue) applyQueue(msg.queue);
         renderAll();
         break;
@@ -561,6 +572,7 @@ function connectWs(){
         break;
       case 'tokens':
         applyTokens(msg.depts);
+        applyPersonaTokens(msg.personas);
         renderAll();
         break;
       case 'queue':

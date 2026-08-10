@@ -17,8 +17,11 @@ server.py — STONEFISH ダッシュボードのイベント受信サーバ
   cwd があれば承認キュー監視対象に登録する。
 - GET  /ws     : WebSocket。接続直後に直近200件のイベント・トークン集計・承認キューの
   現在状態を
-  {"type":"init", "events":[...], "tokens":{...}, "queue":{...}, "queues":{...}, "pending":[...]}
-  で送り、以後 live 配信する。`queue`（単数）は直近アクティブなプロジェクト1件分で、
+  {"type":"init", "events":[...], "tokens":{...}, "personas":{...}, "queue":{...},
+   "queues":{...}, "pending":[...]}
+  で送り、以後 live 配信する。`personas`は部門別`tokens`の兄弟キーで、サブエージェント
+  transcriptから解決できたペルソナ別のトークン集計（discovery.pyがsubagents/配下を発見
+  できた場合のみ値が入る）。`queue`（単数）は直近アクティブなプロジェクト1件分で、
   既存SPA（dashboard/app/index.html）との後方互換のために維持している。`queues`（複数、
   ラベル→キューのdict）は複数プロジェクトを横断表示したい将来のSPA拡張向けに追加した。
 - GET  /health : 死活監視用 {"ok": true, "clients": N, "events": N}
@@ -30,7 +33,7 @@ POLL_INTERVAL_SEC 周期で以下を行い、変化があれば全 WS クライ�
   transcript をトークン集計器・承認キュー監視対象に自動登録する（hooks配線不要）。発見した
   セッションのうち最も新しく更新された transcript のプロジェクトを「直近アクティブな
   プロジェクト」として `queue`（単数）に反映する
-- トークン集計器の poll() が True を返せば {"type":"tokens","depts":{...}}
+- トークン集計器の poll() が True を返せば {"type":"tokens","depts":{...},"personas":{...}}
 - 監視中のいずれかの `_queue.json` の mtime が変化していれば、
   {"type":"queue","queue":{...}}（直近アクティブなプロジェクト1件、既存SPA向け）と
   {"type":"queues","queues":{<label>: {...}, ...}}（既知の全プロジェクト分）の両方を配信する
@@ -279,7 +282,7 @@ def _discover_and_register(app: web.Application) -> list[ActiveSession]:
         return []
 
     for session in sessions:
-        aggregator.register(session.transcript_path, session.dept)
+        aggregator.register(session.transcript_path, session.dept, session.persona)
         _register_queue_target(queue_states, session.cwd)
 
     if sessions:
@@ -367,6 +370,7 @@ async def handle_ws(request: web.Request) -> web.WebSocketResponse:
                 "type": "init",
                 "events": store.recent(INIT_EVENT_COUNT),
                 "tokens": aggregator.totals(),
+                "personas": aggregator.persona_totals(),
                 "queue": _primary_queue(request.app),
                 "queues": _all_queues(queue_states),
                 "pending": [_pending_to_dict(p) for p in pending_list],
@@ -437,7 +441,11 @@ async def _background_poll_task(app: web.Application) -> None:
 
         try:
             if aggregator.poll():
-                await _broadcast(clients, {"type": "tokens", "depts": aggregator.totals()})
+                await _broadcast(clients, {
+                    "type": "tokens",
+                    "depts": aggregator.totals(),
+                    "personas": aggregator.persona_totals(),
+                })
         except Exception as e:
             # ポーリングの1周期での失敗でループ自体は止めない
             _log(f"トークン集計ポーリング中にエラー: {e}")

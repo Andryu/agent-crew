@@ -231,6 +231,88 @@ def test_cache_tokens_combine_creation_and_read(tmp_path):
     assert agg.totals()["product"]["cache"] == 150
 
 
+# ---------- persona 別集計 ----------
+
+
+def test_persona_totals_aggregates_registered_persona(tmp_path):
+    transcript = tmp_path / "agent-1.jsonl"
+    transcript.write_text(
+        _usage_line("msg_1", "2026-08-01T10:00:00.000Z", input_tokens=10, output_tokens=1) + "\n",
+        encoding="utf-8",
+    )
+
+    agg = TranscriptAggregator()
+    agg.register(str(transcript), "product", persona="riku")
+    agg.poll()
+
+    persona_totals = agg.persona_totals()
+    assert persona_totals["riku"]["input"] == 10
+    assert persona_totals["riku"]["output"] == 1
+    assert persona_totals["riku"]["total"] == 11
+    # totals()（部門別）の出力形は変わっていないこと（回帰確認）
+    assert agg.totals()["product"]["total"] == 11
+
+
+def test_persona_totals_excludes_entries_with_persona_none(tmp_path):
+    with_persona = tmp_path / "agent-1.jsonl"
+    without_persona = tmp_path / "session.jsonl"
+    with_persona.write_text(
+        _usage_line("msg_p", "2026-08-01T10:00:00.000Z", input_tokens=5, output_tokens=1) + "\n",
+        encoding="utf-8",
+    )
+    without_persona.write_text(
+        _usage_line("msg_np", "2026-08-01T10:00:00.000Z", input_tokens=100, output_tokens=1) + "\n",
+        encoding="utf-8",
+    )
+
+    agg = TranscriptAggregator()
+    agg.register(str(with_persona), "product", persona="sora")
+    agg.register(str(without_persona), "product")  # persona未指定 = None
+    agg.poll()
+
+    persona_totals = agg.persona_totals()
+    assert set(persona_totals.keys()) == {"sora"}
+    assert persona_totals["sora"]["total"] == 6
+
+
+def test_persona_totals_combines_multiple_files_for_same_persona(tmp_path):
+    t1 = tmp_path / "agent-1.jsonl"
+    t2 = tmp_path / "agent-2.jsonl"
+    t1.write_text(
+        _usage_line("msg_1", "2026-08-01T10:00:00.000Z", input_tokens=10, output_tokens=1) + "\n",
+        encoding="utf-8",
+    )
+    t2.write_text(
+        _usage_line("msg_2", "2026-08-01T10:00:00.000Z", input_tokens=20, output_tokens=2) + "\n",
+        encoding="utf-8",
+    )
+
+    agg = TranscriptAggregator()
+    agg.register(str(t1), "product", persona="riku")
+    agg.register(str(t2), "invest", persona="riku")
+    agg.poll()
+
+    persona_totals = agg.persona_totals()
+    assert persona_totals["riku"]["input"] == 30
+    assert persona_totals["riku"]["output"] == 3
+
+
+def test_persona_totals_deduplicates_by_message_id(tmp_path):
+    """message.id 重複排除（ストリーミング途中経過の合算防止）が persona 集計でも効くこと。"""
+    transcript = tmp_path / "agent-1.jsonl"
+    lines = [
+        _usage_line("msg_1", "2026-08-01T10:00:00.000Z", input_tokens=5, output_tokens=1),
+        _usage_line("msg_1", "2026-08-01T10:00:01.000Z", input_tokens=5, output_tokens=9),
+    ]
+    transcript.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    agg = TranscriptAggregator()
+    agg.register(str(transcript), "product", persona="riku")
+    agg.poll()
+
+    assert agg.persona_totals()["riku"]["output"] == 9
+
+
 # ---------- 実データ検証（Sprint-24 教訓: ストリーミングJSONLは実データ確認必須） ----------
 
 

@@ -170,6 +170,7 @@ async def test_ws_init_includes_tokens_queues_and_pending_defaults(aiohttp_clien
     init_msg = await ws.receive_json()
     assert init_msg["type"] == "init"
     assert init_msg["tokens"] == {}
+    assert init_msg["personas"] == {}
     assert init_msg["queue"] == {"tasks": []}
     assert init_msg["queues"] == {}
     assert init_msg["pending"] == []
@@ -258,6 +259,7 @@ async def test_background_poll_broadcasts_tokens_and_queue(aiohttp_client, tmp_p
     assert "tokens" in seen
     assert seen["tokens"]["depts"]["other"]["input"] == 10
     assert seen["tokens"]["depts"]["other"]["output"] == 5
+    assert seen["tokens"]["personas"] == {}  # persona未解決（メインセッション）分は載らない
 
     label = project_dir.name  # "myproj"
     expected_tasks = [{"slug": "t1", "title": "Task 1", "status": "TODO", "assigned_to": "Riku"}]
@@ -374,6 +376,54 @@ async def test_discovery_finds_session_without_any_hooks_or_post_events(aiohttp_
     assert init_msg["queues"]["agent-crew"]["tasks"][0]["slug"] == "t1"
     # 唯一のアクティブセッションなので、既存SPA向けの単数 "queue" にも同じ内容が入る
     assert init_msg["queue"]["tasks"][0]["slug"] == "t1"
+
+    await ws.close()
+
+
+async def test_discovery_finds_subagent_transcript_and_reports_persona_totals(
+    aiohttp_client, tmp_path, monkeypatch
+):
+    """discovery.py がサブエージェント専用transcript（agent-*.jsonl + .meta.json）を発見した
+    場合、init メッセージの "personas" にペルソナ別トークン集計が載ること。"""
+    projects_root = tmp_path / "claude-projects"
+    project_encoded_dir = projects_root / "-Users-x-agent-crew"
+    project_encoded_dir.mkdir(parents=True)
+
+    real_project_dir = tmp_path / "agent-crew"
+    real_project_dir.mkdir(parents=True)
+
+    main_transcript = project_encoded_dir / "session-1.jsonl"
+    _write_transcript_with_cwd(main_transcript, str(real_project_dir))
+
+    subagents_dir = project_encoded_dir / "session-1" / "subagents"
+    subagents_dir.mkdir(parents=True)
+    (subagents_dir / "agent-abc.jsonl").write_text(
+        json.dumps({
+            "message": {
+                "role": "assistant",
+                "id": "msg_sub",
+                "usage": {"input_tokens": 3, "output_tokens": 4,
+                          "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0},
+            },
+            "timestamp": "2026-08-02T00:00:00.000Z",
+        }) + "\n",
+        encoding="utf-8",
+    )
+    (subagents_dir / "agent-abc.meta.json").write_text(
+        json.dumps({"agentType": "engineer-go", "description": "d", "name": "n"}),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(server_module, "PROJECTS_ROOT", projects_root)
+
+    test_app = server_module.build_app(tmp_path / "data")
+    client = await aiohttp_client(test_app)
+    ws = await client.ws_connect("/ws")
+    init_msg = await ws.receive_json()
+
+    assert init_msg["type"] == "init"
+    assert init_msg["personas"]["riku"]["input"] == 3
+    assert init_msg["personas"]["riku"]["output"] == 4
 
     await ws.close()
 
