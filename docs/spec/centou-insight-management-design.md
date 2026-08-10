@@ -59,14 +59,14 @@ Centou型のインサイトマネジメントSaaS（仮称: **Nugget**）の設�
 ### 2.1 エンティティ
 
 **テナント・組織系**
-- Workspace: id, name, plan, settings(retention, ai_policy)
+- Workspace: 会社（組織）ごとのデータの入れ物。SaaSとして複数社に提供するときに他社とデータを完全に分けるための箱。自分専用の運用ならWorkspaceは1個だけ作り、以後は意識しなくてよい。id, name, plan, settings(retention, ai_policy)
 - Member: workspace_id, user_id, role(admin/editor/contributor/viewer)
-- Project: Sourceのグルーピング。name, goal(調査の問い), status
+- ResearchQuestion（リサーチクエスチョン）: 「何を明らかにしたいか」という問い。例:「なぜ週次レポートの閲覧率が低いのか」。Source（リサーチ＝議事録など）はこの問いにぶら下がる。question, status(open/answered/parked)
 
-> **設計判断**: Fact / Insight はプロジェクトに閉じ込めず、ワークスペース横断で存在させる。プロジェクト内に隔離すると重複リサーチ問題が再生産される。
+> **設計判断**: Fact / Insight はリサーチクエスチョンに閉じ込めず、ワークスペース横断で存在させる。問いの中に隔離すると、別の問いを調べるときに過去の知見に気づけず、重複リサーチ問題が再生産される。
 
 **ナレッジ系（コア）**
-- Source: type(interview/support_ticket/survey/sns/document), title, raw_content_ref, transcript, occurred_at, ingestion_status, channel
+- Source: リサーチ1件とその生データ。当面の取り込み対象は議事録が中心。type(meet_minutes / notion_transcript / slack / chatwork / document / interview / survey), channel(link=URLを渡す / paste=本文を貼る / auto=将来の自動連携), title, raw_content_ref, transcript, occurred_at, ingestion_status。CS問い合わせは当面対象外（将来拡張）
 - Highlight: 原文スパン（テキスト範囲 or タイムスタンプ範囲）。Factのgrounding
 - Fact: statement(1事実1文), verbatim_quote, highlight_ids[], participant_attrs(匿名化済み), origin(ai_extracted/human), extracted_confidence
 - Insight: statement, description, status, confidence_score, confidence_level, freshness, owner_id, superseded_by_id
@@ -195,6 +195,8 @@ Inbox を先頭に置くのは意図的。AI提案レビューが日々の入口
 
 ### 4.3 マルチテナント × ベクトル検索
 
+用語: **テナント**＝Workspaceとほぼ同じ意味の技術用語で、SaaSに同居する顧客企業1社のこと。マルチテナント＝1つのシステムに複数社が同居してもデータが混ざらない仕組み。自分専用の運用（§10）には関係せず、SaaSとして他社に提供するときだけ必要になる。
+
 | 方式 | 分離強度 | 運用コスト | 判定 |
 |---|---|---|---|
 | A. 共有テーブル＋tenant_id＋RLS（pgvector等） | 中（論理） | 低 | **MVP〜v1採用** |
@@ -247,9 +249,9 @@ Inbox を先頭に置くのは意図的。AI提案レビューが日々の入口
 ```
 workspaces(id, name, plan, ai_policy jsonb, created_at)
 members(workspace_id, user_id, role, invited_by)
-projects(id, workspace_id, name, goal, status)
+research_questions(id, workspace_id, question, status)
 
-sources(id, workspace_id, project_id, type, title, raw_ref, transcript_ref,
+sources(id, workspace_id, research_question_id, type, title, raw_ref, transcript_ref,
         occurred_at, channel, ingestion_status, meta jsonb)
 highlights(id, source_id, span_start, span_end, ts_start, ts_end, text)
 
@@ -282,7 +284,7 @@ suggestions(id, workspace_id, type, target_refs jsonb, payload jsonb, rationale,
 audit_logs(id, workspace_id, actor_type, actor_id, action, entity_type,
            entity_id, diff jsonb, suggestion_id, created_at)  -- append-only
 
-canvases(id, workspace_id, project_id, name, updated_at)
+canvases(id, workspace_id, research_question_id, name, updated_at)
 canvas_nodes(id, canvas_id, entity_type?, entity_id?, free_text, x, y, w, h, z,
              style jsonb, group_id?)
 canvas_groups(id, canvas_id, label, style jsonb, promoted_insight_id?)
@@ -378,6 +380,7 @@ Notion ＝ GUI（投影・ワークベンチ）        │ status=accepted を�
 人間のレビュー（承認/編集/却下。コメント・通知はNotion標準機能）
 ```
 
+- **取り込み対象（当面）**: Google Meet 議事録（Docs／リンク）、Notion AI 文字起こし、Slack・Chatwork のスレッド。Claudeへはリンクか本文貼り付けで渡し、リンクの場合は Claude が本文を取得して GCS／BQ に保存する。CS問い合わせは対象外（将来拡張）
 - **BigQuery（マスタ）**: §6スキーマをほぼそのまま写す（workspace_id は単一固定値）
 - **Notion（GUI）**: リレーションは属性を持てないため、stance・weight付きn:mは EvidenceLinks を独立DBにして代替。レビューUX・コメント・通知・モバイルが開発ゼロで手に入るのが最大の資産
 - **Claude**: 冪等ルーチン3本（抽出/照合/反映）＋夜間の整合性照合ジョブ。BQ書込は必ず audit_logs 追記とセット
@@ -388,13 +391,13 @@ Notion ＝ GUI（投影・ワークベンチ）        │ status=accepted を�
 
 1. **BigQuery が唯一の SSoT** — Notion が全損しても BQ から全投影を再構築できる状態を常に維持する（復元もルーチン化）。逆は成り立たない——BQ は Notion から再構築できない
 2. **Notion は「使い捨て可能なワークベンチ」** — 人が見て・レビューして・議論する場所であり、ドメインデータのマスタを一切持たない。唯一の例外はコメント・議論・レポートページ（コラボレーションデータ）で、これだけは Notion がマスタ
-3. **Claude はステートレスな糊** — すべての状態は BQ に置き、Claude 自身は状態を持たない。すべての BQ 書込は audit_logs への追記とセット
+3. **Claude は処理の実行役で、データを保存しない** — 必要なデータは毎回 BQ から読み、結果は BQ へ書く。Claude 自身の中には何も残さない。すべての BQ 書込は audit_logs への追記とセット
 
 | コンポーネント | 責任（オーナーであるもの） | 責任外（持ってはいけないもの） |
 |---|---|---|
 | **BigQuery** | 全ドメインデータの SSoT（facts / insights / evidence_links / suggestions の全量・全履歴）、確信度・鮮度の計算、ベクトル照合（ML.GENERATE_EMBEDDING / VECTOR_SEARCH）、audit_logs、IDマッピング（sync_state） | UI・通知・コラボレーション |
 | **Notion** | レビューワークベンチ（Suggestion Inbox）、人が触る範囲の閲覧・検索、コメント・メンション・共有（*ここだけマスタ*）、レポートの配布面 | ドメインデータのマスタ。全量保持・履歴保持・計算 |
-| **Claude ルーチン** | 抽出・照合・提案生成・承認反映・双方向同期・夜間整合性照合・Slack検索応答・レポート生成 | 状態保持（ステートレス）、人間の承認なしのドメイン確定 |
+| **Claude ルーチン** | 抽出・照合・提案生成・承認反映・双方向同期・夜間整合性照合・Slack検索応答・レポート生成 | データの保存（Claude内には何も残さない）、人間の承認なしのデータ確定 |
 | **GCS / Drive** | 生ファイル（音声・原文・添付）のマスタ | 構造化データ |
 | **人間** | 確定（publish・承認・却下）の唯一の権限者。insight の文言・ステータスの編集 | facts の直接編集（修正提案として起票する） |
 
@@ -441,8 +444,8 @@ Notion ＝ GUI（投影・ワークベンチ）        │ status=accepted を�
 
 | 方式 | 仕組み | 長所 | 短所 | 判定 |
 |---|---|---|---|---|
-| **A. ポーリング** | last_edited_time カーソル＋content_hash 差分で変更ページを巡回検出（5〜15分間隔） | サーバ不要。「Claudeはステートレスな糊」原則（10.2）を維持。単純で冪等にしやすい | 反映遅延＝ポーリング間隔 | **MVP-0〜v1 採用** |
-| B. Notion Webhook | 変更イベントをHTTPエンドポイントで受信 | 秒オーダーの反映 | 常設エンドポイント（Cloud Run等）が必要＝ステートレス原則の例外。取りこぼしがあるため結局Aの照合が要る | v1以降、遅延が実測で問題化したら*Aに追加*（置換ではない） |
+| **A. ポーリング** | last_edited_time カーソル＋content_hash 差分で変更ページを巡回検出（5〜15分間隔） | サーバ不要。「Claudeはデータを保存しない」原則（10.2）を維持。単純で、二重実行しても安全にしやすい | 反映遅延＝ポーリング間隔 | **MVP-0〜v1 採用** |
+| B. Notion Webhook | 変更イベントをHTTPエンドポイントで受信 | 秒オーダーの反映 | 常設の受信サーバ（Cloud Run等）が必要になり「サーバを持たない」構成の例外になる。取りこぼしがあるため結局Aの照合が要る | v1以降、遅延が実測で問題化したら*Aに追加*（置換ではない） |
 | C. 夜間全件照合のみ | 日次でBQ↔Notionを全件diff | 最も単純 | 最大24hの反映遅延、日中の二重編集リスク | 安全網として常設（単独では不採用） |
 
 #### 差分取り込みルーチンの仕様（方式A）
@@ -553,4 +556,5 @@ Notion ＝ GUI（投影・ワークベンチ）        │ status=accepted を�
 - 2026-08-10: 初版（案1: §1〜§9）＋オーナー指示により案2（§10: BQ × Notion × Claude）を追記
 - 2026-08-10: オーナー指摘（案2にv1がない）を受け案2独自のロードマップ（MVP-0→v1→v2）、移行トリガー表、構造的限界の再掲を追加。判定を「使い捨てMVP-0」から「独自ロードマップを持つ第2の本線」へ改訂
 - 2026-08-10: オーナー決定（BQ=マスタ・Notion=GUI）を受け §10 を「代替案の検討」から「アーキテクチャ2の本設計」へ再構成 — 10.2 責任範囲マトリクス（大原則3つ: BQが唯一のSSoT／Notionは使い捨て可能なワークベンチ／Claudeはステートレス）と 10.3 データ配置設計（BQに残すデータ・Notionで保持するデータの全対応表、sync_state、Notion全損リストア）を新設。旧10.2〜10.6は10.4〜10.8へ再番号
+- 2026-08-10: オーナーフィードバック反映 — ①比喩表現の排除（「ステートレスな糊」→平易な説明へ。CLAUDE.md に文体ルールとして記録） ②Project を ResearchQuestion（リサーチクエスチョン）へ改名しオーナーのAtomic Research理解（問い→リサーチ→ファクト→インサイト）と一致させた ③Source種別を実データに合わせ更新（Meet議事録・Notion AI文字起こし・Slack・Chatwork、リンク/本文貼り付け。CS問い合わせは対象外） ④Workspace・テナントに平易な説明を追加 ⑤図3に記法説明（同期/非同期・ジョブ/ストアの見分け）を追加
 - 2026-08-10: 10.4 に Notion→BQ 反映（逆方向同期）の設計を追加 — 変更捕捉3方式の比較（ポーリング採用・Webhookは追加オプション・夜間照合は安全網）、差分取り込みルーチン仕様（オーバーラップ窓・エコー防止2層・所有権判定・版管理）、落とし穴と対策（分単位精度・競合解決・削除の扱い・同期ステータスの可視化）
