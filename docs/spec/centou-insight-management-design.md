@@ -435,6 +435,34 @@ Notion ＝ GUI（投影・ワークベンチ）        │ status=accepted を�
 | suggestions.status | Notion（人間） | Notion→BQ | accepted 検知で反映ルーチンが適用 |
 | evidence_links | BQ（承認済み提案の適用） | BQ→Notion | Notion手動リンクは夜間照合で検出、notion_manual_edit として監査記録の上で正規化 |
 
+#### Notion → BQ 反映: 変更捕捉の方式比較
+
+「Notionを変更したら、それをBQにどう反映するか」——この逆方向同期が案2の生命線。3方式を比較する。
+
+| 方式 | 仕組み | 長所 | 短所 | 判定 |
+|---|---|---|---|---|
+| **A. ポーリング** | last_edited_time カーソル＋content_hash 差分で変更ページを巡回検出（5〜15分間隔） | サーバ不要。「Claudeはステートレスな糊」原則（10.2）を維持。単純で冪等にしやすい | 反映遅延＝ポーリング間隔 | **MVP-0〜v1 採用** |
+| B. Notion Webhook | 変更イベントをHTTPエンドポイントで受信 | 秒オーダーの反映 | 常設エンドポイント（Cloud Run等）が必要＝ステートレス原則の例外。取りこぼしがあるため結局Aの照合が要る | v1以降、遅延が実測で問題化したら*Aに追加*（置換ではない） |
+| C. 夜間全件照合のみ | 日次でBQ↔Notionを全件diff | 最も単純 | 最大24hの反映遅延、日中の二重編集リスク | 安全網として常設（単独では不採用） |
+
+#### 差分取り込みルーチンの仕様（方式A）
+
+1. 対象DB（Insights / Suggestions）を `last_edited_time ≥ cursor − 10分` の**オーバーラップ窓**付きでクエリ
+2. `last_edited_by` が連携ボット自身のページはスキップ（**エコー防止の第1層** — BQ→Notion投影を「人間の編集」として拾い直さない）
+3. 各ページの現在値を正規化して content_hash を計算し、sync_state の「最後に投影した状態のhash」と比較。一致なら人間編集なしとしてスキップ（**エコー防止の第2層**。ボット更新直後・同一分内の人間編集もここで拾える）
+4. 差分フィールドを所有権マトリクスで判定:
+   - **編集可フィールド**（insight.statement / description / status、suggestion.status）→ BQへMERGE。insightは旧版を insight_versions にappendしてから更新し、audit_logs に `actor=user, channel=notion_sync`、before/after diff を記録
+   - **編集不可フィールド**（confidence、facts本文、evidence_links等）→ BQ値でNotion側を上書き復元し、audit_logs に `notion_manual_edit（rejected）` を記録
+5. sync_state を更新（content_hash / last_synced_at）し、カーソル前進
+6. `suggestion.status = accepted` を検出したら反映ルーチン（10.1）へ引き渡す
+
+#### 落とし穴と対策
+
+- **last_edited_time は分単位精度** — 厳密比較のカーソルは同一分内の編集を取りこぼす。オーバーラップ窓（10分）＋hash比較で、取りこぼしと二重適用の両方を防ぐ（ルーチン全体を冪等にする）
+- **競合**（人間のNotion編集とBQ計算が同時） — 所有権で機械的に解決: statement は人間が勝つ（旧版が insight_versions に残るため破壊なし）。needs_review 遷移は BQ が勝つ
+- **Notionページの削除・アーカイブ** — サポート外の操作。夜間照合が BQ から復元し notion_manual_edit として記録。消したい場合の正規経路は status=archived（編集可フィールド経由）
+- **反映遅延のUX** — Notion側に「同期ステータス」プロパティ（synced / pending / rejected）を表示。編集が未取り込みの状態と、編集不可フィールドが復元された事実（rejected）を無言にせず可視化する
+
 ### 10.5 破綻ポイントの評価 — どこで壊れるか
 
 | # | 破綻ポイント | 深刻度 | 評価と緩和 |
@@ -525,3 +553,4 @@ Notion ＝ GUI（投影・ワークベンチ）        │ status=accepted を�
 - 2026-08-10: 初版（案1: §1〜§9）＋オーナー指示により案2（§10: BQ × Notion × Claude）を追記
 - 2026-08-10: オーナー指摘（案2にv1がない）を受け案2独自のロードマップ（MVP-0→v1→v2）、移行トリガー表、構造的限界の再掲を追加。判定を「使い捨てMVP-0」から「独自ロードマップを持つ第2の本線」へ改訂
 - 2026-08-10: オーナー決定（BQ=マスタ・Notion=GUI）を受け §10 を「代替案の検討」から「アーキテクチャ2の本設計」へ再構成 — 10.2 責任範囲マトリクス（大原則3つ: BQが唯一のSSoT／Notionは使い捨て可能なワークベンチ／Claudeはステートレス）と 10.3 データ配置設計（BQに残すデータ・Notionで保持するデータの全対応表、sync_state、Notion全損リストア）を新設。旧10.2〜10.6は10.4〜10.8へ再番号
+- 2026-08-10: 10.4 に Notion→BQ 反映（逆方向同期）の設計を追加 — 変更捕捉3方式の比較（ポーリング採用・Webhookは追加オプション・夜間照合は安全網）、差分取り込みルーチン仕様（オーバーラップ窓・エコー防止2層・所有権判定・版管理）、落とし穴と対策（分単位精度・競合解決・削除の扱い・同期ステータスの可視化）
