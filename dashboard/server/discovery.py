@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
-from enrich import department_for  # noqa: E402
+from enrich import department_for, persona_for  # noqa: E402
 
 # cwd 抽出のために transcript の末尾から読むバイト数。
 # 1行あたり通常は数KB以内に収まるため、直近数行を確実に拾える余裕を持たせている。
@@ -42,6 +42,9 @@ class ActiveSession:
     cwd: str
     dept: str
     mtime: float
+    # サブエージェント専用transcriptから発見した場合のみ設定する。メインセッション自身は
+    # 常に None（既存の挙動を変えないため）。
+    persona: Optional[str] = None
 
 
 def _extract_cwd(jsonl_path: Path) -> Optional[str]:
@@ -74,6 +77,74 @@ def _extract_cwd(jsonl_path: Path) -> Optional[str]:
         if isinstance(cwd, str) and cwd:
             return cwd
     return None
+
+
+def _read_agent_type(meta_path: Path) -> Optional[str]:
+    """agent-<id>.meta.json から agentType を取り出す。
+
+    サブエージェント専用transcriptにはメインセッションのような "cwd" フィールドが無いため、
+    persona解決には代わりにこの sidecar の agentType を使う。読めない・壊れている・
+    agentType が無い場合はクラッシュさせず None を返す（persona 未解決のまま登録される）。
+    """
+    try:
+        raw = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    agent_type = raw.get("agentType")
+    return agent_type if isinstance(agent_type, str) and agent_type else None
+
+
+def _find_subagent_sessions(
+    session_jsonl_path: Path,
+    parent_session_id: str,
+    cwd: str,
+    dept: str,
+    active_within_seconds: float,
+    now: float,
+) -> list[ActiveSession]:
+    """<session_id>/subagents/agent-*.jsonl を探し、見つかった分だけ ActiveSession 化する。
+
+    サブディレクトリが存在しない（大半のセッションはサブエージェントを使わない）場合は
+    単に空リストを返す。
+    """
+    subagents_dir = session_jsonl_path.parent / session_jsonl_path.stem / "subagents"
+    if not subagents_dir.is_dir():
+        return []
+
+    try:
+        agent_jsonl_paths = list(subagents_dir.glob("agent-*.jsonl"))
+    except OSError as e:
+        _log(f"subagentsディレクトリ走査失敗（スキップ）: {subagents_dir}: {e}")
+        return []
+
+    sessions: list[ActiveSession] = []
+    for agent_jsonl_path in agent_jsonl_paths:
+        try:
+            mtime = agent_jsonl_path.stat().st_mtime
+        except OSError as e:
+            _log(f"stat失敗（スキップ）: {agent_jsonl_path}: {e}")
+            continue
+        # サブエージェント自身のtranscriptが直近active_within_seconds秒以内に更新されて
+        # いない限り、そのカードのトークンには一切反映されない（発見の前提条件）。
+        if now - mtime > active_within_seconds:
+            continue
+
+        meta_path = agent_jsonl_path.with_name(agent_jsonl_path.stem + ".meta.json")
+        agent_type = _read_agent_type(meta_path)
+        persona = persona_for({"agent_type": agent_type}) if agent_type else None
+
+        sessions.append(ActiveSession(
+            transcript_path=str(agent_jsonl_path),
+            session_id=f"{parent_session_id}/{agent_jsonl_path.stem}",
+            cwd=cwd,
+            dept=dept,
+            mtime=mtime,
+            persona=persona,
+        ))
+
+    return sessions
 
 
 def find_active_sessions(
@@ -123,12 +194,16 @@ def find_active_sessions(
             if cwd is None:
                 continue
 
+            dept = department_for(cwd)
             sessions.append(ActiveSession(
                 transcript_path=str(jsonl_path),
                 session_id=jsonl_path.stem,
                 cwd=cwd,
-                dept=department_for(cwd),
+                dept=dept,
                 mtime=mtime,
+            ))
+            sessions.extend(_find_subagent_sessions(
+                jsonl_path, jsonl_path.stem, cwd, dept, active_within_seconds, now,
             ))
 
     return sessions
