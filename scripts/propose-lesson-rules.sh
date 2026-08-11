@@ -21,7 +21,7 @@ set -euo pipefail
 
 LESSONS_FILE="${LESSONS_FILE:-$HOME/.claude/_lessons.json}"
 MIN_PRIORITY=4
-# 自身のディレクトリ解決（readlink -f は macOS 非対応のため使わない）
+# 自身のディレクトリ解決（BSD readlink は -f オプション非対応のため使わない）
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 DRY_RUN=false
 AGENTS_DIR=".claude/agents"
@@ -98,7 +98,7 @@ if [[ -n "$EXCLUDED_BY_TRUST" ]]; then
 fi
 
 if [[ -z "$LESSONS_JSON" ]]; then
-  log "No actionable lessons found (priority >= $MIN_PRIORITY, status open/proposed/issue_created)."
+  log "No actionable lessons found (priority >= $MIN_PRIORITY, status open/proposed/issue_created/implemented, 信頼境界通過分)."
   exit 0
 fi
 
