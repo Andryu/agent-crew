@@ -1,9 +1,11 @@
 # 学習ループへの効果検証の導入 — 段階的導入提案（v3）
 
-作成日: 2026-08-08（v2）/ 最終更新: 2026-08-08（v3 追補）
-ステータス: v2 実装済み（PR #177/#178）・v3 追補はレビュー中
+作成日: 2026-08-08（v2）/ 最終更新: 2026-08-08（v3.1）
+ステータス: v2 実装済み（PR #177/#178）・**v3.1 はレビュー反映済み・実装待ち**
 起案: team-lead（Fable）
-レビュー: Sora（QA） — 条件付き承認（2026-08-08、指摘10件を本版に反映済み）
+レビュー:
+- v2: Sora（QA）条件付き承認（2026-08-08、指摘10件を反映済み）
+- v3 追補: Sora（QA）条件付き承認（2026-08-08、MAJOR2件・MEDIUM4件・MINOR3件を v3.1 で反映済み）
 関連: docs/spec/lessons-json-schema.md / docs/spec/evidence-gate-design.md / docs/spec/self-improvement-mode-design.md
 
 ---
