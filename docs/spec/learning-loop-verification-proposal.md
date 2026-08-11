@@ -1,9 +1,11 @@
-# 学習ループへの効果検証の導入 — 段階的導入提案（v2）
+# 学習ループへの効果検証の導入 — 段階的導入提案（v3）
 
-作成日: 2026-08-08
-ステータス: Draft（オーナー承認待ち）
+作成日: 2026-08-08（v2）/ 最終更新: 2026-08-08（v3.1）
+ステータス: v2 実装済み（PR #177/#178）・**v3.1 はレビュー反映済み・実装待ち**
 起案: team-lead（Fable）
-レビュー: Sora（QA） — 条件付き承認（2026-08-08、指摘10件を本版に反映済み）
+レビュー:
+- v2: Sora（QA）条件付き承認（2026-08-08、指摘10件を反映済み）
+- v3 追補: Sora（QA）条件付き承認（2026-08-08、MAJOR2件・MEDIUM4件・MINOR3件を v3.1 で反映済み）
 関連: docs/spec/lessons-json-schema.md / docs/spec/evidence-gate-design.md / docs/spec/self-improvement-mode-design.md
 
 ---
@@ -145,3 +147,121 @@ L2-1（pm-learned-rules 大掃除, M〜L）は負荷分散の観点から**次�
 - 2スプリント後: `verified` へ遷移した lesson が1件以上存在する
 - 3スプリント後: `enforcement: code` の教訓について同型再発ゼロ
 - 4スプリント後: `pm-learned-rules.md` が150行以下で維持されている
+
+---
+
+## v3 追補 — 海外最先端調査（2026-08-08）の反映
+
+3系統の調査（実務家: Karpathy/Willison/HumanLayer/Manus 等、研究: Library Drift/ACE/
+memory poisoning 等、公式: Anthropic/OpenAI/Google）の結論は「予算制約つきの蓄積＋
+機械検証＋定期剪定」への収束であり、v2 実装と方向一致。ただし v2 に欠けている
+4視点が特定されたため、以下を追補する。いずれも小規模（プロンプト・文書の編集）。
+
+### V3-1. 反証条件 — 記憶の作話（confabulation）対策
+
+根拠: Reflexion 型エージェントは「自信はあるが誤った失敗診断」を記憶に固定し、
+以後それに従い続ける（Honest Lying, arXiv 2605.29463）。v2 の verify-check は
+「再発したか」を測るが「診断自体が正しかったか」は測らない。
+
+- retro.md ステップ2.7 に追加: 再発チェック時、**同型事象が別の根因で再発した場合は
+  「ルールが破れた」ではなく「診断が誤っていた」を疑い、supersedes で診断を改訂した
+  新 lesson を起こす**（旧 lesson は dismissed へ）。
+- retro.md ステップ2 の記録ガイドに追加: priority >= 6 の lesson は description に
+  「この診断が誤りなら何が観測されるはずか」（反証のヒント）を1文含めることを推奨。
+
+**診断改訂の実行手順（Sora レビュー必須指摘1への対応 — 誤昇格経路を塞ぐ）:**
+
+1. `lessons.sh verify-check <sprint> --recurred <旧lesson-id>` —
+   **診断改訂対象の旧 lesson は必ず `--recurred` に含める**。防げなかった事実は
+   根因の異同にかかわらず同じであり、streak を確実にリセットするため。
+   verify-check より前に dismiss してはならない（順序固定）。
+2. `lessons.sh add --supersedes <旧lesson-id> ...` で改訂診断の新 lesson を起こす
+3. `lessons.sh set-status <旧lesson-id> dismissed` — dismissed は verify-check の
+   streak 対象ステータスに含まれないため、以後誤って verified へ昇格する経路はない
+4. 旧 lesson に `issue_url` がある場合: 該当 Issue に「診断改訂（supersedes: 新ID）」の
+   コメントを追記してクローズし、新 lesson 側の evidence に旧 Issue URL を残す
+
+後続実装タスク: `lessons.sh add --supersedes` に指定 ID の存在チェックを追加する
+（`--recurred` には存在チェックがあるが supersedes には無い非対称の解消）。
+
+### V3-2. 信頼境界 — 記憶汚染（memory poisoning）対策
+
+根拠: 通常クエリのみで長期記憶を汚染する攻撃（MINJA: 95%超の成功率）が実証されており、
+「記憶を効かせる設計ほど攻撃面が広がる」（arXiv 2606.04329）。
+
+- retro.md ステップ4.5（外部リポジトリ由来 lesson のクロスポスト）に注記を追加しつつ、
+  **強制は構造化フィルタで行う（Sora レビュー必須指摘2への対応）**。プロンプト上の
+  約束だけでは、本提案が対策しようとしている「規範だけでは徹底されない」問題を
+  再生産するため:
+  - `_lessons.json` スキーマに `owner_approved`（boolean, default false）を追加
+  - retro.md ステップ5 と `propose-lesson-rules.sh` の**両方の抽出クエリ**に
+    `and ((.source_repo // "") == $own_repo or (.owner_approved // false))` 相当の
+    条件を追加（`$own_repo` は `git remote get-url origin` の正規化値）
+  - 台帳への記録と Issue 起票までは外部由来でも可。行動変更（ルール書き出し・
+    エージェント定義変更）への昇格は本社リポジトリ由来またはオーナー承認済みに限る
+
+### V3-3. 差分棚卸し — context collapse 対策
+
+根拠: 蓄積した文脈の全面書き換え（monolithic rewrite）は反復のたびに詳細を侵食する
+（ACE, arXiv 2510.04618）。2026-08-08 の初回棚卸し（983→83行）は全面書き換えで実施
+したが、恒常運用で繰り返すべきではない。
+
+- retro.md ステップ5 の棚卸し手順を修正: **棚卸しは差分操作（個別ルールの削除・
+  2件の統合・1件の語調修正）のみとし、ファイル全体の書き直しは行わない**。
+  担保（Sora 指摘への対応）: 棚卸しコミット前に `git diff --stat` を確認し、
+  pm-learned-rules.md の変更行数が現行行数の30%を超える場合は差分操作に分割し直す、
+  を手順に明記する。
+- 月次ヘルスチェックに lint 項目を追加: pm-learned-rules.md 内の
+  「相互に矛盾するルール」「台帳に対応 lesson が見つからない孤児ルール」を検出して
+  報告する（Karpathy の LLM Wiki lint 相当）。
+  **更新対象の実体（Sora 指摘への対応）**: リポジトリ内スクリプトではなく、
+  claude.ai の Routine「学習ループ月次ヘルスチェック」（2026-08-08 作成、毎月1日
+  9:00 JST に読み取り専用のクラウドセッションを起動）の prompt である。
+  lint は Read/Grep のみで実施可能なため、既存の読み取り専用制約と整合する。
+
+### V3-4. 助言化 — 規範的言語の段階的緩和
+
+根拠: Anthropic 公式「旧世代向けの規範的スキルは新世代モデルの品質を劣化させる。
+CRITICAL/YOU MUST は普通の書き方に戻せ」。OpenAI 公式「矛盾ルールの調停に推論トークン
+を浪費する」。Forage V2 の知識ベースは「助言文書であって拘束的命令ではない」設計。
+
+- 次回棚卸し時（差分操作で）: pm-learned-rules.md の「〜してはいけない」列挙を、
+  **「推奨行動＋理由」の形式へ順次書き換える**。禁止形を残すのは、破ると即時に
+  実害が出る**ガードレールL0（人間専権: docs/org/guardrails.md 第1条）**関連のみ
+  （本文書の Level 0 タスク群とは別概念。用語衝突を避けるため「ガードレールL0」と表記）。
+  判定を構造化するため、該当 lesson には `tags: ["guardrail"]` を付与する運用とする。
+- propose-lesson-rules.sh の「禁止行動」語彙の変更は**4箇所を一括改修**する
+  （Sora 指摘への対応 — 見出し1箇所だけ変えると既存セクション判定の grep が
+  外れて重複セクションが量産されるバグになる）:
+  entry フィールド見出し・セクション見出し・既存セクション検出用 grep パターン・
+  コミット/PRメッセージ。
+
+### V3-5. 編集単位の変更記録とリバート（オーナー承認済み・バックログ）
+
+根拠: Prime Agent の `/refine` の内部規律（最小編集・トリガーと結果の記録・ID による
+リバート）。verify-check のスプリント粒度より細かい「編集粒度」の追跡を、
+git の既存機能に乗せて実現する:
+
+- **1ルール編集 = 1コミット**の規約: pm-learned-rules.md・エージェント定義への
+  lesson 由来の変更は、1件ごとに独立コミットとし、コミットメッセージに
+  lesson_id を必ず含める（`propose-lesson-rules.sh` は既に対応済み。棚卸し・
+  手動編集にも同じ規約を適用）
+- **結果の記録**: 当該 lesson の verify-check 結果（verified / 再発リセット）が
+  編集の成否記録を兼ねる
+- **リバート**: ルールが逆効果と判明した場合、lesson_id でコミットを特定して
+  `git revert`。台帳側は supersedes + dismissed で診断改訂（V3-1 の手順を流用）
+
+新規の仕組みはほぼ不要（規約2行＋retro.md への追記のみ）。V3-4 と同じ棚卸し
+サイクルで導入する。
+
+### 導入しないと決めたもの（再掲・明確化）
+
+- **スキルの A/B 並列評価・LLM judge 基盤**（Level 3）: 個人開発の規模では
+  コストが効果に見合わない
+- **ナレッジグラフ型記憶**（Zep/Graphiti 型）: 同上
+- 再検討トリガー: 複数プロジェクト・複数人運用への拡大時のみ
+
+### 実施順序
+
+V3-1〜V3-3 は次スプリントの S タスク×3（retro.md 編集×2・ルーチンプロンプト更新×1）。
+V3-4・V3-5 は次回棚卸し（3スプリント後）に統合する。
