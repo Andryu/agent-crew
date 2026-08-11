@@ -196,6 +196,103 @@ class TestVerifyCheck:
         assert entry["status"] == "dismissed"
 
 
+# ---------- V3-1: supersedes 存在チェック ----------
+
+class TestSupersedesExistence:
+    def test_unknown_supersedes_rejected(self, lessons_file):
+        result = add_failure(lessons_file, extra=[
+            "--recurrence-condition", "同型の事象が発生しない",
+            "--supersedes", "no-such-id",
+        ])
+        assert result.returncode == 1
+        assert "--supersedes: lesson not found" in result.stderr
+
+    def test_existing_supersedes_accepted(self, lessons_file):
+        first = add_failure(lessons_file, extra=["--recurrence-condition", "同型の事象が発生しない"])
+        assert first.returncode == 0, first.stderr
+        old_id = read_lessons(lessons_file)[0]["id"]
+
+        result = add_failure(lessons_file, extra=[
+            "--recurrence-condition", "改訂後の再発条件を満たす",
+            "--supersedes", old_id,
+        ])
+        assert result.returncode == 0, result.stderr
+        assert read_lessons(lessons_file)[-1]["supersedes"] == old_id
+
+
+# ---------- V3-2: 信頼境界（owner_approved / source_repo フィルタ） ----------
+
+class TestTrustBoundary:
+    OWN = "https://github.com/Andryu/agent-crew"
+    EXT = "https://github.com/Andryu/other-app"
+
+    def _add(self, lessons_file, *, repo, approved=False, category="process"):
+        args = [
+            "add", "--project", "p", "--sprint", "sprint-27", "--category", category,
+            "--severity", "3", "--frequency", "2",
+            "--description", "信頼境界テスト用の観察エントリ", "--action", "テスト用の対策アクション",
+            "--recurrence-condition", "同型の事象が発生しない",
+            "--source-repo", repo,
+        ]
+        if approved:
+            args.append("--owner-approved")
+        r = run_lessons(args, lessons_file)
+        assert r.returncode == 0, r.stderr
+        return read_lessons(lessons_file)[-1]["id"]
+
+    def test_owner_approved_defaults_false(self, lessons_file):
+        self._add(lessons_file, repo=self.OWN)
+        assert read_lessons(lessons_file)[0]["owner_approved"] is False
+
+    def test_owner_approved_flag_sets_true(self, lessons_file):
+        self._add(lessons_file, repo=self.EXT, approved=True)
+        assert read_lessons(lessons_file)[0]["owner_approved"] is True
+
+    def _run_propose(self, lessons_file, tmp_path):
+        """自リポジトリを agent-crew とする一時 git リポジトリで dry-run 実行"""
+        work = tmp_path / "work"
+        agents = work / ".claude" / "agents"
+        agents.mkdir(parents=True)
+        for name in ("pm.md", "qa.md"):
+            (agents / name).write_text(f"# {name}\n")
+        subprocess.run(["git", "init", "-q"], cwd=work, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/Andryu/agent-crew.git"],
+            cwd=work, check=True, capture_output=True,
+        )
+        env = {**os.environ, "LESSONS_FILE": str(lessons_file)}
+        return subprocess.run(
+            ["bash", str(PROPOSE_SH), "--dry-run", "--min-priority", "3"],
+            capture_output=True, text=True, env=env, cwd=work,
+        )
+
+    def test_external_unapproved_excluded(self, lessons_file, tmp_path):
+        own_id = self._add(lessons_file, repo=self.OWN)
+        ext_id = self._add(lessons_file, repo=self.EXT)
+        r = self._run_propose(lessons_file, tmp_path)
+        assert r.returncode == 0, r.stderr
+        combined = r.stdout + r.stderr
+        # ルール本体として書き出されるのは「### <id>」の見出し行
+        assert f"### {own_id}" in combined, "自リポジトリ由来は書き出し対象であるべき"
+        assert f"### {ext_id}" not in combined, "外部由来・未承認はルール書き出しされないべき"
+        # 除外はサイレントでなく明示的に報告される
+        assert "信頼境界により除外" in combined and ext_id in combined, \
+            "除外された lesson は報告に出るべき（サイレント除外の防止）"
+
+    def test_external_approved_included(self, lessons_file, tmp_path):
+        ext_id = self._add(lessons_file, repo=self.EXT, approved=True, category="qa")
+        r = self._run_propose(lessons_file, tmp_path)
+        assert r.returncode == 0, r.stderr
+        assert ext_id in (r.stdout + r.stderr), "外部由来でも承認済みなら対象"
+
+    def test_ssh_form_own_repo_normalized(self, lessons_file, tmp_path):
+        """SSH 形式で記録された自リポジトリ由来 lesson も正規化して通過する"""
+        own_id = self._add(lessons_file, repo="git@github.com:Andryu/agent-crew.git")
+        r = self._run_propose(lessons_file, tmp_path)
+        assert r.returncode == 0, r.stderr
+        assert own_id in (r.stdout + r.stderr)
+
+
 # ---------- enforcement: code のプロンプト書き出しスキップ ----------
 
 class TestEnforcementSkip:
@@ -211,10 +308,16 @@ class TestEnforcementSkip:
         code_id = next(l["id"] for l in lessons if l["enforcement"] == "code")
         prompt_id = next(l["id"] for l in lessons if l["enforcement"] == "prompt")
 
-        # propose-lesson-rules.sh は cwd の .claude/agents を見るため tmp に用意
+        # propose-lesson-rules.sh は cwd の .claude/agents と git origin を見るため
+        # 一時ディレクトリを本リポジトリと同じ origin を持つ git リポジトリとして用意する
         agents_dir = tmp_path / ".claude" / "agents"
         agents_dir.mkdir(parents=True)
         (agents_dir / "pm.md").write_text("# pm\n")
+        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/Andryu/agent-crew.git"],
+            cwd=tmp_path, check=True, capture_output=True,
+        )
 
         env = {**os.environ, "LESSONS_FILE": str(lessons_file)}
         r = subprocess.run(

@@ -191,8 +191,13 @@ priority_score = severity_score × frequency_score
         },
         "source_repo": {
           "type": "string",
-          "description": "由来リポジトリ URL。HTTPS 形式に正規化して保存する（SSH 形式は lessons.sh が自動変換）。ローカルのみの場合は \"local\"",
+          "description": "由来リポジトリ URL。HTTPS 形式に正規化して保存する（SSH 形式は lessons.sh が自動変換）。ローカルのみの場合は \"local\"。ルール書き出しの信頼境界フィルタのキーとして機能する（owner_approved 参照）",
           "examples": ["https://github.com/Andryu/agent-crew"]
+        },
+        "owner_approved": {
+          "type": "boolean",
+          "description": "外部リポジトリ由来の lesson を、本リポジトリの行動ルール（エージェント定義・pm-learned-rules.md）へ昇格させることをオーナーが承認したか。記憶汚染対策の信頼境界（V3-2）。false の外部由来 lesson は台帳記録と Issue 起票までは可、ルール書き出しの対象外",
+          "default": false
         },
         "recurrence_condition": {
           "type": ["string", "null"],

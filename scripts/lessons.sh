@@ -20,7 +20,8 @@
 #     [--supersedes <id>] \
 #     [--recurrence-condition "<condition>"] \
 #     [--enforcement <code|prompt|process>] \
-#     [--source-repo <url>]
+#     [--source-repo <url>] \
+#     [--owner-approved]
 #
 #   lessons.sh set-status <id> <proposed|issue_created|implemented|verified|dismissed>
 #   lessons.sh promote <id> <project|global|stack> [<stack>]
@@ -79,6 +80,10 @@ add options:
                  code = script/lint/hook で強制済み。プロンプト書き出し対象外になる
   --source-repo  由来リポジトリURL (省略時: git remote get-url origin。
                  SSH形式は HTTPS 形式へ自動正規化される)
+  --owner-approved
+                 外部リポジトリ由来の lesson を本リポジトリの行動ルールへ
+                 昇格させることをオーナーが承認した場合に指定する（信頼境界)。
+                 未指定かつ外部由来の lesson はルール書き出し対象外になる
   --help         このヘルプを表示
 
 set-status args:
@@ -191,6 +196,7 @@ SUPERSEDES="null"
 RECURRENCE_CONDITION=""
 ENFORCEMENT="prompt"
 SOURCE_REPO=""
+OWNER_APPROVED="false"
 EVIDENCE_ITEMS=()
 TAG_ITEMS=()
 
@@ -213,6 +219,7 @@ while [[ $# -gt 0 ]]; do
     --recurrence-condition) RECURRENCE_CONDITION="$2"; shift 2 ;;
     --enforcement) ENFORCEMENT="$2";  shift 2 ;;
     --source-repo) SOURCE_REPO="$2";  shift 2 ;;
+    --owner-approved) OWNER_APPROVED="true"; shift ;;
     --evidence)    EVIDENCE_ITEMS+=("$2"); shift 2 ;;
     --tags)        TAG_ITEMS+=("$2"); shift 2 ;;
     --help|-h)     usage ;;
@@ -379,6 +386,16 @@ _do_add() {
 
   existing=$(cat "$LESSONS_FILE")
 
+  # --supersedes の存在チェック（V3-1 診断改訂フローの前提）:
+  # 診断改訂で旧 lesson を参照するため、タイプミスによる宙ぶらりん参照を防ぐ。
+  # --recurred と同じ厳格さを supersedes にも適用する。
+  if [[ "$SUPERSEDES" != "null" ]]; then
+    local supersedes_id
+    supersedes_id=$(jq -r . <<< "$SUPERSEDES")
+    jq -e --arg id "$supersedes_id" '.lessons[] | select(.id == $id)' <<< "$existing" > /dev/null \
+      || die "--supersedes: lesson not found: '$supersedes_id'"
+  fi
+
   # ID 採番: project-sprint-category プレフィックスで既存の最大連番を探す
   local id_prefix="${PROJECT}-${SPRINT}-${CATEGORY}"
   next_seq=$(
@@ -443,6 +460,7 @@ _do_add() {
     --argjson supersedes "$SUPERSEDES" \
     --arg created_at   "$created_at" \
     --arg source_repo  "$SOURCE_REPO" \
+    --argjson owner_approved "$OWNER_APPROVED" \
     --argjson recurrence_condition "$recurrence_json" \
     --arg enforcement  "$ENFORCEMENT" \
     '{
@@ -464,6 +482,7 @@ _do_add() {
       supersedes:      $supersedes,
       tags:            $tags,
       source_repo:     $source_repo,
+      owner_approved:  $owner_approved,
       recurrence_condition: $recurrence_condition,
       enforcement:     $enforcement,
       verification_streak: 0,

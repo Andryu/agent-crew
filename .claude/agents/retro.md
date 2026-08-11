@@ -82,6 +82,18 @@ SOURCE_REPO=$(echo "$SOURCE_REPO" | sed -E 's#^git@([^:]+):#https://\1/#; s#\.gi
 source_repo 正規化・`verification_streak: 0` の初期化）が自動で適用される。手書き jq で
 記録する場合も同じフィールドを必ず含めること。
 
+#### 反証のヒント（priority_score >= 6 で推奨 — V3-1）
+
+深刻度の高い教訓ほど、誤った診断が固定されたときの損害が大きい。
+`priority_score >= 6` の lesson は、description に
+**「この診断が誤りなら、何が観測されるはずか」**を1文添える。
+
+例:「二重指揮が根因。もしこの診断が誤りなら、PM経由の指示だけの状況でも
+同型の混乱が起きるはずである」
+
+この1文があると、次スプリント以降の再発チェック（ステップ2.7）で
+「ルールが破れた」と「診断が誤っていた」を切り分ける根拠になる。
+
 #### スコープ（scope）の判断基準（必須）
 
 `scope` フィールドは **必須**。以下の基準で判定し、省略してはならない。
@@ -204,6 +216,40 @@ bash scripts/lessons.sh verify-check <今スプリント> --recurred <lesson-id>
 3. verify-check の出力（再発リセット・verified 遷移・streak 進行中の件数）は
    ステップ7の完了報告に「効果検証結果」として添付する
 
+#### 再発時の判定分岐: 「ルールが破れた」か「診断が誤っていた」か（V3-1）
+
+再発を観察したら、**機械化候補に回す前に根因を突き合わせる**。AIは「自信はあるが誤った
+失敗診断」を記憶に固定し、以後それに従い続けるリスクがあるため（記憶の作話）、
+再発は「ルールの失敗」だけでなく「診断の失敗」の可能性も持つ。
+
+| 観察 | 判定 | 対応 |
+|------|------|------|
+| 同じ根因で再発した | **ルールが破れた** | streak リセット → 機械化（`enforcement: code`）候補として起票 |
+| 事象は同型だが**根因が違った** | **診断が誤っていた** | 下記の診断改訂フローを実行 |
+
+**診断改訂フロー（順序厳守）**
+
+順序を守らないと、誤診断の lesson が streak を積んで `verified` へ誤昇格する。
+
+```bash
+# 1. 旧 lesson を必ず --recurred に含めて verify-check を実行する
+#    （防げなかった事実は根因の異同にかかわらず同じ。ここで dismiss してはならない）
+bash scripts/lessons.sh verify-check <今スプリント> --recurred <旧lesson-id>
+
+# 2. 改訂した診断で新 lesson を起こす（--supersedes で旧IDを参照）
+bash scripts/lessons.sh add --project <p> --sprint <今スプリント> --category <c> \
+  --severity <s> --frequency <f> --description "<改訂した診断>" --action "<新しい対策>" \
+  --recurrence-condition "<新しい再発検知条件>" --supersedes <旧lesson-id> \
+  --evidence "<旧lesson-id の再発事象>"
+
+# 3. 旧 lesson を dismissed にする（dismissed は verify-check の streak 対象外）
+bash scripts/lessons.sh set-status <旧lesson-id> dismissed
+```
+
+4. 旧 lesson に `issue_url` がある場合は、該当 Issue に「診断改訂（supersedes: 新ID）」の
+   コメントを追記してクローズし、新 lesson の evidence に旧 Issue URL を残す
+5. 完了報告の「効果検証結果」に、診断改訂を行った件数と新旧 ID を明記する
+
 ### ステップ 3: エビデンスゲートの実行
 
 記録した lesson のうち、以下の条件をすべて満たすものを Issue 化候補とする：
@@ -319,19 +365,32 @@ done
 
 #### 対象教訓の抽出
 
-`enforcement: code` の lesson は **書き出し対象外**（コードで強制済みのルールを
-プロンプトにも書くと二重管理になる — learning-loop-verification-proposal.md L1-4）。
+除外条件は2つ:
+
+1. **`enforcement: code`** — コードで強制済みのルールをプロンプトにも書くと
+   二重管理になる（L1-4）
+2. **信頼境界（V3-2）** — 外部リポジトリ由来かつ `owner_approved` でない lesson は
+   行動ルールへ昇格させない（記憶汚染対策）。台帳記録と Issue 起票までは可
 
 ```bash
-jq '.lessons[] | select(
-  (.status == "open" or .status == null) and
-  (.priority_score >= 3) and
-  ((.enforcement // "prompt") != "code")
-)' ~/.claude/_lessons.json
+OWN_REPO=$(git remote get-url origin 2>/dev/null | sed -E 's#^git@([^:]+):#https://\1/#; s#\.git$##')
+
+jq --arg own "$OWN_REPO" '
+  def norm: (. // "") | sub("\\.git$"; "")
+    | sub("^git@(?<h>[^:]+):"; "https://\(.h)/");
+  .lessons[] | select(
+    (.status == "open" or .status == null) and
+    (.priority_score >= 3) and
+    ((.enforcement // "prompt") != "code") and
+    (((.source_repo | norm) == ($own | norm)) or (.source_repo == null) or (.owner_approved // false))
+  )' ~/.claude/_lessons.json
 ```
 
-`enforcement: code` と判定したが未実装の lesson は、書き出す代わりに
-コード化タスク（対象スクリプトへの実装）の起票を Yuki へ申し送る。
+- `enforcement: code` と判定したが未実装の lesson は、書き出す代わりに
+  コード化タスク（対象スクリプトへの実装）の起票を Yuki へ申し送る
+- **外部由来で除外された lesson がある場合**は、完了報告に件数と ID を記載し
+  「オーナー承認があれば `lessons.sh` の `--owner-approved` 相当で昇格可能」と添える。
+  みゆきちの判断で勝手に昇格させてはならない
 
 #### 重複チェック
 
@@ -382,6 +441,31 @@ grep -o 'lesson_id: [a-z0-9_-]*' agents/pm-learned-rules.md | awk '{print $2}'
 2. `enforcement: code` に移行済みのルールを削除し、「機械化済み」表に1行追加する
 3. 類似ルールを統合し、根拠 lesson_id を括弧内に併記する
 4. 削除・統合の内訳を完了報告に記載する（経緯は `_lessons.json` に残るため情報は失われない）
+
+**差分操作の原則（V3-3 — 必須）**
+
+棚卸しは **1件削除・2件統合・1件の語調修正といった差分操作のみ**で行う。
+ファイル全体を書き直す（Write ツールでの丸ごと上書き）と、反復のたびに
+細部が侵食される（context collapse）。編集は Edit ツールによる部分置換を使う。
+
+コミット前に変更規模を確認し、閾値を超えたら分割し直す:
+
+```bash
+# 変更行数が現行行数の30%を超えていないか確認
+TOTAL=$(wc -l < .claude/agents/pm-learned-rules.md)
+CHANGED=$(git diff --numstat .claude/agents/pm-learned-rules.md | awk '{print $1+$2}')
+echo "changed=${CHANGED} / total=${TOTAL} (閾値: 30%)"
+```
+
+30%を超える場合は、①本当に必要な削除だけに絞る、②複数スプリントに分割する、
+のいずれかを選ぶ。初回の大規模整理のように全面書き換えが避けられない場合は、
+**全 lesson_id の追跡性を保持したことを完了報告で明示**する。
+
+**1ルール編集 = 1コミット（V3-5）**
+
+`pm-learned-rules.md` およびエージェント定義への lesson 由来の変更は、
+1件ごとに独立コミットとし、コミットメッセージに lesson_id を含める。
+逆効果と判明したルールは lesson_id でコミットを特定して `git revert` できる。
 
 ### ステップ 6: ルーブリックスコアの計算
 

@@ -51,6 +51,19 @@ done
 log() { echo "[propose-lesson-rules] $*"; }
 warn() { echo "[propose-lesson-rules] WARN: $*" >&2; }
 
+# リポジトリURL正規化: SSH 形式を HTTPS 形式へ統一する（lessons.sh と同一ロジック）。
+# source_repo による信頼境界フィルタで形式差による誤判定を防ぐ。
+normalize_repo_url() {
+  local url="$1"
+  url="${url%.git}"
+  if [[ "$url" =~ ^git@([^:]+):(.+)$ ]]; then
+    url="https://${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+  elif [[ "$url" =~ ^ssh://git@([^/]+)/(.+)$ ]]; then
+    url="https://${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+  fi
+  echo "$url"
+}
+
 # category -> エージェントファイル マッピング
 agent_for_category() {
   local category="$1"
@@ -80,10 +93,23 @@ fi
 
 log "Extracting lessons with priority_score >= $MIN_PRIORITY ..."
 
-# enforcement == "code" はプロンプト書き出し対象外:
-# script/lint/hook で機械的に強制済みの教訓をエージェント .md にも書くと
-# 二重管理になるため（learning-loop-verification-proposal.md L1-4）。
-LESSONS_JSON=$(jq -c --argjson min "$MIN_PRIORITY" '
+# 抽出条件は3つの AND:
+# 1. priority_score >= MIN_PRIORITY かつ未確定ステータス
+# 2. enforcement != "code" — script/lint/hook で機械的に強制済みの教訓を
+#    エージェント .md にも書くと二重管理になるため（L1-4）
+# 3. 信頼境界（V3-2）— 本リポジトリ由来、または owner_approved の lesson のみ。
+#    外部リポジトリ由来の未承認 lesson を無審査で行動ルールへ昇格させない
+#    （記憶汚染対策。台帳記録と Issue 起票までは別途可）
+OWN_REPO=$(git remote get-url origin 2>/dev/null || echo "local")
+OWN_REPO=$(normalize_repo_url "$OWN_REPO")
+if [[ "$OWN_REPO" == "local" ]]; then
+  warn "origin を取得できませんでした。信頼境界フィルタは source_repo が 'local'/null または owner_approved の lesson のみを通します。"
+fi
+
+LESSONS_JSON=$(jq -c --argjson min "$MIN_PRIORITY" --arg own "$OWN_REPO" '
+  def norm: (. // "") | sub("\\.git$"; "")
+    | sub("^git@(?<h>[^:]+):"; "https://\(.h)/")
+    | sub("^ssh://git@(?<h>[^/]+)/"; "https://\(.h)/");
   .lessons[]
   | select(
       .priority_score >= $min
@@ -94,8 +120,35 @@ LESSONS_JSON=$(jq -c --argjson min "$MIN_PRIORITY" '
         or .status == "issue_created"
       )
       and ((.enforcement // "prompt") != "code")
+      and (
+        ((.source_repo | norm) == ($own | norm))
+        or (.source_repo == null)
+        or (.owner_approved // false)
+      )
     )
 ' "$LESSONS_FILE" 2>/dev/null || echo "")
+
+# 信頼境界で除外された件数を可視化する（サイレント除外を防ぐ — V3-2）
+EXCLUDED_BY_TRUST=$(jq -r --argjson min "$MIN_PRIORITY" --arg own "$OWN_REPO" '
+  def norm: (. // "") | sub("\\.git$"; "")
+    | sub("^git@(?<h>[^:]+):"; "https://\(.h)/")
+    | sub("^ssh://git@(?<h>[^/]+)/"; "https://\(.h)/");
+  [ .lessons[]
+    | select(
+        .priority_score >= $min
+        and (.status == null or .status == "open" or .status == "proposed" or .status == "issue_created")
+        and ((.enforcement // "prompt") != "code")
+        and ((.source_repo | norm) != ($own | norm))
+        and (.source_repo != null)
+        and ((.owner_approved // false) | not)
+      )
+    | .id ] | join(", ")
+' "$LESSONS_FILE" 2>/dev/null || echo "")
+
+if [[ -n "$EXCLUDED_BY_TRUST" ]]; then
+  log "信頼境界により除外（外部由来・未承認）: $EXCLUDED_BY_TRUST"
+  log "  → オーナー承認後に owner_approved を true にすれば書き出し対象になります"
+fi
 
 if [[ -z "$LESSONS_JSON" ]]; then
   log "No actionable lessons found (priority >= $MIN_PRIORITY, status open/proposed/issue_created)."
