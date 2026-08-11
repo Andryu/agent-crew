@@ -20,11 +20,21 @@
 #     [--supersedes <id>] \
 #     [--recurrence-condition "<condition>"] \
 #     [--enforcement <code|prompt|process>] \
-#     [--source-repo <url>]
+#     [--source-repo <url>] \
+#     [--owner-approved]
 #
 #   lessons.sh set-status <id> <proposed|issue_created|implemented|verified|dismissed>
 #   lessons.sh promote <id> <project|global|stack> [<stack>]
 #   lessons.sh verify-check <current-sprint> [--recurred <id>]...
+#   lessons.sh list-rule-candidates [--min-priority <N>] [--excluded]
+#
+#   list-rule-candidates: ルール書き出し対象 lesson の抽出（読み取り専用）。
+#     この抽出条件の唯一の実装であり、retro.md ステップ5 と
+#     propose-lesson-rules.sh の両方がこれを呼ぶ（ロジック重複によるドリフト防止）。
+#     条件: priority_score >= N（既定3）かつ status が未確定
+#           かつ enforcement != code
+#           かつ 信頼境界（自リポジトリ由来 / source_repo 未設定 / owner_approved）
+#     --excluded を付けると、信頼境界のみで除外された lesson を出力する（可視化用）
 #
 #   verify-check: 効果検証（learning-loop-verification-proposal.md L0-2）。
 #     過去スプリントのルール書き出し対象 lesson（type=failure, priority>=3,
@@ -79,6 +89,10 @@ add options:
                  code = script/lint/hook で強制済み。プロンプト書き出し対象外になる
   --source-repo  由来リポジトリURL (省略時: git remote get-url origin。
                  SSH形式は HTTPS 形式へ自動正規化される)
+  --owner-approved
+                 外部リポジトリ由来の lesson を本リポジトリの行動ルールへ
+                 昇格させることをオーナーが承認した場合に指定する（信頼境界)。
+                 未指定かつ外部由来の lesson はルール書き出し対象外になる
   --help         このヘルプを表示
 
 set-status args:
@@ -93,6 +107,10 @@ promote args:
 verify-check args:
   <current-sprint>  現スプリント識別子 例: sprint-28 (必須)
   --recurred <id>   今スプリントで同型再発が観察された lesson ID (複数指定可)
+
+list-rule-candidates options:
+  --min-priority <N>  最小 priority_score (省略時: 3)
+  --excluded          信頼境界で除外された lesson を代わりに出力する
 HELP_EOF
   exit 1
 }
@@ -142,8 +160,9 @@ if [[ "$CMD" == "--help" || "$CMD" == "-h" || -z "$CMD" ]]; then
   usage
 fi
 
-if [[ "$CMD" != "add" && "$CMD" != "set-status" && "$CMD" != "promote" && "$CMD" != "verify-check" ]]; then
-  die "unknown command: '$CMD'. Use 'add', 'set-status', 'promote', or 'verify-check'."
+if [[ "$CMD" != "add" && "$CMD" != "set-status" && "$CMD" != "promote" \
+   && "$CMD" != "verify-check" && "$CMD" != "list-rule-candidates" ]]; then
+  die "unknown command: '$CMD'. Use 'add', 'set-status', 'promote', 'verify-check', or 'list-rule-candidates'."
 fi
 
 SET_STATUS_ID=""
@@ -153,6 +172,8 @@ PROMOTE_SCOPE=""
 PROMOTE_STACK="null"
 VERIFY_SPRINT=""
 RECURRED_IDS=()
+LIST_MIN_PRIORITY=3
+LIST_EXCLUDED="false"
 
 if [[ "$CMD" == "set-status" ]]; then
   SET_STATUS_ID="${1:-}"
@@ -173,6 +194,17 @@ elif [[ "$CMD" == "verify-check" ]]; then
       *) die "unknown option for verify-check: '$1'" ;;
     esac
   done
+elif [[ "$CMD" == "list-rule-candidates" ]]; then
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --min-priority) LIST_MIN_PRIORITY="$2"; shift 2 ;;
+      --excluded)     LIST_EXCLUDED="true";  shift ;;
+      --help|-h)      usage ;;
+      *) die "unknown option for list-rule-candidates: '$1'" ;;
+    esac
+  done
+  [[ "$LIST_MIN_PRIORITY" =~ ^[0-9]+$ ]] \
+    || die "--min-priority must be a number, got: '$LIST_MIN_PRIORITY'"
 fi
 
 PROJECT=""
@@ -191,6 +223,7 @@ SUPERSEDES="null"
 RECURRENCE_CONDITION=""
 ENFORCEMENT="prompt"
 SOURCE_REPO=""
+OWNER_APPROVED="false"
 EVIDENCE_ITEMS=()
 TAG_ITEMS=()
 
@@ -213,6 +246,7 @@ while [[ $# -gt 0 ]]; do
     --recurrence-condition) RECURRENCE_CONDITION="$2"; shift 2 ;;
     --enforcement) ENFORCEMENT="$2";  shift 2 ;;
     --source-repo) SOURCE_REPO="$2";  shift 2 ;;
+    --owner-approved) OWNER_APPROVED="true"; shift ;;
     --evidence)    EVIDENCE_ITEMS+=("$2"); shift 2 ;;
     --tags)        TAG_ITEMS+=("$2"); shift 2 ;;
     --help|-h)     usage ;;
@@ -379,6 +413,16 @@ _do_add() {
 
   existing=$(cat "$LESSONS_FILE")
 
+  # --supersedes の存在チェック（V3-1 診断改訂フローの前提）:
+  # 診断改訂で旧 lesson を参照するため、タイプミスによる宙ぶらりん参照を防ぐ。
+  # --recurred と同じ厳格さを supersedes にも適用する。
+  if [[ "$SUPERSEDES" != "null" ]]; then
+    local supersedes_id
+    supersedes_id=$(jq -r . <<< "$SUPERSEDES")
+    jq -e --arg id "$supersedes_id" '.lessons[] | select(.id == $id)' <<< "$existing" > /dev/null \
+      || die "--supersedes: lesson not found: '$supersedes_id'"
+  fi
+
   # ID 採番: project-sprint-category プレフィックスで既存の最大連番を探す
   local id_prefix="${PROJECT}-${SPRINT}-${CATEGORY}"
   next_seq=$(
@@ -443,6 +487,7 @@ _do_add() {
     --argjson supersedes "$SUPERSEDES" \
     --arg created_at   "$created_at" \
     --arg source_repo  "$SOURCE_REPO" \
+    --argjson owner_approved "$OWNER_APPROVED" \
     --argjson recurrence_condition "$recurrence_json" \
     --arg enforcement  "$ENFORCEMENT" \
     '{
@@ -464,6 +509,7 @@ _do_add() {
       supersedes:      $supersedes,
       tags:            $tags,
       source_repo:     $source_repo,
+      owner_approved:  $owner_approved,
       recurrence_condition: $recurrence_condition,
       enforcement:     $enforcement,
       verification_streak: 0,
@@ -564,6 +610,40 @@ _do_verify_check() {
   '
 }
 
+_do_list_rule_candidates() {
+  local min_priority="$1" show_excluded="$2"
+  local own_repo
+
+  # 自リポジトリの判定（正規化は normalize_source_repo に一本化）
+  own_repo=$(git remote get-url origin 2>/dev/null || echo "local")
+  own_repo=$(normalize_source_repo "$own_repo")
+
+  # ルール書き出し対象の抽出条件（この定義が唯一の実装）:
+  #   1. priority_score >= min かつ status が未確定（proposed/issue_created/implemented/open/null）
+  #   2. enforcement != "code"（コードで強制済みはプロンプトに書かない = 二重管理防止）
+  #   3. 信頼境界（V3-2）: 自リポジトリ由来 / source_repo 未設定（レガシー）/ owner_approved
+  # --excluded 指定時は 1・2 を満たすが 3 で落ちたものを出力する（サイレント除外の防止）
+  jq -c \
+    --argjson min "$min_priority" \
+    --arg own "$own_repo" \
+    --argjson excluded "$([[ "$show_excluded" == "true" ]] && echo true || echo false)" \
+    '
+    def norm: (. // "") | sub("\\.git$"; "")
+      | sub("^git@(?<h>[^:]+):"; "https://\(.h)/")
+      | sub("^ssh://git@(?<h>[^/]+)/"; "https://\(.h)/");
+    def base_target:
+      ((.priority_score // 0) >= $min)
+      and ((.status // "proposed") | IN("proposed", "issue_created", "implemented", "open"))
+      and ((.enforcement // "prompt") != "code");
+    def trusted:
+      ((.source_repo | norm) == ($own | norm))
+      or (.source_repo == null)
+      or (.owner_approved // false);
+    .lessons[]
+    | select(base_target and (if $excluded then (trusted | not) else trusted end))
+    ' "$LESSONS_FILE"
+}
+
 # ---------- コマンド実行 ----------
 
 execute_with_lock() {
@@ -613,6 +693,10 @@ elif [[ "$CMD" == "verify-check" ]]; then
     result=$(execute_with_lock _do_verify_check "$VERIFY_SPRINT" "${RECURRED_IDS[@]}") || exit $?
   fi
   echo "$result"
+  exit 0
+elif [[ "$CMD" == "list-rule-candidates" ]]; then
+  # 読み取り専用のためロック不要
+  _do_list_rule_candidates "$LIST_MIN_PRIORITY" "$LIST_EXCLUDED"
   exit 0
 fi
 

@@ -21,6 +21,8 @@ set -euo pipefail
 
 LESSONS_FILE="${LESSONS_FILE:-$HOME/.claude/_lessons.json}"
 MIN_PRIORITY=4
+# 自身のディレクトリ解決（BSD readlink は -f オプション非対応のため使わない）
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 DRY_RUN=false
 AGENTS_DIR=".claude/agents"
 TODAY=$(date +%Y-%m-%d)
@@ -80,25 +82,23 @@ fi
 
 log "Extracting lessons with priority_score >= $MIN_PRIORITY ..."
 
-# enforcement == "code" はプロンプト書き出し対象外:
-# script/lint/hook で機械的に強制済みの教訓をエージェント .md にも書くと
-# 二重管理になるため（learning-loop-verification-proposal.md L1-4）。
-LESSONS_JSON=$(jq -c --argjson min "$MIN_PRIORITY" '
-  .lessons[]
-  | select(
-      .priority_score >= $min
-      and (
-        .status == null
-        or .status == "open"
-        or .status == "proposed"
-        or .status == "issue_created"
-      )
-      and ((.enforcement // "prompt") != "code")
-    )
-' "$LESSONS_FILE" 2>/dev/null || echo "")
+# 抽出は scripts/lessons.sh list-rule-candidates に一本化する（V3-2 / ドリフト防止）。
+# 条件（priority・status・enforcement・信頼境界）の定義はそこが唯一の実装であり、
+# retro.md ステップ5 も同じサブコマンドを呼ぶ。ここでクエリを複製してはならない。
+LESSONS_JSON=$(bash "$SCRIPT_DIR/lessons.sh" list-rule-candidates \
+  --min-priority "$MIN_PRIORITY" 2>/dev/null || echo "")
+
+# 信頼境界で除外された lesson を可視化する（サイレント除外の防止 — V3-2）
+EXCLUDED_BY_TRUST=$(bash "$SCRIPT_DIR/lessons.sh" list-rule-candidates \
+  --min-priority "$MIN_PRIORITY" --excluded 2>/dev/null | jq -r '.id' | paste -sd ", " - || echo "")
+
+if [[ -n "$EXCLUDED_BY_TRUST" ]]; then
+  log "信頼境界により除外（外部由来・未承認）: $EXCLUDED_BY_TRUST"
+  log "  → オーナー承認後に owner_approved を true にすれば書き出し対象になります"
+fi
 
 if [[ -z "$LESSONS_JSON" ]]; then
-  log "No actionable lessons found (priority >= $MIN_PRIORITY, status open/proposed/issue_created)."
+  log "No actionable lessons found (priority >= $MIN_PRIORITY, status open/proposed/issue_created/implemented, 信頼境界通過分)."
   exit 0
 fi
 
