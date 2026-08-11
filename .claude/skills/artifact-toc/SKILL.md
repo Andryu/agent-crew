@@ -56,13 +56,28 @@ nav.toc a { display: block; color: var(--muted); text-decoration: none;
 nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); border-left-color: var(--accent); }
 nav.toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* 狭い画面: 隠さず、本文上部のボックスにする（display:none 禁止） */
+/* 狭い画面: 隠さず、本文上部のボックスにする（display:none 禁止）
+   ★このブロックは必ずスタイルシートの最後に置く（下記の落とし穴を参照） */
 @media (max-width: 860px) {
   .wrap { grid-template-columns: minmax(0,1fr); }
-  nav.toc { position: static; margin: 0 0 36px; padding: 16px 18px;
+  nav.toc { position: static; top: auto; margin: 0 0 32px; padding: 14px 16px;
             background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+  /* 縦に長くなりすぎないよう2列に畳む */
+  nav.toc ol { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px;
+               border-left: none; padding-left: 0; }
+  nav.toc a { padding: 4px 0; border-left: none; margin-left: 0; }
 }
 ```
+
+## 落とし穴: メディアクエリの位置（実際に起きた不具合）
+
+`nav.toc { position: static }` を書いたのに**スマホで目次が追従してしまう**ことがある。
+原因は<b>CSSの記述順</b>。メディアクエリを先に書き、後から
+`nav.toc { position: sticky; ... }` を定義すると、詳細度が同じため
+**後に書いたほうが勝ち**、モバイル指定が無効になる。
+
+対策は単純で、**狭い画面用のメディアクエリをスタイルシートの一番最後にまとめる**こと。
+`footer` などの他のモバイル指定も同じブロックに集約すると、順序事故が起きにくい。
 
 ## デザイン: デジタル庁デザインシステムを参考にする
 
@@ -81,5 +96,6 @@ HTMLでなくMarkdownページを公開する場合も、冒頭に見出しへ�
 
 - [ ] 目次がある
 - [ ] ウィンドウ幅を狭めても目次が見える（`display: none` を使っていない）
+- [ ] **狭い画面で目次が追従しない**（`position: static` が効いている＝メディアクエリが最後にある）
 - [ ] 目次のリンクを踏むと該当セクションへ飛ぶ
 - [ ] 目次の番号と本文の見出し番号が一致している
