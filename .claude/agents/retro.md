@@ -372,24 +372,23 @@ done
 2. **信頼境界（V3-2）** — 外部リポジトリ由来かつ `owner_approved` でない lesson は
    行動ルールへ昇格させない（記憶汚染対策）。台帳記録と Issue 起票までは可
 
-```bash
-OWN_REPO=$(git remote get-url origin 2>/dev/null | sed -E 's#^git@([^:]+):#https://\1/#; s#\.git$##')
+抽出は **`scripts/lessons.sh list-rule-candidates` を使う**。この条件（priority・status・
+enforcement・信頼境界）の実装はそこが唯一の場所であり、`propose-lesson-rules.sh` も
+同じサブコマンドを呼ぶ。**ここに jq クエリを手書きで複製してはならない**
+（複製すると正規化ロジックがドリフトし、環境によってサイレントに全件除外される）。
 
-jq --arg own "$OWN_REPO" '
-  def norm: (. // "") | sub("\\.git$"; "")
-    | sub("^git@(?<h>[^:]+):"; "https://\(.h)/");
-  .lessons[] | select(
-    (.status == "open" or .status == null) and
-    (.priority_score >= 3) and
-    ((.enforcement // "prompt") != "code") and
-    (((.source_repo | norm) == ($own | norm)) or (.source_repo == null) or (.owner_approved // false))
-  )' ~/.claude/_lessons.json
+```bash
+# 書き出し対象（JSON Lines で出力される）
+bash scripts/lessons.sh list-rule-candidates
+
+# 信頼境界で除外されたもの（外部由来・未承認）
+bash scripts/lessons.sh list-rule-candidates --excluded
 ```
 
 - `enforcement: code` と判定したが未実装の lesson は、書き出す代わりに
   コード化タスク（対象スクリプトへの実装）の起票を Yuki へ申し送る
-- **外部由来で除外された lesson がある場合**は、完了報告に件数と ID を記載し
-  「オーナー承認があれば `lessons.sh` の `--owner-approved` 相当で昇格可能」と添える。
+- **`--excluded` に該当がある場合**は、完了報告に件数と ID を記載し
+  「オーナー承認後に `lessons.sh add --owner-approved` 相当で昇格可能」と添える。
   みゆきちの判断で勝手に昇格させてはならない
 
 #### 重複チェック

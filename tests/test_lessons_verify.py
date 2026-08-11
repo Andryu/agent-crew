@@ -293,6 +293,136 @@ class TestTrustBoundary:
         assert own_id in (r.stdout + r.stderr)
 
 
+# ---------- list-rule-candidates: 抽出条件の単一実装（ドリフト防止） ----------
+
+class TestListRuleCandidates:
+    """retro.md と propose-lesson-rules.sh が共有する抽出ロジックの検証。
+
+    このサブコマンドが唯一の実装であることが前提（jq クエリを複製すると
+    正規化ロジックがドリフトし、環境によってサイレントに全件除外される）。
+    """
+
+    def _repo(self, tmp_path: Path, origin: str | None) -> Path:
+        work = tmp_path / f"repo_{abs(hash(origin)) % 10000}"
+        work.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=work, check=True, capture_output=True)
+        if origin:
+            subprocess.run(["git", "remote", "add", "origin", origin],
+                           cwd=work, check=True, capture_output=True)
+        return work
+
+    def _list(self, lessons_file: Path, cwd: Path, excluded=False) -> list[str]:
+        args = ["bash", str(LESSONS_SH), "list-rule-candidates"]
+        if excluded:
+            args.append("--excluded")
+        env = {**os.environ, "LESSONS_FILE": str(lessons_file)}
+        r = subprocess.run(args, capture_output=True, text=True, env=env, cwd=cwd)
+        assert r.returncode == 0, r.stderr
+        return [json.loads(line)["id"] for line in r.stdout.splitlines() if line.strip()]
+
+    def _seed(self, lessons_file: Path, *, category, repo=None, approved=False,
+              enforcement=None, status=None, severity="3", frequency="2"):
+        args = [
+            "add", "--project", "p", "--sprint", "sprint-27", "--category", category,
+            "--severity", severity, "--frequency", frequency,
+            "--description", "抽出条件テスト用の観察エントリ", "--action", "テスト用の対策アクション",
+            "--recurrence-condition", "同型の事象が発生しない",
+        ]
+        if repo:
+            args += ["--source-repo", repo]
+        if approved:
+            args.append("--owner-approved")
+        if enforcement:
+            args += ["--enforcement", enforcement]
+        if status:
+            args += ["--status", status]
+        r = run_lessons(args, lessons_file)
+        assert r.returncode == 0, r.stderr
+        return read_lessons(lessons_file)[-1]["id"]
+
+    @pytest.mark.parametrize("origin", [
+        "https://github.com/Andryu/agent-crew.git",
+        "git@github.com:Andryu/agent-crew.git",
+        "ssh://git@github.com/Andryu/agent-crew.git",   # Sora MAJOR 指摘の再現条件
+    ])
+    def test_own_repo_passes_for_all_origin_forms(self, lessons_file, tmp_path, origin):
+        """origin の表記形式（HTTPS/SSH/ssh://）に関わらず自リポジトリ由来は通過する"""
+        own = self._seed(lessons_file, category="process",
+                         repo="https://github.com/Andryu/agent-crew")
+        assert own in self._list(lessons_file, self._repo(tmp_path, origin))
+
+    def test_origin_missing_falls_back_to_local(self, lessons_file, tmp_path):
+        """origin 未設定環境では source_repo='local' の lesson が通る（全件除外にならない）"""
+        work = self._repo(tmp_path, None)
+        env = {**os.environ, "LESSONS_FILE": str(lessons_file)}
+        r = subprocess.run(
+            ["bash", str(LESSONS_SH), "add", "--project", "p", "--sprint", "sprint-27",
+             "--category", "process", "--severity", "3", "--frequency", "2",
+             "--description", "origin未設定環境で記録した観察", "--action", "テスト用の対策アクション",
+             "--recurrence-condition", "同型の事象が発生しない"],
+            capture_output=True, text=True, env=env, cwd=work,
+        )
+        assert r.returncode == 0, r.stderr
+        entry = read_lessons(lessons_file)[-1]
+        assert entry["source_repo"] == "local"
+        assert entry["id"] in self._list(lessons_file, work)
+
+    def test_legacy_entry_without_source_repo_passes(self, lessons_file, tmp_path):
+        """source_repo フィールドを持たない旧エントリを誤ってブロックしない"""
+        data = json.loads(lessons_file.read_text())
+        data["lessons"].append({
+            "id": "legacy-001", "priority_score": 6, "type": "failure",
+            "category": "process", "description": "レガシーエントリ", "action": "対策",
+        })
+        lessons_file.write_text(json.dumps(data, ensure_ascii=False))
+        work = self._repo(tmp_path, "https://github.com/Andryu/agent-crew.git")
+        assert "legacy-001" in self._list(lessons_file, work)
+
+    def test_proposed_status_is_included(self, lessons_file, tmp_path):
+        """lessons.sh add の既定 status='proposed' が抽出対象に含まれる
+
+        （retro.md 側の旧クエリは open/null のみを見ており、既定で記録された
+        lesson を全て取りこぼしていた。一元化でこの潜在バグが解消される）
+        """
+        lid = self._seed(lessons_file, category="process",
+                         repo="https://github.com/Andryu/agent-crew")
+        assert read_lessons(lessons_file)[-1]["status"] == "proposed"
+        work = self._repo(tmp_path, "https://github.com/Andryu/agent-crew.git")
+        assert lid in self._list(lessons_file, work)
+
+    def test_code_enforcement_and_external_excluded(self, lessons_file, tmp_path):
+        own = self._seed(lessons_file, category="process",
+                         repo="https://github.com/Andryu/agent-crew")
+        coded = self._seed(lessons_file, category="qa",
+                           repo="https://github.com/Andryu/agent-crew", enforcement="code")
+        ext = self._seed(lessons_file, category="tooling",
+                         repo="https://github.com/Andryu/other-app")
+        work = self._repo(tmp_path, "https://github.com/Andryu/agent-crew.git")
+        passed = self._list(lessons_file, work)
+        assert own in passed
+        assert coded not in passed, "enforcement=code は二重管理防止のため除外"
+        assert ext not in passed, "外部由来・未承認は信頼境界で除外"
+        # --excluded は信頼境界で落ちたものだけを返す（enforcement=code は含まない）
+        excluded = self._list(lessons_file, work, excluded=True)
+        assert excluded == [ext]
+
+    def test_min_priority_threshold(self, lessons_file, tmp_path):
+        low = self._seed(lessons_file, category="process",
+                         repo="https://github.com/Andryu/agent-crew",
+                         severity="1", frequency="2")  # priority=2
+        work = self._repo(tmp_path, "https://github.com/Andryu/agent-crew.git")
+        assert low not in self._list(lessons_file, work), "既定閾値3未満は対象外"
+
+    def test_invalid_min_priority_rejected(self, lessons_file, tmp_path):
+        env = {**os.environ, "LESSONS_FILE": str(lessons_file)}
+        r = subprocess.run(
+            ["bash", str(LESSONS_SH), "list-rule-candidates", "--min-priority", "abc"],
+            capture_output=True, text=True, env=env, cwd=tmp_path,
+        )
+        assert r.returncode == 1
+        assert "--min-priority must be a number" in r.stderr
+
+
 # ---------- enforcement: code のプロンプト書き出しスキップ ----------
 
 class TestEnforcementSkip:
