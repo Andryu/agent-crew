@@ -1,0 +1,1322 @@
+<title>インサイトマネジメントシステム 設計書 v8</title>
+<style>
+  /* デジタル庁デザインシステム参考トークン（.claude/skills/artifact-toc 準拠） */
+  :root {
+    --bg: #FFFFFF;
+    --surface: #F8F9FB;
+    --ink: #1A1A1C;
+    --muted: #595959;
+    --line: #D8DBE2;
+    --accent: #0017C1;
+    --accent-ink: #0017C1;
+    --accent-soft: rgba(0, 23, 193, 0.05);
+    --ai: #6D5BC7;
+    --ai-soft: rgba(109, 91, 199, 0.08);
+    --ok: #197A4B;
+    --danger: #EC0000;
+    --warn: #927200;
+    --code-bg: #F1F3F7;
+    --thead-bg: #EFF1F6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17171A;
+      --surface: #1F2024;
+      --ink: #E8E8EB;
+      --muted: #A0A0A6;
+      --line: #35363C;
+      --accent: #7096F8;
+      --accent-ink: #9EB4FF;
+      --accent-soft: rgba(112, 150, 248, 0.14);
+      --ai: #A78BDF;
+      --ai-soft: rgba(167, 139, 223, 0.14);
+      --ok: #71C598;
+      --danger: #FF8082;
+      --warn: #D5B133;
+      --code-bg: #222329;
+      --thead-bg: #202126;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17171A;
+    --surface: #1F2024;
+    --ink: #E8E8EB;
+    --muted: #A0A0A6;
+    --line: #35363C;
+    --accent: #7096F8;
+    --accent-ink: #9EB4FF;
+    --accent-soft: rgba(112, 150, 248, 0.14);
+    --ai: #A78BDF;
+    --ai-soft: rgba(167, 139, 223, 0.14);
+    --ok: #71C598;
+    --danger: #FF8082;
+    --warn: #D5B133;
+    --code-bg: #222329;
+    --thead-bg: #202126;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr);
+    gap: 48px;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 32px 96px;
+  }
+  header.doc-head { grid-column: 1 / -1; padding: 56px 0 36px; border-bottom: 1px solid var(--line); margin-bottom: 40px; }
+  .doc-kicker { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin: 0 0 14px; }
+  h1 {
+    font-size: clamp(26px, 4vw, 34px); font-weight: 700; line-height: 1.5;
+    margin: 0 0 8px; text-wrap: balance;
+  }
+  .doc-sub { color: var(--muted); font-size: 15px; margin: 0 0 24px; max-width: 44em; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px 28px; font-size: 12.5px; color: var(--muted); }
+  .doc-meta b { color: var(--ink); font-weight: 600; }
+  .status-pill {
+    display: inline-block; padding: 1px 10px; border: 1px solid var(--accent); border-radius: 999px;
+    color: var(--accent-ink); background: var(--accent-soft); font-weight: 600;
+  }
+  nav.toc { position: sticky; top: 32px; align-self: start; font-size: 13px; line-height: 1.5; }
+  nav.toc .toc-title { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--line); display: flex; flex-direction: column; }
+  nav.toc a { display: block; color: var(--muted); text-decoration: none; padding: 5px 0 5px 14px; border-left: 2px solid transparent; margin-left: -1px; }
+  nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent-ink); border-left-color: var(--accent); }
+  nav.toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  nav.toc .toc-num { font-family: ui-monospace, "SF Mono", "Consolas", monospace; font-size: 11px; margin-right: 7px; color: var(--accent); }
+  main { min-width: 0; }
+  section { margin: 0 0 64px; }
+  .sec-eyebrow { font-family: ui-monospace, "SF Mono", "Consolas", monospace; font-size: 12px; letter-spacing: 0.14em; color: var(--accent); margin: 0 0 6px; }
+  h2 {
+    font-size: 24px; font-weight: 700; line-height: 1.5;
+    margin: 0 0 20px; padding-bottom: 12px; border-bottom: 2px solid var(--line); text-wrap: balance;
+  }
+  h3 { font-size: 16.5px; font-weight: 700; margin: 36px 0 12px; }
+  h4 { font-size: 14px; font-weight: 700; margin: 24px 0 8px; }
+  p { margin: 0 0 14px; max-width: 44em; }
+  ul, ol { margin: 0 0 16px; padding-left: 1.4em; max-width: 44em; }
+  li { margin-bottom: 5px; }
+  li > ul { margin-top: 5px; margin-bottom: 6px; }
+  strong { font-weight: 700; }
+  em { font-style: normal; background: linear-gradient(transparent 68%, var(--accent-soft) 68%); }
+  .lede { font-size: 16px; max-width: 42em; }
+  .principle {
+    border-left: 3px solid var(--accent); background: var(--accent-soft);
+    padding: 14px 18px; margin: 18px 0 22px; max-width: 44em; border-radius: 0 6px 6px 0;
+  }
+  .principle .p-label {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700;
+    color: var(--accent-ink); display: block; margin-bottom: 4px;
+  }
+  .principle p { margin: 0; }
+  .principle.ai { border-left-color: var(--ai); background: var(--ai-soft); }
+  .principle.ai .p-label { color: var(--ai); }
+  /* アーキテクチャ案カード */
+  .opt {
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface); padding: 20px 24px 8px; margin: 0 0 20px;
+  }
+  .opt-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .opt-head h3 { margin: 0; }
+  .badge {
+    font-size: 12px; font-weight: 700; padding: 2px 12px; border-radius: 999px; white-space: nowrap;
+  }
+  .badge.rec { color: var(--accent-ink); background: var(--accent-soft); border: 1px solid var(--accent); }
+  .badge.no { color: var(--muted); border: 1px solid var(--line); }
+  .badge.base { color: var(--warn); border: 1px solid var(--warn); }
+  .opt-sum { color: var(--muted); font-size: 14px; margin-bottom: 12px; }
+  .opt-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
+  @media (max-width: 700px) { .opt-cols { grid-template-columns: 1fr; } }
+  .opt-cols h4 { margin: 8px 0 6px; font-size: 13px; }
+  .opt-cols h4.good { color: var(--ok); }
+  .opt-cols h4.bad { color: var(--danger); }
+  .opt-cols ul { font-size: 14px; margin-bottom: 12px; }
+  .opt-verdict {
+    border-top: 1px solid var(--line); padding: 10px 0 8px; margin: 4px 0 0;
+    font-size: 14px; max-width: none;
+  }
+  .tbl-scroll { overflow-x: auto; margin: 18px 0 24px; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; line-height: 1.6; background: var(--surface); }
+  th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  th { background: var(--thead-bg); font-size: 12px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .verdict { color: var(--accent-ink); font-weight: 700; white-space: nowrap; }
+  code {
+    font-family: ui-monospace, "SF Mono", "Consolas", "Menlo", monospace;
+    font-size: 0.88em; background: var(--code-bg); padding: 1px 6px; border-radius: 4px;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 16px 20px; overflow-x: auto; font-size: 12.5px; line-height: 1.7; margin: 16px 0 24px;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  figure { margin: 24px 0 32px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 24px 20px 14px; }
+  figure .fig-scroll { overflow-x: auto; }
+  figure svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  figcaption { font-size: 12.5px; color: var(--muted); margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); max-width: none; }
+  figcaption b { color: var(--ink); }
+  footer.doc-foot { grid-column: 2; border-top: 1px solid var(--line); padding-top: 20px; font-size: 12.5px; color: var(--muted); }
+  footer.doc-foot a, a { color: var(--accent-ink); }
+
+  /* ===== 狭い画面（スマホ・サイドパネル）=====
+     この一括指定は、上書きされないようスタイルシートの最後に置くこと。
+     先に書くと後続の nav.toc { position: sticky } に負けて追従してしまう。 */
+  @media (max-width: 860px) {
+    .wrap { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0 20px 72px; }
+    footer.doc-foot { grid-column: 1; }
+    /* 目次は追従させず、本文の先頭に置く */
+    nav.toc {
+      position: static;
+      top: auto;
+      margin: 0 0 32px;
+      padding: 14px 16px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    nav.toc .toc-title { margin-bottom: 8px; }
+    /* 縦に長くなりすぎないよう2列に畳む */
+    nav.toc ol {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0 12px;
+      border-left: none;
+      padding-left: 0;
+    }
+    nav.toc a { padding: 4px 0; border-left: none; margin-left: 0; }
+    nav.toc a:hover, nav.toc a:focus-visible { border-left: none; }
+  }
+</style>
+
+<div class="wrap">
+
+<header class="doc-head">
+  <p class="doc-kicker">Design Doc v8 — Insight Management（社内運用版）</p>
+  <h1>インサイトマネジメントシステム 設計書 v8<br>——議事録から、更新され続けるインサイトを育てる</h1>
+  <p class="doc-sub">社内プロダクトの議事録・Slack・文字起こしから、ファクト（事実）とインサイト（解釈）を組織の資産として蓄積・更新し続ける仕組みの設計書。<strong>ドメインモデルは1つ</strong>に固定し、アーキテクチャは<strong>5案すべてを残したうえで、段階1＝案1（すべてNotion）／段階2＝案5（BQ ＋ BigQuery MCP ＋ Artifact）</strong>という2段を採ることに決めた。AI処理はClaude Codeのスキルとして実行する（専用パイプライン基盤は作らない）。<strong>§7に画面と体験、§8にシステム自体の改善ループ</strong>を含む。SaaS化はしない。</p>
+  <div class="doc-meta">
+    <span>ステータス <span class="status-pill">Draft — オーナー承認待ち</span></span>
+    <span>作成日 <b>2026-08-11（v8）</b></span>
+    <span>前提 <b>社内限定・プロダクト別・SaaS化なし</b></span>
+    <span>旧版 <b>git履歴に保存</b></span>
+  </div>
+</header>
+
+<nav class="toc" aria-label="目次">
+  <p class="toc-title">Contents</p>
+  <ol>
+    <li><a href="#s1"><span class="toc-num">§1</span>概要</a></li>
+    <li><a href="#s2"><span class="toc-num">§2</span>ドメインモデル</a></li>
+    <li><a href="#s3"><span class="toc-num">§3</span>AI処理（Claude Codeスキル）</a></li>
+    <li><a href="#s4"><span class="toc-num">§4</span>アーキテクチャ5案と採用する2段</a></li>
+    <li><a href="#s5"><span class="toc-num">§5</span>データ設計（列の定義）</a></li>
+    <li><a href="#s6"><span class="toc-num">§6</span>Notion側の設計</a></li>
+    <li><a href="#s9"><span class="toc-num">§7</span>画面と体験（UX）</a></li>
+    <li><a href="#s10"><span class="toc-num">§8</span>改善ループ</a></li>
+    <li><a href="#s7"><span class="toc-num">§9</span>ロードマップ</a></li>
+    <li><a href="#s8"><span class="toc-num">§10</span>リスクと未決事項</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ============================ §1 ============================ -->
+<section id="s1">
+  <p class="sec-eyebrow">§1 / OVERVIEW</p>
+  <h2>概要</h2>
+
+  <h3>1.1 解決したいこと</h3>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>課題</th><th>この仕組みの解き方</th></tr></thead>
+    <tbody>
+      <tr><td>リサーチ結果が議事録のまま散在し、読み返されない</td><td>ファクト単位で構造化し、検索できる資産にする</td></tr>
+      <tr><td>「前に誰かが同じことを聞いた」ことに気づけない</td><td>新しいファクトを既存インサイトと自動照合する</td></tr>
+      <tr><td>インサイトが作った時点で止まり、古くなる</td><td>新しい根拠が来るたびにAIが更新・反証を提案する</td></tr>
+      <tr><td>思い込みの強い施策判断</td><td>確信度と反証を明示し、根拠の弱さを見えるようにする</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>1.2 中核コンセプト（3つ）</h3>
+  <ul>
+    <li><b>Atomic UX Research の階層</b> — リサーチクエスチョン（問い）→ リサーチ（議事録などの調査1件）→ ファクト（事実の最小単位）→ インサイト（解釈）。Tomer Sharon の枠組みに準拠。</li>
+    <li><b>更新され続ける資産</b> — インサイトは作って終わりではなく、新しい根拠の到着で確信度が動き、反証が出たら見直しがかかる。</li>
+    <li><b>AIは提案まで、確定は人間</b> — AIの書き込み先は提案（Suggestion）と監査ログのみ。データ本体の変更は人間の承認を通る。</li>
+  </ul>
+
+  <h3>1.3 データソースと利用者</h3>
+  <ul>
+    <li><b>取り込み対象</b>: Google Meet 議事録（Docs／リンク）、Notion AI 文字起こし、Slack・Chatwork のスレッド。Claudeへはリンクか本文貼り付けで渡す。CS問い合わせは対象外（将来拡張）。</li>
+    <li><b>実測値</b>: 議事録1本 ≒ ファクト約38件。週2〜3本 → 年間4,000〜6,000ファクト。</li>
+    <li><b>利用者</b>: 社内チーム。運用の中心はオーナー（取り込み・レビュー）、他メンバーは閲覧・コメント。</li>
+  </ul>
+</section>
+
+<!-- ============================ §2 ============================ -->
+<section id="s2">
+  <p class="sec-eyebrow">§2 / DOMAIN MODEL</p>
+  <h2>ドメインモデル（1つに固定）</h2>
+
+  <p class="lede">どのアーキテクチャ案を選んでも、このモデルは変わらない。心臓部はファクトとインサイトを結ぶ<b>根拠リンク（EvidenceLink）</b>——支持（supports）／反証（contradicts）の向きと重みを持つ多対多のリンクで、確信度計算と更新提案のすべての基礎になる。</p>
+
+  <figure>
+    <div class="fig-scroll">
+    <svg viewBox="0 0 920 400" role="img" aria-label="ドメインモデル図。プロダクトの中にリサーチクエスチョンがあり、その下のリサーチ（議事録）からハイライト、ファクトへと抽出が流れる。ファクトとインサイトは根拠リンクで多対多に結ばれる。Claudeスキルは提案にのみ書き込み、人間のレビューを経てデータ本体へ反映される。全変更は監査ログに残る。" style="min-width: 780px;">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+        <marker id="arrAcc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+        </marker>
+        <marker id="arrAi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--ai)"/>
+        </marker>
+      </defs>
+      <!-- chain -->
+      <g fill="none" stroke="currentColor" stroke-width="1.2">
+        <rect x="20"  y="60" width="150" height="56" rx="6"/>
+        <rect x="20"  y="150" width="150" height="52" rx="6"/>
+        <rect x="220" y="150" width="120" height="52" rx="6"/>
+        <rect x="390" y="150" width="110" height="52" rx="6"/>
+        <rect x="660" y="150" width="130" height="52" rx="6" stroke="var(--accent)" stroke-width="2"/>
+      </g>
+      <g font-size="12.5" fill="currentColor" text-anchor="middle" font-weight="600">
+        <text x="95" y="83">リサーチクエスチョン</text>
+        <text x="95" y="176">リサーチ（Source）</text>
+        <text x="280" y="176">原文の引用</text>
+        <text x="445" y="176">ファクト</text>
+        <text x="725" y="176" fill="var(--accent)">インサイト</text>
+      </g>
+      <g font-size="10.5" fill="currentColor" opacity="0.65" text-anchor="middle">
+        <text x="95" y="100">「何を明らかにしたいか」</text>
+        <text x="95" y="193">議事録・Slack・文字起こし</text>
+        <text x="280" y="193">原文の切り抜き</text>
+        <text x="445" y="193">事実1文＋引用</text>
+        <text x="725" y="193" fill="var(--accent)">確信度・状態を持つ</text>
+      </g>
+      <g stroke="currentColor" stroke-width="1.2" marker-end="url(#arr)">
+        <line x1="95" y1="116" x2="95" y2="146"/>
+        <line x1="170" y1="176" x2="216" y2="176"/>
+        <line x1="340" y1="176" x2="386" y2="176"/>
+      </g>
+      <g font-size="10.5" fill="currentColor" opacity="0.75" text-anchor="middle">
+        <text x="193" y="168">切り抜き</text>
+        <text x="363" y="168">抽出</text>
+      </g>
+      <!-- evidence link -->
+      <g stroke="var(--accent)" stroke-width="2">
+        <line x1="500" y1="168" x2="656" y2="168" marker-end="url(#arrAcc)"/>
+        <line x1="500" y1="186" x2="656" y2="186" stroke-dasharray="5 4" marker-end="url(#arrAcc)"/>
+      </g>
+      <g font-size="11" text-anchor="middle" fill="var(--accent)" font-weight="600">
+        <text x="578" y="158">根拠リンク（n:m）</text>
+      </g>
+      <g font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">
+        <text x="578" y="182">supports（支持）</text>
+        <text x="578" y="202">contradicts（反証）</text>
+      </g>
+      <!-- AI lane -->
+      <g fill="none" stroke="var(--ai)" stroke-width="1.4">
+        <rect x="180" y="290" width="160" height="52" rx="6"/>
+        <rect x="420" y="290" width="140" height="52" rx="6"/>
+        <rect x="640" y="290" width="150" height="52" rx="6"/>
+      </g>
+      <g font-size="12.5" text-anchor="middle" fill="var(--ai)" font-weight="600">
+        <text x="260" y="312">Claude スキル</text>
+        <text x="490" y="312">提案</text>
+        <text x="715" y="312">人間のレビュー</text>
+      </g>
+      <g font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.65">
+        <text x="260" y="330">抽出・照合・提案生成</text>
+        <text x="490" y="330">Suggestion（差分）</text>
+        <text x="715" y="330">承認 / 編集 / 却下</text>
+      </g>
+      <g stroke="var(--ai)" stroke-width="1.4" marker-end="url(#arrAi)">
+        <line x1="340" y1="316" x2="416" y2="316"/>
+        <line x1="560" y1="316" x2="636" y2="316"/>
+      </g>
+      <text x="378" y="306" font-size="10.5" fill="var(--ai)" text-anchor="middle">書けるのはここだけ</text>
+      <line x1="715" y1="290" x2="722" y2="208" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#arr)"/>
+      <text x="810" y="255" font-size="10.5" fill="currentColor" opacity="0.75" text-anchor="middle">承認時のみ反映</text>
+      <text x="60" y="316" font-size="11" fill="currentColor" opacity="0.75">監査ログ:</text>
+      <text x="60" y="332" font-size="10.5" fill="currentColor" opacity="0.6">全変更を追記記録</text>
+      <!-- product frame -->
+      <rect x="8" y="30" width="904" height="332" rx="10" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="2 5" opacity="0.5"/>
+      <text x="20" y="20" font-size="11" fill="currentColor" opacity="0.7" letter-spacing="2">PRODUCT（プロダクト単位。インサイトのみ全社横断も可）</text>
+    </svg>
+    </div>
+    <figcaption><b>図1 — ドメインモデル。</b>問い→リサーチ→ファクト→インサイトの連鎖と、Claudeの書き込みが提案（Suggestion）に閉じるレーン。根拠リンクの向き（支持／反証）が確信度計算の入力になる。</figcaption>
+  </figure>
+
+  <h3>2.1 エンティティ一覧</h3>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>エンティティ</th><th>意味</th><th>主な属性</th></tr></thead>
+    <tbody>
+      <tr><td><b>プロダクト</b>（products）</td><td>社内プロダクトの単位。データの基本的な仕切り</td><td><code>name, status</code></td></tr>
+      <tr><td><b>リサーチクエスチョン</b>（research_questions）</td><td>「何を明らかにしたいか」という問い。例:「なぜ週次レポートの閲覧率が低いのか」</td><td><code>product_id, question, status(open/answered/parked)</code></td></tr>
+      <tr><td><b>リサーチ</b>（sources）</td><td>調査1件とその生データ。議事録・Slackスレッド・文字起こし</td><td><code>product_id, research_question_id, type, title, occurred_at, raw_ref, channel(link/paste/auto), ingestion_status</code></td></tr>
+      <tr><td><b>ファクト</b>（facts）</td><td>解釈を含まない事実1文と、その<b>原文の引用</b>（要約ではなく発言そのもの）。「A社の田中さんは週次レポートを見ていないと述べた」＋引用</td><td><code>product_id, source_id, statement, quote, quote_locator, speaker, origin(ai/human), <b>status(active/retracted)</b></code></td></tr>
+      <tr><td><b>インサイト</b>（insights）</td><td>解釈。「顧客は定型レポートより異常時の通知を求めている」</td><td><code>product_id(NULL=全社), statement, description, status, confidence_*, freshness, owner, superseded_by_id, <b>falsification_condition</b>（任意）, <b>last_referenced_at / reference_count</b></code></td></tr>
+      <tr><td><b>根拠リンク</b>（evidence_links）</td><td>ファクト⇄インサイトの多対多リンク。<b>本設計の心臓部</b></td><td><code>fact_id, insight_id, stance(supports/contradicts/context), weight(0–1), linked_by, rationale（紐付け理由文）</code>。UNIQUE(fact_id, insight_id)</td></tr>
+      <tr><td><b>提案</b>（suggestions）</td><td>AIからの提案。その場で答えなかった分・cronが後から作った分の置き場（<code>/review</code> でさばく）</td><td><code>type, payload(変更前後の差分), rationale, score, status(pending/accepted/rejected/expired), expires_at</code></td></tr>
+      <tr><td><b>監査ログ</b>（audit_logs）</td><td>誰が・いつ・何を・どう変えたかの履歴帳。追記専用</td><td><code>actor, action, entity_ref, diff, suggestion_id, <b>reason</b>（なぜそうしたか一文）</code></td></tr>
+      <tr><td><b>フィードバック</b>（feedbacks）</td><td>人からの指摘1件。改善の材料（§8.1）</td><td><code>target_type, target_id, kind, summary, applied</code></td></tr>
+      <tr><td><b>学習ルール</b>（learnings）</td><td>繰り返した指摘から作った改善ルール（§8.2）</td><td><code>category, observation, rule, status, feedback_ids</code></td></tr>
+      <tr><td>タグ（tags/taggings）</td><td>ファセット分類（MVPでは使わない）</td><td><code>name, facet</code></td></tr>
+      <tr><td>将来: レポート・キャンバス</td><td>活用レイヤー。MVPには含めない</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="principle">
+    <span class="p-label">「機会（Opportunity）」は作らない</span>
+    <p>インサイトから仮説を立てて検証する役割は、<b>既にNotionにある組織の課題仮説DB</b>が担っている。同じものをBQに持つと二重管理になる。境界は「本システム＝問い→リサーチ→ファクト→インサイト」「既存の課題仮説DB＝課題仮説→検証→結果」（§6.5）。</p>
+  </div>
+
+  <div class="principle">
+    <span class="p-label">設計判断（2つ）</span>
+    <p>① <b>ファクトとインサイトはリサーチクエスチョンに閉じ込めない</b>。問いの中に隔離すると、別の問いを調べるときに過去の知見に気づけず、重複リサーチが再発する。<br>
+    ② <b>インサイトのみ product_id を NULL 可</b>にし、プロダクト横断（全社）の知見を持てるようにする。照合は「同一プロダクト＋全社」を対象にする。</p>
+  </div>
+
+  <h3>2.2 インサイトの状態遷移</h3>
+  <pre><code>draft ──公開──▶ active ◀──解決── needs_review（要見直し）
+                  │  ▲                  ▲
+                  │  └─（更新承認で復帰）│
+                  │  自動トリガー ───────┘
+                  │   ①反証リンクの追加提案 ②確信度の大幅変動 ③鮮度の閾値割れ
+                  ├──統合──▶ merged（superseded_by で後継へ誘導）
+                  └──保管──▶ archived
+※ merged / archived は削除しない（監査とリンク整合性のため）</code></pre>
+
+  <h4>ファクトの撤回とその伝播</h4>
+  <p>発言の取り消し・前提の誤りは起こる。引用必須で捏造は防げるが、<b>後から誤りと判明したファクト</b>への対処が要る。</p>
+  <pre><code>facts.status: active ──撤回──▶ retracted
+   ↓ 撤回した瞬間に自動で
+   ① そのファクトを参照する根拠リンクを無効化
+   ② 対象インサイトの確信度を再計算（既存のトリガーをそのまま使う）
+   ③ 確信度が大きく下がったインサイトは needs_review へ</code></pre>
+  <p>ファクト自体は削除せず <code>retracted</code> にする（監査のため）。再計算の経路は根拠リンク変更時のトリガーが既にあるので流用する。</p>
+
+  <h3>2.3 確信度・鮮度の計算モデルと、その根拠</h3>
+
+  <pre><code>確信度 = clamp( 根拠の強さ × 多様性 × 鮮度 − 反証の減点 )
+
+根拠の強さ = Σ supports（手法の重み × リンクの重み）を飽和曲線で頭打ちに
+             ── 11件目の価値 &lt; 2件目の価値
+多様性     = 独立した発言者数・リサーチ数・種別数（同一人物の10発言 ≪ 10人の発言）
+鮮度       = 根拠の発生日に半減期付きの減衰（デフォルト12ヶ月・調整可）
+反証の減点 = contradicts 側の同様の合算。支持/反証比が閾値割れで needs_review へ
+
+表示: 4段階レベル（仮説 → 兆候 → 検証済 → 強固）を主、数値を従。内訳を必ず開示</code></pre>
+
+  <h4>このモデルは何を根拠にしているか（正直な整理）</h4>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>構成要素</th><th>根拠</th></tr></thead>
+    <tbody>
+      <tr><td>件数の頭打ち（飽和曲線）</td><td>定性調査の<b>データ飽和（saturation）</b>の知見。少数のサンプルで大半の発見が出て、追加サンプルの新情報は逓減する（Guest et al. 2006 の飽和研究、Nielsenの「5ユーザーテスト」など）</td></tr>
+      <tr><td>多様性（独立ソースを重視）</td><td>研究手法の<b>トライアンギュレーション</b>（独立した複数の情報源による裏付けで信頼性を上げる）。同一人物の繰り返し発言は独立した裏付けにならない</td></tr>
+      <tr><td>鮮度の半減期減衰</td><td>知識の陳腐化モデル（文献計量学の「引用半減期」と同型）。市場とユーザー行動は変わるため、古い根拠は割り引く</td></tr>
+      <tr><td>反証の減点・一級市民化</td><td>反証主義と<b>確証バイアス対策</b>。医療のエビデンス評価<b>GRADE</b>が「結果の非一貫性」で証拠の質を下げるのと同じ構造</td></tr>
+      <tr><td>4段階レベル表示</td><td>GRADEの4段階（High/Moderate/Low/Very low）に倣った離散化。数値の見かけの精密さより判断に使える粗さを優先</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="principle">
+    <span class="p-label">ただし——式と係数は「設計仮説」である</span>
+    <p>構成要素の選定には上記の根拠があるが、<b>式の形・手法の重み（面談1.0/Slack 0.6等）・半減期12ヶ月といった具体値は実証された標準ではなく、本設計の仮説</b>。だからこそ ①内訳を必ず開示する ②係数は設定で変えられるようにする ③運用の実データ（提案の承認率、レビュー時の体感とスコアのズレ）で校正する、を設計に組み込む。スコアが信頼を失ったら数値を隠して4段階レベルだけにする退路も残す。</p>
+  </div>
+  <h3>2.4 剪定 — いつアーカイブするか</h3>
+  <p>状態に <code>archived</code> はあるが、<b>いつ・誰が・どの基準で</b>が未定義だとインサイトは増える一方になる。</p>
+  <div class="principle">
+    <span class="p-label">なぜ剪定するのか（理由を正確に）</span>
+    <p>保存容量が理由ではない。剪定が要る本当の理由は2つ。<br>
+    ① <b>人が一覧を読めなくなる</b> — インサイトが数百件になると、そこから選べない<br>
+    ② <b>照合にノイズが増える</b> — 関連の薄いインサイトが候補に混ざり、提案の質が落ちる</p>
+  </div>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>対象</th><th>アーカイブ候補の条件（週次cronで判定し <code>/review</code> に提案。自動archiveはしない）</th></tr></thead>
+    <tbody>
+      <tr><td>インサイト</td><td>確信度が「仮説」のまま × 90日間参照ゼロ × 鮮度切れ（新しい根拠が来ていない）</td></tr>
+      <tr><td>ファクト</td><td>どのインサイトにもリンクされていない × 180日経過</td></tr>
+    </tbody>
+  </table></div>
+  <p><code>last_referenced_at</code> / <code>reference_count</code> は詳細画面を開いた回数を記録する。<b>これは「使われた」証明にはならないが、「使われていない」の検出には十分</b>（開かれてすらいないものは確実に使われていない）。<em>剪定の材料としてのみ使い、価値の指標には使わない。</em></p>
+  <div class="principle">
+    <span class="p-label">「使われたか」は課題仮説リレーションで測る</span>
+    <p>既存のNotionインサイトDBには課題仮説へのリレーションが張られている（§6.5）。<b>そこにリレーションが付いたインサイト＝実際に仮説の根拠として使われた</b>ということ。週次で<em>読むだけ</em>（書き込みはしない）で、閲覧回数より遥かに正確な使用実態が得られる。<br>
+    将来、仮説の<b>検証結果</b>（当たった／外れた）まで読めば、「確信度が高いインサイトから立てた仮説は本当に当たりやすいか」が測れる。これは§2.3で「未検証の仮説」と断った確信度モデルの、最も強い校正材料になる（§8.4）。</p>
+  </div>
+</section>
+
+<!-- ============================ §3 ============================ -->
+<section id="s3">
+  <p class="sec-eyebrow">§3 / AI VIA CLAUDE CODE SKILLS</p>
+  <h2>AI処理 — Claude Codeのスキルとして実行する</h2>
+
+  <p class="lede">専用のパイプライン基盤（キュー・ワーカー・イベントバス）は<b>作らない</b>。AI処理はすべて<b>Claude Codeのスキル</b>として実装し、手動またはcron（定期実行）で起動する。基盤は段階1（案1）ではNotionだけ、段階2（案5）ではBigQueryだけ（§4）。</p>
+
+  <p>下の表は<b>段階1（すべてNotion）</b>の動作。段階2に移ると、読み書きの相手がNotion MCPからBigQuery MCPに変わるだけで、やることは同じ。</p>
+
+  <h3>3.1 スキル構成（4本）</h3>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>スキル</th><th>やること</th><th>起動</th></tr></thead>
+    <tbody>
+      <tr><td><code>/research-ingest</code></td><td>議事録のリンク or 本文を受け取る → リサーチDBに1行作る（原文はリンクで参照）→ ファクト抽出（引用必須）→ どの問いに紐づくか確認 → ファクトDBへ書き込み → <b>確認ビューのリンクを返す</b></td><td>手動（議事録を渡すとき）</td></tr>
+      <tr><td><code>/insight-match</code></td><td>新しいファクトを既存インサイトと照合（インサイトDBを意味検索で絞る、数十件なら全件読む → 支持/反証を判定）→ 各ファクトの <code>review_status</code> を3群に振り分け → 根拠リンクを作り、確信度を計算して書く</td><td>ingest後に続けて実行</td></tr>
+      <tr><td><code>/review</code></td><td>「要確認」に残っているファクト、見直しが必要なインサイトをまとめて提示し、<b>まとめて承認/却下</b> → 反映。状態変更（アーカイブ等）もここで行う</td><td>手動（気が向いたとき）</td></tr>
+      <tr><td><code>/insight-report</code></td><td>週次まとめ（新規・要見直し・確信度の変動）を<b>Notionページとして</b>生成。あわせて<b>アーカイブ候補</b>（§2.4）と<b>ルール化の提案</b>（§8.2）を出す</td><td>cron（週1）</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="principle">
+    <span class="p-label">承認はチャットではなく「確認ビュー」で行う（UXレビューで方針変更）</span>
+    <p>当初は「スキル実行時にチャットでその場で聞く」としていたが、<b>38件をチャットのテキストで流し込むのは最も不向きな提示形式</b>（一覧できない・絞り込めない・後から見返せない）で、実質「見ずに承認」になる。AIを提案までに留める設計が形骸化してしまう。<br>
+    正しくは、スキルは<b>「38件を仕分けました」というビューのリンクを返すだけ</b>にし、承認はファクトDBのボードビュー（§7.2）で行う。MVPではNotionの標準機能だけで作れるので、専用画面は要らない。<br>
+    その場で処理しなかったものは <code>review_status</code> が「要確認」のまま残り、<code>/review</code> から同じビューでさばく。</p>
+  </div>
+
+  <h4>リサーチクエスチョンの登録</h4>
+  <p>問いDBは<b>1つだけ</b>置く。下書き用と確定用に分けない（分けると同じ問いが2箇所に存在して混乱する）。</p>
+  <ul>
+    <li>人はNotionの問いDBに行を追加するだけ。<b><code>id</code> 列が空＝まだスキルに認識されていない</b></li>
+    <li><code>/research-ingest</code> の実行時に問いDBを<b>1回クエリ</b>し、<code>id</code> が空の行にIDを振って書き戻す（問いは数十件規模なので1リクエスト。巡回cronもURL貼り付けも不要）</li>
+    <li>IDが入った行にはリサーチ数・インサイト数がスキルから書かれ始める。これが「認識された」ことの表示を兼ねる</li>
+  </ul>
+  <p>これは編集の同期ではなく<b>新規作成の検知</b>なので競合が起きない。段階2に移っても同じやり方をそのまま使える。</p>
+
+  <h3>3.2 原則（基盤がなくても守るもの）</h3>
+  <ul>
+    <li><b>人間の承認なしにデータ本体を変えない</b>。AIが勝手に確定するのは禁止で、必ずその場の確認か <code>/review</code> を通す。</li>
+    <li><b>ファクトは引用必須</b> — 原文の引用が取れないファクト文は登録しない（捏造防止）。</li>
+    <li>段階1では<b>構造化された監査ログを持たない</b>（案1の項）。代わりにインサイトの変更には必ず <code>update_reason</code> を1文書く。段階2で監査ログを導入したら、書き込みと監査ログ追記を必ずセットにする。</li>
+    <li><b>Notionへの読み書き処理は1ファイルに集約する</b>（4.9-5）。段階2で差し替えるのはそこだけにする。</li>
+    <li><b>スキルは何度実行しても安全に</b>（同じ議事録を2回渡しても二重登録しない。リサーチDBの <code>content_hash</code> で重複検知）。</li>
+    <li><b>レビュー運用</b>: ファクトは実測38件/本のため<em>議事録1本＝1回の一括承認</em>（一覧を見せて、除外したいものだけ外す）。個別に丁寧に見るのは新インサイト・見直し・反証リンクに集中する。</li>
+    <li><b>人の指摘は必ず記録する</b> — 修正・削除・追加・不調の報告を受けたら、要約1文にして確認を取り<b>フィードバックDB</b>に入れる（§8.1）。会話の全文は保存しない。</li>
+    <li>スキルファイルは<b>150行を目安</b>に保つ。ルールを1つ足すときは効いていないものを1つ削るか統合する（§8.3）。</li>
+  </ul>
+</section>
+
+<!-- ============================ §4 ============================ -->
+<section id="s4">
+  <p class="sec-eyebrow">§4 / ARCHITECTURE OPTIONS</p>
+  <h2>アーキテクチャ — 5案と、採用する2段</h2>
+
+  <p class="lede">ドメインモデル（§2）とスキル構成（§3）は、どの案でも変わらない。違うのは「<b>マスタをどこに置き、画面を何にするか</b>」だけ。5案をすべて残したうえで、採用する道筋を決める。</p>
+
+  <h3>4.1 決定 — 案1で始めて、案5へ移る</h3>
+
+  <div class="tbl-scroll"><table>
+    <thead><tr><th></th><th>段階1（MVP）<br>案1: すべてNotion</th><th>段階2（移行先）<br>案5: BQ ＋ BQ MCP ＋ Artifact</th></tr></thead>
+    <tbody>
+      <tr><td>ストア</td><td>Notionだけ（7つのDB）</td><td>BigQueryだけ</td></tr>
+      <tr><td>画面</td><td>NotionのDBビュー</td><td>Claude Artifact</td></tr>
+      <tr><td>Claudeの接続先</td><td>Notion MCP</td><td><b>公式BigQuery MCP</b></td></tr>
+      <tr><td>同期のコード</td><td class="verdict"><b>0行</b>（ストアが1つ）</td><td class="verdict"><b>0行</b>（投影する先がない）</td></tr>
+      <tr><td>いつ</td><td>今すぐ着手</td><td>4.8のトリガーに当たったとき</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="fig-scroll">
+  <svg viewBox="0 0 940 300" role="img" aria-label="採用する2段のアーキテクチャ図。段階1は議事録をClaude CodeスキルがNotionの5つのDBへ書き、人がNotionを直接見て書く。段階2はNotionを使わず、スキルがBigQueryへ書き、人はArtifactを通してBigQuery MCP経由で閲覧・編集する。どちらの段階も投影や同期が存在しない。" style="min-width: 860px;">
+    <defs>
+      <marker id="a2Arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+      </marker>
+      <marker id="a2ArrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+      </marker>
+    </defs>
+
+    <!-- ===== 段階1 ===== -->
+    <text x="20" y="24" font-size="13" fill="currentColor" font-weight="700">段階1（MVP）＝ 案1: すべてNotion — ストアが1つなので同期がない</text>
+    <g fill="none" stroke="currentColor" stroke-width="1.2">
+      <rect x="20" y="40" width="96" height="38" rx="5"/>
+      <rect x="150" y="40" width="120" height="38" rx="5" stroke="var(--ai)" stroke-width="1.6"/>
+      <rect x="304" y="34" width="250" height="50" rx="5" stroke="var(--accent)" stroke-width="2"/>
+      <rect x="588" y="40" width="70" height="38" rx="5"/>
+    </g>
+    <g font-size="11" text-anchor="middle" fill="currentColor">
+      <text x="68" y="64">議事録</text>
+      <text x="210" y="64" fill="var(--ai)">Claude Codeスキル</text>
+      <text x="429" y="55" fill="var(--accent)" font-weight="700">Notion（マスタ兼画面）</text>
+      <text x="429" y="72" font-size="9.5" opacity="0.8">問い・リサーチ・ファクト・インサイト・根拠リンク</text>
+      <text x="623" y="64">人</text>
+    </g>
+    <g stroke="currentColor" stroke-width="1.2" marker-end="url(#a2Arr)">
+      <line x1="116" y1="59" x2="146" y2="59"/>
+      <line x1="270" y1="59" x2="300" y2="59"/>
+    </g>
+    <line x1="584" y1="59" x2="558" y2="59" stroke="currentColor" stroke-width="1.2" marker-end="url(#a2Arr)"/>
+    <text x="678" y="55" font-size="10.5" fill="currentColor" opacity="0.75">人はNotionを直接見て書く</text>
+    <text x="678" y="71" font-size="10.5" fill="currentColor" opacity="0.75">（課題仮説DBへのリレーションもここ）</text>
+
+    <line x1="20" y1="112" x2="920" y2="112" stroke="currentColor" stroke-width="1" opacity="0.2"/>
+
+    <!-- ===== 段階2 ===== -->
+    <text x="20" y="146" font-size="13" fill="currentColor" font-weight="700">段階2 ＝ 案5: BQ ＋ BQ MCP ＋ Artifact — Notionを使わない。投影する先がないので同期もない</text>
+    <g fill="none" stroke="currentColor" stroke-width="1.2">
+      <rect x="20" y="176" width="96" height="38" rx="5"/>
+      <rect x="150" y="176" width="120" height="38" rx="5" stroke="var(--ai)" stroke-width="1.6"/>
+      <rect x="304" y="170" width="230" height="50" rx="5" stroke="var(--accent)" stroke-width="2"/>
+      <rect x="304" y="242" width="230" height="44" rx="5" stroke="var(--accent)" stroke-width="2"/>
+      <rect x="588" y="245" width="70" height="38" rx="5"/>
+    </g>
+    <g font-size="11" text-anchor="middle" fill="currentColor">
+      <text x="68" y="200">議事録</text>
+      <text x="210" y="200" fill="var(--ai)">Claude Codeスキル</text>
+      <text x="419" y="191" fill="var(--accent)" font-weight="700">BigQuery（唯一のストア）</text>
+      <text x="419" y="208" font-size="9.5" opacity="0.8">全データ・埋め込み・確信度・監査ログ</text>
+      <text x="419" y="262" fill="var(--accent)" font-weight="700">Claude Artifact</text>
+      <text x="419" y="278" font-size="9.5" opacity="0.8">閲覧・編集・承認・分析キャンバス</text>
+      <text x="623" y="269">人</text>
+    </g>
+    <g stroke="currentColor" stroke-width="1.2" marker-end="url(#a2Arr)">
+      <line x1="116" y1="195" x2="146" y2="195"/>
+      <line x1="270" y1="195" x2="300" y2="195"/>
+    </g>
+    <line x1="584" y1="264" x2="538" y2="264" stroke="currentColor" stroke-width="1.2" marker-end="url(#a2Arr)"/>
+    <line x1="405" y1="238" x2="405" y2="224" stroke="var(--accent)" stroke-width="1.4" marker-end="url(#a2ArrA)"/>
+    <line x1="433" y1="224" x2="433" y2="238" stroke="var(--accent)" stroke-width="1.4" marker-end="url(#a2ArrA)"/>
+    <text x="470" y="235" font-size="10" fill="var(--accent)" font-weight="600">BQ MCP</text>
+    <text x="678" y="196" font-size="10.5" fill="currentColor" opacity="0.75">Notionが構成から消える</text>
+    <text x="678" y="212" font-size="10.5" fill="currentColor" opacity="0.75">＝ 投影も突合も存在しない</text>
+    <text x="678" y="264" font-size="10.5" fill="currentColor" opacity="0.75">人の操作はすべてArtifact上</text>
+  </svg>
+  </div>
+
+  <div class="principle">
+    <span class="p-label">この2段にした理由</span>
+    <p>① <b>どちらの段階も同期のコードが0行。</b> 本設計で一番壊れやすかったのは「2つのストアの間で同じデータをどう合わせるか」だった。案1はストアが1つ、案5も投影する先がないので、その問題がどちらにも存在しない。<b>案2〜案4は必ず同期を抱える</b>ため通過点にしない<br>
+    ② <b>BigQuery MCPはArtifactとセットで使う。</b> BQに置いたデータをClaude ArtifactからMCP経由で読み書きする形であって、Notionと組み合わせるものではない<br>
+    ③ <b>移行しても自作プログラムが要らない。</b> Googleの公式マネージドMCPサーバ（<code>bigquery.googleapis.com/mcp</code>）を使うので、同期サーバもカスタムコネクタも立てない</p>
+  </div>
+
+  <div class="principle">
+    <span class="p-label">用語</span>
+    <p><b>MCP</b> ＝ Claudeが外部サービスを読み書きするための接続の規格。<b>BigQuery MCP</b> ＝ Googleが運用している公式のMCPサーバで、自分でサーバを立てずにClaudeやArtifactからBigQueryへSQLを実行できる。<code>execute_sql_readonly</code>（SELECTのみ）と <code>execute_sql</code>（INSERT/UPDATEもできる）の2つの窓口がある。</p>
+  </div>
+
+  <!-- ===== 案1 ===== -->
+  <div class="opt">
+    <div class="opt-head"><h3>案1: すべてNotion</h3><span class="badge rec">段階1で採用</span></div>
+    <p class="opt-sum">NotionのDB群がマスタ兼画面。Claude CodeはNotion MCPだけを読み書きする。BQなし。</p>
+<pre><code>議事録 ──▶ スキル ──▶ Notion（マスタ兼画面）──▶ 人が見る・書く</code></pre>
+    <div class="opt-cols">
+      <div>
+        <h4 class="good">メリット</h4>
+        <ul>
+          <li><b>ストアが1つで同期が不要</b>（本設計で最大の複雑さが存在しない）</li>
+          <li><b>最速で始められる</b>（DBを作れば今日から）</li>
+          <li>コメント・通知・モバイルが最初からある。運用対象ゼロ</li>
+          <li><b>既存のインサイトDB・課題仮説DBのリレーションがそのまま使える</b>（§6.5）</li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="bad">デメリット</h4>
+        <ul>
+          <li><b>行数</b> — ファクトが年4,000〜6,000件（実測38件/議事録）。3年で1.5万〜2万件</li>
+          <li><b>横断集計ができない</b> — 現在のプラン（Business ＋ Notion AI）ではSQLは1つのDBの中だけ</li>
+          <li><b>構造化された監査ログを置けない</b> — 監査ログはファクト以上に行数が増える</li>
+          <li>分析キャンバス・確信度の内訳の図は作れない</li>
+        </ul>
+      </div>
+    </div>
+    <div class="principle">
+      <span class="p-label">過去の「不採用」判断を訂正する</span>
+      <p>v2〜v7ではこの案を不採用としていた。その根拠2つは<b>調べ直した結果、誤りだった</b>。<br>
+      ① 「Notionには意味検索がないので自動照合ができない」→ <b>できる。</b> Notion MCPの検索は対象DBを指定した意味検索に対応している（このセッションで動作を確認）。さらに<b>照合の相手はインサイト（数十〜百件）であってファクト全件ではない</b>ので、数十件ならClaudeがまとめて読んで支持/反証を判定できる<br>
+      ② 「飽和曲線や半減期をNotionの数式で書けないので確信度が計算できない」→ <b>Notionが計算する必要がない。</b> 計算するのはClaude。Notionは結果の数値を1列持つだけ。むしろ数式・ロールアップを<b>使わないこと</b>がNotionを重くしない条件そのもの（劣化の主因は行数ではなく数式・ロールアップの多用）</p>
+    </div>
+    <p class="opt-verdict"><b>判定</b>: 中核である照合と確信度は成立する。弱点は行数・横断集計・監査ログの3つに絞られ、いずれも<em>MVPの間は困らない</em>。<b>段階1として採用する。</b></p>
+
+    <p><b>段階1のDB構成（7つ。うち1つは既存）</b></p>
+    <div class="tbl-scroll"><table>
+      <thead><tr><th>Notion DB</th><th>中身</th><th>年間の行数</th><th>新規/既存</th></tr></thead>
+      <tbody>
+        <tr><td>問いDB</td><td>リサーチクエスチョン</td><td>数十</td><td>新規</td></tr>
+        <tr><td>リサーチDB</td><td>議事録などの調査1件</td><td>約150</td><td>新規</td></tr>
+        <tr><td><b>ファクトDB</b></td><td>事実1文＋引用＋話者＋仕分けステータス</td><td><b>4,000〜6,000</b></td><td>新規</td></tr>
+        <tr><td>インサイトDB</td><td>解釈・確信度・状態</td><td>数十〜百</td><td><b>既存を使う</b>（§6.5）</td></tr>
+        <tr><td><b>根拠リンクDB</b></td><td>どのファクトがどのインサイトを支持/反証するか</td><td><b>約3,000</b></td><td>新規</td></tr>
+        <tr><td>フィードバックDB</td><td>人からの指摘の要約1文（§8.1）</td><td>数百</td><td>新規</td></tr>
+        <tr><td>学びDB</td><td>繰り返した指摘から作った改善ルール（§8.2）</td><td>数十</td><td>新規</td></tr>
+        <tr><td>（課題仮説DB）</td><td>組織の既存DB。<b>読むだけ・一切書かない</b></td><td>—</td><td>既存</td></tr>
+      </tbody>
+    </table></div>
+    <p>行数の95%はファクトDBと根拠リンクDBに集中する。</p>
+
+    <div class="principle">
+      <span class="p-label">横断集計ができない問題への対処 — 根拠リンクDBにファクトの属性を写しておく</span>
+      <p>確信度の計算には「そのインサイトを支持する根拠が、いくつの独立したリサーチから、どの手法で、いつ得られたか」が要る。本来はファクトDBと結合して取るが、複数DBをまたぐ集計が書けない。<br>
+      そこで<b>根拠リンクDBに、ファクト側の変わらない属性を最初から書き写しておく</b>（発言者の属性・リサーチの種別・発生日）。後から変わらない値なので写しがずれない。これで「インサイトXの根拠リンクを全部取る」という<b>1つのDBへの絞り込みだけ</b>で計算材料が揃う。件数も数十件なのでSQLすら要らずClaudeが読んで計算できる。</p>
+    </div>
+
+    <div class="principle">
+      <span class="p-label">段階1で「できないこと」を先に認める</span>
+      <p>・<b>構造化された監査ログ</b> — 作らない。Notionのページ更新履歴で「誰がいつ」は追える。「なぜ」はインサイトの <code>update_reason</code> に1文書く。検索・集計できる監査ログは段階2で導入する<br>
+      ・<b>全ファクトを横断した分析</b> — 段階2で行う。MVPで必要になる場面がない<br>
+      ・<b>埋め込み（ベクトル）を自分で持って閾値を調整する</b> — Notionの検索に任せる。校正は段階2から</p>
+    </div>
+  </div>
+
+  <!-- ===== 案2 ===== -->
+  <div class="opt">
+    <div class="opt-head"><h3>案2: BQマスタ × Notion GUI</h3><span class="badge no">採らない</span></div>
+    <p class="opt-sum">Claude Codeのスキルに議事録を渡すと、ファクトを抽出して<b>BQに登録し、続けてNotionにも登録（投影）する</b>。人はNotionを見て、必要なら編集する。BQが全量・履歴・計算のマスタ。</p>
+<pre><code>議事録 ──▶ スキル ──▶ BQ（マスタ・全量）──投影──▶ Notion ──▶ 人が見る
+                              ▲                       │
+                              └────── 編集を取り込む ──┘  ← ここが双方向</code></pre>
+    <div class="opt-cols">
+      <div>
+        <h4 class="good">メリット</h4>
+        <ul>
+          <li>照合・確信度計算・監査ログがSQLで確実に作れる</li>
+          <li>承認率などの計測が初日からSQL一発</li>
+          <li>Notionの閲覧・コメント・通知はそのまま使える</li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="bad">デメリット</h4>
+        <ul>
+          <li><b>同期の造り込み</b> — 所有権固定・hash差分・429対策・夜間突合（§6）。運用の複雑さが増える</li>
+          <li><b>ファクト全量の閲覧面がない</b> — 38件/本により直近30日＋リンク済みしか置けない</li>
+          <li>開始時点で投影の実装が必要になる</li>
+        </ul>
+      </div>
+    </div>
+    <p class="opt-verdict"><b>判定</b>: 中核要件はすべて成立するが、<b>開始した瞬間から双方向同期を抱える</b>。案1で始めれば同じ機能に到達するまで同期を書かずに済むため、<em>通過点にもしない。</em></p>
+  </div>
+
+  <!-- ===== 案3 ===== -->
+  <div class="opt">
+    <div class="opt-head"><h3>案3: 案2 ＋ 閲覧Artifact（公式BigQueryコネクタ）</h3><span class="badge no">採らない</span></div>
+    <p class="opt-sum">案2に、Claude Artifact＋公式BigQuery MCPによる<b>読み取り専用の閲覧画面</b>を足す。検索・全量ファクト一覧・インサイト詳細の閲覧をArtifactが担う。</p>
+<pre><code>議事録 ──▶ スキル ──▶ BQ（マスタ）──投影──▶ Notion ──▶ 人が見る・編集する
+                        │  ▲                  │
+                        │  └── 編集を取り込む ─┘  ← 双方向は案2のまま
+                        └──読取──▶ 閲覧Artifact ──▶ 人が探す（全量）</code></pre>
+    <div class="opt-cols">
+      <div>
+        <h4 class="good">案2に対する追加メリット</h4>
+        <ul>
+          <li>弱点だった「ファクト全量の閲覧面」が埋まる</li>
+          <li>追加コストは設定のみ（公式マネージドMCPのためコード・サーバ運用ゼロ）</li>
+          <li>案4・案5へ同じ構成のまま拡張できる</li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="bad">残るデメリット</h4>
+        <ul>
+          <li><b>案2の双方向同期がそのまま残る</b></li>
+          <li>編集・承認はまだArtifactでできない</li>
+          <li>Artifact閲覧にclaude.aiログイン＋コネクタ同意が必要</li>
+        </ul>
+      </div>
+    </div>
+    <p class="opt-verdict"><b>判定</b>: 案2の弱点は埋まるが、<b>同期の複雑さは1つも減らない</b>。採らない。</p>
+  </div>
+
+  <!-- ===== 案4 ===== -->
+  <div class="opt">
+    <div class="opt-head"><h3>案4: 更新Artifact ＋ Notionは読み取り専用の共有ボード</h3><span class="badge base">採らない・ただし退避先</span></div>
+    <p class="opt-sum">操作（閲覧・編集・承認・分析キャンバス）は<b>すべてArtifactで行い</b>、Notionは<b>BQから一方向に流し込むだけの読み取り専用ボード</b>として残す。Notionからは一切編集しない。</p>
+<pre><code>議事録 ──▶ スキル ──▶ BQ（マスタ）──投影──▶ Notion ──▶ 人が見る・議論する
+                        ▲  │                            （編集はしない）
+          人が操作する ──┴──┴──▶ Artifact（閲覧・編集・承認・キャンバス）</code></pre>
+    <p><b>案5との違いは「Notionを残すかどうか」だけ。残す理由は2つ</b>——① <b>議論の場</b>（インサイトにコメントを付けて会話できる。Artifactにこの機能はない）② <b>claude.aiを開かない人への共有</b>（ログインもコネクタ同意も要らない）。逆に言えばこの2つが要らないなら案5でよい。</p>
+    <div class="opt-cols">
+      <div>
+        <h4 class="good">メリット</h4>
+        <ul>
+          <li>同期が<b>一方向（BQ→Notion）だけ</b>になる。案2で必要だった逆方向の取り込み（所有権の固定・競合解決・エコー防止）が丸ごと不要</li>
+          <li>コメント・気軽な共有を保ったまま、操作性はArtifactで得られる</li>
+          <li><b>既存の課題仮説リレーションを保てる</b>（4.10）</li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="bad">デメリット</h4>
+        <ul>
+          <li>それでも<b>投影の実装は要る</b>（差分検知・429対策・投影上限）</li>
+          <li>Notionの行数制約は残る（投影対象を絞る必要がある）</li>
+          <li>画面を全部Artifactで作る手間は案5と同じ</li>
+        </ul>
+      </div>
+    </div>
+    <p class="opt-verdict"><b>判定</b>: 採らない。ただし<b>4.10の「案5に移ると失うもの」が実際に問題になったときの退避先</b>として残す。案5から案4へは、インサイトDBへの一方向投影を足すだけで移れる。</p>
+  </div>
+
+  <!-- ===== 案5 ===== -->
+  <div class="opt">
+    <div class="opt-head"><h3>案5: BQ ＋ BQ MCP ＋ Artifact（Notionを使わない）</h3><span class="badge rec">段階2で採用</span></div>
+    <p class="opt-sum">Notionを構成から外し、<b>閲覧も更新もすべてArtifact上で完結</b>させる。ストアはBQ1つだけ。画面はArtifact、AI処理はClaude Codeスキル、その橋渡しがBigQuery MCP。</p>
+<pre><code>議事録 ──▶ スキル ──▶ BQ（唯一のストア）◀──BQ MCP──▶ Artifact ──▶ 人
+                                                （閲覧・編集・承認・キャンバス）
+※ 投影する先がないので、同期の実装が存在しない</code></pre>
+    <div class="opt-cols">
+      <div>
+        <h4 class="good">メリット</h4>
+        <ul>
+          <li><b>同期がゼロ</b> — 所有権マトリクス・hash差分・夜間突合・429対策・投影上限のすべてが不要</li>
+          <li><b>行数の制約から解放される</b> — 投影しないのでUI劣化も投影上限も無関係</li>
+          <li><b>確信度の内訳の図・支持/反証の並置・分析キャンバス</b>など、Notionでは作れない画面を自由に作れる</li>
+          <li>監査ログ・横断集計・ベクトル検索がSQLで確実に使える</li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="bad">デメリット</h4>
+        <ul>
+          <li><b>画面をすべて自分で作る</b> — Notionが無料で提供していた一覧・フィルタ・並べ替えを実装することになる</li>
+          <li><b>コメント・議論の場がなくなる</b>（4.10）</li>
+          <li><b>閲覧にclaude.aiログインとコネクタ同意が必要</b> — 気軽な共有は失われる</li>
+          <li><b>画面を直せるのは作成者1人</b>（下記）</li>
+        </ul>
+      </div>
+    </div>
+    <div class="principle">
+      <span class="p-label">更新の危険範囲を絞る方法は2段階。サーバを立てずに始められる</span>
+      <p><b>まず権限だけで絞る（サーバ不要）</b> — 公式マネージドMCPの <code>execute_sql</code> を使い、<em>接続アカウントに「書き換えてよいテーブル」だけ書込権限を与える</em>。インサイト・提案・監査ログだけ書込可、ファクトとリサーチは読み取り専用にすれば、画面のバグが壊せる範囲がそこに限定される。<br>
+      <b>次に操作そのものを限定する（サーバが必要）</b> — <b>MCP Toolbox for BigQuery</b>（Google公式OSS <code>googleapis/mcp-toolbox</code>）は、設定ファイルに<em>ツールを1つずつ定義する</em>方式。「提案を承認する」「インサイトの文言を更新する」といった<b>定型SQLとその引数だけ</b>を公開でき、定義していない操作は実行できない。ただし<em>これは自分で動かすプログラム</em>なので、Cloud Runなどに常時起動で置きカスタムコネクタとして登録する必要がある。<br>
+      <b>進め方</b>: まず権限で絞って始め、更新の種類が増えて「特定の操作だけに固定したい」となった時点でToolboxへ移る。<em>最初からサーバを立てる必要はない。</em></p>
+    </div>
+    <div class="principle">
+      <span class="p-label">重要な制約 — Artifactを更新できるのは作成者だけ</span>
+      <p>Artifactは<b>所有者（作成した人）しか更新できない</b>。他の人は共有されれば閲覧できるが内容を直せない。さらにコネクタを使う（＝BQに接続する）ページは<em>一般公開の共有ができない</em>。呼び出しは閲覧者自身の資格情報で実行されるため、各自がBQの権限を持っている必要もある。<b>つまり画面の改修担当が1人に固定される。</b> 1人運用なら問題にならない。<br>
+      <b>緩和策</b>: 画面のHTMLをリポジトリで管理し、Artifactはそこから発行した表示用の複製とみなす。こうすれば<em>誰でもソースを直せる</em>し、担当者が不在でも別の人が自分のArtifactとして発行し直せる（URLは変わるが内容は失われない）。</p>
+    </div>
+    <p class="opt-verdict"><b>判定</b>: 構造的に最もシンプルで、同期の問題が存在しない。段階1で溜めたデータをそのまま活かせる。<b>段階2として採用する。</b> ただし移行時に4.10を必ず判断すること。</p>
+  </div>
+
+  <h3>4.7 比較表</h3>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>観点</th><th>案1<br>すべてNotion</th><th>案2<br>BQ×Notion</th><th>案3<br>＋閲覧Artifact</th><th>案4<br>更新Artifact＋<br>読み取りNotion</th><th>案5<br>Notionなし</th></tr></thead>
+    <tbody>
+      <tr><td><b>採否</b></td><td class="verdict"><b>段階1で採用</b></td><td>採らない</td><td>採らない</td><td>退避先</td><td class="verdict"><b>段階2で採用</b></td></tr>
+      <tr><td>照合（意味検索）</td><td>○ Notionの検索</td><td>◎ SQL＋ベクトル</td><td>◎</td><td>◎</td><td>◎</td></tr>
+      <tr><td>確信度の計算</td><td>◎ Claudeが計算</td><td>◎</td><td>◎</td><td>◎</td><td>◎</td></tr>
+      <tr><td>監査ログ</td><td>× 持たない</td><td>◎</td><td>◎</td><td>◎</td><td>◎</td></tr>
+      <tr><td>横断集計</td><td>× 1DB内のみ</td><td>◎</td><td>◎</td><td>◎</td><td>◎</td></tr>
+      <tr><td>ファクト全量の閲覧</td><td>△ 1.5万件で未知</td><td>× 置き場がない</td><td>◎</td><td>◎</td><td>◎ 制約なし</td></tr>
+      <tr><td>分析・レポート画面</td><td>△ DBビュー止まり</td><td>△ 同左</td><td>◎</td><td>◎</td><td>◎</td></tr>
+      <tr><td>分析キャンバス（付箋）</td><td>×</td><td>×</td><td>×</td><td>◎</td><td>◎</td></tr>
+      <tr><td><b>同期の手間</b></td><td class="verdict"><b>◎ ゼロ</b></td><td>× 双方向の一式</td><td>× 同左</td><td>○ 一方向だけ</td><td class="verdict"><b>◎ ゼロ</b></td></tr>
+      <tr><td>コメント・議論</td><td>◎</td><td>◎</td><td>◎</td><td>◎</td><td><b>× なし</b></td></tr>
+      <tr><td>気軽な閲覧・共有</td><td>◎</td><td>◎</td><td>◎</td><td>◎</td><td>△ ログイン必須</td></tr>
+      <tr><td><b>課題仮説リレーション</b></td><td><b>◎ そのまま使える</b></td><td>◎</td><td>◎</td><td>◎</td><td><b>× 切れる（4.10）</b></td></tr>
+      <tr><td>画面を直せる人</td><td>◎ 全員</td><td>◎ 全員</td><td>△ Artifactは作成者のみ</td><td>△ 同左</td><td>△ 作成者のみ</td></tr>
+      <tr><td>構築の速さ</td><td>◎ 今日から</td><td>○ 2〜4週</td><td>○ ＋設定のみ</td><td>△ ＋画面開発</td><td>△ 画面を全部作る</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>4.8 いつ案5へ移るか（移行トリガー）</h3>
+  <p>次のどれか1つに当たったら移行を検討する。<b>当たるまでは移さない。</b></p>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>トリガー</th><th>判定のしかた</th></tr></thead>
+    <tbody>
+      <tr><td>ファクトDBの表示が体感で待たされる</td><td>ビューを開いてから一覧が出るまで、日常的に3秒以上かかる</td></tr>
+      <tr><td>ファクトDBが1万行を超えた</td><td>行数を月1で確認（4.11の実測で前倒しの必要が分かる場合もある）</td></tr>
+      <tr><td>取り込み1本あたりの書き込み時間が邪魔になった</td><td>議事録1本＝38件の書き込みに40秒前後かかる。これが待てなくなったとき</td></tr>
+      <tr><td>横断集計・監査ログの検索・分析キャンバスが必要になった</td><td>抽出粒度の校正や複数プロダクトの傾向分析を実際にやりたくなったとき</td></tr>
+    </tbody>
+  </table></div>
+
+  <p><b>移行の手順と手間（見積り: データ移行2〜3日＋画面開発）</b></p>
+  <ol>
+    <li>NotionのDB7つを全件取得（100件/リクエスト。6,000行なら60リクエスト＝約20秒）</li>
+    <li>BigQueryのテーブル（§5）へ読み込む。IDはNotionのページIDではなく<b>スキルが振った安定ID</b>をそのまま使う（4.9-4）</li>
+    <li>埋め込みを一括生成（<code>ML.GENERATE_EMBEDDING</code>）</li>
+    <li>スキル4本の読み書き先をNotion MCPからBigQuery MCPへ差し替える（4.9-5で1箇所に集約してあるため差し替え箇所は少ない）</li>
+    <li>Artifactの画面を作る（§7.1の7画面。<b>ここが移行作業の大半</b>）</li>
+    <li>NotionのDBはアーカイブして参照専用にする（消さずに1ヶ月置く）</li>
+  </ol>
+
+  <h3>4.9 移行を安く保つために、段階1の時点で守る5つの制約</h3>
+  <p>これを守らないと移行が「作り直し」になる。<b>案1で始めることと、この5つを守ることはセット。</b></p>
+  <ol>
+    <li><b>Notionの列は、将来のBigQueryのカラムと1対1に対応させる</b>（§5のスキーマの列名をそのままNotionのプロパティ名にする）</li>
+    <li><b>数式・ロールアップ・DB間の集計を使わない。</b> 値はすべてスキルが計算して書いた「ただの数値・テキスト・セレクト」にする。Notion上でしか再現できない計算を作らない（性能対策と移行容易性が同じ答えになる）</li>
+    <li><b>根拠リンクDBにはファクトの不変属性を写しておく</b>（案1の項）。移行後もこの形のまま使える</li>
+    <li><b>IDは自分で振る。</b> NotionのページIDに依存せず、スキルが採番した安定ID（例: <code>fact_20260811_001</code>）を必ず列として持つ。参照関係をこのIDで持てば、移行時に参照が壊れない</li>
+    <li><b>Notionへの読み書き処理はスキルの1ファイルに集約する。</b> 移行時に差し替えるのはそのファイルだけにする</li>
+  </ol>
+
+  <h3>4.10 案5に移ると失うもの — 移行時に必ず判断する</h3>
+  <p>案5はNotionを使わないため、<b>段階1で使えていた3つが失われる</b>。技術ではなく運用の選択なので、移行のタイミングで判断する。</p>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>失うもの</th><th>影響</th><th>対処の選択肢</th></tr></thead>
+    <tbody>
+      <tr><td><b>インサイト → 課題仮説のリレーション</b></td><td>組織で既に動いているワークフローが切れる（§6.5）。<b>これが一番重い</b></td><td>① <b>インサイトDBだけNotionに残し、BQから一方向投影する</b>（＝案4の形。投影対象は数十〜百行なので軽い）② 課題仮説の運用ごとArtifactへ移す ③ リレーションを諦める</td></tr>
+      <tr><td>コメント・議論の場</td><td>インサイトに対する会話ができなくなる</td><td>議論はSlackで行い、<b>結論をインサイトの説明欄に書く</b>運用にする</td></tr>
+      <tr><td>気軽な閲覧・共有</td><td>claude.aiログイン＋コネクタ同意が必要になる</td><td>週次まとめだけはMarkdownやメールで配る</td></tr>
+    </tbody>
+  </table></div>
+  <div class="principle">
+    <span class="p-label">推奨は①</span>
+    <p>課題仮説DBは組織共有のもので、こちらの都合で運用を変えられない。インサイトDB（数十〜百行）だけをNotionに残せば、リレーションを保ったまま案5の利点（同期ゼロに近い・行数制約なし・自由な画面）をほぼ得られる。この形は<b>案4そのもの</b>なので、案4を「退避先」として残してある。<br>
+    ただし<b>MVPの間はこの判断をしなくてよい</b>。段階1ではNotionにインサイトがあり、リレーションはそのまま使えている。</p>
+  </div>
+
+  <h3>4.11 着手前にやること — 1万件の実測（1日）</h3>
+  <div class="principle">
+    <span class="p-label">案1の唯一の未検証点</span>
+    <p>「ファクトDBが1万〜1.5万行になったとき、実際にどれくらい重いか」——ここに実測データがない。<br>
+    ・ダミーのファクト1万件をNotionのDBへ投入する（数式・ロールアップなしの、本番と同じ列構成で）<br>
+    ・測るのは3つ: ①既定ビュー（登録日の降順・直近30日フィルタ）が表示されるまでの時間 ②DB内の検索の応答時間 ③スキルから100件取得するときの時間<br>
+    ・3秒を超えるようなら、<b>MVPの時点で案5から始める</b><br>
+    この1日で、案1で始めてよいかどうかが確定する。</p>
+  </div>
+
+  <h3>4.12 責任範囲</h3>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>担当</th><th>段階1（案1）</th><th>段階2（案5）</th></tr></thead>
+    <tbody>
+      <tr><td><b>Notion</b></td><td>すべてのデータの原本。画面・通知・議論・既存の課題仮説DBとのリレーション</td><td>使わない（4.10で①を選んだ場合はインサイトDBだけ残る）</td></tr>
+      <tr><td><b>BigQuery</b></td><td>使わない</td><td>すべてのデータの原本。埋め込み・確信度計算・監査ログ・横断集計</td></tr>
+      <tr><td><b>Claude Artifact</b></td><td>使わない（画面はNotionのビュー）</td><td>画面のすべて。閲覧・編集・承認・分析キャンバス。BQ MCP経由で読み書きする</td></tr>
+      <tr><td><b>Claude Codeスキル</b></td><td>処理の実行役。データを自分では保存しない（毎回Notionから読み、Notionへ書く）</td><td>同じ。読み書きの相手がBigQueryになる</td></tr>
+      <tr><td><b>人（PdM）</b></td><td>議事録を渡す・確認ビューで承認する・インサイトの文言と状態を決める・課題仮説へのリレーションを張る</td><td>同じ（操作の場がNotionからArtifactへ移る）</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================ §5 ============================ -->
+<section id="s5">
+  <p class="sec-eyebrow">§5 / DATA MODEL</p>
+  <h2>データ設計（段階1・段階2で共通の列定義）</h2>
+
+  <p class="lede">ここに書く列の定義は、<b>段階1ではNotionのプロパティ名、段階2ではBigQueryのカラム名</b>としてそのまま使う（4.9-1）。同じ名前を両方で使うことが、移行を安く保つ条件になる。</p>
+
+  <div class="tbl-scroll"><table>
+    <thead><tr><th></th><th>段階1（Notion）</th><th>段階2（BigQuery）</th></tr></thead>
+    <tbody>
+      <tr><td>置き場所</td><td>すべてNotionのDB</td><td>すべてBigQuery（4.10で①を選んだ場合はインサイトのみNotionにも投影）</td></tr>
+      <tr><td>型</td><td>セレクト・数値・テキスト・日付（<b>数式とロールアップは使わない</b>）</td><td>下のスキーマのとおり</td></tr>
+      <tr><td>段階1で使わないもの</td><td colspan="2"><code>embedding</code> / <code>audit_logs</code> / <code>suggestions</code> / <code>sync_state</code>（案1の項）</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>5.1 各テーブル（DB）の役割</h3>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>テーブル</th><th>何を入れるか</th><th>なぜ必要か</th><th>1行の例</th></tr></thead>
+    <tbody>
+      <tr><td><code>products</code></td><td>社内プロダクトの一覧</td><td>データの仕切り。検索を「このプロダクト内」に絞る</td><td>プロダクトX</td></tr>
+      <tr><td><code>research_questions</code></td><td>明らかにしたい問い</td><td>リサーチをぶら下げる先。「何のために調べたか」を残す</td><td>なぜ週次レポートの閲覧率が低いのか</td></tr>
+      <tr><td><code>sources</code></td><td>議事録などの調査1件</td><td>ファクトの出典。原文に戻れるようにする</td><td>2026-08-05 A社定例（Meet議事録）</td></tr>
+      <tr><td><code>facts</code></td><td>事実1文＋その引用と話者</td><td>インサイトの根拠になる最小単位。<b>本システムの素材</b></td><td>「田中さんは週次レポートを見ていないと述べた」＋原文引用</td></tr>
+      <tr><td><code>insights</code></td><td>解釈と確信度</td><td><b>資産そのもの</b>。最終的に読み返すのはここ</td><td>「顧客は定型レポートより異常時の通知を求めている」確信度72</td></tr>
+      <tr><td><code>evidence_links</code></td><td>どのファクトがどのインサイトを支持／反証するか</td><td>確信度計算の入力。<b>この表がないと確信度が出せない</b></td><td>ファクト#123 → インサイト#7 を supports（重み0.8）</td></tr>
+      <tr><td><code>suggestions</code></td><td>AIからの未処理の提案</td><td>cronが後から作った提案の置き場。<em>段階2から。段階1はファクトの <code>review_status</code>＝要確認 とインサイトの状態＝要見直し で代替</em></td><td>「ファクト#123をインサイト#7の根拠に追加しますか」</td></tr>
+      <tr><td><code>audit_logs</code></td><td>変更の履歴（誰が・いつ・何を・どう・なぜ）</td><td>「なぜこうなってる？」を後から追う。AIが勝手に変えていない証明。<em>段階2から。段階1はNotionのページ履歴＋<code>update_reason</code> で代替</em>（4.1）</td><td>8/10 14:32 提案#55を承認 → 確信度55→72</td></tr>
+      <tr><td><code>sync_state</code></td><td>BQのIDとNotionページIDの対応表</td><td><em>4.10で①（インサイトDBだけNotionに残す）を選んだ場合のみ必要</em></td><td>インサイト#7 = Notionページ abc123</td></tr>
+      <tr><td><code>feedbacks</code></td><td>人からの指摘1件（要約1文）</td><td>改善の材料。繰り返したらルールに昇格</td><td>「日程調整の発言はファクトにしないで」</td></tr>
+      <tr><td><code>learnings</code></td><td>繰り返した指摘から作った改善ルール</td><td>スキルが実行時に読んでプロンプトに入れる</td><td>「進行・日程に関する発言はファクトにしない」</td></tr>
+      <tr><td><code>tags</code> / <code>taggings</code></td><td>ペルソナ・テーマなどの分類</td><td>絞り込み用。<em>MVPでは使わない（スキーマだけ用意）</em></td><td>「新規ユーザー」「オンボーディング」</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>5.2 スキーマ</h3>
+  <pre><code>-- dataset: core（データ本体）
+products(id, name, status)
+
+research_questions(id, product_id, question, status, created_at)
+
+sources(id, product_id, research_question_id, type, title, occurred_at,
+        raw_ref,          -- GCS上の原文への参照
+        content_hash,     -- 同じ議事録の二重取り込みを防ぐ
+        channel,          -- link / paste / auto
+        ingestion_status)
+
+facts(id, product_id, source_id,
+      statement,          -- 事実1文
+      quote,              -- 原文の引用（旧 highlights を統合）
+      quote_locator,      -- 原文中の位置（文字位置 or タイムスタンプ）
+      speaker,            -- 発言者（匿名化した属性）
+      origin,             -- ai / human
+      embedding ARRAY&lt;FLOAT64&gt;, embedding_model,   -- 意味検索用
+      status,             -- active / retracted（撤回。削除はしない）
+      review_status,      -- 要確認 / 裏付け / 関連が弱い / 確定 / 却下 / 保管（§7.2）
+      retracted_at, retracted_reason,
+      created_at)
+
+insights(id, product_id,  -- NULL = プロダクト横断（全社）の知見
+         statement, description, status, owner,
+         confidence_score, confidence_level, confidence_breakdown JSON,
+         freshness_score, last_evidence_at, superseded_by_id,
+         falsification_condition,   -- 反証条件。「検証済」以上への昇格時のみ任意
+         update_reason,     -- 直近の変更理由を1文（段階1の監査の代わり。4.1）
+         last_referenced_at, reference_count,  -- 剪定の材料（価値の指標には使わない）
+         embedding ARRAY&lt;FLOAT64&gt;, embedding_model,
+         published_at)
+
+evidence_links(id, fact_id, insight_id,
+               stance,    -- supports / contradicts / context
+               weight, linked_by, rationale, created_at,
+               -- ↓ ファクトからの写し（後から変わらない属性）
+               --   段階1はDBをまたぐ集計ができないため、段階2でも結合を減らせるため
+               fact_speaker, fact_source_type, fact_occurred_at)
+               -- UNIQUE(fact_id, insight_id)
+
+suggestions(id, product_id, type, payload JSON, rationale, score,
+            status, reviewed_at, expires_at, created_at)
+
+tags(id, name, facet)                        -- MVPでは使わない（定義のみ）
+taggings(tag_id, entity_type, entity_id)     -- 同上
+
+-- dataset: ops（運用データ）
+audit_logs(id, actor_type, actor_id, action, entity_type, entity_id,
+           diff JSON,
+           reason,                        -- なぜそうしたか一文（人の判断のとき）
+           created_at)                    -- 追記専用
+sync_state(entity_type, entity_id, notion_page_id,
+           content_hash, last_synced_at)  -- Notionを使う場合のみ
+
+-- dataset: ops（改善ループ。§8）
+feedbacks(id, target_type,   -- fact / insight / suggestion / skill
+          target_id, kind,   -- 修正 / 削除 / 追加 / 不調
+          summary,           -- 指摘の要約1文（会話全文は保存しない）
+          embedding ARRAY&lt;FLOAT64&gt;,   -- 似た指摘をまとめるため
+          applied, created_at)
+learnings(id, category,      -- 抽出 / 照合 / 確信度 / 表示
+          observation, rule,
+          status,            -- 提案中 / 適用中 / 効果確認済 / 廃止
+          feedback_ids ARRAY&lt;STRING&gt;,
+          activated_at, verified_at, retired_at, created_at)</code></pre>
+
+  <h3>5.3 v1から変えたところ</h3>
+
+  <div class="principle">
+    <span class="p-label">重要な確認 — ベクトル検索（embedding）は使う。やめたのは「テーブルを分けること」だけ</span>
+    <p><b>embedding（埋め込み）＝文章の意味を数百個の数値の並びに変換したもの。</b>数値が近い＝意味が近いので、「言葉は違うが同じことを言っているファクト」を探せる。BigQueryの <code>ML.GENERATE_EMBEDDING</code> で作り、<code>VECTOR_SEARCH</code> で近いものを探す。<em>これが「新しいファクトを既存インサイトと自動照合する」という本システムの核そのもの</em>で、当然使う。<br>
+    <b>段階1（すべてNotion）では、この埋め込みを自分では持たない。</b> 照合はNotionのDB内の意味検索に任せ、相手はインサイト（数十〜百件）なので十分に成立する（案1の項）。自分で埋め込みを持って近さの閾値を調整できるようになるのは段階2から。<br>
+    v3で変えたのは置き場所だけ——<code>embeddings</code> という<b>別テーブルを作るのをやめ、facts / insights の列にした</b>。BigQueryは列指向（使わない列は読み込まれない）なので、分けても速度の利点がなく、結合が増える分むしろ扱いにくいため。<b>機能は1ミリも減っていない。</b></p>
+  </div>
+
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>変更</th><th>理由</th></tr></thead>
+    <tbody>
+      <tr><td><code>highlights</code> → <b>facts に統合</b></td><td>実態は「1ファクト＝1引用」であり、引用だけを独立して検索することがない。<code>facts.quote</code> と <code>quote_locator</code> で足りる</td></tr>
+      <tr><td><code>fact_highlights</code> → <b>廃止</b></td><td>ファクトと引用を多対多にする必要がなかった。複数箇所を引くケースは facts 側の配列で持てる</td></tr>
+      <tr><td><code>insight_versions</code> → <b>廃止</b></td><td><b>audit_logs と重複</b>。監査ログが変更前後の差分を持つので、過去の文言はそこから復元できる。同じ情報を2箇所に持つのは事故のもと</td></tr>
+      <tr><td><code>embeddings</code> → <b>facts / insights の列へ移動</b></td><td>上記のとおり。<em>ベクトル検索の機能自体は変わらず使う</em></td></tr>
+      <tr><td><code>tags</code> / <code>taggings</code> → <b>残すがMVPでは使わない</b></td><td>ペルソナ・テーマなどでの絞り込みは将来必要になる。スキーマは定義しておき、投入と画面はMVPの後に回す</td></tr>
+    </tbody>
+  </table></div>
+
+  <h4>設計メモ</h4>
+  <ul>
+    <li>データの仕切りは <b>product_id のみ</b>。主要テーブルは product_id でクラスタリングする。</li>
+    <li><code>audit_logs</code> は追記専用（UPDATE/DELETE権限を発行しない）。</li>
+    <li>確信度の再計算は evidence_links の変化時＋日次の減衰更新（スケジュールドクエリ）。</li>
+    <li>キャンバス系テーブルは、案5へ移って分析キャンバスを作るときに追加する。段階1では作らない。</li>
+    <li><b><code>skill_runs</code>（スキルの実行記録）は作らない。</b>用途のほとんどが他テーブルで足りることを確認済み: 取り込み失敗は <code>sources.ingestion_status</code>／二重取り込みは <code>content_hash</code>／承認率は <code>suggestions.status</code>／処理件数の分母は <code>COUNT(*) FROM facts WHERE source_id=X</code>／不在の可視化は <code>sources.occurred_at</code>。cronスキルが3本以上に増えたとき、またはAI利用コストを月次で把握したくなったときに追加する。</li>
+  </ul>
+</section>
+
+<!-- ============================ §6 ============================ -->
+<section id="s6">
+  <p class="sec-eyebrow">§6 / NOTION</p>
+  <h2>Notion側の設計（DB構成・性能・既存資産との接続）</h2>
+
+  <p class="lede">この節は<b>段階1（案1: すべてNotion）</b>の設計。Notionがデータの原本そのものになる。段階2（案5: Notionを使わない）へ移るとこの節の大半は不要になるが、<b>列構成はそのままBigQueryのテーブル定義になる</b>ので、ここで決めた列名が引き継がれる（4.9-1）。</p>
+
+  <h3>6.1 DB構成と列</h3>
+
+  <p>列名は§5のBigQueryのカラム名と1対1に対応させる。<b>数式・ロールアップ・DB間集計は1つも使わない</b>（4.9-2）。</p>
+
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>DB</th><th>主な列</th><th>書く人</th></tr></thead>
+    <tbody>
+      <tr><td>問いDB</td><td><code>id</code> / <code>product_id</code> / <code>question</code> / <code>status</code> / <code>created_at</code></td><td>人が新規行を作る → スキルが <code>id</code> を書き戻す</td></tr>
+      <tr><td>リサーチDB</td><td><code>id</code> / <code>product_id</code> / <code>research_question_id</code> / <code>type</code> / <code>title</code> / <code>occurred_at</code> / <code>raw_ref</code>（原文リンク） / <code>content_hash</code></td><td>スキルのみ</td></tr>
+      <tr><td>ファクトDB</td><td><code>id</code> / <code>product_id</code> / <code>source_id</code> / <code>statement</code> / <code>quote</code> / <code>quote_locator</code> / <code>speaker</code> / <code>origin</code> / <code>status</code> / <b><code>review_status</code></b>（要確認/裏付け/低関連/確定/却下）/ <code>created_at</code></td><td>スキルが書き、人は確認ビューで <code>review_status</code> だけ変える</td></tr>
+      <tr><td>インサイトDB（既存）</td><td><code>id</code> / <code>product_id</code> / <code>statement</code> / <code>description</code> / <code>status</code> / <code>owner</code> / <code>confidence_score</code> / <code>confidence_level</code> / <code>confidence_breakdown</code> / <code>last_evidence_at</code> / <code>falsification_condition</code> / <code>update_reason</code> ／ <b>課題仮説リレーション（既存）</b></td><td>下表のとおり列ごとに分ける</td></tr>
+      <tr><td>根拠リンクDB</td><td><code>id</code> / <code>fact_id</code> / <code>insight_id</code> / <code>stance</code> / <code>weight</code> / <code>linked_by</code> / <code>rationale</code> / <code>created_at</code> ＋ <b>ファクトからの写し</b>（<code>fact_speaker</code> / <code>fact_source_type</code> / <code>fact_occurred_at</code>）</td><td>スキルのみ</td></tr>
+      <tr><td>フィードバックDB</td><td><code>id</code> / <code>target_type</code> / <code>target_id</code> / <code>kind</code> / <code>summary</code> / <code>applied</code> / <code>created_at</code></td><td>スキルが人の指摘を要約して書く</td></tr>
+      <tr><td>学びDB</td><td><code>id</code> / <code>category</code> / <code>observation</code> / <code>rule</code> / <code>status</code> / <code>feedback_ids</code> / <code>activated_at</code></td><td>スキルが提案し、人が「適用中」にする</td></tr>
+    </tbody>
+  </table></div>
+
+  <p><code>id</code> は<b>スキルが採番した安定ID</b>（<code>fact_20260811_001</code> など）で、NotionのページIDとは別に列として持つ（4.9-4）。</p>
+
+  <div class="principle">
+    <span class="p-label">なぜリレーションではなく文字列のIDで繋ぐのか</span>
+    <p>リレーションは件数が増えるとページの読み込みを重くする要因になり、さらに移行時にIDを付け替える手間が生まれる。文字列のIDならNotionでもBigQueryでも同じ意味を持つ。<b>画面上で辿る必要があるのは「インサイト → その根拠」だけ</b>で、これは根拠リンクDBを <code>insight_id</code> で絞れば済む。DB間の参照は文字列IDで持ち、Notionのリレーション機能は原則使わない（例外は既存の課題仮説リレーション）。</p>
+  </div>
+
+  <h3>6.2 性能を保つ3つのルール</h3>
+  <ol>
+    <li><b>数式・ロールアップを使わない。</b> 表示の重さの主因は行数そのものより、行ごとに計算が走る列。確信度も根拠件数もスキルが計算して数値として書く</li>
+    <li><b>既定ビューには必ずフィルタと並び順を付ける。</b> ファクトDBの既定ビューは「直近30日」＋「登録日の降順」。全件を開くビューは作らない（必要なときだけ検索で辿る）</li>
+    <li><b>古いファクトは既定ビューから外す。</b> 削除はしない（原本なので消せない）。90日を過ぎ、根拠リンクを1つも持たないファクトは <code>review_status</code> を「保管」にして既定ビューの対象外にする</li>
+  </ol>
+
+  <h3>6.3 レート制限（429）対策</h3>
+  <ul>
+    <li>Notion APIは平均3リクエスト/秒。書き込みは1つの流れに直列化し、1件あたり350ms間隔を空ける</li>
+    <li>429が返ったら <code>Retry-After</code> の秒数だけ止め、再発したら待ち時間を倍にする</li>
+    <li>議事録1本（ファクト38件＋根拠リンク）で<b>90〜120リクエスト＝約40秒</b>。この待ち時間が邪魔になったら移行トリガー（4.8）</li>
+  </ul>
+
+  <h3>6.4 コメント・議論は取り込まない</h3>
+  <p>Notion上のコメント・議論は<b>システムに取り込まない</b>。理由は2つ。</p>
+  <ul>
+    <li><b>技術的に完全には取れない</b> — コメント取得APIが返すのは未解決のものだけで、解決済みは取得手段がない。取りこぼしが構造的に起きるものを「保存してある」と扱うのは危険。また全件一覧のAPIがなくページ単位でしか取得できないため、集めるだけで大量のリクエストを要し、書き込みと同じレート枠を食い合う</li>
+    <li><b>そもそも失われない</b> — 段階1ではNotionが原本なのでページを作り直さない。段階2でもインサイトのページは更新方式で扱うため、コメントは消えない</li>
+  </ul>
+  <p>「議論の結論だけは残したい」場合は、<b>結論をインサイトの説明欄に書く</b>運用で対応する。取り込む仕組みを作るより、結論を書く運用のほうが実際に読み返される。</p>
+
+  <h3>6.5 既存のインサイトDBと課題仮説DBへの接続</h3>
+
+  <div class="principle">
+    <span class="p-label">新しいインサイトDBを作らない。既にあるDBをそのまま使う</span>
+    <p>Notionには既にインサイトDBがあり、そこから組織の課題仮説DBへリレーションが張られている。別のDBを作ると<b>その繋がりが切れる</b>うえ、繋ぎ直すには課題仮説DB側にプロパティを追加することになる（組織共有のDBなので避けたい）。</p>
+  </div>
+
+<pre><code>ファクトDB ──┐
+             ├─ 根拠リンクDB ──▶ 既存のインサイトDB ──リレーション──▶ 課題仮説DB
+リサーチDB ──┘                    （新規作成しない）      （人が張る・スキルは触らない）</code></pre>
+
+  <p><b>列ごとに書く人を分ける</b>——避けたいのは「<b>同じ列</b>を人とスキルの両方が書く」こと。<b>別々の列をそれぞれが持つ</b>なら競合しない。</p>
+
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>列</th><th>書く人</th></tr></thead>
+    <tbody>
+      <tr><td><code>confidence_score</code> / <code>confidence_level</code> / <code>confidence_breakdown</code> / <code>last_evidence_at</code> / 根拠件数</td><td><b>スキル</b>（計算結果を書く。人は編集しない）</td></tr>
+      <tr><td><code>statement</code> / <code>description</code> / <code>status</code> / <code>update_reason</code></td><td><b>人</b>（解釈と公開・保管の判断は人のもの。スキルは提案するだけ）</td></tr>
+      <tr><td><b>課題仮説リレーション</b></td><td class="verdict"><b>人（PdM）。スキルは絶対に触らない</b></td></tr>
+      <tr><td>既存インサイトDBに元からある他の列</td><td>触らない</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>スキルは担当列だけを更新し、それ以外の列には書き込まない。</p>
+
+  <div class="principle">
+    <span class="p-label">段階2（案5）へ移ると、このリレーションが切れる</span>
+    <p>どう扱うかは4.10で移行時に判断する（推奨は<b>インサイトDBだけNotionに残して一方向投影する形</b>）。段階1の間はこの判断をしなくてよい。</p>
+  </div>
+
+  <p><b>初期移行</b> — 既存インサイトは2件のみ・作成者は1人なので、<b>手で列を埋める</b>。移行スクリプトは作らない。順番は ①既存2件に <code>id</code> と確信度の列を追加して手で埋める → ②新しいDB（問い・リサーチ・ファクト・根拠リンク）を作る → ③スキルを動かし始める。</p>
+
+  <p><b>課題仮説DBは読むだけ</b> — スキルは課題仮説DBに一切書き込まない。週次で読んで「どのインサイトにリレーションが張られたか」を集め、実際に使われているかの把握に使う（2.4）。組織のワークフローには影響しない。</p>
+</section>
+
+<section id="s9">
+  <p class="sec-eyebrow">§7 / UX</p>
+  <h2>画面と体験（UX）</h2>
+  <p class="lede">UXレビュー（2026-08-11）を受けて追加。<b>アーキテクチャの段階（§4）に関わらず、この体験は必ず必要</b>。動作するプロトタイプは別Artifactを参照（画面の理想形として作ったもので、MVPではこれをNotionのビューで代替する）。</p>
+
+  <h3>7.1 MVPで作る画面 — すべてNotionのビューで用意する</h3>
+  <p><b>MVPでは専用画面（Artifact）を作らない。</b> 下の7つはすべてNotionのDBビューとして成立する。</p>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>#</th><th>画面</th><th>MVPでの作り方（Notion）</th><th>主な利用者</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>ホーム（週次まとめ）</td><td><code>/insight-report</code> が週次でNotionページを1枚生成する</td><td>閲覧者</td></tr>
+      <tr><td>2</td><td><b>取り込み確認 ★</b></td><td>ファクトDBの<b>ボードビュー</b>（<code>review_status</code> でグループ化）。7.2</td><td>オーナー</td></tr>
+      <tr><td>3</td><td>インサイト一覧</td><td>既存インサイトDBのテーブルビュー（確信度で並べ替え・状態でフィルタ）</td><td>全員</td></tr>
+      <tr><td>4</td><td>インサイト詳細</td><td>インサイトのページ。確信度の内訳は本文に書き、根拠は根拠リンクDBを <code>insight_id</code> で絞ったビューを埋め込む</td><td>全員</td></tr>
+      <tr><td>5</td><td>問い（リサーチクエスチョン）</td><td>問いDBのビュー。人が新規行を足す場所でもある（7.5）</td><td>全員</td></tr>
+      <tr><td>6</td><td>ファクト一覧</td><td>ファクトDBの既定ビュー（直近30日・登録日の降順）＋DB内検索</td><td>オーナー中心</td></tr>
+      <tr><td>7</td><td>ゼロ状態</td><td>各ビューの説明欄に「次にやること」を書いておく（7.6）</td><td>全員</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="principle">
+    <span class="p-label">専用画面（Artifact）が要るのはどこか</span>
+    <p>Notionで作れないのは3つだけ。①確信度の内訳を図で見せる ②支持と反証を左右に並べる ③分析キャンバス（付箋を動かす）。<b>どれもMVPの必須ではない</b>。段階2（案5）へ移るときに、この7画面をすべてArtifactで作り直すことになる——それが移行作業の大半を占める。</p>
+  </div>
+
+  <h3>7.2 取り込み確認ビュー — 38件を3群に仕分ける</h3>
+  <p>実測38件/本を平坦に並べると必ず読み飛ばされる。<code>/insight-match</code> が既に計算している照合スコアをそのまま使い、<b>AIが自動で3群に仕分けて提示</b>する（追加の計算コストはゼロ）。仕分けの結果はファクトDBの <code>review_status</code> に書く。</p>
+  <pre><code>要確認（3〜5件）  ← 新インサイト候補・既存への反証・統合候補
+                    1件ずつカードで表示し、個別に承認/保留/却下
+既存の裏付け（20件）← 既存インサイトを支持するだけ
+                    折りたたみ。初期状態は「まとめて承認」
+関連が弱い（15件） ← どれとも弱くしか結びつかない
+                    折りたたみ。初期状態は「保留」（破棄しない）</code></pre>
+  <ul>
+    <li>人間の注意力を「要確認」の数件に集中させ、残りは<b>開けば見られる</b>状態にする</li>
+    <li>確定後に取り消せることを画面に明記する（一括承認の心理的ハードルはUndoの可視性で下げる）</li>
+    <li>保留にしたファクトもBQには残る。後で別のインサイトの根拠になりうるため</li>
+  </ul>
+
+  <h3>7.3 取り込み直後に返すサマリー（継続の要）</h3>
+  <p>最大の事業リスクは「取り込む習慣が続かないこと」（§10）。投入の摩擦を下げるだけでは続かず、<b>入れた直後に価値が返ること</b>が必要。</p>
+  <pre><code>今回の取り込みでわかったこと
+✓ 新しいインサイト候補が1件生まれました
+✓ 「週次レポートは最初の画面で離脱している」の確信度が 兆候 → 検証済 に上がりました
+⚠ 「オンボーディングの設定項目が多すぎる」に反証が1件 → 要見直しになりました</code></pre>
+  <p><b>「38件処理しました」ではなく「これがわかった」を主語にする。</b>件数はシステムの都合であり、継続の理由にならない。あわせて週次まとめに「今週まだ取り込まれていません」という不在の可視化を入れる。</p>
+
+  <h3>7.4 確信度の表示ルール</h3>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>場所</th><th>出すもの</th><th>出さないもの</th></tr></thead>
+    <tbody>
+      <tr><td>一覧</td><td>4段階バッジ（仮説/兆候/検証済/強固）＋段階ドット、根拠件数・発言者数</td><td><b>数値を出さない</b></td></tr>
+      <tr><td>詳細</td><td>数値＋メーター＋<b>内訳とセット</b>（支持12件・発言者9名・反証1件・最終更新3週間前）</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li>一覧に「72」と出すと自動的に順位比較の道具になるが、<b>式はまだ未検証の仮説</b>（§2.3）。検証されていない精度を信じさせるのは、課題4番目の「思い込みの強い施策判断」を自分で作り出すことになる</li>
+    <li>色だけで段階を伝えない。ラベル＋ドット（●●●○）を併記する</li>
+    <li><code>needs_review</code> は確信度のバッジとは<b>別軸</b>で警告表示する</li>
+    <li>詳細には確信度の推移（履歴）を出す。「仮説だったものが検証済に上がった」変化が信頼形成に効く</li>
+  </ul>
+
+  <h3>7.5 リサーチクエスチョンの登録</h3>
+  <p>課題認識の1番目「前に誰かが同じことを聞いたことに気づけない」に直接応える画面。<b>これが無いとその課題は解決しない。</b>登録の経路は2つで、<b>専用スキルは作らない</b>。</p>
+  <ol>
+    <li><b>議事録を渡すとき（主）</b> — <code>/research-ingest</code> の中で「この議事録はどの問いに紐づきますか」と聞き、既存から選ぶか、その場で新規登録する。問いの登録頻度は月に数件程度なので、独立した操作にする必要がない</li>
+    <li><b>画面から</b> — 一覧・状態管理（進行中/回答済み/保留）と新規登録。Notion構成の場合は§3.1の方式（問いDB1本・BQ IDの有無で判定）</li>
+  </ol>
+  <p>登録時は<b>似た問いを自動照合して警告する</b>。これが重複リサーチの防止そのもの。</p>
+
+  <h3>7.6 ゼロ状態（最初の1〜2週間）</h3>
+  <p>立ち上げ直後はインサイトの大半が「仮説」で確信度も低い。これは正常だが、説明がないと「大した発見をしていない」という誤った第一印象になる。<b>低いことを失敗に見せない</b>のがここの仕事。</p>
+  <ul>
+    <li>インサイトが空/少数: 「まだ育てている途中です。議事録を3〜5本取り込むと照合が効き始めます」</li>
+    <li>問いが0件: 「最初に明らかにしたいことを1つ決めましょう」＋登録導線</li>
+    <li>検索0件: 「一致するインサイトはありません。<b>まだ誰も調べていないテーマかもしれません</b>」→ 問いとして登録する導線</li>
+  </ul>
+
+  <h3>7.7 引用とエラーの扱い</h3>
+  <ul>
+    <li><b>引用</b>: 一覧では事実文を主に見せ、引用は折りたたみ。開くと前後の文脈を数行含め、元の議事録へのリンクを併記する。引用は捏造防止の担保なので、画面上で検証可能でなければ意味がない</li>
+    <li><b>エラー</b>: 無言で失敗させない。①リンクが読めない →「共有設定をご確認いただくか、本文を貼り付けてください」 ②ファクト0件 →「事実らしい発言が見つかりませんでした」 ③重複 →「この議事録は8/5に取り込み済みです」</li>
+  </ul>
+
+  <h3>7.8 閲覧者とオーナーで見せるものを分ける</h3>
+  <ul>
+    <li>閲覧者のホームは<b>週次まとめ</b>。未承認の提案・draft状態のインサイトは<b>見せない</b>（未確定情報はノイズになる）</li>
+    <li>インサイト詳細には「誰が・いつ確定させたか」（監査ログの情報）を閲覧者にも見せる。AIが生成する仕組みである以上、人が確認した痕跡が見えることが信頼の条件</li>
+  </ul>
+</section>
+
+<!-- ============================ §8 改善ループ ============================ -->
+<section id="s10">
+  <p class="sec-eyebrow">§8 / IMPROVEMENT LOOP</p>
+  <h2>改善ループ — システム自体を良くする</h2>
+
+  <h3>8.0 2つのループを混同しない</h3>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th></th><th>インサイトの更新ループ</th><th><b>システムの改善ループ（この節）</b></th></tr></thead>
+    <tbody>
+      <tr><td>何が良くなるか</td><td>個々のインサイトの確信度・鮮度</td><td>AIの抽出・照合の精度、スキルの挙動</td></tr>
+      <tr><td>きっかけ</td><td>新しい根拠・反証の到着</td><td><b>人からの指摘</b>（修正・削除・追加・不調）</td></tr>
+      <tr><td>仕組み</td><td>§2.2 の状態遷移（既にある）</td><td>この節（足りていなかった部分）</td></tr>
+    </tbody>
+  </table></div>
+  <p>前者は設計済み。<b>足りていなかったのは後者</b>——「提案の承認率が低いスキルをどう直すか」「確信度の係数をどう校正するか」の具体的な手順。</p>
+
+  <h3>8.1 人の指摘を溜める（feedbacks）</h3>
+  <p>ファクトやインサイトを見た人は必ず言う。「そこは登録しなくていい」「この解釈はこうだよ」「スキルの挙動がおかしい」。<b>これが改善の唯一の材料</b>なので、その場の修正で終わらせず記録する。</p>
+  <div class="principle">
+    <span class="p-label">会話の全文は保存しない</span>
+    <p>AIが<b>1文に要約して、その場で人に確認を取ってから</b>入れる。<br>
+    <em>「日程調整に関する発言はファクトにしない」という指摘として記録します。よろしいですか？</em><br>
+    記録するのは、対象（ファクト/インサイト/提案/スキル）・種別（修正/削除/追加/不調）・要約1文・その場で適用したか。「修正前後のdiffと理由の一文」があれば生ログの価値のほとんどは取れる（diffは <code>audit_logs</code>、理由は <code>audit_logs.reason</code>）。</p>
+  </div>
+
+  <h3>8.2 繰り返したらルールに昇格させる（learnings）</h3>
+  <p><b>1回目の指摘は「その場の修正」にしか見えない。2回目・3回目で初めてパターンだと分かる。</b>ここを人の記憶に頼らず仕組みにする。</p>
+  <ul>
+    <li>同じ趣旨のフィードバックが<b>3件</b>溜まったら、<code>/review</code> と週次まとめで提案する<br>
+      <em>似た指摘が3件たまっています。ルールにしますか？「日程調整・会議進行に関する発言はファクトにしない」（8/5・8/12・8/19の指摘より）</em></li>
+    <li>類似判定は<b>既にある埋め込みをそのまま使う</b>（<code>feedbacks.embedding</code>）。追加コストはほぼゼロ</li>
+    <li>承認されたら <code>learnings</code> に登録し <code>status=適用中</code> に。<b>スキルは実行時に「適用中」のルールを読んでプロンプトに入れる</b></li>
+  </ul>
+  <p>これは本システムのドメインモデルと同じ形（ファクトが複数集まってインサイトになる ＝ 指摘が複数集まってルールになる）。ただし実装は別テーブルにする（product_id や source が噛み合わないため、無理に統一しない）。</p>
+
+  <h3>8.3 効き目の測定と剪定（総量固定）</h3>
+  <div class="principle">
+    <span class="p-label">ルールを書くだけでは改善しない</span>
+    <p>過去に同種の運用で<b>ルール集が983行まで膨れ、全ルールが薄まって効かなくなった実例</b>がある。最初から剪定を設計に入れる。</p>
+  </div>
+  <ul>
+    <li><b>効き目</b>: ルールを <code>適用中</code> にした日以降、同じ趣旨のフィードバックが減ったか。<code>learnings.activated_at</code> と <code>feedbacks.created_at</code> の突合で見る。<b>これがBQに置く最大の理由</b>（gitやNotionだと指摘件数・承認率と突合できない）</li>
+    <li><b>判定</b>: 3ヶ月フィードバックが来ない → <code>効果確認済</code>。適用しても減らない → <code>廃止</code> にするか、<b>プロンプトより強い手段（コード側で機械的に除外）へ格上げ</b>する</li>
+    <li><b>総量固定</b>: ルールを1つ足すときは、効いていないものを1つ削るか統合する。スキルファイルは<b>150行を目安</b>に保つ。上限を宣言するだけでは守れないので、「足すときに削る」を運用ルールにする</li>
+  </ul>
+
+  <h3>8.4 確信度の係数を校正する</h3>
+  <p>§2.3で「式と係数は設計仮説であり、運用の実データで校正する」と書いた。その具体的な手順。</p>
+  <ul>
+    <li><b>月次で、後から反証が出たインサイトのレベル分布を見る。</b>「強固」「検証済」だったものに反証が出る率が高ければ、<b>係数が甘い</b>（多様性の重みを上げる、半減期を短くする等）</li>
+    <li><b>レビュー時の体感とのズレを拾う。</b>「これが検証済のはずがない」という指摘は <code>feedbacks</code> に <code>category=確信度</code> で記録し、3件溜まったら係数を見直す（8.2と同じ仕組みに乗せる）</li>
+    <li>係数を変えたら <code>audit_logs</code> に <code>actor_type=system, reason=係数校正</code> で記録し、前後の分布を比較できるようにする</li>
+  </ul>
+</section>
+
+<!-- ============================ §9 ============================ -->
+<section id="s7">
+  <p class="sec-eyebrow">§9 / ROADMAP</p>
+  <h2>ロードマップ</h2>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>段階</th><th>内容</th><th>ゲート（次へ進む条件）</th></tr></thead>
+    <tbody>
+      <tr><td><b>段階0（1日）</b></td><td><b>1万件の実測</b>（4.8）。3秒を超えるならMVPから段階2で始める</td><td>数字が出ること</td></tr>
+      <tr><td><b>MVP（2〜3週）</b></td><td>NotionのDB6つを作る＋既存インサイトDBに列を足す（既存2件は手で埋める）→ スキル4本 → ボードビューでの確認。議事録を渡す→抽出→確認→照合→確信度が動く、が1本つながる。<code>product_id</code> は初日から</td><td>承認率50%以上／週次のレビュー習慣が続く／「判断が変わった」事例1件</td></tr>
+      <tr><td><b>v1（+1〜2ヶ月）</b></td><td>取り込みの自動化（新着監視）、週次まとめの本運用、抽出粒度の校正、確信度の係数の校正（§8.4）、タグの投入</td><td>議事録を「渡し忘れない」状態になる</td></tr>
+      <tr><td><b>段階2（トリガー到達時）</b></td><td><b>案5へ移行</b>——全データをBigQueryへ移し、画面をArtifactで作り直す（4.8）。公式BigQuery MCPで接続。監査ログ・横断集計・ベクトル検索・分析キャンバスがここで揃う。4.10（課題仮説リレーションをどうするか）を移行前に判断する</td><td>4.8のトリガーに当たったとき</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================ §8 ============================ -->
+<section id="s8">
+  <p class="sec-eyebrow">§10 / RISKS</p>
+  <h2>リスクと未決事項</h2>
+
+  <h3>8.1 リスク</h3>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>リスク</th><th>緩和策</th></tr></thead>
+    <tbody>
+      <tr><td><b>取り込みの習慣が続かない</b>（最大の事業リスク）</td><td>議事録を渡すだけの1アクションに絞る（/research-ingest にリンクを貼るだけ）。v2で自動化</td></tr>
+      <tr><td>レビュー負荷（実測38件/本）</td><td>議事録1本＝1レビューの一括承認。個別レビューはインサイト系のみ</td></tr>
+      <tr><td>確信度が信頼されない</td><td>内訳の完全開示・係数調整可・4段階レベル主表示。承認率とのズレで校正（§2.3）</td></tr>
+      <tr><td>同期ドリフト</td><td>段階1では<b>存在しない</b>（ストアが1つ）。段階2でも書き戻しは確信度の列だけで、書く人が列ごとに固定されている（§6.5）</td></tr>
+      <tr><td><b>Notionの表示速度が想定より早く劣化する</b></td><td>着手前に1万件で実測する（4.8）。基準を超えたらMVPから段階2で始める</td></tr>
+      <tr><td><b>段階1に監査ログがない</b></td><td>インサイトの変更には <code>update_reason</code> を必須にする。Notionのページ履歴で「誰がいつ」は追える。段階2で構造化された監査ログを入れる</td></tr>
+      <tr><td><b>案5: Artifactからの誤更新</b></td><td>まず書込権限をテーブル単位で絞る（サーバ不要）。更新の種類が増えたらMCP Toolboxで定型ツールだけを公開する／削除せずstatus変更のみ／BigQueryのタイムトラベル（既定7日）で復旧</td></tr>
+      <tr><td><b>移行のときに作り直しになる</b></td><td>4.9の5つの制約（列名の一致・数式を使わない・不変属性の写し・自前のID・読み書きの1ファイル集約）を段階1の時点から守る</td></tr>
+      <tr><td><b>案5へ移ると課題仮説リレーションが切れる</b></td><td>4.10で移行時に判断する。推奨はインサイトDBだけNotionに残して一方向投影する形（＝案4）</td></tr>
+      <tr><td><b>案5: 画面を直せるのが作成者1人</b></td><td>画面のHTMLをgitで管理し、Artifactは発行した複製として扱う。担当者が不在でも別の人がソースから発行し直せる。<em>段階1ではArtifactを作らないので当面は無関係</em>（7.1）</td></tr>
+      <tr><td><b>解釈が固定される</b>（誤ったインサイトが確信度を得たまま残る）</td><td>反証を一級市民として扱う（§2）／「検証済」以上への昇格時に反証条件を任意で書く／後から反証が出た率で係数を校正（§8.4）</td></tr>
+      <tr><td>知見が増えすぎて読めなくなる</td><td>週次でアーカイブ候補を提案（§2.4）。自動archiveはしない</td></tr>
+      <tr><td>改善ルールが溜まって効かなくなる</td><td>総量固定＋効き目の測定で剪定（§8.3）。過去に983行まで膨れた実例あり</td></tr>
+      <tr><td>抽出粒度（38件は多すぎる可能性）</td><td>MVPの最初の数本で「根拠リンクに使われた率」を測り、重要度フィルタを校正</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>8.2 未決事項</h3>
+  <ul>
+    <li>確信度の係数（手法の重み・半減期）の初期値をどの水準から始めるか（§2.3の仮説を最初の1ヶ月で校正）</li>
+    <li>Slack・Chatworkスレッドの「1リサーチ」の切り方（スレッド単位か期間単位か）</li>
+    <li>発言者の匿名化レベル（speaker_attrs にどこまで持たせるか）</li>
+    <li><b>1万件でのNotionの表示速度</b>（4.8）。着手前の1日で測る。結果次第でMVPの構成が変わる</li>
+    <li>段階2でBigQueryへ書き込む際、公式BigQuery MCPの <code>execute_sql</code> をそのまま使うか、MCP Toolbox for BigQuery で操作を定型化するか（移行時に判断。段階1では発生しない）</li>
+    <li><b>4.10 — 案5へ移るとき、課題仮説リレーションをどう扱うか</b>（推奨①インサイトDBだけNotionに残す／②Artifactへ移す／③諦める）。移行のタイミングで決める</li>
+  </ul>
+</section>
+
+</main>
+
+<footer class="doc-foot">
+  <p><b>参考資料</b> —
+    Tomer Sharon “Atomic UX Research” ／ Guest et al. (2006) データ飽和 ／ GRADEエビデンス評価 ／
+    <a href="https://developers.notion.com/reference/request-limits" rel="noopener">Notion API Request limits</a> ／
+    <a href="https://www.notion.com/help/optimize-database-load-times-and-performance" rel="noopener">Notion公式: DB読み込み最適化</a> ／
+    <a href="https://docs.cloud.google.com/bigquery/docs/use-bigquery-mcp" rel="noopener">Google Cloud: BigQuery MCP server</a> ／
+    <a href="https://centou.jp/" rel="noopener">Centou（ベンチマーク）</a>
+  </p>
+  <p>正本: <code>docs/spec/centou-insight-management-design.md</code>（v8）。GUI比較の詳細版: <code>docs/spec/centou-gui-redesign.md</code>。v1（SaaS前提版）はgit履歴に保存。</p>
+</footer>
+
+</div>
