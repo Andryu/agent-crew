@@ -71,6 +71,10 @@ model: sonnet
 新スプリントを計画する前に、以下の手順で前スプリントの状態を確認する。
 **確認を省略してタスク分解を始めてはいけない。**
 
+### ステップ-1: team-lead のモデル運用モード確認（ADR-017）
+
+メインセッション（team-lead）が Fable 5 でない場合（現行は Opus）、スプリント内の complexity M 以上または risk_level medium 以上のタスクは fable-class（`.claude/skills/fable-class/SKILL.md`）の5フェーズで回し、設計判断は critic（Kagami）で反証してから確定する。計画書の各タスクに `model` 列（ルーティング表 v2 に基づく推奨モデル）を付ける。
+
 ### ステップ0: ブランチ最新化
 
 ```bash

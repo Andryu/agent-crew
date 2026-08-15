@@ -38,6 +38,8 @@
 
 **スプリント進行中のタスクレベル指示は PM 経由に一本化する** — team-lead は方針決定に徹し、実装担当者へ直接指示を出さない。チーム合意と衝突する指示の温床になる。（sprint-27-process-001, priority 9・未検証）
 
+**team-lead をモデル名で呼ばない** — 計画書・レトロ・教訓では「team-lead（メインセッション）」と書き、Fable/Opus 等のモデル名でロールを指さない。モデルは差し替わる前提（ADR-017）。
+
 ## Riku（実装）
 
 **委譲サイズを守る** — 実装指示は 2,000 トークン以下、大きなファイルは関係部分のみ抜粋、complexity L は M×2 に分割。Riku への L タスクは 1スプリント1件まで。（sprint-08-reliability-001, sprint-09-process-001, sprint-11-reliability-001）

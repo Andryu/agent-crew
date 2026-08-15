@@ -12,6 +12,7 @@
 | **Riku** | 実装エンジニア（スタック依存） | プロジェクト単位 |
 | **Sora** | QA・コードレビュー | グローバル |
 | **Hana** | ドキュメントレビュー（PRD/仕様書） | グローバル |
+| **Kagami** | 反証レビュー（設計判断を確定前に壊しにいく・Opus） | グローバル |
 
 ---
 
@@ -175,6 +176,17 @@ scripts/queue.sh next                                            # 次に実行�
 2. QA対象の全タスクで `qa_result == "APPROVED"`
 
 両方を満たしたとき `subagent_stop.sh` が完了を通知します。
+
+---
+
+## モデル運用（ADR-017）
+
+Fable 5 が利用できない環境では、team-lead（メインセッション）を Opus で運用しても工程を強制すれば同等品質を維持できる、という方針です。詳細は `docs/adr/ADR-017-opus-fable-parity.md`。
+
+- **推奨設定**: `~/.claude/settings.json` の `"model"` は `"opus"`。`effortLevel` は `"high"` のまま据え置く（深い局面は `ultrathink` を都度使う）
+- **fable-class の自動発動**: Fable 5 が使えない環境では、`.claude/skills/fable-class/SKILL.md` が complexity M 以上または risk_level medium 以上のタスクで自動発動する。`risk_level` 連動のモデルルーティング表 v2 も同ファイルに定義
+- **Fable 5 復帰時**: `"model"` を `"best"` に変更するだけでよい
+- **Stage 2（1スプリント計測後に判断）**: `advisorModel: "opus"` の有効化、`qa`/`security` エージェントの `effort: xhigh` 化
 
 ---
 

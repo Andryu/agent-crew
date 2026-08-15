@@ -4,6 +4,12 @@
 
 set -u
 
+# フック入力 JSON（stdin）を先に退避する（§7 のモデル検知で使う）
+HOOK_INPUT=""
+if [ ! -t 0 ]; then
+  HOOK_INPUT=$(cat 2>/dev/null || true)
+fi
+
 # ---------- 1. 1セッション1回制限 ----------
 SESSION_FLAG="/tmp/claude_session_start_${PPID}.lock"
 if [[ -f "$SESSION_FLAG" ]]; then
@@ -80,6 +86,18 @@ if [[ -f "$LESSONS_FILE" ]]; then
 else
   echo "  (なし — ~/.claude/_lessons.json が存在しません)"
   echo "  初回セットアップ: scripts/lessons_init.sh を実行してください"
+fi
+
+echo ""
+
+# ---------- 7. モデル運用モード（ADR-017） ----------
+# 実効モデルの検知と表示は scripts/model-mode.sh に集約（UserPromptSubmit フックと共用）。
+# stdin（フック入力 JSON）はそのまま渡す。
+echo "[モデル運用モード]"
+if [[ -x "${PROJECT_ROOT}/scripts/model-mode.sh" ]]; then
+  echo "  $("${PROJECT_ROOT}/scripts/model-mode.sh" <<< "${HOOK_INPUT:-}")"
+else
+  echo "  (scripts/model-mode.sh が見つかりません)"
 fi
 
 echo ""
