@@ -10,12 +10,9 @@ if [ ! -t 0 ]; then
   HOOK_INPUT=$(cat 2>/dev/null || true)
 fi
 
-# ---------- 1. 1セッション1回制限 ----------
-SESSION_FLAG="/tmp/claude_session_start_${PPID}.lock"
-if [[ -f "$SESSION_FLAG" ]]; then
-  exit 0
-fi
-touch "$SESSION_FLAG" 2>/dev/null || true
+# ---------- 1. 1セッション1回制限（撤去） ----------
+# PreToolUse 登録時代の重複抑止。SessionStart 登録（ADR-017）では起動・resume・compact ごとに
+# 1回だけ発火し、いずれも新しいコンテキストなので再注入が望ましい。PPID ロックは撤去した。
 
 # ---------- 2. 依存チェック ----------
 if ! command -v jq >/dev/null 2>&1; then

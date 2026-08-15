@@ -70,9 +70,12 @@ case "$MODEL" in
   *)        FAMILY="$MODEL" ;;
 esac
 
-if [[ "$FAMILY" == "fable" ]]; then
+# fail-closed: Fable モードと断定してよいのは実体（hook 入力 / transcript）で確認できたときだけ。
+# settings.json のみ（初回ターン等）では「fable」と書いてあっても実体は Opus でありうるため、fable-class ON 側に倒す。
+if [[ "$FAMILY" == "fable" && ( "$SOURCE" == "hook" || "$SOURCE" == "transcript" ) ]]; then
   echo "[team-lead=${FAMILY} effort=${EFFORT} src=${SOURCE}] Fable モード: fable-class は中〜大規模タスクで発動（ADR-017）"
 else
+  [[ "$FAMILY" == "fable" ]] && FAMILY="fable?(未確認)"
   echo "[team-lead=${FAMILY} effort=${EFFORT} src=${SOURCE}] fable-class ON: complexity≥M or risk≥medium → SPEC/PLAN を docs/plans/ に残す, ミニADRは critic(Kagami,opus) で反証してから確定, ルーティング表 v2 = .claude/skills/fable-class/SKILL.md（ADR-017）"
 fi
 

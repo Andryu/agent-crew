@@ -58,7 +58,7 @@ Fable 5 依存箇所の棚卸し:
 
 ### 2. fable-class の発動を既定化（description と客観基準）
 
-- `SKILL.md` の frontmatter `description` を書き換える。**「メインセッションが Fable 5 でない場合、次のいずれかに該当するタスクの開始時に必ず発動する」**: (a) `complexity` M 以上（`pm-estimation.md` 基準）、(b) `risk_level` medium 以上、(c) 設計判断・新規 ADR・新規ファイル作成・複数ファイル横断の変更を含む、(d) オーナーが「しっかり」「設計して」等と指示。該当しない小タスク（complexity S 相当・設計判断なし）は team-lead が直接作業してよい。
+- `SKILL.md` の frontmatter `description` を書き換える。**「メインセッションが Fable 5 でない場合、次のいずれかに該当するタスクの開始時に必ず発動する」**: (a) `complexity` M 以上（`pm-estimation.md` 基準）、(b) `risk_level` medium 以上、(c) 設計判断・新規 ADR・複数ファイル横断の変更を含む（新規ファイル1本の作成だけでは該当しない）、(d) オーナーが「しっかり」「設計して」等と指示。該当しない小タスク（complexity S 相当・設計判断なし）は team-lead が直接作業してよい。(a)(b) は着手前の見立て（Yuki の `_queue.json` 値、なければ team-lead の初期見積り）で判定し、PLAN で確定値に更新する。
 - **Lite モードは新設しない**（レビューで却下）。Lite/Full の分類はコストを払いたくない当人の自己申告になり、抜け道と形骸化を同時に招く。分類は上記の客観基準に外注し、Full か「対象外」かの二値にする。
 - 発動条件の判定材料として、`planning.md` のマイクロタスク必須項目に **`complexity` と `risk_level`（`pm-estimation.md` 基準、team-lead 自身が付与）** を追加する。Yuki の `_queue.json` を経ないタスクでもルーティング表が使えるようにするため。
 
@@ -67,7 +67,7 @@ Fable 5 依存箇所の棚卸し:
 - **独立クリティーク（critic）**: `risk_level` medium 以上のタスクの設計判断（ミニ ADR）は、確定前に専用エージェント **`critic`（Kagami）** へ「この決定を反証せよ」と依頼する。`.claude/agents/critic.md` を新設（`model: opus`・`effort: xhigh`・tools: Read/Grep/Glob・`Agent` なし）。採否は team-lead が判断する。
   - **非対称ルール**: critic の CRITICAL 指摘を却下する場合は「反論1文」を成果物（§4 の plan ファイル）に必ず残す。同じ Opus が最終審になる構造的限界への最低限の歯止め。
   - **効果指標**: 「レトロ時点で事後に見つかった欠陥のうち、critic が事前に指摘していた割合」をレトロで数える。2スプリント連続で 0/N（N≥3）なら D案（別系統モデル）へ切替を検討。従来案の「10回連続」は個人開発の頻度では感度が低すぎるため採らない。
-- **effort の底上げ（限定）**: `critic` と `architect` の frontmatter に `effort: xhigh`。`qa`・`security` は Stage 2 で計測後に判断（symlink 配布のため全プロジェクトに効く点を考慮）。
+- **effort の底上げ（限定）**: `critic` と `architect` の frontmatter に `effort: xhigh`。`qa`・`security` は Stage 2 で計測後に判断（Sonnet の xhigh がレビュー精度に効くかは未計測。なお `~/.claude/agents/` は `install.sh` による**コピー配布**〔symlink ではない、2026-04-20 付〕で、agent-crew 内では `.claude/agents/` が優先されるため、本 PR の変更は他プロジェクトへ自動伝播しない。伝播させるには `install.sh` の再実行が要る）。
 - **コンテキスト衛生**: team-lead は大きなファイルの通読・広範囲検索を Explore/Sonnet に委譲し、自分のコンテキストを判断用に温存する（鉄則として `SKILL.md` に追加）。
 
 ### 4. 工程の成果物化（機械可読な足跡）
@@ -96,7 +96,7 @@ Full 発動時、team-lead は SPEC・PLAN・DoD・critic 採否を **`docs/plan
 
 - **`session_start.sh` の登録先を PreToolUse → SessionStart に移す**（既存の SessionStart echo と統合）。PreToolUse の stdout はモデルに届かないため。
 - **UserPromptSubmit フックを新設**: `scripts/model-mode.sh` が1行を注入する。例: `[team-lead=opus | fable-class ON: complexity≥M or risk≥medium → SPEC/PLAN→docs/plans, critic before design decisions]`。「コンテキストが長いほど初期の制約を忘れる」への直接の対策。30秒タイムアウトの範囲内で軽量に。
-- **モデル検知は実体から**: `scripts/model-mode.sh` はフック入力 JSON の `model`（あれば）→ `transcript_path` の直近 assistant メッセージの `message.model` → `~/.claude/settings.json` の `model` の順で解決する。設定ファイルだけを見ると「`fable` と書いてあるが実体は Opus」で誤判定するため。
+- **モデル検知は実体から、fail-closed**: `scripts/model-mode.sh` はフック入力 JSON の `model`（あれば）→ `transcript_path` の直近 assistant メッセージの `message.model` → `~/.claude/settings.json` の `model` の順で解決する。設定ファイルだけを見ると「`fable` と書いてあるが実体は Opus」で誤判定するため、**Fable モードと表示するのは hook / transcript で実体確認できたときだけ**。settings のみ（セッション初回ターンなど）では fable-class ON 側に倒す。フックコマンドは `cd "$(git rev-parse --show-toplevel)"` で囲み、サブディレクトリ起動でも動くようにする（他の Stop フックと同形式）。
 - Stop フックでの工程チェックは入れない（判定材料が未実証。ADR-016 と同じ姿勢）。§4 の成果物が溜まってから再検討する。
 
 ### 7. 表記・導線・ドキュメント
@@ -164,7 +164,9 @@ Full 発動時、team-lead は SPEC・PLAN・DoD・critic 採否を **`docs/plan
 | `.claude/skills/fable-class/references/planning.md` | マイクロタスク必須項目に `complexity`/`risk_level` 追加、plan 成果物の書き出し手順 |
 | `.claude/skills/fable-class/references/verification.md` | critic 手順（発動条件・非対称ルール・効果指標）、最終ゲートに「critic 実施 or risk=low の記録」 |
 | `templates/plan.md` | 新設 |
-| `.claude/agents/critic.md` | 新設（Kagami） |
+| `.claude/agents/critic.md` | 新設（Kagami）。強/中/弱 = CRITICAL/MAJOR/MINOR の対応を明記（非対称ルールの発火語を揃える） |
+| `.claude/agents/retro.md` | ステップ 2.8「critic 効果指標の記録」新設、完了報告テンプレに節追加 |
+| `.github/pull_request_template.md` | チェックリストに `docs/plans/` リンク（対象外なら理由）を追加 |
 | `.claude/agents/architect.md` | `effort: xhigh` |
 | `.claude/hooks/session_start.sh` | §7 モデル運用モードを `scripts/model-mode.sh` 呼び出しに置換 |
 | `scripts/model-mode.sh` | 新設（実体からのモデル検知、1行出力） |

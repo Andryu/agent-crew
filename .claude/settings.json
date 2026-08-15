@@ -77,7 +77,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/session_start.sh"
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\" && bash .claude/hooks/session_start.sh'"
           }
         ]
       }
@@ -87,7 +87,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "scripts/model-mode.sh",
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\" && bash scripts/model-mode.sh'",
             "timeout": 10
           }
         ]

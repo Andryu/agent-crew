@@ -73,6 +73,7 @@ T1・T2・T3 は対象ファイルが重ならず並列委譲可能。VERIFY は
 - **仕様準拠レビュー**（新規コンテキスト Sonnet）: MAJOR 1（`SKILL.md` frontmatter の `effort: xhigh` は ADR v2 の決定外 → 採用・削除）、MINOR 1（`start-hook-design.md` の追記が変更ファイル表に未記載 → 採用・表に追加）。他 12 項目は一致。
 - **品質レビュー**（Sora, qa）: APPROVED_WITH_COMMENTS。MINOR: `model-mode.sh` の `tail -n 200` はツール呼び出しの多いターンで assistant 行を取りこぼし settings へ縮退（10万行 transcript で再現）→ 採用・`grep '"type":"assistant"' | tail -n 50` に変更（実測 0.12s）。他（PPID ロック・`set -u`・settings.json 配置・frontmatter YAML）は問題なし。
 - **修正ループ回数**: 1回（採用3件を team-lead が直接修正、再テスト済み）。
+- **追加 VERIFY（Fable vs Opus 比較実験の副産物、T1 反証レビュー×2）**: 両モデルが指摘 → 採用: (1) 初回ターンで settings の `fable` に落ちて Fable モードを誤注入 → fail-closed 化、(2) retro.md に critic 効果指標の計測手順がない → ステップ 2.8 新設。Opus のみ → 採用: (3) critic の語彙（強/中/弱）と非対称ルールの発火語 CRITICAL が不整合 → 対応を明記、(4) UserPromptSubmit の相対パスはサブディレクトリ起動で exit 127 → `cd git root` で囲む、(5) PPID ロックは SessionStart 移行後は不要・compact 再注入を潰す → 撤去、(6) 発動基準 (a)(b) は着手前に判定できない／(c) の「新規ファイル作成」は過剰包摂 → 見立てで判定・PLAN で確定、(c) を絞る。Fable のみ → 採用: (7) `~/.claude/agents/` は symlink でなくコピー、ADR の前提が誤り → 訂正、(8) PR テンプレに plan リンク欄 → 追加。Opus の T3 付随発見（privacy-check.sh が untracked を見ない・stderr 握り潰し）→ Issue 化。
 
 ## エビデンス
 

@@ -250,6 +250,16 @@ bash scripts/lessons.sh set-status <旧lesson-id> dismissed
    コメントを追記してクローズし、新 lesson の evidence に旧 Issue URL を残す
 5. 完了報告の「効果検証結果」に、診断改訂を行った件数と新旧 ID を明記する
 
+### ステップ 2.8: critic 効果指標の記録（ADR-017・必須）
+
+今スプリントの `docs/plans/*.md` の「critic」節と、スプリント中・レトロ時点で判明した欠陥
+（QA の CHANGES_REQUESTED、修正ループ、事後バグ、オーナー差し戻し）を突合し、
+**「事後に見つかった欠陥 N のうち、critic が事前に指摘していた件数 k」** を数える。
+
+- 記録先: Yuki への完了報告「critic 効果指標」節（下記テンプレ）と、`_lessons.json` の当該 lesson の `notes` に `critic_hit: k/N`
+- 判定: 2スプリント連続で k=0 かつ N>=3 なら、ADR-017 の再検討トリガー（critic を別系統モデルへ）を Yuki の完了報告で提案する
+- N=0（欠陥なし）はスキップせず「N=0」と記録する（計測が回っている証跡）
+
 ### ステップ 3: エビデンスゲートの実行
 
 記録した lesson のうち、以下の条件をすべて満たすものを Issue 化候補とする：
@@ -582,6 +592,11 @@ Stop フック（`scripts/enforce-retro-stop.sh`）が実運用の起動経路�
 - verified 遷移: [n] 件 [→ lesson-id, ...]
 - streak 進行中: [n] 件
 - 機械化タスクの起票提案: [なし / あり — 対象と実装先を記載]
+
+### critic 効果指標（ステップ2.8）
+- 対象 plan: [docs/plans/... の一覧 / なし]
+- 事後欠陥 N: [n]、うち critic 事前指摘 k: [n]（critic_hit: k/N）
+- 再検討トリガー: [未発火 / 発火 — critic 別系統化を提案]
 
 ### enforce-retro-stop.sh 実戦検証（ステップ6.5）
 - 発動確認（隔離環境）: [PASS / 未確認]
