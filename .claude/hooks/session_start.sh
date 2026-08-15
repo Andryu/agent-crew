@@ -94,8 +94,8 @@ echo ""
 # 実効モデルの検知と表示は scripts/model-mode.sh に集約（UserPromptSubmit フックと共用）。
 # stdin（フック入力 JSON）はそのまま渡す。
 echo "[モデル運用モード]"
-if [[ -x "${PROJECT_ROOT}/scripts/model-mode.sh" ]]; then
-  echo "  $("${PROJECT_ROOT}/scripts/model-mode.sh" <<< "${HOOK_INPUT:-}")"
+if [[ -f "${PROJECT_ROOT}/scripts/model-mode.sh" ]]; then
+  echo "  $(bash "${PROJECT_ROOT}/scripts/model-mode.sh" <<< "${HOOK_INPUT:-}")"
 else
   echo "  (scripts/model-mode.sh が見つかりません)"
 fi
