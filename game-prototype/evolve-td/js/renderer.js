@@ -267,6 +267,47 @@ function drawShots(ctx, shots) {
   ctx.restore();
 }
 
+/**
+ * 撃破ジュース: 個体の塗り色の粒子群を描画する（CP3）。
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Array<{x:number,y:number,color:string,ttl:number,life:number}>} particles
+ */
+function drawParticles(ctx, particles) {
+  if (!particles || !particles.length) return;
+  ctx.save();
+  for (const p of particles) {
+    const alpha = Math.max(0, Math.min(1, p.ttl / p.life));
+    if (alpha <= 0) continue;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * 撃破報酬の数字ポップを描画する（CP3）。
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Array<{x:number,y:number,text:string,ttl:number,life:number}>} goldPopups
+ */
+function drawGoldPopups(ctx, goldPopups) {
+  if (!goldPopups || !goldPopups.length) return;
+  ctx.save();
+  ctx.font = 'bold 13px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const p of goldPopups) {
+    const alpha = Math.max(0, Math.min(1, p.ttl / p.life));
+    if (alpha <= 0) continue;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#f4d35e';
+    ctx.fillText(p.text, p.x, p.y);
+  }
+  ctx.restore();
+}
+
 function drawRangeCircle(ctx, col, row, range) {
   const { x, y } = cellToPx(col, row);
   ctx.save();
@@ -300,6 +341,8 @@ export function drawTowerIcon(ctx, towerId, size) {
  *   rangePreview?: {col:number,row:number,towerId:string}|null,
  *   laneSelectAlpha?: number|null, // 発熱レーン選択モード中の3レーン点滅alpha
  *   laneFlash?: {lane:number, alpha:number}|null, // 発熱発動レーンの一瞬の白フラッシュ
+ *   particles?: Array<object>, // 撃破ジュースの粒子（CP3）
+ *   goldPopups?: Array<object>, // 撃破報酬の数字ポップ（CP3）
  * }} view
  */
 export function render(ctx, view) {
@@ -333,6 +376,9 @@ export function render(ctx, view) {
   for (const enemy of view.enemies || []) {
     drawEnemy(ctx, enemy, GRID.laneRows);
   }
+
+  drawParticles(ctx, view.particles);
+  drawGoldPopups(ctx, view.goldPopups);
 
   if (view.rangePreview) {
     const def = TOWERS[view.rangePreview.towerId];

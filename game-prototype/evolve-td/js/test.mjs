@@ -9,6 +9,8 @@ import * as GameState from './game-state.js';
 import * as Towers from './towers.js';
 import * as Enemies from './enemies.js';
 import * as Evolution from './evolution.js';
+import * as Share from './share.js';
+import * as Storage from './storage.js';
 
 let count = 0;
 let failed = 0;
@@ -31,22 +33,19 @@ check('game-state.jsが読み込める', typeof GameState.startNewGame === 'func
 check('towers.jsが読み込める', typeof Towers.stepTowers === 'function');
 check('enemies.jsが読み込める', typeof Enemies.spawnFromPopulation === 'function');
 check('evolution.jsが読み込める', typeof Evolution.initialPopulation === 'function');
+check('share.jsが読み込める', typeof Share.encodeChallenge === 'function');
+check('storage.jsが読み込める', typeof Storage.saveBestWave === 'function');
 
-// renderer.js / main.js はDOM依存のため構文チェックのみ（SyntaxErrorのみ失敗）
-console.log('--- renderer.js / main.js 構文チェック（DOM参照エラーは許容） ---');
-try {
-  await import('./renderer.js');
-  check('renderer.jsのimportがSyntaxErrorを起こさない', true);
-} catch (e) {
-  const isSyntaxError = e instanceof SyntaxError;
-  check(`renderer.jsのimportがSyntaxErrorを起こさない（発生時: ${e.constructor.name}: ${e.message}）`, !isSyntaxError);
-}
-try {
-  await import('./main.js');
-  check('main.jsのimportがSyntaxErrorを起こさない', true);
-} catch (e) {
-  const isSyntaxError = e instanceof SyntaxError;
-  check(`main.jsのimportがSyntaxErrorを起こさない（発生時: ${e.constructor.name}: ${e.message}）`, !isSyntaxError);
+// renderer.js / main.js / audio.js / survey.js はDOM依存のため構文チェックのみ（SyntaxErrorのみ失敗）
+console.log('--- renderer.js / main.js / audio.js / survey.js 構文チェック（DOM参照エラーは許容） ---');
+for (const mod of ['./renderer.js', './main.js', './audio.js', './survey.js']) {
+  try {
+    await import(mod);
+    check(`${mod}のimportがSyntaxErrorを起こさない`, true);
+  } catch (e) {
+    const isSyntaxError = e instanceof SyntaxError;
+    check(`${mod}のimportがSyntaxErrorを起こさない（発生時: ${e.constructor.name}: ${e.message}）`, !isSyntaxError);
+  }
 }
 
 // --- rng.js ---
@@ -185,6 +184,31 @@ console.log('--- enemies.js ---');
   const reachEnemies = [{ genome: genomes[0], x: laneLength - 0.5, spawnAt: 0, realSpeed: 1, slowUntil: 0, slowFactor: 1, alive: true, reached: false, lane: 0 }];
   Enemies.stepEnemies(reachEnemies, 1, laneLength, 0);
   check('stepEnemies: laneLengthに到達するとreached=true・alive=false', reachEnemies[0].reached === true && reachEnemies[0].alive === false);
+
+  // pickGameOverRepresentative（CP3修正: 同点判定でbest.genome.hpを参照する例外バグの回帰テスト）
+  const reachedTie1 = {
+    genome: { hp: 1.5, size: 1.0 },
+    x: laneLength,
+    spawnAt: 0,
+    alive: false,
+    reached: true,
+  };
+  const reachedTie2 = {
+    genome: { hp: 2.5, size: 1.0 },
+    x: laneLength,
+    spawnAt: 0,
+    alive: false,
+    reached: true,
+  };
+  const pickedTie = Enemies.pickGameOverRepresentative([reachedTie1, reachedTie2], laneLength);
+  check(
+    'pickGameOverRepresentative: 到達2体同点でも例外を投げずhpが大きい方のgenomeを返す',
+    pickedTie === reachedTie2.genome
+  );
+
+  const notYetSpawned = { genome: { hp: 9, size: 1.0 }, x: -1, spawnAt: 1, alive: true, reached: false };
+  const noneEligible = Enemies.pickGameOverRepresentative([notYetSpawned], laneLength);
+  check('pickGameOverRepresentative: 出現済み該当個体が0体ならnullを返す', noneEligible === null);
 }
 
 // --- towers.js ---
@@ -661,6 +685,88 @@ console.log('--- enemies.js (CP2: applyHeatToLane) ---');
     'applyHeatToLane: 同ケースでslowUntilがnow+3.0に延長される',
     Math.abs(coldThenHeat[0].slowUntil - (90 + Config.SKILL.duration)) < 1e-9
   );
+}
+
+// --- share.js（CP3） ---
+console.log('--- share.js ---');
+{
+  // 往復1: 通常の値
+  const encoded1 = Share.encodeChallenge({ seed: 12345, gold: 300 });
+  const decoded1 = Share.decodeChallenge(encoded1);
+  check(
+    'share: 往復(seed=12345,gold=300)が一致する',
+    !!decoded1 && decoded1.seed === 12345 && decoded1.gold === 300
+  );
+
+  // 往復2: gold範囲境界の値
+  const encoded2 = Share.encodeChallenge({ seed: 0, gold: 600 });
+  const decoded2 = Share.decodeChallenge(encoded2);
+  check(
+    'share: 往復(seed=0,gold=600の境界値)が一致する',
+    !!decoded2 && decoded2.seed === 0 && decoded2.gold === 600
+  );
+
+  // "#c=" 付きの文字列も受理される
+  const withHash = Share.decodeChallenge(`#c=${encoded1}`);
+  check('share: "#c="付き文字列も受理される', !!withHash && withHash.seed === 12345 && withHash.gold === 300);
+
+  // 不正5種（テスト専用にbase64url化する。encodeChallenge本体とは独立した経路で任意のペイロードを作る）
+  const toRawPayload = (obj) => {
+    const b64 = Buffer.from(JSON.stringify(obj), 'binary').toString('base64');
+    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+  check('share: v!==1はnull', Share.decodeChallenge(toRawPayload({ v: 2, seed: 1, gold: 300 })) === null);
+  check('share: seed非整数はnull', Share.decodeChallenge(toRawPayload({ v: 1, seed: 1.5, gold: 300 })) === null);
+  check('share: seed範囲外(負)はnull', Share.decodeChallenge(toRawPayload({ v: 1, seed: -1, gold: 300 })) === null);
+  check('share: gold範囲外はnull', Share.decodeChallenge(toRawPayload({ v: 1, seed: 1, gold: 10000 })) === null);
+  check('share: JSON不正(パース不能な文字列)はnull', Share.decodeChallenge('###not-valid-base64-json') === null);
+  check('share: 空文字列はnull', Share.decodeChallenge('') === null);
+  check('share: 非文字列(null)はnull', Share.decodeChallenge(null) === null);
+}
+
+// --- storage.js（CP3: localStorage不在環境でのガード。Nodeにはglobalthis.localStorageが無い） ---
+console.log('--- storage.js（localStorage不在） ---');
+{
+  check('storage: localStorage不在でもloadBestWaveは0を返す', Storage.loadBestWave() === 0);
+
+  const callsDoNotThrow = [
+    ['saveBestWave', () => Storage.saveBestWave(5)],
+    ['saveSurveyResponse', () => Storage.saveSurveyResponse({ a: 1 })],
+    ['markChallengeReceived', () => Storage.markChallengeReceived()],
+    ['markSeenIntro', () => Storage.markSeenIntro()],
+    ['recordSessionStart', () => Storage.recordSessionStart()],
+    ['recordWave2Started', () => Storage.recordWave2Started()],
+  ];
+  for (const [name, fn] of callsDoNotThrow) {
+    let threw = false;
+    try {
+      fn();
+    } catch {
+      threw = true;
+    }
+    check(`storage: ${name}はlocalStorage不在でも例外を投げない`, !threw);
+  }
+
+  check('storage: loadSurveyResponsesはlocalStorage不在でも空配列を返す', Array.isArray(Storage.loadSurveyResponses()) && Storage.loadSurveyResponses().length === 0);
+  check('storage: hasChallengeReceivedはlocalStorage不在でもfalseを返す', Storage.hasChallengeReceived() === false);
+  check('storage: hasSeenIntroはlocalStorage不在でもfalseを返す', Storage.hasSeenIntro() === false);
+
+  // exportSurveyAsJSONの形（5キー）
+  let exported;
+  let exportThrew = false;
+  try {
+    exported = Storage.exportSurveyAsJSON();
+  } catch {
+    exportThrew = true;
+  }
+  check('storage: exportSurveyAsJSONはlocalStorage不在でも例外を投げない', !exportThrew);
+  const parsed = JSON.parse(exported);
+  const keys = Object.keys(parsed).sort();
+  check(
+    'storage: exportSurveyAsJSONは5キー(responses,bestWave,challengeReceived,sessions,wave2Started)を持つ',
+    JSON.stringify(keys) === JSON.stringify(['bestWave', 'challengeReceived', 'responses', 'sessions', 'wave2Started'])
+  );
+  check('storage: exportSurveyAsJSON.responsesは配列', Array.isArray(parsed.responses));
 }
 
 // --- 結果出力 ---

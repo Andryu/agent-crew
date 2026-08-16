@@ -177,6 +177,25 @@ export const DIFF_THRESHOLDS = {
 export const RESIST_LABELS = { 1: 'マクロファージ', 2: 'インターフェロン', 3: '抗体' };
 export const LANE_LABELS = ['上', '中央', '下'];
 
+// --- 撃破ジュース・UI演出の数値（CP3） ---
+export const JUICE = {
+  particleMin: 6, // 撃破時の粒子個数下限
+  particleMax: 10, // 撃破時の粒子個数上限
+  particleSpeedMin: 30, // px/秒
+  particleSpeedMax: 80, // px/秒
+  particleLife: 0.4, // 秒
+  goldPopupLife: 0.6, // 秒
+  goldPopupRiseSpeed: -20, // px/秒（y減少方向＝上昇）
+  killSoundThrottleSec: 0.04, // 同時多数撃破時の撃破音再生間隔下限
+  toastDurationMs: 2000,
+  introBubbleTimeoutMs: 8000, // 初回吹き出しの自動消去タイムアウト
+  vibrateMs: 50, // 配置拒否時の振動
+  // ビネットのフェード秒数。実体はstyle.cssの@keyframes vignette-fade（0.25s）。
+  // main.jsはクラス切替のみで秒数を直接扱わないため参照はしていないが、
+  // 数値の一元管理のためここにも記録する。
+  vignetteDurationSec: 0.25,
+};
+
 // --- 能動スキル「発熱」（CP2） ---
 export const SKILL = {
   unlockWave: 3, // wave>=3で解禁（塔heatと同時）

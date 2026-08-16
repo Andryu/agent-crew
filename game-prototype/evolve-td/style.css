@@ -72,6 +72,33 @@ html, body {
   cursor: default;
 }
 
+/* --- チャレンジリンク（タイトル） --- */
+.challenge-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(74, 168, 224, 0.12);
+  border: 1px solid rgba(74, 168, 224, 0.3);
+  max-width: 320px;
+}
+
+.challenge-banner-text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #cfe6f7;
+}
+
+.challenge-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
 /* --- プレイ画面 --- */
 #playing-screen {
   padding: 8px;
@@ -93,6 +120,41 @@ html, body {
 
 .hud-item {
   font-weight: 600;
+}
+
+.mute-button {
+  margin-left: auto;
+  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: none;
+  background: #1b1d24;
+  color: #f0f0f2;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* --- 教えない導入: 初回吹き出し --- */
+.intro-bubble {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translate(-50%, 100%);
+  z-index: 6;
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.75);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.3s ease-out;
+}
+
+/* 消滅時: is-fadingでopacityを0にし、300ms後にJS側で.hiddenを付与する */
+.intro-bubble.is-fading {
+  opacity: 0;
 }
 
 .board-row {
@@ -212,7 +274,9 @@ html, body {
 
 .sell-button {
   position: absolute;
-  transform: translate(-50%, -100%);
+  /* 既定はセルの下側に出す。row>=6（下2行）は.sell-button-aboveを付与し上側に反転する
+     （main.jsの座標計算で分岐。CP3確定回答#10） */
+  transform: translate(-50%, 0%);
   padding: 8px 14px;
   border-radius: 6px;
   border: none;
@@ -221,6 +285,10 @@ html, body {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.sell-button.sell-button-above {
+  transform: translate(-50%, -100%);
 }
 
 .controls {
@@ -405,6 +473,17 @@ html, body {
   text-align: center;
 }
 
+.result-genome-canvas {
+  background: #14161c;
+  border-radius: 12px;
+}
+
+.result-genome-caption {
+  margin: 0;
+  color: #cfd2da;
+  font-size: 0.95rem;
+}
+
 .result-wave-count {
   font-size: 1.25rem;
   color: #cfd2da;
@@ -415,6 +494,108 @@ html, body {
   flex-direction: column;
   gap: 10px;
   width: 240px;
+}
+
+/* --- アンケート --- */
+#survey-screen {
+  gap: 12px;
+}
+
+#survey-form {
+  width: 100%;
+  max-width: 420px;
+  text-align: left;
+}
+
+#survey-form fieldset {
+  border: 1px solid #2a2d36;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  padding: 12px;
+}
+
+#survey-form legend {
+  color: #cfd2da;
+  padding: 0 6px;
+  font-size: 0.85rem;
+}
+
+.scale {
+  display: flex;
+  gap: 12px;
+  justify-content: space-around;
+}
+
+.scale label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #b8bac2;
+}
+
+#survey-form input[type="text"] {
+  width: 100%;
+  padding: 8px;
+  background: #14161c;
+  border: 1px solid #2a2d36;
+  color: #f0f0f2;
+  border-radius: 6px;
+}
+
+.survey-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+#survey-after-submit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.copy-status {
+  color: #b8bac2;
+  font-size: 0.9rem;
+  min-height: 1.2em;
+}
+
+/* --- 到達時の赤ビネット --- */
+.vignette-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  opacity: 0;
+}
+
+.vignette-overlay.flash {
+  opacity: 1;
+  box-shadow: inset 0 0 0 12px rgba(224, 90, 58, 0.6);
+  animation: vignette-fade 0.25s ease-out forwards;
+}
+
+@keyframes vignette-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* --- トースト --- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 50;
+  margin: 0;
+  padding: 8px 18px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #f0f0f2;
+  font-size: 0.9rem;
 }
 
 /* --- PC横（デスクトップ） --- */

@@ -150,6 +150,29 @@ export function applyHeatToLane(enemies, lane, now) {
 }
 
 /**
+ * ゲームオーバー時点で出現済み(spawnAt<=0)の個体(alive または reached)から
+ * 即席スコア (reached?2:0) + x/laneLength が最大の1体のgenomeを返す（同点はgenome.hpが大きい方）。
+ * 該当個体が1体もいない場合はnullを返す（呼び出し側でフォールバックすること）。
+ * @param {Array<object>} enemies
+ * @param {number} [laneLength]
+ * @returns {object|null} genome または null
+ */
+export function pickGameOverRepresentative(enemies, laneLength = LANE_LENGTH) {
+  let best = null;
+  let bestScore = -Infinity;
+  for (const enemy of enemies) {
+    if (enemy.spawnAt > 0) continue; // 未出現は対象外
+    if (!enemy.alive && !enemy.reached) continue;
+    const score = (enemy.reached ? 2 : 0) + enemy.x / laneLength;
+    if (score > bestScore || (score === bestScore && best && enemy.genome.hp > best.hp)) {
+      bestScore = score;
+      best = enemy.genome;
+    }
+  }
+  return best;
+}
+
+/**
  * evolution.evaluateへの入力resultsを生成する。populationと同じ順序で返す。
  * @param {Array<object>} enemies
  * @param {number} laneLength

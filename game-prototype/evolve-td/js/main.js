@@ -1,7 +1,7 @@
 // main.js
 // 画面遷移・ゲームループ・入力（配置/売却/ボタン）を担当するエントリーポイント。
 // CP2: 変異レポートmodal・次ウェーブプレビュー・発熱スキルを追加。
-// CP3: チャレンジリンク・アンケート・音・粒子・吹き出しは実装しない。
+// CP3: チャレンジリンク・アンケート・保存・SE・撃破ジュース・負けた画・教えない導入を追加。
 
 import {
   GRID,
@@ -10,7 +10,10 @@ import {
   ECONOMY,
   LANE_LENGTH,
   SKILL,
+  JUICE,
   WAVE_COUNT,
+  RESIST_COLORS,
+  RESIST_LABELS,
   killReward,
 } from './config.js';
 import { makeRng } from './rng.js';
@@ -35,15 +38,36 @@ import {
   collectResults,
   livesLostFor,
   applyHeatToLane,
+  pickGameOverRepresentative,
 } from './enemies.js';
 import { stepTowers } from './towers.js';
 import { render, drawTowerIcon, renderGenomeIcon } from './renderer.js';
-import { representative } from './evolution.js';
+import { representative, evaluate, summarize } from './evolution.js';
+import { encodeChallenge, decodeChallenge } from './share.js';
+import {
+  saveBestWave,
+  markChallengeReceived,
+  markSeenIntro,
+  hasSeenIntro,
+  recordSessionStart,
+  recordWave2Started,
+} from './storage.js';
+import { initSurvey, resetSurveyScreen } from './survey.js';
+import {
+  initAudio,
+  playPlace,
+  playKill,
+  playHit,
+  playWaveStart,
+  setMuted,
+  isMuted,
+} from './audio.js';
 
 const screens = {
   title: document.getElementById('title-screen'),
   playing: document.getElementById('playing-screen'),
   result: document.getElementById('result-screen'),
+  survey: document.getElementById('survey-screen'),
 };
 
 const startButton = document.getElementById('start-button');
@@ -52,6 +76,7 @@ const ctx = canvas.getContext('2d');
 const hudGold = document.getElementById('hud-gold');
 const hudLives = document.getElementById('hud-lives');
 const hudWave = document.getElementById('hud-wave');
+const muteButton = document.getElementById('mute-button');
 const sellButton = document.getElementById('sell-button');
 const paletteEl = document.getElementById('tower-palette');
 const paletteSlots = Array.from(document.querySelectorAll('.tower-slot'));
@@ -59,14 +84,19 @@ const waveStartButton = document.getElementById('wave-start-button');
 const speedToggleButton = document.getElementById('speed-toggle-button');
 const resultHeading = document.getElementById('result-heading');
 const resultWaveCount = document.getElementById('result-wave-count');
+const resultGenomeCanvas = document.getElementById('result-genome-canvas');
+const resultGenomeCaption = document.getElementById('result-genome-caption');
 const endlessButton = document.getElementById('endless-button');
 const retryButton = document.getElementById('retry-button');
 const titleFromResultButton = document.getElementById('title-from-result-button');
+const challengeSendButton = document.getElementById('challenge-send-button');
+const surveyOpenButton = document.getElementById('survey-open-button');
 const previewPanel = document.getElementById('preview-panel');
 const previewCanvases = Array.from(document.querySelectorAll('.preview-icon'));
 const skillButton = document.getElementById('skill-button');
 const skillLabel = document.getElementById('skill-label');
 const skillSelectBanner = document.getElementById('skill-select-banner');
+const introBubble = document.getElementById('intro-bubble');
 const reportModal = document.getElementById('report-modal');
 const reportHeading = document.getElementById('report-heading');
 const reportIntro = document.getElementById('report-intro');
@@ -74,12 +104,20 @@ const reportLinesEl = document.getElementById('report-lines');
 const reportPrevCanvas = document.getElementById('report-prev-canvas');
 const reportNextCanvas = document.getElementById('report-next-canvas');
 const reportCloseButton = document.getElementById('report-close-button');
+const challengeBanner = document.getElementById('challenge-banner');
+const challengeBannerText = document.getElementById('challenge-banner-text');
+const challengeAcceptButton = document.getElementById('challenge-accept-button');
+const challengeDeclineButton = document.getElementById('challenge-decline-button');
+const vignetteOverlay = document.getElementById('vignette-overlay');
+const toastEl = document.getElementById('toast');
 
 let state = null;
-let screen = 'title'; // 'title' | 'playing' | 'result'（画面状態はここで管理。state.phaseはplace/wave/reportのみ）
+let screen = 'title'; // 'title' | 'playing' | 'result' | 'survey'（画面状態はここで管理。state.phaseはplace/wave/reportのみ）
 let masterRng = null;
 let enemies = [];
 let activeShots = [];
+let particles = []; // 撃破ジュースの粒子 {x,y,color,vx,vy,ttl,life}
+let goldPopups = []; // 撃破報酬の数字ポップ {x,y,text,ttl,life}
 let waveClock = 0;
 let speedMultiplier = 1;
 let selectedTowerId = null;
@@ -91,6 +129,12 @@ let lastTimestamp = null;
 let loopRunning = false;
 let skillSelectMode = false;
 let laneFlash = null; // {lane, until}
+let pendingChallenge = null; // {seed, gold} タイトルで検出した挑戦状
+let initialGold = ECONOMY.initialGoldDefault; // このランの開始時資金（挑戦状リンク生成に使う。state.goldは変動するため別管理）
+let seenIntroThisSession = false; // このプレイ開始前に既にhasSeenIntro()済みだったか（初回吹き出し・レポート初回1行の連動に使う）
+let introBubbleTimerId = null;
+let toastTimerId = null;
+let lastKillSoundAt = -Infinity;
 
 if (!ctx) {
   const msg = document.createElement('p');
@@ -98,6 +142,44 @@ if (!ctx) {
   document.getElementById('app').prepend(msg);
   startButton.disabled = true;
 }
+
+function prefersReducedMotion() {
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+// --- トースト（コピー完了通知） ---
+
+function showToast(text) {
+  toastEl.textContent = text;
+  toastEl.classList.remove('hidden');
+  if (toastTimerId !== null) clearTimeout(toastTimerId);
+  toastTimerId = setTimeout(() => {
+    toastEl.classList.add('hidden');
+    toastTimerId = null;
+  }, JUICE.toastDurationMs);
+}
+
+// --- 到達時の赤ビネット（0.25秒、box-shadow inset） ---
+
+function flashVignette() {
+  vignetteOverlay.classList.remove('flash');
+  // eslint-disable-next-line no-unused-expressions
+  void vignetteOverlay.offsetWidth; // 強制リフローで同じクラスの再付与でもアニメーションを再生させる
+  vignetteOverlay.classList.add('flash');
+}
+
+// --- ミュート ---
+
+function updateMuteButton() {
+  muteButton.textContent = isMuted() ? '🔇' : '🔊';
+  muteButton.setAttribute('aria-label', isMuted() ? 'ミュート解除' : 'ミュート');
+}
+
+muteButton.addEventListener('click', () => {
+  setMuted(!isMuted());
+  updateMuteButton();
+});
+updateMuteButton();
 
 function showScreen(name) {
   Object.entries(screens).forEach(([key, el]) => {
@@ -226,6 +308,31 @@ function activateSkill(lane) {
   exitSkillSelect();
 }
 
+// --- 教えない導入（初回吹き出し） ---
+
+function showIntroBubbleIfFirstTime() {
+  if (seenIntroThisSession) return; // 既にhasSeenIntro()済み（初回ではない）
+  introBubble.classList.remove('hidden');
+  introBubble.classList.remove('is-fading');
+  if (introBubbleTimerId !== null) clearTimeout(introBubbleTimerId);
+  introBubbleTimerId = setTimeout(dismissIntroBubble, JUICE.introBubbleTimeoutMs); // タイムアウト消去
+}
+
+function dismissIntroBubble() {
+  if (introBubbleTimerId !== null) {
+    clearTimeout(introBubbleTimerId);
+    introBubbleTimerId = null;
+  }
+  if (introBubble.classList.contains('hidden') || introBubble.classList.contains('is-fading')) return;
+  // 0.3秒フェードアウト後にhiddenへ切り替える（即時非表示にしない）
+  introBubble.classList.add('is-fading');
+  setTimeout(() => {
+    introBubble.classList.add('hidden');
+    introBubble.classList.remove('is-fading');
+  }, 300);
+  markSeenIntro();
+}
+
 // --- 次ウェーブ・プレビュー ---
 
 function renderPreview() {
@@ -278,12 +385,14 @@ function closeReportModal() {
 reportCloseButton.addEventListener('click', closeReportModal);
 skillButton.addEventListener('click', onSkillButtonPress);
 
-function cellCenterToClientPx(col, row) {
+// aboveがtrueならセルの上側に出す座標（cellの上端）、falseなら下側に出す座標（cellの下端）を返す。
+// CP3確定回答#10: row>=6（下2行）はaboveをtrueにして呼ぶ。それ以外（現状どおり）はfalse。
+function cellCenterToClientPx(col, row, above) {
   const rect = canvas.getBoundingClientRect();
   const scaleX = rect.width / (GRID.cols * GRID.cellSize);
   const scaleY = rect.height / (GRID.rows * GRID.cellSize);
   const x = (col + 0.5) * GRID.cellSize * scaleX;
-  const y = row * GRID.cellSize * scaleY;
+  const y = (above ? row : row + 1) * GRID.cellSize * scaleY;
   return { x, y };
 }
 
@@ -291,9 +400,11 @@ function showSellButtonFor(col, row, towerId) {
   const def = TOWERS[towerId];
   const refund = Math.floor(def.cost * ECONOMY.sellRatio);
   sellButton.textContent = `売る (+${refund}G)`;
-  const { x, y } = cellCenterToClientPx(col, row);
+  const above = row >= 6; // 下2行はボタンをセルの上側に出す（main.jsの座標計算で分岐）
+  const { x, y } = cellCenterToClientPx(col, row, above);
   const wrapRect = canvas.parentElement.getBoundingClientRect();
   const canvasRect = canvas.getBoundingClientRect();
+  sellButton.classList.toggle('sell-button-above', above);
   sellButton.style.left = `${canvasRect.left - wrapRect.left + x}px`;
   sellButton.style.top = `${canvasRect.top - wrapRect.top + y}px`;
   sellButton.classList.remove('hidden');
@@ -349,9 +460,12 @@ function handleBoardTap(clientX, clientY) {
     if (canPlace(state, selectedTowerId, col, row)) {
       state = placeTower(state, selectedTowerId, col, row);
       selectedTowerId = null;
+      playPlace();
+      dismissIntroBubble();
     } else if (GRID.laneRows.includes(row)) {
-      // レーン上セルへの配置拒否: 赤フラッシュ、選択は継続
+      // レーン上セルへの配置拒否: 赤フラッシュ＋振動50ms、選択は継続
       flashCell = { col, row, until: performance.now() + 150 };
+      if (navigator.vibrate) navigator.vibrate(JUICE.vibrateMs);
     }
     updatePalette();
     updateHud();
@@ -363,6 +477,7 @@ function handleSell() {
   state = sellTower(state, sellTarget.col, sellTarget.row);
   hideSellButton();
   selectedTowerId = null; // 売却後はパレット選択と射程円プレビューを解除する
+  playPlace(true); // 配置音を低ピッチ再生（新規SEは追加しない）
   updatePalette();
   updateHud();
 }
@@ -446,9 +561,14 @@ speedToggleButton.addEventListener('click', () => {
 
 function onWaveStart() {
   if (!state || state.phase !== 'place') return;
+  dismissIntroBubble();
+  if (state.wave === 2) recordWave2Started(); // 離脱計測点「ウェーブ2開始率」
   state = startWave(state);
   enemies = spawnFromPopulation(state.population, state.wave, masterRng);
   activeShots = [];
+  particles = [];
+  goldPopups = [];
+  playWaveStart();
   waveClock = 0;
   speedMultiplier = 1;
   speedToggleButton.classList.remove('selected');
@@ -462,21 +582,110 @@ function onWaveStart() {
 
 waveStartButton.addEventListener('click', onWaveStart);
 
+// --- 撃破ジュース（粒子・資金ポップ） ---
+
+function enemyCenterPx(enemy) {
+  return {
+    x: enemy.x * GRID.cellSize + GRID.cellSize / 2,
+    y: GRID.laneRows[enemy.lane] * GRID.cellSize + GRID.cellSize / 2,
+  };
+}
+
+function spawnKillParticles(enemy) {
+  if (prefersReducedMotion()) return; // reduced-motionでは粒子を省略
+  const { x, y } = enemyCenterPx(enemy);
+  const color = RESIST_COLORS[enemy.genome.resist];
+  const count = JUICE.particleMin + Math.floor(Math.random() * (JUICE.particleMax - JUICE.particleMin + 1));
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = JUICE.particleSpeedMin + Math.random() * (JUICE.particleSpeedMax - JUICE.particleSpeedMin);
+    particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      color,
+      life: JUICE.particleLife,
+      ttl: JUICE.particleLife,
+    });
+  }
+}
+
+function spawnGoldPopup(enemy, amount) {
+  const { x, y } = enemyCenterPx(enemy);
+  goldPopups.push({ x, y, text: `+${amount}`, life: JUICE.goldPopupLife, ttl: JUICE.goldPopupLife });
+}
+
+function playKillThrottled(now) {
+  // 同時多数撃破は約40ms間隔でクランプし音の飽和を防ぐ
+  if (now - lastKillSoundAt < JUICE.killSoundThrottleSec) return;
+  lastKillSoundAt = now;
+  playKill();
+}
+
 function processReachedAndKilled() {
   for (const enemy of enemies) {
     if (enemy.reached && !enemy._lifeGiven) {
       enemy._lifeGiven = true;
       const n = livesLostFor(enemy.genome);
       state = loseLives(state, n);
+      flashVignette();
+      playHit();
       if (isGameOver(state)) {
         return true;
       }
     } else if (!enemy.alive && !enemy.reached && !enemy._rewardGiven) {
       enemy._rewardGiven = true;
-      state = { ...state, gold: state.gold + killReward(state.wave) };
+      const reward = killReward(state.wave);
+      state = { ...state, gold: state.gold + reward };
+      spawnKillParticles(enemy);
+      spawnGoldPopup(enemy, reward);
+      playKillThrottled(waveClock);
     }
   }
   return false;
+}
+
+// --- 負けた画／クリア画面の代表個体 ---
+
+// ゲームオーバー時点の代表個体genomeを選ぶ（選出ロジック本体はenemies.jsの純粋関数）。
+// 出現済み個体が1体もいない極端なケースはフォールバックする。
+function pickGameOverRepresentativeGenome() {
+  return pickGameOverRepresentative(enemies, LANE_LENGTH) ?? representative(state.population, summarize(state.population));
+}
+
+// クリア時: W15のcollectResultsに基づくevaluate最大の1体
+function pickClearRepresentative(prevPopulation) {
+  const results = collectResults(enemies, LANE_LENGTH);
+  const fitness = evaluate(results);
+  let bestIndex = 0;
+  let bestFitness = -Infinity;
+  fitness.forEach((f, i) => {
+    if (f > bestFitness) {
+      bestFitness = f;
+      bestIndex = i;
+    }
+  });
+  return prevPopulation[bestIndex] ?? representative(prevPopulation, summarize(prevPopulation));
+}
+
+// 「第{n}世代・速度×{speedMean 小数1桁}・{resist最多}耐性」を生成する。
+// resist最多がnone(index0)の場合は耐性句を省略する。
+function formatResultCaption(wave, summary) {
+  const speedStr = summary.speedMean.toFixed(1);
+  const shares = summary.resistShare;
+  let maxIndex = 0;
+  for (let i = 1; i < shares.length; i++) {
+    if (shares[i] > shares[maxIndex]) maxIndex = i;
+  }
+  const resistPart = maxIndex === 0 ? '' : `・${RESIST_LABELS[maxIndex]}耐性`;
+  return `第${wave}世代・速度×${speedStr}${resistPart}`;
+}
+
+function showResultGenome(genome, summary) {
+  const genomeCtx = resultGenomeCanvas.getContext('2d');
+  if (genomeCtx && genome) renderGenomeIcon(genomeCtx, genome, resultGenomeCanvas.width);
+  resultGenomeCaption.textContent = formatResultCaption(state.wave, summary);
 }
 
 function goToGameOver() {
@@ -489,14 +698,20 @@ function goToGameOver() {
     ? `到達ウェーブ ${state.wave}（エンドレス）`
     : `到達ウェーブ ${state.wave} / ${WAVE_COUNT}`;
   endlessButton.classList.add('hidden');
+  retryButton.classList.remove('hidden');
+  showResultGenome(pickGameOverRepresentativeGenome(), summarize(state.population));
+  saveBestWave(state.wave);
   showScreen('result');
 }
 
-function goToClearResult() {
+function goToClearResult(prevPopulation) {
   screen = 'result';
   resultHeading.textContent = '防衛完了';
   resultWaveCount.textContent = `到達ウェーブ ${WAVE_COUNT}`;
   endlessButton.classList.remove('hidden');
+  retryButton.classList.add('hidden'); // UX§7.2: クリア画面はエンドレス／挑戦状／アンケート／タイトルの4つ
+  showResultGenome(pickClearRepresentative(prevPopulation), state.prevSummary);
+  saveBestWave(state.wave);
   showScreen('result');
 }
 
@@ -509,7 +724,7 @@ function finishWave() {
   state = newState;
 
   if (isCleared(state)) {
-    goToClearResult();
+    goToClearResult(prevPopulation);
     return;
   }
 
@@ -520,7 +735,8 @@ function finishWave() {
     lines: report,
     prevGenome,
     nextGenome,
-    isFirst: state.wave === 1,
+    // CP3: 初回1行はセッション開始時点でhasSeenIntro()が未設定だった場合のみ（storage.seenIntroに連動）
+    isFirst: state.wave === 1 && !seenIntroThisSession,
   });
   updateHud();
 }
@@ -533,6 +749,12 @@ function gameStep(dt) {
   activeShots = activeShots
     .map((s) => ({ ...s, ttl: s.ttl - dt }))
     .filter((s) => s.ttl > 0);
+  particles = particles
+    .map((p) => ({ ...p, x: p.x + p.vx * dt, y: p.y + p.vy * dt, ttl: p.ttl - dt }))
+    .filter((p) => p.ttl > 0);
+  goldPopups = goldPopups
+    .map((p) => ({ ...p, y: p.y + JUICE.goldPopupRiseSpeed * dt, ttl: p.ttl - dt }))
+    .filter((p) => p.ttl > 0);
 
   stepEnemies(enemies, dt, LANE_LENGTH, waveClock);
 
@@ -547,10 +769,6 @@ function gameStep(dt) {
   if (waveComplete) {
     finishWave();
   }
-}
-
-function prefersReducedMotion() {
-  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 }
 
 function laneSelectAlphaAt(t) {
@@ -581,6 +799,8 @@ function frame(timestamp) {
       rangePreview: selectedTowerId ? lastHoverCell && { ...lastHoverCell, towerId: selectedTowerId } : null,
       laneSelectAlpha: skillSelectMode ? laneSelectAlphaAt(waveClock) : null,
       laneFlash: laneFlash ? { lane: laneFlash.lane, alpha: 0.6 } : null,
+      particles,
+      goldPopups,
     });
     if (flashCell) drawFlash();
     updateSkillButton();
@@ -614,31 +834,44 @@ function startLoop() {
   requestAnimationFrame(frame);
 }
 
-function startGame() {
-  const seed = Math.floor(Math.random() * 0xffffffff) >>> 0;
+/**
+ * @param {{seed?:number, gold?:number}} [options] 挑戦状受領時にseed/goldを上書きする
+ */
+function startGame(options = {}) {
+  const seed = typeof options.seed === 'number' ? options.seed : Math.floor(Math.random() * 0xffffffff) >>> 0;
+  const gold = typeof options.gold === 'number' ? options.gold : ECONOMY.initialGoldDefault;
+  initialGold = gold; // チャレンジリンク生成に使う開始時資金（state.goldは以後変動する）
+  seenIntroThisSession = hasSeenIntro(); // マーク前に捕捉（初回吹き出し・レポート初回1行の判定に使う）
+  recordSessionStart();
+  initAudio(); // ユーザー操作(クリック)ハンドラ内なのでAudioContext初期化が許可される
   masterRng = makeRng(seed);
-  state = startNewGame({ seed, gold: ECONOMY.initialGoldDefault });
+  state = startNewGame({ seed, gold });
   screen = 'playing';
   previousUnlocked = ['basic'];
   previousSkillUnlocked = false;
   enemies = [];
   activeShots = [];
+  particles = [];
+  goldPopups = [];
   selectedTowerId = null;
   skillSelectMode = false;
   laneFlash = null;
   skillSelectBanner.classList.add('hidden');
   reportModal.classList.add('hidden');
+  challengeBanner.classList.add('hidden');
+  startButton.classList.remove('hidden');
   hideSellButton();
   updateHud();
   updatePalette();
   updateSkillButton();
   renderPreview();
   showScreen('playing');
+  showIntroBubbleIfFirstTime();
   startLoop();
 }
 
-startButton.addEventListener('click', startGame);
-retryButton.addEventListener('click', startGame);
+startButton.addEventListener('click', () => startGame());
+retryButton.addEventListener('click', () => startGame());
 endlessButton.addEventListener('click', () => {
   state = continueEndless(state);
   state = closeReport(state);
@@ -649,12 +882,84 @@ endlessButton.addEventListener('click', () => {
   renderPreview();
   showScreen('playing');
 });
-titleFromResultButton.addEventListener('click', () => {
+
+function goToTitle() {
   loopRunning = false;
   screen = 'title';
   skillSelectMode = false;
   skillSelectBanner.classList.add('hidden');
+  checkForChallenge();
   showScreen('title');
+}
+
+titleFromResultButton.addEventListener('click', goToTitle);
+
+// --- チャレンジリンク（届け方） ---
+
+function clearChallengeHash() {
+  if (window.location.hash) {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+}
+
+function checkForChallenge() {
+  const decoded = decodeChallenge(window.location.hash);
+  if (!decoded) {
+    pendingChallenge = null;
+    challengeBanner.classList.add('hidden');
+    startButton.classList.remove('hidden');
+    return;
+  }
+  pendingChallenge = decoded;
+  challengeBannerText.textContent = `挑戦状が届いています（seed: ${decoded.seed}）`;
+  challengeBanner.classList.remove('hidden');
+  startButton.classList.add('hidden');
+}
+
+challengeAcceptButton.addEventListener('click', () => {
+  if (!pendingChallenge) return;
+  const { seed, gold } = pendingChallenge;
+  markChallengeReceived();
+  clearChallengeHash();
+  startGame({ seed, gold });
 });
 
+challengeDeclineButton.addEventListener('click', () => {
+  // 通常ではじめる: ハッシュを消してランダムseedで開始する
+  clearChallengeHash();
+  pendingChallenge = null;
+  challengeBanner.classList.add('hidden');
+  startButton.classList.remove('hidden');
+  startGame();
+});
+
+async function handleChallengeSend() {
+  if (!state) return;
+  const encoded = encodeChallenge({ seed: state.seed, gold: initialGold });
+  const url = `${window.location.origin}${window.location.pathname}#c=${encoded}`;
+  const text = `群変 seed:${state.seed} で ${state.wave} ウェーブ耐えた。あなたは？ ${url}`;
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('コピーしました');
+  } catch {
+    showToast('コピーに失敗しました');
+  }
+}
+
+challengeSendButton.addEventListener('click', handleChallengeSend);
+
+// --- アンケート ---
+
+initSurvey({
+  onBackToTitle: goToTitle,
+  getReachedWave: () => (state ? state.wave : 0),
+});
+
+surveyOpenButton.addEventListener('click', () => {
+  resetSurveyScreen();
+  screen = 'survey';
+  showScreen('survey');
+});
+
+checkForChallenge();
 showScreen('title');

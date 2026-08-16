@@ -11,6 +11,13 @@
     <section id="title-screen" class="screen">
       <h1 class="title">群変</h1>
       <p class="copy">群れは、あなたの守り方に合わせて進化する。</p>
+      <div id="challenge-banner" class="challenge-banner hidden">
+        <p id="challenge-banner-text" class="challenge-banner-text"></p>
+        <div class="challenge-banner-actions">
+          <button id="challenge-accept-button" class="primary-button" type="button">この条件で始める</button>
+          <button id="challenge-decline-button" class="secondary-button" type="button">通常ではじめる</button>
+        </div>
+      </div>
       <button id="start-button" class="primary-button" type="button">はじめる</button>
     </section>
 
@@ -19,11 +26,13 @@
         <span id="hud-gold" class="hud-item">300G</span>
         <span id="hud-lives" class="hud-item">♥ 20</span>
         <span id="hud-wave" class="hud-item">WAVE 1/15</span>
+        <button id="mute-button" class="mute-button" type="button" aria-label="ミュート切り替え">🔊</button>
       </div>
 
       <div class="board-row">
         <div class="board-area">
           <p id="skill-select-banner" class="skill-select-banner hidden">レーンを選ぶ</p>
+          <p id="intro-bubble" class="intro-bubble hidden">塔を置いて、ウェーブ開始</p>
           <div class="board-wrap">
             <canvas id="board-canvas" width="576" height="384"></canvas>
             <button id="sell-button" class="sell-button hidden" type="button">売る</button>
@@ -104,13 +113,73 @@
 
     <section id="result-screen" class="screen hidden">
       <h2 id="result-heading">あなたを倒した群れ</h2>
+      <canvas id="result-genome-canvas" class="result-genome-canvas" width="140" height="140"></canvas>
+      <p id="result-genome-caption" class="result-genome-caption"></p>
       <p id="result-wave-count" class="result-wave-count">到達ウェーブ 0 / 15</p>
       <div class="result-actions">
         <button id="endless-button" class="primary-button hidden" type="button">エンドレスで続ける</button>
+        <button id="challenge-send-button" class="secondary-button" type="button">この条件で挑戦状を送る</button>
         <button id="retry-button" class="primary-button" type="button">もう一度あそぶ</button>
+        <button id="survey-open-button" class="secondary-button" type="button">アンケートに答える</button>
         <button id="title-from-result-button" class="secondary-button" type="button">タイトルへ</button>
       </div>
     </section>
+
+    <section id="survey-screen" class="screen hidden">
+      <h2>アンケート（任意）</h2>
+      <form id="survey-form">
+        <fieldset>
+          <legend>①また遊びたいと思いましたか（1〜5）</legend>
+          <div class="scale" data-name="wantToPlayAgain">
+            <label><input type="radio" name="wantToPlayAgain" value="1" required />1</label>
+            <label><input type="radio" name="wantToPlayAgain" value="2" />2</label>
+            <label><input type="radio" name="wantToPlayAgain" value="3" />3</label>
+            <label><input type="radio" name="wantToPlayAgain" value="4" />4</label>
+            <label><input type="radio" name="wantToPlayAgain" value="5" />5</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>②群れが自分の守り方に合わせてきたと感じましたか（1〜5）</legend>
+          <div class="scale" data-name="adaptationFelt">
+            <label><input type="radio" name="adaptationFelt" value="1" required />1</label>
+            <label><input type="radio" name="adaptationFelt" value="2" />2</label>
+            <label><input type="radio" name="adaptationFelt" value="3" />3</label>
+            <label><input type="radio" name="adaptationFelt" value="4" />4</label>
+            <label><input type="radio" name="adaptationFelt" value="5" />5</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>③難易度はどうでしたか（1〜5）</legend>
+          <div class="scale" data-name="difficultyLevel">
+            <label><input type="radio" name="difficultyLevel" value="1" required />1</label>
+            <label><input type="radio" name="difficultyLevel" value="2" />2</label>
+            <label><input type="radio" name="difficultyLevel" value="3" />3</label>
+            <label><input type="radio" name="difficultyLevel" value="4" />4</label>
+            <label><input type="radio" name="difficultyLevel" value="5" />5</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>④良かった瞬間があれば教えてください（自由記述）</legend>
+          <input type="text" id="survey-good-moment" name="goodMoment" maxlength="200" />
+        </fieldset>
+        <fieldset>
+          <legend>⑤イライラした瞬間があれば教えてください（自由記述）</legend>
+          <input type="text" id="survey-bad-moment" name="badMoment" maxlength="200" />
+        </fieldset>
+        <div class="survey-actions">
+          <button id="survey-submit" class="primary-button" type="submit">結果をコピー</button>
+          <button id="survey-skip-button" class="secondary-button" type="button">スキップ</button>
+        </div>
+      </form>
+      <div id="survey-after-submit" class="hidden">
+        <p>回答ありがとうございました。</p>
+        <p id="survey-copy-status" class="copy-status"></p>
+        <button id="survey-back-title-button" class="primary-button" type="button">タイトルへ戻る</button>
+      </div>
+    </section>
+
+    <div id="vignette-overlay" class="vignette-overlay" aria-hidden="true"></div>
+    <p id="toast" class="toast hidden">コピーしました</p>
   </div>
 
   <script type="module" src="js/main.js"></script>
