@@ -361,6 +361,8 @@ Claude Code の hook イベントとして `PreToolUse` と `Start` がある。
 `PreToolUse` は確実に最初のツール使用前に実行されるため採用した。
 1回制限（セッションフラグ）で毎ツール実行のノイズを防ぐ。
 
+> **更新（2026-08-15, ADR-017）**: 公式仕様では PreToolUse の stdout は debug log 行きでモデルには届かず、モデルに見えるのは `SessionStart` / `UserPromptSubmit` の stdout のみと明記された（https://code.claude.com/docs/en/hooks）。そのため登録先を `SessionStart` に移し、毎ターンの想起は `UserPromptSubmit` の `scripts/model-mode.sh` が担う。1回制限（PPID フラグ）はそのまま残す。
+
 ### PPID vs セッション ID
 
 Claude Code の「セッション」を特定する公式な環境変数は存在しない。

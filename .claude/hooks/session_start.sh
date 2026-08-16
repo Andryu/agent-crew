@@ -4,12 +4,15 @@
 
 set -u
 
-# ---------- 1. 1セッション1回制限 ----------
-SESSION_FLAG="/tmp/claude_session_start_${PPID}.lock"
-if [[ -f "$SESSION_FLAG" ]]; then
-  exit 0
+# フック入力 JSON（stdin）を先に退避する（§7 のモデル検知で使う）
+HOOK_INPUT=""
+if [ ! -t 0 ]; then
+  HOOK_INPUT=$(cat 2>/dev/null || true)
 fi
-touch "$SESSION_FLAG" 2>/dev/null || true
+
+# ---------- 1. 1セッション1回制限（撤去） ----------
+# PreToolUse 登録時代の重複抑止。SessionStart 登録（ADR-017）では起動・resume・compact ごとに
+# 1回だけ発火し、いずれも新しいコンテキストなので再注入が望ましい。PPID ロックは撤去した。
 
 # ---------- 2. 依存チェック ----------
 if ! command -v jq >/dev/null 2>&1; then
@@ -80,6 +83,18 @@ if [[ -f "$LESSONS_FILE" ]]; then
 else
   echo "  (なし — ~/.claude/_lessons.json が存在しません)"
   echo "  初回セットアップ: scripts/lessons_init.sh を実行してください"
+fi
+
+echo ""
+
+# ---------- 7. モデル運用モード（ADR-017） ----------
+# 実効モデルの検知と表示は scripts/model-mode.sh に集約（UserPromptSubmit フックと共用）。
+# stdin（フック入力 JSON）はそのまま渡す。
+echo "[モデル運用モード]"
+if [[ -f "${PROJECT_ROOT}/scripts/model-mode.sh" ]]; then
+  echo "  $(bash "${PROJECT_ROOT}/scripts/model-mode.sh" <<< "${HOOK_INPUT:-}")"
+else
+  echo "  (scripts/model-mode.sh が見つかりません)"
 fi
 
 echo ""

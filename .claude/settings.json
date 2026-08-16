@@ -10,17 +10,6 @@
         ]
       }
     ],
-    "PreToolUse": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/session_start.sh"
-          }
-        ]
-      }
-    ],
     "SubagentStop": [
       {
         "hooks": [
@@ -81,6 +70,25 @@
           {
             "type": "command",
             "command": "echo 'スプリント計画・レトロの前に必読: ~/Workspace/Obsidian/knowledge/agent-crew-failure-patterns.md（繰り返し失敗パターン）と ~/Workspace/Obsidian/decisions/agent-crew-adr-index.md（ADR索引）'"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\" && bash .claude/hooks/session_start.sh'"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\" && bash scripts/model-mode.sh'",
+            "timeout": 10
           }
         ]
       }
