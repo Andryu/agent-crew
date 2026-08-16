@@ -1,7 +1,8 @@
 // game-state.js
 // 資金・ライフ・ウェーブ・塔配置の状態と純粋な更新関数。
 // GameState: { seed, gold, lives, wave, phase, towers, population, prevSummary,
-//              lastSummary, unlocked, waveDiversity, cleared, endless, bestWave }
+//              lastSummary, unlocked, waveDiversity, cleared, endless, bestWave,
+//              skillReadyAt }
 // phase: 'place' | 'wave' | 'report'
 
 import { makeRng } from './rng.js';
@@ -15,6 +16,7 @@ import {
   ECONOMY,
   POPULATION,
   populationSizeForWave,
+  SKILL,
 } from './config.js';
 
 function isLaneRow(row) {
@@ -61,6 +63,7 @@ export function startNewGame({ seed, gold }) {
     cleared: false,
     endless: false,
     bestWave: 0,
+    skillReadyAt: 0,
   };
 }
 
@@ -141,7 +144,35 @@ export function startWave(state) {
     ...state,
     phase: 'wave',
     waveDiversity: computeTowerDiversity(state),
+    skillReadyAt: 0,
   };
+}
+
+/**
+ * 発熱スキルが解禁済みか（wave>=SKILL.unlockWave）。
+ * @param {object} state
+ * @returns {boolean}
+ */
+export function skillUnlocked(state) {
+  return state.wave >= SKILL.unlockWave;
+}
+
+/**
+ * 発熱スキルを使用する。解禁済み・ウェーブ中・CD0（now>=skillReadyAt）・
+ * laneが0〜2の場合のみskillReadyAtをnow+SKILL.cooldownに更新する。
+ * 条件を満たさない場合は状態を変更せず返す。
+ * 実際の減速適用は enemies.js の applyHeatToLane を別途呼ぶこと（本関数は状態更新のみ）。
+ * @param {object} state
+ * @param {number} lane 0..2
+ * @param {number} now waveClock基準の現在時刻（秒）
+ * @returns {object} GameState
+ */
+export function useSkill(state, lane, now) {
+  if (!skillUnlocked(state)) return state;
+  if (state.phase !== 'wave') return state;
+  if (!(lane === 0 || lane === 1 || lane === 2)) return state;
+  if (now < (state.skillReadyAt ?? 0)) return state;
+  return { ...state, skillReadyAt: now + SKILL.cooldown };
 }
 
 /**

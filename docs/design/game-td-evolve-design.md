@@ -75,8 +75,10 @@
 ```js
 // genome: { speed: number, hp: number, resist: 0|1|2|3, lane: [number,number,number], size: number }
 //   speed: 0.6〜2.0（基準1.0＝1.0セル/秒）
-//   hp:    0.6〜3.0（倍率。実HP = (20 + wave*8) * hp * size）
-//   resist: 0=なし 1=heat 2=cold 3=bolt（該当属性からの被ダメ50%）
+//   hp:    0.6〜3.0（倍率。実HP = (20 + wave*8) * hp * size * (resist!==0 ? 0.85 : 1)）
+//          ← 2026-08-16: 「耐性のコスト」。特化した個体は少し脆い。対応する塔がなければ耐性は選択で消え、
+//             対応する塔があるときだけ残る（進化がプレイヤーの塔構成に追随する）。選択圧なしでの単一耐性への固着（浮動）も抑える
+//   resist: 0=なし 1=heat 2=cold 3=bolt（該当属性からの被ダメ50%。ただし resist≠0 は実HP×0.85 のコスト）
 //   lane:  正規化済み重み。個体はこの重みで出現レーンを1つ抽選
 //   size:  0.7〜1.5（実速度 = speed / sqrt(size)。表示半径に比例）
 ```
@@ -85,7 +87,7 @@
 
 ### 進化（`evolution.js`、純粋関数・DOM非依存・乱数は注入）
 ```js
-// export function initialPopulation(n, rng): genome[]  — 全遺伝子を基準値±10%でジッター、resistは全て0、laneは均等
+// export function initialPopulation(n, rng): genome[]  — speed/hp/size を基準値±20%でジッター、resistは全て0、lane は均等(1/3)に各要素±0.15の一様ノイズを加えて再正規化（2026-08-16 CP2知覚テストで±10%・lane均等では W1→W2 のレポートが seed により空になったため、初期分散を広げた。閾値は変えない）
 // export function evaluate(results): number[]
 //   results[i] = { progress: 0..1(到達距離割合), reachedBase: boolean, damageDealtToBase: number }
 //   fitness = progress + (reachedBase ? 1.0 : 0) + damageDealtToBase*0.25
@@ -95,14 +97,17 @@
 //   2. 子は親2体からの遺伝子ごとの一様交叉
 //   3. 突然変異: 遺伝子ごとに確率 p = 0.08 * (1 + (1 - towerDiversity))  ← 単一戦術への罰
 //        speed/hp/size: 正規乱数(σ=0.15)を乗算的に加え、範囲でクランプ
-//        resist: p の確率で 0〜3 から再抽選
+//        resist: p の確率で「現在値を除く」0〜3 から再抽選（2026-08-16: 固着抑制のため。同値再抽選は無意味なので除外）
 //        lane: 各要素に ±0.15 の一様ノイズ、負値は0、再正規化
-//   4. 多様性保険: 子集団の10%は initialPopulation の個体で置き換える（局所解の固着と理不尽化を防ぐ）
+//   4. 多様性保険: 子集団の15%（切り上げ）は initialPopulation の個体で置き換える（局所解の固着と理不尽化を防ぐ。2026-08-16: 10%では選択圧なし15世代で単一resistが90%まで浮動したため15%へ）
 // export function summarize(population): { speedMean, hpMean, sizeMean, resistShare: [4], laneShare: [3] }
 // export function diffReport(prevSummary, nextSummary): string[]
 //   変化量の大きい順に最大3行の日本語文。例:
 //   「群れは高速化した（+12%）」「抗体への耐性を持つ個体が増えた（15%→40%）」「中央レーンを好むようになった（33%→52%）」「体格が大きくなった（+9%）」
-//   |変化| が閾値未満（速度・体力・体格 ±4%未満、割合 ±8pt未満）の項目は出さない。全て閾値未満なら「群れに目立った変化はない」1行
+//   |変化| が閾値未満（速度・体力・体格 ±4%未満、割合 ±8pt未満）の項目は出さない。
+//   耐性・レーンの「増えた」行は変化後の割合が15%以上のときだけ（2026-08-16: 小集団ノイズで「抗体耐性4%→12%」等が出たため）。
+//   全て閾値未満なら最大の変化を「わずかに〜」の1行で見せる（変化1%/3pt以上のとき。2026-08-16: 実プレイのW1で強い守りだと定型文になり「約束」が見えなかったため）。
+//   それも無ければ「群れに目立った変化はない」1行
 ```
 
 ### ウェーブ進行

@@ -8,7 +8,7 @@
 //   alive, reached,
 // }
 
-import { hpBaseForWave, POPULATION, LANE_LENGTH } from './config.js';
+import { hpBaseForWave, POPULATION, LANE_LENGTH, SKILL, RESIST_HP_COST } from './config.js';
 
 /**
  * lane重み配列から1つのレーンindex(0..2)を抽選する。
@@ -29,7 +29,7 @@ function pickLane(laneWeights, rng) {
 }
 
 /**
- * 個体群から敵インスタンス配列を生成する。個体は0.4秒間隔で順次出現、初期x=-1。
+ * 個体群から敵インスタンス配列を生成する。個体はPOPULATION.spawnInterval秒間隔で順次出現、初期x=-1。
  * @param {Array<object>} population genome配列
  * @param {number} wave
  * @param {ReturnType<import('./rng.js').makeRng>} rng
@@ -38,7 +38,7 @@ function pickLane(laneWeights, rng) {
 export function spawnFromPopulation(population, wave, rng) {
   const hpBase = hpBaseForWave(wave);
   return population.map((genome, index) => {
-    const maxHp = hpBase * genome.hp * genome.size;
+    const maxHp = hpBase * genome.hp * genome.size * (genome.resist !== 0 ? RESIST_HP_COST : 1);
     return {
       genome,
       lane: pickLane(genome.lane, rng),
@@ -112,6 +112,23 @@ export function stepEnemies(enemies, dt, laneLength = LANE_LENGTH, now) {
       enemy.alive = false;
       enemy.reached = true;
     }
+  }
+}
+
+/**
+ * 発熱スキルをレーンに発動する。出現済み(spawnAt<=0)の生存個体(alive)のうち
+ * 指定レーンの個体全てに applySlow(SKILL.slowFactor, SKILL.duration, now) を適用する。
+ * cold耐性(resist===2)の個体は SKILL.coldResistFactor（弱い減速）を適用する。
+ * @param {Array<object>} enemies
+ * @param {number} lane 0..2
+ * @param {number} now waveClock基準の現在時刻（秒）
+ */
+export function applyHeatToLane(enemies, lane, now) {
+  for (const enemy of enemies) {
+    if (!enemy.alive || enemy.spawnAt > 0 || enemy.reached) continue;
+    if (enemy.lane !== lane) continue;
+    const factor = enemy.genome.resist === 2 ? SKILL.coldResistFactor : SKILL.slowFactor;
+    applySlow(enemy, factor, SKILL.duration, now);
   }
 }
 

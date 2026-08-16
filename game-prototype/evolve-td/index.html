@@ -21,9 +21,24 @@
         <span id="hud-wave" class="hud-item">WAVE 1/15</span>
       </div>
 
-      <div class="board-wrap">
-        <canvas id="board-canvas" width="576" height="384"></canvas>
-        <button id="sell-button" class="sell-button hidden" type="button">売る</button>
+      <div class="board-row">
+        <div class="board-area">
+          <p id="skill-select-banner" class="skill-select-banner hidden">レーンを選ぶ</p>
+          <div class="board-wrap">
+            <canvas id="board-canvas" width="576" height="384"></canvas>
+            <button id="sell-button" class="sell-button hidden" type="button">売る</button>
+          </div>
+        </div>
+        <aside id="preview-panel" class="preview-panel hidden">
+          <h3 class="preview-heading">次に来る群れ</h3>
+          <div class="preview-list">
+            <canvas class="preview-icon" width="40" height="40"></canvas>
+            <canvas class="preview-icon" width="40" height="40"></canvas>
+            <canvas class="preview-icon" width="40" height="40"></canvas>
+            <canvas class="preview-icon" width="40" height="40"></canvas>
+            <canvas class="preview-icon" width="40" height="40"></canvas>
+          </div>
+        </aside>
       </div>
 
       <div class="controls">
@@ -62,9 +77,24 @@
         <div class="action-buttons">
           <button id="wave-start-button" class="primary-button" type="button">ウェーブ開始</button>
           <button id="speed-toggle-button" class="secondary-button" type="button">×2</button>
+          <button id="skill-button" class="secondary-button skill-button locked" type="button">発熱</button>
         </div>
       </div>
     </section>
+
+    <div id="report-modal" class="modal hidden">
+      <div class="modal-box">
+        <h2 id="report-heading">第1世代の記録</h2>
+        <p id="report-intro" class="report-intro hidden">群れは、あなたの守り方に合わせて変わります</p>
+        <div class="report-compare">
+          <canvas id="report-prev-canvas" class="report-icon" width="96" height="96"></canvas>
+          <span class="report-arrow" aria-hidden="true">→</span>
+          <canvas id="report-next-canvas" class="report-icon" width="96" height="96"></canvas>
+        </div>
+        <ul id="report-lines" class="report-lines"></ul>
+        <button id="report-close-button" class="primary-button" type="button">とじる</button>
+      </div>
+    </div>
 
     <section id="result-screen" class="screen hidden">
       <h2 id="result-heading">あなたを倒した群れ</h2>

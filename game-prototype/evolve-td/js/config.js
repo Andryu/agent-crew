@@ -111,12 +111,19 @@ export const GENOME_RANGES = {
 };
 
 export const GENOME_BASE = { speed: 1.0, hp: 1.0, size: 1.0 };
-export const INITIAL_JITTER = 0.1; // 初期集団の±10%ジッター
+// 初期集団の±20%ジッター（2026-08-16 CP2知覚テストで±10%・lane均等では
+// W1→W2のレポートがseedにより空になったため、初期分散を拡大。閾値は変えない）
+export const INITIAL_JITTER = 0.2;
+export const INITIAL_LANE_NOISE = 0.15; // 初期集団のlane: 均等(1/3)に±0.15の一様ノイズを加え再正規化
 
 // 実HP = (20 + wave*8) * hp * size
 export function hpBaseForWave(wave) {
   return 20 + wave * 8;
 }
+
+// 耐性のコスト: resist!==0 の個体は実HP×0.85（対応する塔がなければ耐性は選択で消え、
+// 対応する塔があるときだけ残る。選択圧なしでの単一耐性への固着も抑える。2026-08-16 設計判断）
+export const RESIST_HP_COST = 0.85;
 
 // --- 個体群 ---
 export const POPULATION = {
@@ -143,14 +150,40 @@ export const WAVE_COUNT = 15;
 export const EVOLUTION = {
   mutationBaseRate: 0.08, // p = 0.08 * (1 + (1 - towerDiversity))
   parentRatio: 0.3,
-  parentMin: 4,
+  // 2026-08-16 team-lead判断: 4→6（親プールのボトルネックをさらに緩め、
+  // CP2理不尽化テスト⑦のresist固着を抑える）
+  parentMin: 6,
   mutationSigma: 0.15, // 正規乱数σ
   laneNoise: 0.15,
-  diversityInsuranceRatio: 0.1,
+  // 2026-08-16 team-lead判断: 0.1→0.15（切り上げ）。CP2理不尽化テスト⑦で
+  // 選択圧のかからないresistが15世代のボトルネックで固着したため、
+  // 毎世代の新鮮個体供給を増やして遺伝的浮動を抑える
+  diversityInsuranceRatio: 0.15,
 };
 
 // --- diffReportの閾値（CP2で使用） ---
 export const DIFF_THRESHOLDS = {
   statPercent: 0.04, // 速度・体力・体格 ±4%未満は出さない
   sharePoint: 0.08, // 割合 ±8pt未満は出さない
+  shareMinAfter: 0.15, // 耐性・レーンの「増えた」行は変化後の割合が15%以上のときだけ（小集団ノイズ抑制、2026-08-16）
+  softStatPercent: 0.01, // 全項目が閾値未満のとき、これ以上の最大変化を「わずかに〜」1行で見せる
+  softSharePoint: 0.03,
+};
+
+// --- diffReport文面用の表示名（CP2）。resist 1..3 は対抗する塔の名前を使う ---
+export const RESIST_LABELS = { 1: 'マクロファージ', 2: 'インターフェロン', 3: '抗体' };
+export const LANE_LABELS = ['上', '中央', '下'];
+
+// --- 能動スキル「発熱」（CP2） ---
+export const SKILL = {
+  unlockWave: 3, // wave>=3で解禁（塔heatと同時）
+  cooldown: 30, // 秒
+  duration: 3.0, // 減速持続秒
+  slowFactor: 0.5, // 実速度×0.5
+  coldResistFactor: 0.75, // cold耐性(resist=2)個体は×0.75
+  laneFlashDuration: 0.3, // 発動レーンが白く光る秒数
+  laneBlinkPeriod: 0.6, // レーン選択モードの点滅周期（秒）
+  laneBlinkAlphaMin: 0.12,
+  laneBlinkAlphaMax: 0.25,
+  laneBlinkAlphaReducedMotion: 0.18,
 };

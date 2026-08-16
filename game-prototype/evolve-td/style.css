@@ -95,12 +95,77 @@ html, body {
   font-weight: 600;
 }
 
+.board-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.board-area {
+  position: relative;
+  width: 100%;
+}
+
 .board-wrap {
   position: relative;
   width: 100%;
   max-width: 720px;
   aspect-ratio: 576 / 384;
   margin: 0 auto;
+}
+
+/* --- 次ウェーブ・プレビュー --- */
+.preview-panel {
+  width: 100%;
+}
+
+.preview-heading {
+  margin: 0 0 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #cfd2da;
+  text-align: center;
+}
+
+.preview-list {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.preview-icon {
+  background: #14161c;
+  border-radius: 6px;
+}
+
+/* --- 発熱: レーン選択モード --- */
+.skill-select-banner {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.65);
+  font-size: 0.8rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.skill-button.locked {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.skill-button.selecting {
+  outline: 2px solid #e05a3a;
+  outline-offset: -2px;
 }
 
 #board-canvas {
@@ -233,6 +298,72 @@ html, body {
   justify-content: center;
 }
 
+/* --- 変異レポートmodal --- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.modal-box {
+  width: 100%;
+  max-width: 340px;
+  padding: 24px;
+  border-radius: 12px;
+  background: #1b1d24;
+  text-align: center;
+}
+
+.modal-box h2 {
+  margin: 0 0 12px;
+  font-size: 1.2rem;
+}
+
+.report-intro {
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(74, 168, 224, 0.15);
+  color: #cfe6f7;
+  font-size: 0.8rem;
+}
+
+.report-compare {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.report-icon {
+  background: #14161c;
+  border-radius: 8px;
+}
+
+.report-arrow {
+  font-size: 1.4rem;
+  color: #cfd2da;
+}
+
+.report-lines {
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.report-lines li::before {
+  content: '・';
+}
+
 /* --- リザルト --- */
 #result-screen {
   justify-content: center;
@@ -258,6 +389,26 @@ html, body {
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
+  }
+
+  .board-row {
+    flex-direction: row;
+    align-items: flex-start;
+    max-width: 960px;
+  }
+
+  .board-area {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .preview-panel {
+    width: 160px;
+    flex-shrink: 0;
+  }
+
+  .preview-list {
+    flex-direction: column;
   }
 }
 

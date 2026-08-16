@@ -1,7 +1,7 @@
 // main.js
 // 画面遷移・ゲームループ・入力（配置/売却/ボタン）を担当するエントリーポイント。
-// CP1: 進化本体・変異レポートUI・次ウェーブプレビュー・発熱・チャレンジリンク・
-//      アンケート・音・粒子・吹き出しは実装しない（CP2/CP3で追加）。
+// CP2: 変異レポートmodal・次ウェーブプレビュー・発熱スキルを追加。
+// CP3: チャレンジリンク・アンケート・音・粒子・吹き出しは実装しない。
 
 import {
   GRID,
@@ -9,6 +9,7 @@ import {
   TOWER_ORDER,
   ECONOMY,
   LANE_LENGTH,
+  SKILL,
   killReward,
 } from './config.js';
 import { makeRng } from './rng.js';
@@ -24,10 +25,19 @@ import {
   continueEndless,
   isCleared,
   isGameOver,
+  skillUnlocked,
+  useSkill,
 } from './game-state.js';
-import { spawnFromPopulation, stepEnemies, collectResults, livesLostFor } from './enemies.js';
+import {
+  spawnFromPopulation,
+  stepEnemies,
+  collectResults,
+  livesLostFor,
+  applyHeatToLane,
+} from './enemies.js';
 import { stepTowers } from './towers.js';
-import { render, drawTowerIcon } from './renderer.js';
+import { render, drawTowerIcon, renderGenomeIcon } from './renderer.js';
+import { representative } from './evolution.js';
 
 const screens = {
   title: document.getElementById('title-screen'),
@@ -51,6 +61,17 @@ const resultWaveCount = document.getElementById('result-wave-count');
 const endlessButton = document.getElementById('endless-button');
 const retryButton = document.getElementById('retry-button');
 const titleFromResultButton = document.getElementById('title-from-result-button');
+const previewPanel = document.getElementById('preview-panel');
+const previewCanvases = Array.from(document.querySelectorAll('.preview-icon'));
+const skillButton = document.getElementById('skill-button');
+const skillSelectBanner = document.getElementById('skill-select-banner');
+const reportModal = document.getElementById('report-modal');
+const reportHeading = document.getElementById('report-heading');
+const reportIntro = document.getElementById('report-intro');
+const reportLinesEl = document.getElementById('report-lines');
+const reportPrevCanvas = document.getElementById('report-prev-canvas');
+const reportNextCanvas = document.getElementById('report-next-canvas');
+const reportCloseButton = document.getElementById('report-close-button');
 
 let state = null;
 let screen = 'title'; // 'title' | 'playing' | 'result'（画面状態はここで管理。state.phaseはplace/wave/reportのみ）
@@ -63,8 +84,11 @@ let selectedTowerId = null;
 let sellTarget = null; // {col, row}
 let flashCell = null; // {col, row, until}
 let previousUnlocked = ['basic'];
+let previousSkillUnlocked = false;
 let lastTimestamp = null;
 let loopRunning = false;
+let skillSelectMode = false;
+let laneFlash = null; // {lane, until}
 
 if (!ctx) {
   const msg = document.createElement('p');
@@ -108,6 +132,13 @@ function pulseNewlyUnlocked() {
     }
   });
   previousUnlocked = state.unlocked;
+
+  const nowSkillUnlocked = skillUnlocked(state);
+  if (nowSkillUnlocked && !previousSkillUnlocked) {
+    skillButton.classList.add('newly-unlocked');
+    setTimeout(() => skillButton.classList.remove('newly-unlocked'), 2000);
+  }
+  previousSkillUnlocked = nowSkillUnlocked;
 }
 
 function updateHud() {
@@ -121,6 +152,127 @@ function hideSellButton() {
   sellButton.classList.add('hidden');
   sellTarget = null;
 }
+
+// --- 発熱スキル ---
+
+function updateSkillButton() {
+  if (!state) return;
+  const unlocked = skillUnlocked(state);
+  skillButton.classList.toggle('locked', !unlocked);
+  skillButton.classList.toggle('selecting', skillSelectMode);
+  if (!unlocked) {
+    skillButton.disabled = true;
+    skillButton.textContent = '発熱';
+    return;
+  }
+  if (state.phase !== 'wave') {
+    skillButton.disabled = true;
+    skillButton.textContent = '発熱';
+    return;
+  }
+  const remaining = (state.skillReadyAt ?? 0) - waveClock;
+  if (remaining > 0 && !skillSelectMode) {
+    skillButton.disabled = true;
+    skillButton.textContent = `発熱 ${Math.ceil(remaining)}s`;
+  } else {
+    skillButton.disabled = false;
+    skillButton.textContent = '発熱';
+  }
+}
+
+function enterSkillSelect() {
+  skillSelectMode = true;
+  skillSelectBanner.classList.remove('hidden');
+  updateSkillButton();
+}
+
+function exitSkillSelect() {
+  skillSelectMode = false;
+  skillSelectBanner.classList.add('hidden');
+  updateSkillButton();
+}
+
+function onSkillButtonPress() {
+  if (!state) return;
+  if (!skillUnlocked(state)) return;
+  if (skillSelectMode) {
+    exitSkillSelect();
+    return;
+  }
+  if (state.phase !== 'wave') return;
+  if (waveClock < (state.skillReadyAt ?? 0)) return;
+  enterSkillSelect();
+}
+
+function rowToLane(row) {
+  if (row <= 2) return 0;
+  if (row <= 5) return 1;
+  return 2;
+}
+
+function activateSkill(lane) {
+  const before = state.skillReadyAt;
+  state = useSkill(state, lane, waveClock);
+  if (state.skillReadyAt === before) {
+    // 条件を満たさず発動しなかった（CD未了 等）
+    exitSkillSelect();
+    return;
+  }
+  applyHeatToLane(enemies, lane, waveClock);
+  laneFlash = { lane, until: waveClock + SKILL.laneFlashDuration };
+  exitSkillSelect();
+}
+
+// --- 次ウェーブ・プレビュー ---
+
+function renderPreview() {
+  if (!state) return;
+  const show = state.phase === 'place' && state.wave >= 2;
+  previewPanel.classList.toggle('hidden', !show);
+  if (!show) return;
+  const sample = state.population.slice(0, previewCanvases.length);
+  previewCanvases.forEach((canvas, i) => {
+    const c = canvas.getContext('2d');
+    if (!c) return;
+    if (sample[i]) {
+      canvas.classList.remove('hidden');
+      renderGenomeIcon(c, sample[i], canvas.width);
+    } else {
+      canvas.classList.add('hidden');
+    }
+  });
+}
+
+// --- 変異レポートmodal ---
+
+function showReportModal({ wave, lines, prevGenome, nextGenome, isFirst }) {
+  reportHeading.textContent = `第${wave}世代の記録`;
+  reportIntro.classList.toggle('hidden', !isFirst);
+  reportLinesEl.innerHTML = '';
+  lines.slice(0, 3).forEach((line) => {
+    const li = document.createElement('li');
+    li.textContent = line;
+    reportLinesEl.appendChild(li);
+  });
+  const prevCtx = reportPrevCanvas.getContext('2d');
+  const nextCtx = reportNextCanvas.getContext('2d');
+  if (prevCtx && prevGenome) renderGenomeIcon(prevCtx, prevGenome, reportPrevCanvas.width);
+  if (nextCtx && nextGenome) renderGenomeIcon(nextCtx, nextGenome, reportNextCanvas.width);
+  reportModal.classList.remove('hidden');
+}
+
+function closeReportModal() {
+  reportModal.classList.add('hidden');
+  state = closeReport(state);
+  pulseNewlyUnlocked();
+  updatePalette();
+  updateHud();
+  updateSkillButton();
+  renderPreview();
+}
+
+reportCloseButton.addEventListener('click', closeReportModal);
+skillButton.addEventListener('click', onSkillButtonPress);
 
 function cellCenterToClientPx(col, row) {
   const rect = canvas.getBoundingClientRect();
@@ -161,7 +313,17 @@ function findTowerAt(col, row) {
 }
 
 function handleBoardTap(clientX, clientY) {
-  if (!state || (state.phase !== 'place' && state.phase !== 'wave')) return;
+  if (!state) return;
+  if (skillSelectMode) {
+    const { col, row } = clientToCell(clientX, clientY);
+    if (col < 0 || col >= GRID.cols || row < 0 || row >= GRID.rows) {
+      exitSkillSelect();
+      return;
+    }
+    activateSkill(rowToLane(row));
+    return;
+  }
+  if (state.phase !== 'place' && state.phase !== 'wave') return;
   const { col, row } = clientToCell(clientX, clientY);
   if (col < 0 || col >= GRID.cols || row < 0 || row >= GRID.rows) {
     selectedTowerId = null;
@@ -223,6 +385,9 @@ sellButton.addEventListener('click', (e) => {
 });
 
 document.addEventListener('click', (e) => {
+  if (skillSelectMode && e.target !== canvas && e.target !== skillButton) {
+    exitSkillSelect();
+  }
   if (!sellTarget) return;
   if (e.target === sellButton) return;
   if (e.target === canvas) return; // canvasのクリックはhandleBoardTapが処理
@@ -236,6 +401,7 @@ window.addEventListener('keydown', (e) => {
     const towerId = TOWER_ORDER[index];
     if (towerId) selectTower(towerId);
   } else if (e.key === 'Escape') {
+    if (skillSelectMode) exitSkillSelect();
     selectedTowerId = null;
     hideSellButton();
     updatePalette();
@@ -248,6 +414,11 @@ window.addEventListener('keydown', (e) => {
     if (state.phase === 'wave') {
       e.preventDefault();
       toggleSpeed();
+    }
+  } else if (e.key === 'f' || e.key === 'F') {
+    if (state.phase === 'wave' || skillSelectMode) {
+      e.preventDefault();
+      onSkillButtonPress();
     }
   }
 });
@@ -274,6 +445,8 @@ function onWaveStart() {
   hideSellButton();
   updatePalette();
   updateHud();
+  updateSkillButton();
+  renderPreview();
 }
 
 waveStartButton.addEventListener('click', onWaveStart);
@@ -312,8 +485,9 @@ function goToClearResult() {
 }
 
 function finishWave() {
+  const prevPopulation = state.population;
   const results = collectResults(enemies, LANE_LENGTH);
-  const { state: newState } = endWave(state, results, masterRng);
+  const { state: newState, report } = endWave(state, results, masterRng);
   state = newState;
 
   if (isCleared(state)) {
@@ -321,9 +495,15 @@ function finishWave() {
     return;
   }
 
-  state = closeReport(state);
-  pulseNewlyUnlocked();
-  updatePalette();
+  const prevGenome = representative(prevPopulation, state.prevSummary);
+  const nextGenome = representative(state.population, state.lastSummary);
+  showReportModal({
+    wave: state.wave,
+    lines: report,
+    prevGenome,
+    nextGenome,
+    isFirst: state.wave === 1,
+  });
   updateHud();
 }
 
@@ -351,6 +531,18 @@ function gameStep(dt) {
   }
 }
 
+function prefersReducedMotion() {
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+function laneSelectAlphaAt(t) {
+  if (prefersReducedMotion()) return SKILL.laneBlinkAlphaReducedMotion;
+  const period = SKILL.laneBlinkPeriod;
+  const phase = ((t % period) + period) % period / period; // 0..1
+  const triangle = phase < 0.5 ? phase * 2 : 2 - phase * 2; // 0->1->0
+  return SKILL.laneBlinkAlphaMin + triangle * (SKILL.laneBlinkAlphaMax - SKILL.laneBlinkAlphaMin);
+}
+
 function frame(timestamp) {
   if (!loopRunning) return;
   if (lastTimestamp === null) lastTimestamp = timestamp;
@@ -363,13 +555,17 @@ function frame(timestamp) {
 
   if (state) {
     if (flashCell && performance.now() > flashCell.until) flashCell = null;
+    if (laneFlash && waveClock >= laneFlash.until) laneFlash = null;
     render(ctx, {
       towers: state.towers,
       enemies,
       shots: activeShots,
       rangePreview: selectedTowerId ? lastHoverCell && { ...lastHoverCell, towerId: selectedTowerId } : null,
+      laneSelectAlpha: skillSelectMode ? laneSelectAlphaAt(waveClock) : null,
+      laneFlash: laneFlash ? { lane: laneFlash.lane, alpha: 0.6 } : null,
     });
     if (flashCell) drawFlash();
+    updateSkillButton();
   }
 
   requestAnimationFrame(frame);
@@ -406,12 +602,19 @@ function startGame() {
   state = startNewGame({ seed, gold: ECONOMY.initialGoldDefault });
   screen = 'playing';
   previousUnlocked = ['basic'];
+  previousSkillUnlocked = false;
   enemies = [];
   activeShots = [];
   selectedTowerId = null;
+  skillSelectMode = false;
+  laneFlash = null;
+  skillSelectBanner.classList.add('hidden');
+  reportModal.classList.add('hidden');
   hideSellButton();
   updateHud();
   updatePalette();
+  updateSkillButton();
+  renderPreview();
   showScreen('playing');
   startLoop();
 }
@@ -424,11 +627,15 @@ endlessButton.addEventListener('click', () => {
   screen = 'playing';
   updateHud();
   updatePalette();
+  updateSkillButton();
+  renderPreview();
   showScreen('playing');
 });
 titleFromResultButton.addEventListener('click', () => {
   loopRunning = false;
   screen = 'title';
+  skillSelectMode = false;
+  skillSelectBanner.classList.add('hidden');
   showScreen('title');
 });
 

@@ -194,29 +194,63 @@ function isLight(hexColor) {
   return luminance > 0.6;
 }
 
-function drawEnemy(ctx, enemy, laneRows) {
-  if (!enemy.alive || enemy.spawnAt > 0) return;
-  const cx = enemy.x * CELL + CELL / 2;
-  const cy = laneRows[enemy.lane] * CELL + CELL / 2;
-  const radius = sizeToRadius(enemy.genome.size);
+/**
+ * genome1体分の図形（速度=縦横比、体力=輪郭太さ、耐性=色+形状記号、体格=半径）を
+ * 指定した中心座標に描画する。動きのない静止描画（レポート・プレビュー用）にも
+ * ゲーム中のEnemy描画にも使う共通ルーチン。
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} cx
+ * @param {number} cy
+ * @param {object} genome
+ * @param {number} [scale] 半径・線幅のスケール倍率（既定1）
+ */
+function drawGenomeShape(ctx, cx, cy, genome, scale = 1) {
+  const radius = sizeToRadius(genome.size) * scale;
   // speed: 縦横比（速いほど進行方向に細長い）
   const [minSpeed, maxSpeed] = GENOME_RANGES.speed;
-  const t = Math.min(1, Math.max(0, (enemy.genome.speed - minSpeed) / (maxSpeed - minSpeed)));
+  const t = Math.min(1, Math.max(0, (genome.speed - minSpeed) / (maxSpeed - minSpeed)));
   const rx = radius * lerp(0.9, 1.5, t);
   const ry = radius * lerp(1.1, 0.75, t);
 
-  const color = RESIST_COLORS[enemy.genome.resist];
+  const color = RESIST_COLORS[genome.resist];
   ctx.save();
   ctx.fillStyle = color;
   ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-  ctx.lineWidth = hpToStrokeWidth(enemy.genome.hp);
+  ctx.lineWidth = hpToStrokeWidth(genome.hp) * scale;
   ctx.beginPath();
   ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
   ctx.restore();
 
-  drawResistMarker(ctx, cx, cy, radius, enemy.genome.resist, color);
+  drawResistMarker(ctx, cx, cy, radius, genome.resist, color);
+}
+
+function drawEnemy(ctx, enemy, laneRows) {
+  if (!enemy.alive || enemy.spawnAt > 0) return;
+  const cx = enemy.x * CELL + CELL / 2;
+  const cy = laneRows[enemy.lane] * CELL + CELL / 2;
+  drawGenomeShape(ctx, cx, cy, enemy.genome);
+}
+
+/**
+ * genome1体を size×size のCanvasに静止描画する（変異レポートの代表個体・
+ * 次ウェーブプレビュー用）。
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {object} genome
+ * @param {number} size
+ */
+export function renderGenomeIcon(ctx, genome, size) {
+  ctx.clearRect(0, 0, size, size);
+  const scale = size / CELL;
+  drawGenomeShape(ctx, size / 2, size / 2, genome, scale);
+}
+
+function drawLaneOverlay(ctx, row, alpha) {
+  ctx.save();
+  ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+  ctx.fillRect(0, row * CELL, CANVAS_W, CELL);
+  ctx.restore();
 }
 
 function drawShots(ctx, shots) {
@@ -263,6 +297,8 @@ export function drawTowerIcon(ctx, towerId, size) {
  *   enemies: Array<object>,
  *   shots?: Array<object>,
  *   rangePreview?: {col:number,row:number,towerId:string}|null,
+ *   laneSelectAlpha?: number|null, // 発熱レーン選択モード中の3レーン点滅alpha
+ *   laneFlash?: {lane:number, alpha:number}|null, // 発熱発動レーンの一瞬の白フラッシュ
  * }} view
  */
 export function render(ctx, view) {
@@ -275,6 +311,15 @@ export function render(ctx, view) {
   drawGrid(ctx);
   drawLanes(ctx);
   drawOrgan(ctx);
+
+  if (typeof view.laneSelectAlpha === 'number') {
+    for (const row of GRID.laneRows) {
+      drawLaneOverlay(ctx, row, view.laneSelectAlpha);
+    }
+  }
+  if (view.laneFlash) {
+    drawLaneOverlay(ctx, GRID.laneRows[view.laneFlash.lane], view.laneFlash.alpha);
+  }
 
   for (const tower of view.towers || []) {
     drawTower(ctx, tower);
