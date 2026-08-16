@@ -124,9 +124,9 @@ function mutate(child, p, rng) {
 
 /**
  * 次世代個体群を生成する。
- * 1. fitness上位30%（最低4体）を親プールに
+ * 1. fitness上位20%（EVOLUTION.parentRatio）（最低4体）を親プールに
  * 2. 子は親2体からの遺伝子ごとの一様交叉
- * 3. 突然変異: 遺伝子ごとに確率 p = 0.08*(1+(1-towerDiversity))
+ * 3. 突然変異: 遺伝子ごとに確率 p = EVOLUTION.mutationBaseRate*(1+(1-towerDiversity))
  * 4. 多様性保険: 子集団の10%をinitialPopulationの個体で置換
  * @param {Array<object>} population
  * @param {number[]} fitness

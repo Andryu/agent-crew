@@ -117,7 +117,7 @@ export const GENOME_BASE = { speed: 1.0, hp: 1.0, size: 1.0 };
 // 初期集団の±20%ジッター（2026-08-16 CP2知覚テストで±10%・lane均等では
 // W1→W2のレポートがseedにより空になったため、初期分散を拡大。閾値は変えない）
 export const INITIAL_JITTER = 0.3; // 2026-08-17 「変化が分からない」→ 初期集団の見た目のばらつきを広げる（±30%）
-export const INITIAL_LANE_NOISE = 0.15; // （旧）均等±0.15ノイズ。現在は INITIAL_LANE_PREF を使う
+export const INITIAL_LANE_NOISE = 0.15; // 均等(1/3)に±0.15ノイズ（preferredLane の土台として現役。その上に好みレーンへ +INITIAL_LANE_PREF）
 // 2026-08-17: 各個体は「好みのレーン」を1つ持つ（そのレーンに +INITIAL_LANE_PREF して正規化 → 例 [0.6,0.2,0.2]）。
 // 表現型（実際に出るレーン）が遺伝子に強く従うほど、選択でレーン嗜好が目に見えて動く
 export const INITIAL_LANE_PREF = 0.4;
