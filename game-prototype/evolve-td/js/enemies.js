@@ -17,6 +17,7 @@ import {
   REACHED_DAMAGE_LARGE_SIZE_THRESHOLD,
   REACHED_DAMAGE_LARGE,
   REACHED_DAMAGE_SMALL,
+  LANE_SHARPNESS,
 } from './config.js';
 
 /**
@@ -26,12 +27,14 @@ import {
  * @returns {number}
  */
 function pickLane(laneWeights, rng) {
-  const total = laneWeights[0] + laneWeights[1] + laneWeights[2];
+  // 2026-08-17: 重み^LANE_SHARPNESS で抽選（好みのレーンにほぼ従う＝表現型が遺伝子を反映する）
+  const sharp = laneWeights.map((w) => Math.pow(Math.max(0, w), LANE_SHARPNESS));
+  const total = sharp[0] + sharp[1] + sharp[2];
   if (total <= 0) return rng.int(3);
   const r = rng() * total;
   let acc = 0;
   for (let i = 0; i < 3; i++) {
-    acc += laneWeights[i];
+    acc += sharp[i];
     if (r < acc) return i;
   }
   return 2;

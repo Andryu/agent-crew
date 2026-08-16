@@ -141,13 +141,13 @@ function lerp(a, b, t) {
 function hpToStrokeWidth(hp) {
   const [min, max] = GENOME_RANGES.hp;
   const t = Math.min(1, Math.max(0, (hp - min) / (max - min)));
-  return lerp(1, 5, t);
+  return lerp(1, 6, t); // 2026-08-17: 上限5→6px（硬さの差を見やすく）
 }
 
 function sizeToRadius(size) {
   const [min, max] = GENOME_RANGES.size;
   const t = Math.min(1, Math.max(0, (size - min) / (max - min)));
-  return lerp(8, 17, t);
+  return lerp(7, 18, t); // 2026-08-17: 8〜17→7〜18px（体格の差を見やすく）
 }
 
 function drawResistMarker(ctx, cx, cy, r, resist, fillColor) {
@@ -209,8 +209,9 @@ function drawGenomeShape(ctx, cx, cy, genome, scale = 1) {
   // speed: 縦横比（速いほど進行方向に細長い）
   const [minSpeed, maxSpeed] = GENOME_RANGES.speed;
   const t = Math.min(1, Math.max(0, (genome.speed - minSpeed) / (maxSpeed - minSpeed)));
-  const rx = radius * lerp(0.9, 1.5, t);
-  const ry = radius * lerp(1.1, 0.75, t);
+  // 2026-08-17 「変化が分からない」→ 縦横比の振れ幅を拡大（遅い=丸〜縦長、速い=矢のように横長）
+  const rx = radius * lerp(0.85, 1.9, t);
+  const ry = radius * lerp(1.15, 0.6, t);
 
   const color = RESIST_COLORS[genome.resist];
   ctx.save();
@@ -240,6 +241,28 @@ function drawEnemy(ctx, enemy, laneRows) {
  * @param {object} genome
  * @param {number} size
  */
+/**
+ * 群れのサンプル（最大 cols*rows 体）を size×size のCanvasに格子状に静止描画する。
+ * 変異レポートの「前の群れ／次の群れ」用（2026-08-17: 代表1体では変化が伝わりにくかったため）。
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Array<object>} genomes
+ * @param {number} width
+ * @param {number} height
+ * @param {number} cols
+ * @param {number} rows
+ */
+export function renderGenomeGroup(ctx, genomes, width, height, cols = 3, rows = 2) {
+  ctx.clearRect(0, 0, width, height);
+  const cellW = width / cols;
+  const cellH = height / rows;
+  const scale = (Math.min(cellW, cellH) / CELL) * 0.75;
+  genomes.slice(0, cols * rows).forEach((g, i) => {
+    const cx = (i % cols) * cellW + cellW / 2;
+    const cy = Math.floor(i / cols) * cellH + cellH / 2;
+    drawGenomeShape(ctx, cx, cy, g, scale);
+  });
+}
+
 export function renderGenomeIcon(ctx, genome, size) {
   ctx.clearRect(0, 0, size, size);
   // 0.8の余白係数: size1.5/speed2.0の個体の楕円が40px/96pxのcanvas内に収まるよう縮小する

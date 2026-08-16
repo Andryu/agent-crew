@@ -41,7 +41,7 @@ import {
   pickGameOverRepresentative,
 } from './enemies.js';
 import { stepTowers } from './towers.js';
-import { render, drawTowerIcon, renderGenomeIcon } from './renderer.js';
+import { render, drawTowerIcon, renderGenomeIcon, renderGenomeGroup } from './renderer.js';
 import { representative, evaluate, summarize } from './evolution.js';
 import { encodeChallenge, decodeChallenge } from './share.js';
 import {
@@ -355,7 +355,7 @@ function renderPreview() {
 
 // --- 変異レポートmodal ---
 
-function showReportModal({ wave, lines, prevGenome, nextGenome, isFirst }) {
+function showReportModal({ wave, lines, prevGroup, nextGroup, isFirst }) {
   reportHeading.textContent = `第${wave}世代の記録`;
   reportIntro.classList.toggle('hidden', !isFirst);
   reportLinesEl.innerHTML = '';
@@ -366,8 +366,9 @@ function showReportModal({ wave, lines, prevGenome, nextGenome, isFirst }) {
   });
   const prevCtx = reportPrevCanvas.getContext('2d');
   const nextCtx = reportNextCanvas.getContext('2d');
-  if (prevCtx && prevGenome) renderGenomeIcon(prevCtx, prevGenome, reportPrevCanvas.width);
-  if (nextCtx && nextGenome) renderGenomeIcon(nextCtx, nextGenome, reportNextCanvas.width);
+  // 2026-08-17: 代表1体ではなく前後の群れサンプル6体を並べる（色・形の変化を一目で）
+  if (prevCtx) renderGenomeGroup(prevCtx, prevGroup, reportPrevCanvas.width, reportPrevCanvas.height);
+  if (nextCtx) renderGenomeGroup(nextCtx, nextGroup, reportNextCanvas.width, reportNextCanvas.height);
   reportModal.classList.remove('hidden');
 }
 
@@ -728,13 +729,11 @@ function finishWave() {
     return;
   }
 
-  const prevGenome = representative(prevPopulation, state.prevSummary);
-  const nextGenome = representative(state.population, state.lastSummary);
   showReportModal({
     wave: state.wave,
     lines: report,
-    prevGenome,
-    nextGenome,
+    prevGroup: prevPopulation.slice(0, 6),
+    nextGroup: state.population.slice(0, 6),
     // CP3: 初回1行はセッション開始時点でhasSeenIntro()が未設定だった場合のみ（storage.seenIntroに連動）
     isFirst: state.wave === 1 && !seenIntroThisSession,
   });

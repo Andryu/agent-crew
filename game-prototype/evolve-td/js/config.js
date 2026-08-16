@@ -116,8 +116,15 @@ export const GENOME_RANGES = {
 export const GENOME_BASE = { speed: 1.0, hp: 1.0, size: 1.0 };
 // 初期集団の±20%ジッター（2026-08-16 CP2知覚テストで±10%・lane均等では
 // W1→W2のレポートがseedにより空になったため、初期分散を拡大。閾値は変えない）
-export const INITIAL_JITTER = 0.2;
-export const INITIAL_LANE_NOISE = 0.15; // 初期集団のlane: 均等(1/3)に±0.15の一様ノイズを加え再正規化
+export const INITIAL_JITTER = 0.3; // 2026-08-17 「変化が分からない」→ 初期集団の見た目のばらつきを広げる（±30%）
+export const INITIAL_LANE_NOISE = 0.15; // （旧）均等±0.15ノイズ。現在は INITIAL_LANE_PREF を使う
+// 2026-08-17: 各個体は「好みのレーン」を1つ持つ（そのレーンに +INITIAL_LANE_PREF して正規化 → 例 [0.6,0.2,0.2]）。
+// 表現型（実際に出るレーン）が遺伝子に強く従うほど、選択でレーン嗜好が目に見えて動く
+export const INITIAL_LANE_PREF = 0.4;
+// 2026-08-17: 初期集団の一部に最初から耐性を持たせる（色が最初から見え、塔構成に応じて増減が見える）
+export const INITIAL_RESIST_SHARE = 0.25;
+// レーン抽選のシャープさ（重み^LANE_SHARPNESS で抽選。1=線形、3=好みのレーンにほぼ従う）
+export const LANE_SHARPNESS = 3;
 
 // 実HP = (20 + wave*8) * hp * size
 export function hpBaseForWave(wave) {
@@ -150,18 +157,16 @@ export const REACHED_DAMAGE_SMALL = 1;
 export const WAVE_COUNT = 15;
 
 // --- 進化（CP2で本実装。数値はCP1から凍結） ---
+// 2026-08-17 オーナー実プレイ「変化が分からない」→ 進化を派手に（選択を強く・変異を大きく）。
+// 固着対策は「耐性のコスト」「初期集団の耐性混在」「多様性保険」で担保する
 export const EVOLUTION = {
-  mutationBaseRate: 0.08, // p = 0.08 * (1 + (1 - towerDiversity))
-  parentRatio: 0.3,
-  // 2026-08-16 team-lead判断: 4→6（親プールのボトルネックをさらに緩め、
-  // CP2理不尽化テスト⑦のresist固着を抑える）
-  parentMin: 6,
-  mutationSigma: 0.15, // 正規乱数σ
-  laneNoise: 0.15,
-  // 2026-08-16 team-lead判断: 0.1→0.15（切り上げ）。CP2理不尽化テスト⑦で
-  // 選択圧のかからないresistが15世代のボトルネックで固着したため、
-  // 毎世代の新鮮個体供給を増やして遺伝的浮動を抑える
-  diversityInsuranceRatio: 0.15,
+  mutationBaseRate: 0.14, // p = 0.14 * (1 + (1 - towerDiversity))
+  parentRatio: 0.2, // 上位20%を親に
+  parentMin: 4,
+  mutationSigma: 0.25, // 正規乱数σ
+  laneNoise: 0.3,
+  resistMutationScale: 0.4, // 耐性の再抽選確率は p×0.4（耐性の変化は選択で動かす。ノイズで色が入れ替わるのを抑える）
+  diversityInsuranceRatio: 0.1,
 };
 
 // --- diffReportの閾値（CP2で使用） ---

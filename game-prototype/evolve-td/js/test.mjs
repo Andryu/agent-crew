@@ -85,7 +85,9 @@ console.log('--- evolution.js ---');
     'initialPopulationの全個体でsizeが範囲内',
     pop.every((g) => g.size >= Config.GENOME_RANGES.size[0] && g.size <= Config.GENOME_RANGES.size[1])
   );
-  check('initialPopulationの全個体でresist=0', pop.every((g) => g.resist === 0));
+  // 2026-08-17: 初期集団の一部（INITIAL_RESIST_SHARE≈25%）は耐性1〜3を持つ設計に変更（進化を派手にするため）
+  check('initialPopulationのresistは0〜3の整数', pop.every((g) => Number.isInteger(g.resist) && g.resist >= 0 && g.resist <= 3));
+  check('initialPopulationに耐性なし(0)の個体が過半数いる', pop.filter((g) => g.resist === 0).length > pop.length / 2);
   // 2026-08-16 team-lead判断: laneは均等固定[1/3,1/3,1/3]から「均等(1/3)に±0.15の
   // 一様ノイズを加え再正規化」に変更（CP2知覚テスト⑥でW1からのレーン適応が
   // 検出できるようにするため）。よって「厳密に1/3」ではなく「合計1・各要素≥0」を検証する

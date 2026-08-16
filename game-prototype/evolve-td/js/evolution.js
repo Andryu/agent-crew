@@ -7,6 +7,8 @@ import {
   GENOME_RANGES,
   INITIAL_JITTER,
   INITIAL_LANE_NOISE,
+  INITIAL_LANE_PREF,
+  INITIAL_RESIST_SHARE,
   EVOLUTION,
   DIFF_THRESHOLDS,
   RESIST_LABELS,
@@ -35,8 +37,21 @@ function jitteredLane(noise, rng) {
 }
 
 /**
- * 初期集団を生成する。speed/hp/sizeを基準値±20%でジッター、resistは全て0、
- * laneは均等(1/3)に各要素±0.15の一様ノイズを加えて再正規化する。
+ * 「好みのレーン」を1つ持つlane重みを返す（均等±noise → 好みのレーンに +pref → 正規化）。
+ * 2026-08-17: 表現型が遺伝子に強く従うようにし、選択でレーン嗜好が目に見えて動くようにする。
+ */
+function preferredLane(noise, pref, rng) {
+  const base = jitteredLane(noise, rng);
+  const fav = rng.int(3);
+  base[fav] += pref;
+  const total = base[0] + base[1] + base[2];
+  return base.map((w) => w / total);
+}
+
+/**
+ * 初期集団を生成する。speed/hp/sizeを基準値±INITIAL_JITTERでジッター、
+ * resistは INITIAL_RESIST_SHARE の割合で1〜3をランダムに持ち、残りは0、
+ * laneは「好みのレーン」を1つ持つ重み（preferredLane）。
  * @param {number} n
  * @param {ReturnType<import('./rng.js').makeRng>} rng
  * @returns {Array<{speed:number, hp:number, resist:number, lane:number[], size:number}>}
@@ -47,8 +62,9 @@ export function initialPopulation(n, rng) {
     population.push({
       speed: jittered(GENOME_BASE.speed, GENOME_RANGES.speed, rng),
       hp: jittered(GENOME_BASE.hp, GENOME_RANGES.hp, rng),
-      resist: 0,
-      lane: jitteredLane(INITIAL_LANE_NOISE, rng),
+      // 2026-08-17: 一部の個体は最初から耐性を持つ（色が最初から見え、塔構成に応じた増減が見える）
+      resist: rng() < INITIAL_RESIST_SHARE ? 1 + rng.int(3) : 0,
+      lane: preferredLane(INITIAL_LANE_NOISE, INITIAL_LANE_PREF, rng),
       size: jittered(GENOME_BASE.size, GENOME_RANGES.size, rng),
     });
   }
@@ -98,7 +114,7 @@ function mutate(child, p, rng) {
   if (rng() < p) child.speed = mutateStat(child.speed, GENOME_RANGES.speed, rng);
   if (rng() < p) child.hp = mutateStat(child.hp, GENOME_RANGES.hp, rng);
   if (rng() < p) child.size = mutateStat(child.size, GENOME_RANGES.size, rng);
-  if (rng() < p) child.resist = rerollResistExcluding(child.resist, GENOME_RANGES.resistCount, rng);
+  if (rng() < p * (EVOLUTION.resistMutationScale ?? 1)) child.resist = rerollResistExcluding(child.resist, GENOME_RANGES.resistCount, rng);
   if (rng() < p) {
     const noisy = child.lane.map((w) => Math.max(0, w + (rng() * 2 - 1) * EVOLUTION.laneNoise));
     const total = noisy[0] + noisy[1] + noisy[2];
