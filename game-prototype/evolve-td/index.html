@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>群変（ぐんぺん）</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <section id="title-screen" class="screen">
+      <h1 class="title">群変</h1>
+      <p class="copy">群れは、あなたの守り方に合わせて進化する。</p>
+      <button id="start-button" class="primary-button" type="button">はじめる</button>
+    </section>
+
+    <section id="playing-screen" class="screen hidden">
+      <div class="hud">
+        <span id="hud-gold" class="hud-item">300G</span>
+        <span id="hud-lives" class="hud-item">♥ 20</span>
+        <span id="hud-wave" class="hud-item">WAVE 1/15</span>
+      </div>
+
+      <div class="board-wrap">
+        <canvas id="board-canvas" width="576" height="384"></canvas>
+        <button id="sell-button" class="sell-button hidden" type="button">売る</button>
+      </div>
+
+      <div class="controls">
+        <div id="tower-palette" class="tower-palette">
+          <button class="tower-slot" data-tower-id="basic" type="button">
+            <span class="icon-stack">
+              <canvas class="tower-icon" width="40" height="40"></canvas>
+            </span>
+            <span class="tower-cost">50G</span>
+          </button>
+          <button class="tower-slot" data-tower-id="heat" type="button">
+            <span class="icon-stack">
+              <canvas class="tower-icon" width="40" height="40"></canvas>
+              <span class="lock-icon" aria-hidden="true">🔒</span>
+              <span class="lock-badge">3</span>
+            </span>
+            <span class="tower-cost">100G</span>
+          </button>
+          <button class="tower-slot" data-tower-id="cold" type="button">
+            <span class="icon-stack">
+              <canvas class="tower-icon" width="40" height="40"></canvas>
+              <span class="lock-icon" aria-hidden="true">🔒</span>
+              <span class="lock-badge">5</span>
+            </span>
+            <span class="tower-cost">100G</span>
+          </button>
+          <button class="tower-slot" data-tower-id="bolt" type="button">
+            <span class="icon-stack">
+              <canvas class="tower-icon" width="40" height="40"></canvas>
+              <span class="lock-icon" aria-hidden="true">🔒</span>
+              <span class="lock-badge">7</span>
+            </span>
+            <span class="tower-cost">120G</span>
+          </button>
+        </div>
+        <div class="action-buttons">
+          <button id="wave-start-button" class="primary-button" type="button">ウェーブ開始</button>
+          <button id="speed-toggle-button" class="secondary-button" type="button">×2</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="result-screen" class="screen hidden">
+      <h2 id="result-heading">あなたを倒した群れ</h2>
+      <p id="result-wave-count" class="result-wave-count">到達ウェーブ 0 / 15</p>
+      <div class="result-actions">
+        <button id="endless-button" class="primary-button hidden" type="button">エンドレスで続ける</button>
+        <button id="retry-button" class="primary-button" type="button">もう一度あそぶ</button>
+        <button id="title-from-result-button" class="secondary-button" type="button">タイトルへ</button>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

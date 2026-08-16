@@ -1,0 +1,280 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #0b0c10;
+  color: #f0f0f2;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.screen {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* --- タイトル --- */
+#title-screen {
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.title {
+  font-size: 3rem;
+  letter-spacing: 0.1em;
+  margin: 0;
+}
+
+.copy {
+  color: #b8bac2;
+  margin: 0 0 8px;
+}
+
+.primary-button, .secondary-button {
+  font-size: 1rem;
+  padding: 12px 28px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.primary-button {
+  background: #4aa8e0;
+  color: #06131c;
+}
+
+.secondary-button {
+  background: #2a2d36;
+  color: #f0f0f2;
+}
+
+.primary-button:disabled, .secondary-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* --- プレイ画面 --- */
+#playing-screen {
+  padding: 8px;
+  gap: 8px;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.hud {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  height: 36px;
+  padding: 0 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-item {
+  font-weight: 600;
+}
+
+.board-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  aspect-ratio: 576 / 384;
+  margin: 0 auto;
+}
+
+#board-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #14161c;
+  border-radius: 4px;
+  touch-action: manipulation;
+}
+
+.sell-button {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  background: #e05a3a;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.tower-palette {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.tower-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: #1b1d24;
+  cursor: pointer;
+}
+
+.tower-slot.selected {
+  border-color: #4aa8e0;
+}
+
+.tower-slot:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.icon-stack {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.tower-icon {
+  position: absolute;
+  inset: 0;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+
+.lock-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.tower-slot.locked .tower-icon {
+  opacity: 0;
+}
+
+.tower-slot.locked .lock-icon {
+  opacity: 1;
+}
+
+.tower-cost {
+  font-size: 0.75rem;
+  color: #cfd2da;
+}
+
+.lock-badge {
+  display: none;
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  font-size: 0.65rem;
+  line-height: 1.3;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  padding: 0 3px;
+  pointer-events: none;
+}
+
+.tower-slot.locked .lock-badge {
+  display: block;
+}
+
+.tower-slot.newly-unlocked {
+  animation: pulse 0.5s ease-in-out 4;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* --- リザルト --- */
+#result-screen {
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.result-wave-count {
+  font-size: 1.25rem;
+  color: #cfd2da;
+}
+
+.result-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 240px;
+}
+
+/* --- PC横（デスクトップ） --- */
+@media (min-width: 720px) and (orientation: landscape) {
+  .controls {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+/* --- スマホ縦 --- */
+@media (max-width: 719px) {
+  .hud {
+    font-size: 0.85rem;
+    gap: 10px;
+  }
+
+  .tower-slot {
+    padding: 4px 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tower-slot.newly-unlocked {
+    animation: none;
+  }
+}
