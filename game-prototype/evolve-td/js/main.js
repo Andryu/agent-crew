@@ -10,6 +10,7 @@ import {
   ECONOMY,
   LANE_LENGTH,
   SKILL,
+  WAVE_COUNT,
   killReward,
 } from './config.js';
 import { makeRng } from './rng.js';
@@ -64,6 +65,7 @@ const titleFromResultButton = document.getElementById('title-from-result-button'
 const previewPanel = document.getElementById('preview-panel');
 const previewCanvases = Array.from(document.querySelectorAll('.preview-icon'));
 const skillButton = document.getElementById('skill-button');
+const skillLabel = document.getElementById('skill-label');
 const skillSelectBanner = document.getElementById('skill-select-banner');
 const reportModal = document.getElementById('report-modal');
 const reportHeading = document.getElementById('report-heading');
@@ -144,7 +146,8 @@ function pulseNewlyUnlocked() {
 function updateHud() {
   hudGold.textContent = `${state.gold}G`;
   hudLives.textContent = `♥ ${state.lives}`;
-  hudWave.textContent = `WAVE ${state.wave}/15`;
+  // エンドレス中は分母(WAVE.../15)を出さない（wave16以降は15を超えるため）
+  hudWave.textContent = state.endless ? `WAVE ${state.wave}` : `WAVE ${state.wave}/${WAVE_COUNT}`;
   speedToggleButton.disabled = state.phase !== 'wave';
 }
 
@@ -162,21 +165,21 @@ function updateSkillButton() {
   skillButton.classList.toggle('selecting', skillSelectMode);
   if (!unlocked) {
     skillButton.disabled = true;
-    skillButton.textContent = '発熱';
+    skillLabel.textContent = '発熱';
     return;
   }
   if (state.phase !== 'wave') {
     skillButton.disabled = true;
-    skillButton.textContent = '発熱';
+    skillLabel.textContent = '発熱';
     return;
   }
   const remaining = (state.skillReadyAt ?? 0) - waveClock;
   if (remaining > 0 && !skillSelectMode) {
     skillButton.disabled = true;
-    skillButton.textContent = `発熱 ${Math.ceil(remaining)}s`;
+    skillLabel.textContent = `発熱 ${Math.ceil(remaining)}s`;
   } else {
     skillButton.disabled = false;
-    skillButton.textContent = '発熱';
+    skillLabel.textContent = '発熱';
   }
 }
 
@@ -262,6 +265,7 @@ function showReportModal({ wave, lines, prevGenome, nextGenome, isFirst }) {
 }
 
 function closeReportModal() {
+  if (reportModal.classList.contains('hidden')) return;
   reportModal.classList.add('hidden');
   state = closeReport(state);
   pulseNewlyUnlocked();
@@ -396,15 +400,22 @@ document.addEventListener('click', (e) => {
 
 window.addEventListener('keydown', (e) => {
   if (!state) return;
+  // 変異レポートmodal表示中は1-4/Space/Tab/F/Escをすべて無視する
+  if (!reportModal.classList.contains('hidden')) return;
   if (e.key >= '1' && e.key <= '4') {
     const index = Number(e.key) - 1;
     const towerId = TOWER_ORDER[index];
     if (towerId) selectTower(towerId);
   } else if (e.key === 'Escape') {
-    if (skillSelectMode) exitSkillSelect();
-    selectedTowerId = null;
-    hideSellButton();
-    updatePalette();
+    // Escは1段階のみ解除する: レーン選択モード中はそれだけ解除し、
+    // そうでなければ塔選択/売却パネルだけを解除する
+    if (skillSelectMode) {
+      exitSkillSelect();
+    } else {
+      selectedTowerId = null;
+      hideSellButton();
+      updatePalette();
+    }
   } else if (e.key === ' ') {
     if (state.phase === 'place') {
       e.preventDefault();
@@ -469,9 +480,14 @@ function processReachedAndKilled() {
 }
 
 function goToGameOver() {
+  exitSkillSelect();
+  laneFlash = null;
   screen = 'result';
   resultHeading.textContent = 'あなたを倒した群れ';
-  resultWaveCount.textContent = `到達ウェーブ ${state.wave} / 15`;
+  // エンドレス中はWAVE_COUNTを超え得るため分母を出さない
+  resultWaveCount.textContent = state.endless
+    ? `到達ウェーブ ${state.wave}（エンドレス）`
+    : `到達ウェーブ ${state.wave} / ${WAVE_COUNT}`;
   endlessButton.classList.add('hidden');
   showScreen('result');
 }
@@ -479,12 +495,14 @@ function goToGameOver() {
 function goToClearResult() {
   screen = 'result';
   resultHeading.textContent = '防衛完了';
-  resultWaveCount.textContent = '到達ウェーブ 15';
+  resultWaveCount.textContent = `到達ウェーブ ${WAVE_COUNT}`;
   endlessButton.classList.remove('hidden');
   showScreen('result');
 }
 
 function finishWave() {
+  exitSkillSelect();
+  laneFlash = null;
   const prevPopulation = state.population;
   const results = collectResults(enemies, LANE_LENGTH);
   const { state: newState, report } = endWave(state, results, masterRng);

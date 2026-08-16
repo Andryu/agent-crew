@@ -6,7 +6,9 @@ CP2/CP3の実装者は、この地図＋自分が触るファイル＋設計/UX�
 全数値の一元定義。塔4種（TOWERS）、経済（ECONOMY, killReward）、盤面（GRID, LANE_LENGTH）、
 遺伝子範囲（GENOME_RANGES, GENOME_BASE, INITIAL_JITTER=0.2, INITIAL_LANE_NOISE=0.15, hpBaseForWave, RESIST_HP_COST=0.85）、個体数式（POPULATION,
 populationSizeForWave）、色/形状符号（RESIST_COLORS, RESIST_MARKER_SHAPES, TOWER_COLORS,
-TOWER_SHAPES）、解禁ウェーブ（UNLOCK_WAVES）、進化パラメータ（EVOLUTION: parentRatio 0.3/parentMin 6/多様性保険 0.15 ほか、DIFF_THRESHOLDS: stat 4%/share 8pt/shareMinAfter 15%/soft 1%・3pt）、表示名（RESIST_LABELS, LANE_LABELS）、スキル（SKILL: 発熱 CD30s・0.5・cold耐性0.75・3.0s）。
+TOWER_SHAPES）、解禁ウェーブ（UNLOCK_WAVES）、進化パラメータ（EVOLUTION: parentRatio 0.3/parentMin 6/多様性保険 0.15 ほか、DIFF_THRESHOLDS: stat 4%/share 8pt/shareMinAfter 15%/soft 1%・3pt）、表示名（RESIST_LABELS, LANE_LABELS）、スキル（SKILL: 発熱 CD30s・0.5・cold耐性0.75・3.0s）、
+ウェーブ数（WAVE_COUNT=15）、到達被害（REACHED_DAMAGE_LARGE_SIZE_THRESHOLD=1.2, REACHED_DAMAGE_LARGE=2, REACHED_DAMAGE_SMALL=1）、
+属性一致ダメージ倍率（RESIST_DAMAGE_MULT=0.5、CP2レビューで塔のapplyDamageハードコードから移設）。
 公開: 全て名前付きexport（関数以外は定数オブジェクト）。
 
 ## rng.js
@@ -43,7 +45,7 @@ population, prevSummary, lastSummary, unlocked, waveDiversity, cleared, endless,
 Enemy: `{genome, lane(0-2), x, hp, maxHp, spawnAt, realSpeed, slowUntil, slowFactor, alive, reached}`。
 - `spawnFromPopulation(population, wave, rng): Enemy[]` — `spawnAt=index*0.6`、初期`x=-1`、実HP=hpBase*hp*size*(resist≠0?0.85:1)
 - `livesLostFor(genome): 1|2`（size>=1.2 で 2）
-- `applyHeatToLane(enemies, lane, now): void` — 出現済み生存個体に applySlow(0.5, 3.0)、cold耐性は 0.75
+- `applyHeatToLane(enemies, lane, now): void` — 出現済み生存個体の減速factorを「現在のslowFactorと発熱factor(0.5、cold耐性0.75)の小さい方」に、slowUntilを「現在値とnow+3.0の大きい方」に更新（applySlowとは別ロジック。cold塔で既に強い減速が乗っていてもno-opにならず、持続時間だけは必ず延長される。2026-08-16 CP2レビュー対応）
 - `stepEnemies(enemies, dt, laneLength=12, now): void` — 破壊的更新。`now`はwaveClock基準の
   現在時刻（cold/発熱の減速判定に使用、省略時は減速無視）
 - `collectResults(enemies, laneLength): results[]`

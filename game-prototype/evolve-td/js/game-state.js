@@ -17,6 +17,7 @@ import {
   POPULATION,
   populationSizeForWave,
   SKILL,
+  WAVE_COUNT,
 } from './config.js';
 
 function isLaneRow(row) {
@@ -203,7 +204,7 @@ export function endWave(state, results, rng) {
   const nextPopulation = evolve(state.population, fitness, ctx, rng);
   const nextSummary = summarize(nextPopulation);
   const report = diffReport(prevSummary, nextSummary);
-  const cleared = state.wave === 15 && !state.endless;
+  const cleared = state.wave === WAVE_COUNT && !state.endless;
   const newState = {
     ...state,
     gold: state.gold + ECONOMY.waveClearBonus,

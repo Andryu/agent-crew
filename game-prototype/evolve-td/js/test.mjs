@@ -524,12 +524,50 @@ console.log('--- evolution.js (CP2) ---');
     const base = { speedMean: 1, hpMean: 1, sizeMean: 1, resistShare: [1, 0, 0, 0], laneShare: [1 / 3, 1 / 3, 1 / 3] };
     const soft = Evolution.diffReport(base, { ...base, speedMean: 1.02 });
     check('diffReport: 全項目閾値未満なら最大変化を「わずかに」1行', soft.length === 1 && soft[0].startsWith('わずかに速く'));
+    // 4%→12%は浮動小数点誤差でabsがsharePoint(0.08)未満になり、元々ハード閾値未満の
+    // 変化として扱われるため、shareMinAfter未達でもソフト行に出る（既存挙動を維持）
     const noisy = Evolution.diffReport({ ...base, resistShare: [0.96, 0, 0, 0.04] }, { ...base, resistShare: [0.88, 0, 0, 0.12] });
     check('diffReport: 耐性8pt増でも変化後15%未満なら本行にしない（ソフト行）', noisy.length === 1 && noisy[0].startsWith('わずかに抗体'));
+    // 2026-08-16 CP2レビュー対応: |変化|がハード閾値(share8pt)以上の候補は、shareMinAfterのみで
+    // 本行落ちした場合、ソフト行の対象にもしない。resistShare 2%→12%（変化10pt、ハード閾値超）は
+    // 本行にもソフト行にも出ない
+    const excludedFromSoft = Evolution.diffReport({ ...base, resistShare: [0.98, 0, 0, 0.02] }, { ...base, resistShare: [0.88, 0, 0, 0.12] });
+    check(
+      'diffReport: resistShare 2%→12%(shareMinAfter未満)は本行にもソフト行にも出ない（他に候補が無ければ定型1行）',
+      excludedFromSoft.length === 1 && excludedFromSoft[0] === '群れに目立った変化はない'
+    );
     const real = Evolution.diffReport({ ...base, resistShare: [0.96, 0, 0, 0.04] }, { ...base, resistShare: [0.77, 0, 0, 0.23] });
     check('diffReport: 耐性4%→23%は本行', real[0] === '抗体への耐性を持つ個体が増えた（4%→23%）');
     const same = Evolution.diffReport(base, base);
     check('diffReport: 変化ゼロは定型1行', same.length === 1 && same[0] === '群れに目立った変化はない');
+
+    // NaNガード: pctChange/share差分がNumber.isFiniteでない項目は候補から除外される
+    const nanReport = Evolution.diffReport(base, { ...base, speedMean: NaN });
+    check(
+      'diffReport: speedMeanがNaNになる変化は候補から除外され定型1行になる',
+      nanReport.length === 1 && nanReport[0] === '群れに目立った変化はない'
+    );
+  }
+
+  // evolve 入力ガード（2026-08-16 CP2レビュー対応）
+  {
+    const rngPop = makeRng(11);
+    const guardPop = Evolution.initialPopulation(20, rngPop);
+    const guardFitness = guardPop.map(() => 1);
+    const withDefault = Evolution.evolve(guardPop, guardFitness, { wave: 1, towerDiversity: 0.25, nextSize: 20 }, makeRng(50));
+    const withInvalid = Evolution.evolve(guardPop, guardFitness, { wave: 1, towerDiversity: undefined, nextSize: 20 }, makeRng(50));
+    check(
+      'evolve: ctx.towerDiversityが数値でなければ0.25扱いになる（同seedで同じ子集団）',
+      JSON.stringify(withDefault) === JSON.stringify(withInvalid)
+    );
+
+    const rngExpected = makeRng(77);
+    const expectedFresh = Evolution.initialPopulation(15, rngExpected);
+    const emptyPopResult = Evolution.evolve([], [], { wave: 1, towerDiversity: 0.25, nextSize: 15 }, makeRng(77));
+    check(
+      'evolve: populationが空ならinitialPopulation(nextSize)相当を返す',
+      JSON.stringify(emptyPopResult) === JSON.stringify(expectedFresh)
+    );
   }
 
   // 耐性コスト: resist!==0 の個体は maxHp が resist=0 の RESIST_HP_COST 倍
@@ -608,6 +646,21 @@ console.log('--- enemies.js (CP2: applyHeatToLane) ---');
   check('applyHeatToLane: 別レーンの個体には適用されない', laneEnemies[2].slowFactor === 1);
   check('applyHeatToLane: 未出現の個体には適用されない', laneEnemies[3].slowFactor === 1);
   check('applyHeatToLane: 撃破済みの個体には適用されない', laneEnemies[4].slowFactor === 1);
+
+  // 2026-08-16 CP2レビュー対応: cold塔の減速が乗ったcold耐性個体に発熱をかけてもno-opにならない
+  // （既存slowFactorと発熱factorの小さい方を採用し、slowUntilは常に延長される）
+  const coldThenHeat = [
+    { genome: { resist: 2 }, lane: 0, alive: true, spawnAt: 0, reached: false, slowUntil: 90.5, slowFactor: 0.6 },
+  ];
+  Enemies.applyHeatToLane(coldThenHeat, 0, 90);
+  check(
+    'applyHeatToLane: cold塔0.6が乗ったcold耐性個体に発熱→factorは0.6のまま（小さい方優先）',
+    coldThenHeat[0].slowFactor === 0.6
+  );
+  check(
+    'applyHeatToLane: 同ケースでslowUntilがnow+3.0に延長される',
+    Math.abs(coldThenHeat[0].slowUntil - (90 + Config.SKILL.duration)) < 1e-9
+  );
 }
 
 // --- 結果出力 ---

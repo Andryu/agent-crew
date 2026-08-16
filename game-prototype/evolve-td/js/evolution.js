@@ -119,13 +119,21 @@ function mutate(child, p, rng) {
  * @returns {Array<object>}
  */
 export function evolve(population, fitness, ctx, rng) {
+  // 入力ガード（2026-08-16 CP2レビュー対応）: populationが空ならinitialPopulationで
+  // 次世代サイズ分を新規生成して返す。towerDiversityが数値でなければ0.25扱いにする。
+  if (!population || population.length === 0) {
+    return initialPopulation(ctx.nextSize, rng);
+  }
+  const towerDiversity =
+    typeof ctx.towerDiversity === 'number' && Number.isFinite(ctx.towerDiversity) ? ctx.towerDiversity : 0.25;
+
   const parentCount = Math.max(EVOLUTION.parentMin, Math.ceil(population.length * EVOLUTION.parentRatio));
   const ranked = population
     .map((genome, i) => ({ genome, fitness: fitness[i] }))
     .sort((a, b) => b.fitness - a.fitness);
   const parents = ranked.slice(0, Math.min(parentCount, ranked.length)).map((entry) => entry.genome);
 
-  const p = EVOLUTION.mutationBaseRate * (1 + (1 - ctx.towerDiversity));
+  const p = EVOLUTION.mutationBaseRate * (1 + (1 - towerDiversity));
 
   const children = [];
   for (let i = 0; i < ctx.nextSize; i++) {
@@ -213,13 +221,18 @@ function formatSharePercent(share) {
  * |変化|が閾値未満（速度・体力・体格 ±4%未満、割合 ±8pt未満）の項目は出さない。
  * 耐性・レーンの「増えた」は変化後の割合が shareMinAfter(15%) 以上のときだけ閾値通過。
  * 全て閾値未満なら、最大の変化を「わずかに〜」1行（softStat/softShare 以上のとき）、それも無ければ「群れに目立った変化はない」1行。
+ * ソフト行の候補は「|変化|がハード閾値（stat 4%／share 8pt）未満」のものだけに限定する。
+ * shareMinAfterだけで本行落ちした候補（|変化|自体はハード閾値以上）はソフト行にも出さない
+ * （2026-08-16 CP2レビュー対応。ソフト行の順位付けはsoft側の閾値で正規化する）。
+ * pctChange／share差分がNumber.isFiniteでない項目は候補から除外する。
  * @param {ReturnType<typeof summarize>} prevSummary
  * @param {ReturnType<typeof summarize>} nextSummary
  * @returns {string[]}
  */
 export function diffReport(prevSummary, nextSummary) {
   const T = DIFF_THRESHOLDS;
-  // 候補: { magnitude(閾値比で正規化), passes(閾値以上か), text, softText }
+  // 候補: { magnitude(ハード閾値比で正規化・本行の順位付け用), softMagnitude(ソフト閾値比で正規化・ソフト行の順位付け用),
+  //         passes(本行として出せるか), softEligible(ソフト行の対象になり得るか=|変化|がハード閾値未満), text, softText }
   const candidates = [];
   const statItems = [
     ['speedMean', '群れは高速化した', '群れは低速化した', '速く', '遅く'],
@@ -228,12 +241,15 @@ export function diffReport(prevSummary, nextSummary) {
   ];
   for (const [key, up, down, softUp, softDown] of statItems) {
     const change = pctChange(prevSummary[key], nextSummary[key]);
+    if (!Number.isFinite(change)) continue;
     const abs = Math.abs(change);
     if (abs < T.softStatPercent) continue;
     const pct = formatSignedPercent(change);
     candidates.push({
       magnitude: abs / T.statPercent,
+      softMagnitude: abs / T.softStatPercent,
       passes: abs >= T.statPercent,
+      softEligible: abs < T.statPercent,
       text: `${change > 0 ? up : down}（${pct}）`,
       softText: `わずかに${change > 0 ? softUp : softDown}なった（${pct}）`,
     });
@@ -243,6 +259,7 @@ export function diffReport(prevSummary, nextSummary) {
     const from = prevSummary.resistShare[i];
     const to = nextSummary.resistShare[i];
     const change = to - from;
+    if (!Number.isFinite(change)) continue;
     const abs = Math.abs(change);
     if (abs < T.softSharePoint) continue;
     const label = RESIST_LABELS[i];
@@ -251,7 +268,9 @@ export function diffReport(prevSummary, nextSummary) {
     const passes = abs >= T.sharePoint && (change < 0 || to >= T.shareMinAfter);
     candidates.push({
       magnitude: abs / T.sharePoint,
+      softMagnitude: abs / T.softSharePoint,
       passes,
+      softEligible: abs < T.sharePoint,
       text: change > 0 ? `${label}への耐性を持つ個体が増えた（${range}）` : `${label}への耐性を持つ個体が減った（${range}）`,
       softText: change > 0 ? `わずかに${label}への耐性を持つ個体が増えた（${range}）` : `わずかに${label}への耐性を持つ個体が減った（${range}）`,
     });
@@ -260,6 +279,7 @@ export function diffReport(prevSummary, nextSummary) {
     const from = prevSummary.laneShare[i];
     const to = nextSummary.laneShare[i];
     const change = to - from;
+    if (!Number.isFinite(change)) continue;
     const abs = Math.abs(change);
     if (abs < T.softSharePoint) continue;
     const label = LANE_LABELS[i];
@@ -267,7 +287,9 @@ export function diffReport(prevSummary, nextSummary) {
     const passes = abs >= T.sharePoint && (change < 0 || to >= T.shareMinAfter);
     candidates.push({
       magnitude: abs / T.sharePoint,
+      softMagnitude: abs / T.softSharePoint,
       passes,
+      softEligible: abs < T.sharePoint,
       text: change > 0 ? `${label}レーンを好むようになった（${range}）` : `${label}レーンを好まなくなった（${range}）`,
       softText: change > 0 ? `わずかに${label}レーンを好むようになった（${range}）` : `わずかに${label}レーンを好まなくなった（${range}）`,
     });
@@ -275,11 +297,9 @@ export function diffReport(prevSummary, nextSummary) {
 
   const passing = candidates.filter((c) => c.passes).sort((a, b) => b.magnitude - a.magnitude);
   if (passing.length > 0) return passing.slice(0, 3).map((c) => c.text);
-  // 全項目が閾値未満: 最大の変化を「わずかに」1行で見せる（変化がほぼゼロなら定型1行）
-  if (candidates.length > 0) {
-    candidates.sort((a, b) => b.magnitude - a.magnitude);
-    return [candidates[0].softText];
-  }
+  // 本行が1つも無い: ソフト行の対象（|変化|がハード閾値未満）の中から最大の変化を「わずかに」1行で見せる
+  const softCandidates = candidates.filter((c) => c.softEligible).sort((a, b) => b.softMagnitude - a.softMagnitude);
+  if (softCandidates.length > 0) return [softCandidates[0].softText];
   return ['群れに目立った変化はない'];
 }
 

@@ -8,7 +8,16 @@
 //   alive, reached,
 // }
 
-import { hpBaseForWave, POPULATION, LANE_LENGTH, SKILL, RESIST_HP_COST } from './config.js';
+import {
+  hpBaseForWave,
+  POPULATION,
+  LANE_LENGTH,
+  SKILL,
+  RESIST_HP_COST,
+  REACHED_DAMAGE_LARGE_SIZE_THRESHOLD,
+  REACHED_DAMAGE_LARGE,
+  REACHED_DAMAGE_SMALL,
+} from './config.js';
 
 /**
  * lane重み配列から1つのレーンindex(0..2)を抽選する。
@@ -61,7 +70,7 @@ export function spawnFromPopulation(population, wave, rng) {
  * @returns {number}
  */
 export function livesLostFor(genome) {
-  return genome.size >= 1.2 ? 2 : 1;
+  return genome.size >= REACHED_DAMAGE_LARGE_SIZE_THRESHOLD ? REACHED_DAMAGE_LARGE : REACHED_DAMAGE_SMALL;
 }
 
 /**
@@ -117,8 +126,13 @@ export function stepEnemies(enemies, dt, laneLength = LANE_LENGTH, now) {
 
 /**
  * 発熱スキルをレーンに発動する。出現済み(spawnAt<=0)の生存個体(alive)のうち
- * 指定レーンの個体全てに applySlow(SKILL.slowFactor, SKILL.duration, now) を適用する。
- * cold耐性(resist===2)の個体は SKILL.coldResistFactor（弱い減速）を適用する。
+ * 指定レーンの個体全てに適用する。cold耐性(resist===2)の個体は SKILL.coldResistFactor
+ * （弱い減速）、それ以外は SKILL.slowFactor を「発熱factor」として扱う。
+ * applySlow（強い方優先・同じなら延長・弱ければ無視）とは別の専用ロジックで、
+ * 対象個体の減速factorを「現在の（有効中の）slowFactorと発熱factorの小さい方」に、
+ * slowUntilを「現在のslowUntilとnow+SKILL.durationの大きい方」に更新する。
+ * これにより、既にcold塔などでより強い減速がかかっている個体に対しても
+ * 発熱がno-opにならず、持続時間だけは必ず延長される（2026-08-16 CP2レビュー対応）。
  * @param {Array<object>} enemies
  * @param {number} lane 0..2
  * @param {number} now waveClock基準の現在時刻（秒）
@@ -127,8 +141,11 @@ export function applyHeatToLane(enemies, lane, now) {
   for (const enemy of enemies) {
     if (!enemy.alive || enemy.spawnAt > 0 || enemy.reached) continue;
     if (enemy.lane !== lane) continue;
-    const factor = enemy.genome.resist === 2 ? SKILL.coldResistFactor : SKILL.slowFactor;
-    applySlow(enemy, factor, SKILL.duration, now);
+    const heatFactor = enemy.genome.resist === 2 ? SKILL.coldResistFactor : SKILL.slowFactor;
+    const currentlySlowed = typeof now === 'number' && now < (enemy.slowUntil ?? 0);
+    const currentFactor = currentlySlowed ? enemy.slowFactor : 1;
+    enemy.slowFactor = Math.min(currentFactor, heatFactor);
+    enemy.slowUntil = Math.max(enemy.slowUntil ?? 0, now + SKILL.duration);
   }
 }
 

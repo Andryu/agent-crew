@@ -75,6 +75,9 @@ export const TOWERS = {
   },
 };
 
+// 属性一致による耐性のダメージ倍率（towers.jsのapplyDamageが参照）
+export const RESIST_DAMAGE_MULT = 0.5;
+
 export const TOWER_ORDER = ['basic', 'heat', 'cold', 'bolt'];
 
 // wave到達で累積解禁。unlockedTowers(wave)が参照する

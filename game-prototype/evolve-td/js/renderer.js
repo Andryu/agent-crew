@@ -242,7 +242,8 @@ function drawEnemy(ctx, enemy, laneRows) {
  */
 export function renderGenomeIcon(ctx, genome, size) {
   ctx.clearRect(0, 0, size, size);
-  const scale = size / CELL;
+  // 0.8の余白係数: size1.5/speed2.0の個体の楕円が40px/96pxのcanvas内に収まるよう縮小する
+  const scale = (size / CELL) * 0.8;
   drawGenomeShape(ctx, size / 2, size / 2, genome, scale);
 }
 

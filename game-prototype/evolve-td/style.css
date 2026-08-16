@@ -168,6 +168,39 @@ html, body {
   outline-offset: -2px;
 }
 
+/* 発熱ボタン: 塔スロットと同じ icon-stack + lock-icon + lock-badge 構造
+   （lock-icon/lock-badgeの基本スタイルは.tower-slot用の共通ルールを流用） */
+.skill-icon-stack {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.skill-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+
+.skill-button.locked .skill-label {
+  opacity: 0;
+}
+
+.skill-button.locked .lock-icon {
+  opacity: 1;
+}
+
+.skill-button.locked .lock-badge {
+  display: block;
+}
+
 #board-canvas {
   width: 100%;
   height: 100%;
@@ -283,7 +316,8 @@ html, body {
   display: block;
 }
 
-.tower-slot.newly-unlocked {
+.tower-slot.newly-unlocked,
+.skill-button.newly-unlocked {
   animation: pulse 0.5s ease-in-out 4;
 }
 
@@ -425,7 +459,8 @@ html, body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tower-slot.newly-unlocked {
+  .tower-slot.newly-unlocked,
+  .skill-button.newly-unlocked {
     animation: none;
   }
 }

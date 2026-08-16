@@ -2,7 +2,7 @@
 // 塔の索敵・攻撃（ヒットスキャン即着弾）。弾は即着弾扱いとし、
 // 描画用に0.1秒の軌跡を shots 配列として返す（実装者裁量の範囲）。
 
-import { TOWERS } from './config.js';
+import { TOWERS, RESIST_DAMAGE_MULT } from './config.js';
 import { applySlow } from './enemies.js';
 
 const TRAIL_TTL = 0.1; // 秒
@@ -49,7 +49,7 @@ function findTarget(tower, enemies, def, laneRows) {
 
 function applyDamage(enemy, rawDamage, attr) {
   const resisted = attr !== 'none' && enemy.genome.resist === ATTR_TO_RESIST[attr];
-  const damage = resisted ? rawDamage * 0.5 : rawDamage;
+  const damage = resisted ? rawDamage * RESIST_DAMAGE_MULT : rawDamage;
   enemy.hp -= damage;
   if (enemy.hp <= 0) {
     enemy.alive = false;
