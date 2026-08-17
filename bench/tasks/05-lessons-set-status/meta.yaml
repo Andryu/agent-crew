@@ -1,0 +1,8 @@
+# タスクメタ情報（採点には使わない。出典の記録用）
+id: "05"
+slug: lessons-set-status
+title: "lessons.sh に status フィールドと set-status コマンドを追加"
+source_pr: 74
+merge_commit: da73b5954e62050235a6088df619ccdeb513464c
+parent_commit: e2bdf9b7e19f39571666632cbe74427de86f00cb
+requires: "bash, jq"

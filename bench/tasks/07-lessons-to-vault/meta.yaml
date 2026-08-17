@@ -1,0 +1,8 @@
+# タスクメタ情報（採点には使わない。出典の記録用）
+id: "07"
+slug: lessons-to-vault
+title: "高優先度の教訓を知識vaultへ転記するスクリプトの新規作成"
+source_pr: 123
+merge_commit: 945bd46cacd1341a8be0cd1f24fc39fb3f08e6f4
+parent_commit: c97fcf1b61019be080493bb1ac65e35419bb3524
+requires: "bash, jq"

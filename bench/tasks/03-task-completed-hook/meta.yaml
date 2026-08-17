@@ -1,0 +1,8 @@
+# タスクメタ情報（採点には使わない。出典の記録用）
+id: "03"
+slug: task-completed-hook
+title: "タスク完了シグナルを記録するフックの新規作成"
+source_pr: 98
+merge_commit: 4f3b73f5f0aef0d0b4942912650e8967d8f9fa00
+parent_commit: 26df0f50d400cb92a16bbabe2f40e5d4d03fb98c
+requires: "bash, jq"

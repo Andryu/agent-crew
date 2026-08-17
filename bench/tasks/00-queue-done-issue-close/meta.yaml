@@ -1,0 +1,10 @@
+# タスクメタ情報（採点には使わない。出典の記録用）
+id: "00"
+slug: queue-done-issue-close
+role: smoke  # ハーネス疎通確認用
+title: "queue.sh done 時に GitHub Issue を自動クローズ"
+source_pr: 8
+merge_commit: 4b5e4a580f8cb9bf8bf9008422d45ef586d38938
+parent_commit: 4efcf85ed6297d7ca2243da6bd3104aed68272c2
+answer_size: "+12 lines"
+requires: "bash, jq"

@@ -1,0 +1,8 @@
+# タスクメタ情報（採点には使わない。出典の記録用）
+id: "01"
+slug: token-dept-order
+title: "部門トークン会計: ゲーム/ビデオ部門追加と分類順序バグ"
+source_pr: 170
+merge_commit: dad13b93373804513e935fde5f933b0e741580e1
+parent_commit: 2564a1d4010dda3a1539d7d08a1430814e1235c1
+requires: "python3, pytest"
