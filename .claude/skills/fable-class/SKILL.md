@@ -6,7 +6,7 @@ description: >
   complexity S 以上＝ほぼ全タスクで必ず発動する。対象外は「変更が1ファイル・
   既存関数への局所修正・そのファイルのテストが既にある・設計判断を含まない」の
   4条件をすべて満たすものに限る（免除は complexity の自己申告ではなく、ファイル数と
-  テスト有無を rg/fd/git status で確認して判定する）。メインが Opus の場合は ADR-017 基準
+  テスト有無を rg/fd/git diff で確認して判定する）。メインが Opus の場合は ADR-017 基準
   （(a) complexity M 以上 (b) risk_level medium 以上 (c) 設計判断・新規ADR・
   新規ファイル作成・複数ファイル横断の変更を含む (d) 「fable-class」「しっかり設計して」
   等の指示）で発動。Fable 5 がメインの場合は中〜大規模タスクで発動。
@@ -25,7 +25,7 @@ v2（ADR-017、「どのモデルを使うか」）を置き換える。**v3 の
 | 工程 / risk_level | low | medium | high |
 |---|---|---|---|
 | 設計（SPEC/PLAN・ミニADR） | team-lead（`ultrathink`） | team-lead（`ultrathink`）＋ critic 推奨 | team-lead（`ultrathink`）＋ **critic 必須（従量 API）** |
-| 実装 | Codex（herdr ペイン） | Codex（herdr ペイン） | Codex（herdr ペイン） |
+| 実装 | Codex（herdr ペイン、delegation.md の手順あり）／無ければ fresh Sonnet | 同 | 同 |
 | 仕様準拠レビュー | fresh Sonnet | fresh Sonnet | fresh Sonnet |
 | 品質レビュー（Sora） | fresh Sonnet | fresh Sonnet | fresh Sonnet ＋ **critic** |
 | セキュリティ（Kai） | fresh Sonnet | fresh Sonnet ＋ critic 推奨 | fresh Sonnet ＋ **critic** |
@@ -33,30 +33,33 @@ v2（ADR-017、「どのモデルを使うか」）を置き換える。**v3 の
 | 探索・列挙・件数確認 | **`rg`/`fd`/`jq`/テスト（LLM に投げない）** | 同 | 同 |
 | 仕様ドライラン（planning.md） | fresh Sonnet | 同 | 同 |
 | critic | 不要 | 従量 API（推奨） | **従量 API（必須）** |
-| 採否判断 | team-lead | team-lead（CRITICAL 却下不可） | team-lead（CRITICAL 却下不可） |
+| 採否判断 | team-lead | team-lead（CRITICAL 却下不可※） | team-lead（CRITICAL 却下不可※） |
 
 - **設計 ＝ team-lead（`ultrathink`）**: 判断はセッション内で行うが、そのターンだけ思考を深める。high では critic を必ず通す。medium で省略する場合は plan に理由を1行残す。
-- **実装 ＝ Codex（herdr ペイン）**: 実装をプラン上限の外（別系統・別プロセス）に出し、team-lead のコンテキストを判断用に温存する。Codex が使えない環境では fresh Sonnet サブエージェントにフォールバックし、plan に明記する。委譲プロンプトの書き方は delegation.md のとおり（規約は Codex に届かないので明示する）。
+- **実装 ＝ Codex（herdr ペイン）**: 実装をプラン上限の外（別系統・別プロセス）に出し、team-lead のコンテキストを判断用に温存する。手順（起動・委譲テンプレ・生出力の回収・スコープ外変更の検出）は delegation.md の Codex 節に従う。Codex が使えない環境では fresh Sonnet サブエージェントにフォールバックし、plan に明記する。別系統は明示の禁止を読み飛ばす前例（失敗パターン §6）があるため、完了後の `git diff --name-only` と対象ファイル一覧の突合を必須にする。
 - **レビュー ＝ fresh Sonnet**: 二段階レビュー（verification.md）は Sonnet で回してよい。high のときだけ critic を追加し、Sonnet 同士の相関した盲点を格上かつ別コンテキストで切る。
 - **探索・列挙 ＝ 決定的コマンド**: 対象ファイル一覧・参照箇所・件数・存在確認は `rg`/`fd`/`jq`/テストで求め、その出力を plan に貼る。LLM（Explore/haiku 含む）に「全部挙げて」と頼まない。
 - **critic ＝ 従量 API**: `scripts/critic.sh` で呼び、`docs/plans/<slug>-critic.md` を成果物として残す（verification.md 参照）。
 - **fresh** は従来どおりタスクごとに新規起動したコンテキストを指す（前段の思考のノイズを引き継がせない）。
+- **※ 却下不可の唯一の例外**: CRITICAL の根拠が事実誤認であることを決定的コマンドの生出力で示せる場合（鉄則10）。critic 成果物のヘッダに `attach_skipped: yes`（自動添付をサイズ上限で見送った）が立っている回の CRITICAL は、添付漏れ由来でありうるため却下不可の対象外（通常の採否判断に戻る）。
+- **モードはタスク単位でラッチする**: plan 先頭の `mode:`（`scripts/model-mode.sh` の判定と `src=`）を着手時に記録し、そのタスクの発動条件・却下権は plan の mode に従う。ターンごとの判定揺れで規則を変えない。実体未確認（`src=settings`）は**発動条件**を Pro 側に倒すが、**却下権の剥奪**は実体で sonnet/haiku と確認できたとき（または plan に mode: pro と記録したとき）に限る。
 
 **同時 Opus 上限・レート上限到達時の手順**（ADR-017 §5）は Opus 運用時のみ適用する。Pro 運用では対象がない。
 
 ### fable-class 免除の判定レシピ（Pro 運用）
 
-免除は自己申告（complexity）でなく客観条件で判定し、plan を書かない場合は次のコマンド出力を PR 本文に1行残す。4条件を**すべて**満たすときだけ免除。
+免除は自己申告（complexity）でなく客観条件で判定する。判定は **ブランチの差分（`origin/main...HEAD`）に対して行う**ので、作業ツリーの無関係な汚れ（未追跡ファイル等）は数えない。着手前は「触る予定のファイル」で仮判定し、**PR 時に同じコマンドの生出力で事後検証する**（免除を主張する PR は plan リンクの代わりにこの生出力を本文に貼る。仮判定と食い違えば免除は無効で、plan を書いてから提出する）。条件1〜3 は機械判定で、1つでも満たさなければ条件4を待たずに免除不可。`rg`/`fd`/`git` のいずれかが無い環境では免除不可（fable-class 発動側に倒す）。
 
 ```bash
-# 1. 変更対象が 1 ファイルか（作業後に確認。着手前は触る予定のファイルを列挙する）
-git status --porcelain | wc -l                    # => 1
-# 2. 新規ファイル・ADR・スキル・フック・エージェント定義・設定を含まないか
-git status --porcelain | rg -c '^(\?\?|A)' || echo 0                              # => 0（新規ファイルなし）
-git status --porcelain | rg -c 'docs/adr|\.claude/(skills|hooks|agents|settings)' || echo 0  # => 0
-# 3. そのファイルのテストが既にあるか（例: scripts/foo.py → tests/test_foo*.py）
-fd 'test_foo' tests | head                       # => 1件以上
-# 4. 設計判断を含まないか（代替案が1つ、または選択が結果に影響しない）— これだけは team-lead が判断し、1文で書く
+BASE=$(git merge-base origin/main HEAD)
+# 1. 変更対象が 1 ファイル
+git diff --name-only "$BASE"...HEAD | wc -l                                             # => 1
+# 2. 新規ファイル・ADR・スキル・フック・エージェント定義・設定・スクリプトを含まない
+git diff --name-only --diff-filter=A "$BASE"...HEAD | wc -l                             # => 0
+git diff --name-only "$BASE"...HEAD | rg -c 'docs/adr|\.claude/(skills|hooks|agents|settings)|^scripts/' || echo 0   # => 0
+# 3. そのファイルのテストが既にある（例: dashboard/foo.py → tests/test_*foo*.py）
+f=$(git diff --name-only "$BASE"...HEAD); fd "test_.*$(basename "${f%.*}")" tests | head   # => 1件以上
+# 4. 設計判断を含まない — 条件1〜3を満たした上で、代替案が2つ以上あるなら免除不可。1文で書く
 ```
 
 ## ワークフロー（必須工程）
@@ -65,7 +68,7 @@ fd 'test_foo' tests | head                       # => 1件以上
 
 1. **SPEC** — 要求の再記述と仕様確定。詳細は `references/planning.md` の SPEC 節を参照。
 2. **PLAN** — 代替案比較・意思決定・マイクロタスク分解。詳細は `references/planning.md` の PLAN 節を参照。マイクロタスク分解後は、委譲前に仕様ドライラン（同 PLAN 節参照）を必ず実施する。ミニADRは risk_level high なら critic（`scripts/critic.sh`、従量 API）で反証してから確定する（medium は推奨、verification.md 参照）。team-lead が Opus 以上でない場合、critic の CRITICAL は却下できない（ADR-018）。
-3. **DELEGATE** — Sonnet サブエージェントへの実装委譲。詳細は `references/delegation.md` を参照。
+3. **DELEGATE** — 実装の委譲。Opus 運用では Sonnet サブエージェント、Pro 運用では Codex（herdr ペイン、手順は `references/delegation.md` の Codex 節）を既定とし、Codex が使えなければ fresh Sonnet。詳細は `references/delegation.md` を参照。
 4. **VERIFY** — 新規コンテキストでの二段階レビュー。詳細は `references/verification.md` を参照。
 5. **CONVERGE** — 修正ループ（上限あり）を経て、エビデンス付きの完了報告を作成する。詳細は `references/verification.md` を参照。
 
@@ -80,7 +83,7 @@ fd 'test_foo' tests | head                       # => 1件以上
 7. **工程は成果物で残す** — Full 発動時は SPEC・PLAN・DoD・critic 採否を `docs/plans/<YYYY-MM-DD>-<slug>.md`（テンプレ: `templates/plan.md`）に書き、PR 本文からリンクする。書いていない工程は踏んでいないものとみなす。
 8. **同時 Opus 上限（Opus 運用時のみ）** — 1タスクにつき同時に走らせる Opus サブエージェントは critic ＋ 1本まで。
 9. **決定的に求まるものを LLM に判断させない** — ファイル一覧・参照箇所・件数・存在確認は `rg`/`fd`/`jq`/テストで求め、出力を plan に貼る。Sonnet の弱さは「見落とし」に出るので、見落としは決定的コマンドで潰す（ADR-018）。
-10. **弱い側は強い側の CRITICAL を却下できない** — team-lead が Opus 以上でないとき、critic の CRITICAL 指摘は「修正して再 critic」か「オーナーへエスカレーション」のどちらかで処理する（ADR-018）。
+10. **弱い側は強い側の CRITICAL を却下できない** — plan の `mode` が Pro のとき、critic の CRITICAL 指摘は「修正して再 critic」か「オーナーへエスカレーション」で処理する。唯一の例外は **CRITICAL の根拠が事実誤認であることを決定的コマンド（rg/fd/テスト）の生出力で示せる場合**で、その生出力を plan の critic 節に貼って却下する。推論だけの反論では却下できない（ADR-018）。
 
 ## メインセッションのモデル別の扱い
 

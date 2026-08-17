@@ -4,6 +4,7 @@
 - **担当**: team-lead（メインセッション）
 - **complexity**: M
 - **risk_level**: high（スキル発動条件・フック注入文・エージェント間プロトコルの変更を含む。pm-estimation「強制 high」該当）
+- **mode**: fable（src=hook。team-lead は Fable 5 のため critic CRITICAL の却下は ADR-017 ルール〔反論1文〕）
 - **ADR参照**: `docs/adr/ADR-018-pro-sonnet-operation.md`
 
 ## SPEC
@@ -46,10 +47,12 @@ T1 → T2/T4（表 v3 と発動条件は ADR の文言に従う）。T3 は独�
 
 ## critic
 
-- **発動有無**: risk_level high のため発動。critic（Kagami, opus サブエージェント）に ADR-018 草稿の反証を依頼した（2026-08-17 22:3x）。
-- **結果**: **セッション内で報告が返らなかった**（約25分待機、途中で「現時点の材料でまとめて」と催促するも未着）。critic 実施記録なしのため、ADR-018 は Status: Proposed のまま提出し、**確定前に `scripts/critic.sh --target docs/adr/ADR-018-pro-sonnet-operation.md --ctx docs/adr/ADR-017-opus-fable-parity.md --ctx .claude/skills/fable-class/SKILL.md` を回して `docs/plans/ADR-018-pro-sonnet-operation-critic.md` を残すこと**を DoD の残項目とする（皮肉にも「サブエージェント critic が静かに落ちる」という ADR-018 D案の却下理由がここで再現した）。
-- **指摘と採否**: 未実施（上記）
-- **CRITICAL却下の反論**: 該当なし
+- **発動有無**: risk_level high のため発動。critic（Kagami, opus サブエージェント）に ADR-018 草稿を反証させた。報告は依頼から約40分後に到着（強4・中1、条件付き差し戻し）。
+- **指摘と採否**: ADR-018「critic（Kagami, opus）の反証と採否」節に転記。1・4 は一部採用、2・3・5 は採用。
+- **CRITICAL却下の反論**（team-lead は Fable 5、mode: fable のため ADR-017 ルール〔反論1文〕が適用）:
+  - 指摘1の「条件4を削除」部分を却下: 1ファイルの局所修正でも代替案が複数ある変更は存在し、機械判定（1〜3）を優先させた上で残余として1文書かせる方が、無条件免除より安全側。
+  - 指摘4の「表 v3 の実装行を fresh Sonnet 既定に反転」部分を却下: 実装＝Codex はオーナーの明示指示。代わりに手順を成果物化し、突合を必須にして「未確認事項に賭ける」状態を解消した。
+- 補足: 当初「サブエージェント critic が返らない」と記録したが、40分後に到着したため訂正。返りが遅いこと自体は「上限内のサブエージェントに critic を賭けない」（ADR-018 D案却下）の傍証にはなる。
 
 ## DoD
 
@@ -61,12 +64,12 @@ T1 → T2/T4（表 v3 と発動条件は ADR の文言に従う）。T3 は独�
 - [x] README モデル運用節に Pro 運用の行がある
 - [x] 既存テスト（`uv run --python 3.12 --with pytest --with pytest-asyncio python -m pytest tests -q`）が全件 pass（181 passed。system の python3.9 では requires-python>=3.12 のため既存テストが収集エラーになる＝既知・本 PR 外）
 - [x] `bash -n` が全 .sh で通る
-- [ ] ADR-018 に対する critic 実施（`scripts/critic.sh`、オーナーの API キー準備後）
+- [x] ADR-018 に対する critic 実施（Kagami サブエージェント、上記）。従量 API 版 `scripts/critic.sh` での再反証はオーナーの API キー準備後に任意で実施
 
 ## VERIFY 記録
 
-- **レビュー結果**: 本タスクは team-lead（Fable 5）が自前で実装したため二段階レビューは未実施。critic は上記のとおり未着。オーナーレビュー（PR）を最終ゲートとする。
-- **修正ループ回数**: 0
+- **レビュー結果**: 本タスクは team-lead（Fable 5）が自前で実装したため二段階レビューは未実施。critic の反証を v2 に反映済み。オーナーレビュー（PR）を最終ゲートとする。
+- **修正ループ回数**: 1（critic 反映）
 
 ## エビデンス
 
@@ -84,7 +87,7 @@ $ env -u ANTHROPIC_API_KEY CRITIC_NO_ENV_FILES=1 scripts/critic.sh --target READ
 critic.sh: ANTHROPIC_API_KEY が見つかりません。 ... exit=1
 
 $ uv run --python 3.12 --with pytest --with pytest-asyncio python -m pytest tests -q
-181 passed in 19.27s
+182 passed in 19.44s（critic 反映後）
 $ for f in scripts/*.sh .claude/hooks/*.sh; do bash -n "$f" || echo "FAIL $f"; done
 （出力なし＝全件 OK）
 ```

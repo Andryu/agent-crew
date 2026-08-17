@@ -9,7 +9,11 @@
 # 使い方:
 #   scripts/critic.sh --target <反証対象.md> [--slug <slug>] [--ctx <添付ファイル>]... \
 #                     [--model <model>] [--effort <low|medium|high|xhigh|max>] \
-#                     [--instruction "<追加指示>"] [--out <出力パス>] [--dry-run]
+#                     [--instruction "<追加指示>"] [--out <出力パス>] [--mode <fable|opus|pro>] \
+#                     [--no-auto-ctx] [--dry-run]
+#
+#   対象 md 内で参照されているリポジトリ内パス（`path` やリンク）は自動で添付候補にする（--no-auto-ctx で無効）。
+#   サイズ上限を超える分は送らずにヘッダへ attach_skipped として列挙する（切り詰めは行わない）。
 #
 # 環境変数:
 #   ANTHROPIC_API_KEY      API キー。**このラッパ内でのみ使う。** シェルプロファイルで export しないこと
@@ -18,7 +22,7 @@
 #   CRITIC_MODEL           既定 claude-opus-5（team-lead より強いことが非対称ルールの前提）
 #   CRITIC_EFFORT          既定 xhigh
 #   CRITIC_MAX_TOKENS      既定 32000（thinking を含む出力上限。1回あたりのコスト上限を兼ねる）
-#   CRITIC_MAX_CTX_BYTES   既定 300000（対象＋添付の合計バイト上限。超えたら送らずに終了）
+#   CRITIC_MAX_CTX_BYTES   既定 300000（対象＋添付の合計バイト上限。明示添付で超えたら送らずに終了、自動添付は超える分を見送る）
 #   CRITIC_FALLBACK=1      安全分類器の拒否時に別モデルへ自動フォールバック（beta）。既定オフ
 #   CRITIC_API_URL         既定 https://api.anthropic.com/v1/messages（テスト用に差し替え可）
 #   CRITIC_NO_ENV_FILES=1  キーのファイル探索を行わない（テスト用）
@@ -29,11 +33,12 @@
 
 set -euo pipefail
 
-usage() { sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; }
 
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-TARGET=""; SLUG=""; OUT=""; INSTRUCTION=""; DRY_RUN=0
+TARGET=""; SLUG=""; OUT=""; INSTRUCTION=""; DRY_RUN=0; MODE="${CRITIC_MODE:-}"; AUTO_CTX=1
 CTX_FILES=()
+AUTO_FILES=(); SKIPPED=()
 MODEL="${CRITIC_MODEL:-claude-opus-5}"
 EFFORT="${CRITIC_EFFORT:-xhigh}"
 MAX_TOKENS="${CRITIC_MAX_TOKENS:-32000}"
@@ -50,6 +55,8 @@ while [[ $# -gt 0 ]]; do
     --effort) EFFORT="$2"; shift 2 ;;
     --instruction) INSTRUCTION="$2"; shift 2 ;;
     --out) OUT="$2"; shift 2 ;;
+    --mode) MODE="$2"; shift 2 ;;
+    --no-auto-ctx) AUTO_CTX=0; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "critic.sh: 不明な引数: $1" >&2; usage >&2; exit 1 ;;
@@ -76,6 +83,27 @@ if (( total_bytes > MAX_CTX_BYTES )); then
   exit 1
 fi
 
+# ---- 自動添付: 対象 md が参照するリポジトリ内パスを候補にし、上限内で追加（超える分は見送って記録） ----
+if (( AUTO_CTX )); then
+  target_abs=$(cd "$(dirname "$TARGET")" && pwd)/$(basename "$TARGET")
+  while IFS= read -r cand; do
+    [[ -n "$cand" ]] || continue
+    abs="${REPO_ROOT}/${cand}"
+    [[ -f "$abs" ]] || continue
+    [[ "$abs" == "$target_abs" ]] && continue
+    dup=0
+    for f in "${CTX_FILES[@]+"${CTX_FILES[@]}"}"; do
+      [[ "$(cd "$(dirname "$f")" && pwd)/$(basename "$f")" == "$abs" ]] && { dup=1; break; }
+    done
+    (( dup )) && continue
+    sz=$(wc -c < "$abs")
+    if (( total_bytes + sz > MAX_CTX_BYTES )); then SKIPPED+=("${cand} (${sz}B)"); continue; fi
+    total_bytes=$(( total_bytes + sz ))
+    CTX_FILES+=("$abs"); AUTO_FILES+=("$cand")
+  done < <(grep -oE '`[A-Za-z0-9_./-]+\.[A-Za-z0-9]+`|\]\([A-Za-z0-9_./-]+\)' "$TARGET" \
+            | sed -E 's/^`//; s/`$//; s/^\]\(//; s/\)$//' | grep -vE '^(https?:|#)' | sed -E 's#^\./##' | sort -u)
+fi
+
 # ---- slug / 出力パス ----
 if [[ -z "$SLUG" ]]; then
   SLUG=$(basename "$TARGET"); SLUG="${SLUG%.*}"
@@ -94,11 +122,11 @@ SYSTEM_PROMPT="${PERSONA}
 
 ## この実行の前提（従量 API から呼ばれている）
 
-あなたはいま Claude Code のサブエージェントではなく、外部プロセス（scripts/critic.sh）から従量 API 経由で呼ばれている。Read/Grep/Glob などのツールは使えない。裏取りは、このメッセージに添付されたファイルの範囲でのみ行うこと。添付されていないファイルの内容を推測して根拠にしてはならない。確認できない点は「未確認（添付なし）」と明記し、反証の強さを「弱」に留める。出力は報告フォーマットのとおり Markdown で書く。"
+あなたはいま Claude Code のサブエージェントではなく、外部プロセス（scripts/critic.sh）から従量 API 経由で呼ばれている。Read/Grep/Glob などのツールは使えない。裏取りは、このメッセージに添付されたファイルの範囲でのみ行うこと。添付されていないファイルの内容を推測して根拠にしてはならない。確認できない点は「未確認（添付なし）」と明記し、反証の強さを「弱」に留める。**強（CRITICAL）には、対象または添付ファイル内の該当箇所の引用（ファイル名と原文）を必ず添える** — 引用できない指摘は中以下に留める。反証命題の件数は 0〜5 個でよく、件数を揃えるために強さを上げてはならない。該当が無ければ「確認した範囲と限界」だけを書く。出力は報告フォーマットのとおり Markdown で書く。"
 
 # ---- user message: 対象 ＋ 添付 ----
 build_user_message() {
-  printf '%s\n\n' "以下の決定を反証せよ。反証命題は3〜5個、各命題に 強(CRITICAL)/中(MAJOR)/弱(MINOR)・根拠・修正提案を付け、最後に総合判定を一言で示すこと。"
+  printf '%s\n\n' "以下の決定を反証せよ。反証命題は該当がある分だけ（最大5個）、各命題に 強(CRITICAL)/中(MAJOR)/弱(MINOR)・根拠（引用）・修正提案を付け、最後に総合判定を一言で示すこと。"
   if [[ -n "$INSTRUCTION" ]]; then printf '追加指示: %s\n\n' "$INSTRUCTION"; fi
   printf '# 反証対象: %s\n\n' "$TARGET"
   cat "$TARGET"; printf '\n\n'
@@ -135,6 +163,7 @@ REQUEST=$(jq -n \
 if (( DRY_RUN )); then
   printf '%s\n' "$REQUEST"
   echo "critic.sh: dry-run（API 呼び出しなし）。出力予定: $OUT" >&2
+  echo "critic.sh: 添付 ${#CTX_FILES[@]} 件（自動 ${#AUTO_FILES[@]} 件）、見送り ${#SKIPPED[@]} 件、合計 ${total_bytes} bytes" >&2
   exit 0
 fi
 
@@ -208,6 +237,10 @@ VERDICT=$(printf '%s\n' "$BODY" | grep -E '採択可|差し戻し' | tail -n 1 |
 
 CTX_LIST="なし"
 if (( ${#CTX_FILES[@]} > 0 )); then CTX_LIST=$(printf '%s, ' "${CTX_FILES[@]}"); CTX_LIST="${CTX_LIST%, }"; fi
+AUTO_LIST="なし"
+if (( ${#AUTO_FILES[@]} > 0 )); then AUTO_LIST=$(printf '%s, ' "${AUTO_FILES[@]}"); AUTO_LIST="${AUTO_LIST%, }"; fi
+SKIP_FLAG="no"; SKIP_LIST=""
+if (( ${#SKIPPED[@]} > 0 )); then SKIP_FLAG="yes"; SKIP_LIST=$(printf '%s, ' "${SKIPPED[@]}"); SKIP_LIST="${SKIP_LIST%, }"; fi
 
 mkdir -p "$(dirname "$OUT")"
 {
@@ -216,12 +249,15 @@ mkdir -p "$(dirname "$OUT")"
   echo "- **日時**: ${STARTED_AT}"
   echo "- **対象**: \`${TARGET}\`"
   echo "- **添付**: ${CTX_LIST}"
+  echo "- **自動添付**: ${AUTO_LIST}"
+  echo "- **attach_skipped**: ${SKIP_FLAG}${SKIP_LIST:+ — ${SKIP_LIST}}"
+  echo "- **mode（呼び出し時の team-lead）**: ${MODE:-未指定}"
   echo "- **モデル**: ${RESP_MODEL:-$MODEL}（要求: ${MODEL}, effort: ${EFFORT}）"
   echo "- **stop_reason**: ${STOP_REASON:-unknown}"
   echo "- **usage**: input=${IN_TOK} (cache_read=${CACHE_READ}) output=${OUT_TOK}"
   echo "- **CRITICAL 件数（近似・要目視）**: ${CRITICAL_COUNT}"
   echo "- **総合判定行**: ${VERDICT:-（検出できず）}"
-  echo "- **採否**: team-lead が plan の critic 節に転記する。team-lead が Opus 以上でない場合、CRITICAL は却下不可（ADR-018）"
+  echo "- **採否**: team-lead が plan の critic 節に転記する。plan の mode が pro なら CRITICAL は却下不可（例外: 決定的コマンドの生出力で事実誤認を示せる場合。attach_skipped: yes の回は対象外）（ADR-018）"
   echo
   echo "---"
   echo

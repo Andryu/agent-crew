@@ -35,7 +35,8 @@
     ```
 - **採否**: team-lead が判断する。**非対称ルール**:
   - team-lead が Opus 以上のとき: critic の CRITICAL を却下する場合は反論1文を plan 成果物に必ず残す（ADR-017）。
-  - team-lead が Opus 以上でないとき: **critic の CRITICAL は却下できない**（弱い側が強い側の CRITICAL を却下できない、ADR-018）。取れる行動は (a) 修正して再 critic、(b) オーナーへエスカレーション（plan の critic 節に「CRITICAL 未解消・オーナー判断待ち」と記録し、PR は Draft のまま）のみ。MAJOR/MINOR は従来どおり team-lead が採否を判断する。
+  - plan の `mode` が pro のとき: **critic の CRITICAL は却下できない**（弱い側が強い側の CRITICAL を却下できない、ADR-018）。取れる行動は (a) 修正して再 critic、(b) オーナーへエスカレーション（plan の critic 節に「CRITICAL 未解消・オーナー判断待ち」と記録し、PR は Draft のまま）、(c) **唯一の例外**: CRITICAL の根拠が事実誤認であることを決定的コマンド（rg/fd/テスト）の生出力で示せる場合に限り却下でき、その生出力を plan の critic 節に貼る（推論だけの反論は不可）。critic 成果物ヘッダに `attach_skipped: yes` が立つ回の CRITICAL は却下不可の対象外（通常の採否判断）。MAJOR/MINOR は従来どおり team-lead が採否を判断する。
+  - どのモードを採用するかは plan 先頭の `mode:` に着手時に記録し、タスク内で固定する（ターンごとの検知揺れで規則を変えない）。
 - **効果指標**: レトロで「事後に見つかった欠陥のうち critic が事前に指摘していた割合」を数える。2スプリント連続 0/N（N≥3）なら別系統モデルへの切替を検討（ADR-017）。`*-critic.md` が残るので集計は機械的に行える。
 
 ## 判定はオーケストレーターが行う

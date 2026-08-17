@@ -205,3 +205,29 @@ def test_default_out_path_uses_docs_plans_and_does_not_overwrite(tmp_path, fake_
     assert r2.returncode == 0, r2.stderr
     assert (repo / "docs" / "plans" / "2026-08-17-x-critic-2.md").exists()
     assert first.read_text(encoding="utf-8") == first_content  # 1回目の成果物は上書きされていない
+
+
+def test_auto_attach_referenced_paths_and_skip_over_limit(tmp_path):
+    # 対象 md 内で参照されるリポジトリ内パスは自動添付され、上限を超える分は見送って dry-run 出力に件数が出る
+    repo = tmp_path / "repo"
+    (repo / ".claude" / "agents").mkdir(parents=True)
+    (repo / ".claude" / "agents" / "critic.md").write_text(
+        (REPO_DIR / ".claude" / "agents" / "critic.md").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    (repo / "small.md").write_text("small-content", encoding="utf-8")
+    (repo / "big.md").write_text("B" * 5000, encoding="utf-8")
+    target = repo / "plan.md"
+    target.write_text("参照: `small.md` と [big](big.md) と `missing.md`\n", encoding="utf-8")
+    env = _base_env(tmp_path)
+    env["CRITIC_MAX_CTX_BYTES"] = "4000"  # big.md は入らない
+    r = _run(["--target", str(target), "--dry-run"], env, cwd=repo)
+    assert r.returncode == 0, r.stderr
+    req = json.loads(r.stdout)
+    user = req["messages"][0]["content"]
+    assert "small-content" in user
+    assert "BBBB" not in user
+    assert "添付 1 件（自動 1 件）、見送り 1 件" in r.stderr
+    # --no-auto-ctx で無効化
+    r2 = _run(["--target", str(target), "--dry-run", "--no-auto-ctx"], env, cwd=repo)
+    assert "small-content" not in json.loads(r2.stdout)["messages"][0]["content"]
