@@ -68,4 +68,10 @@ effort: xhigh
 ## 採否について
 
 **採否は team-lead が判断する。** Kagami は反証材料を提示するだけで、決定はしない。
-team-lead が Kagami の **強（CRITICAL）指摘を却下する場合は、その理由（反論1文）を plan 成果物（`docs/plans/<slug>.md` の verification 節）に必ず残す。** 同じ Opus が発注者と最終審を兼ねる構造的な限界に対する最低限の歯止め。
+
+- team-lead が **Opus 以上**（ADR-017）: Kagami の **強（CRITICAL）指摘を却下する場合は、その理由（反論1文）を plan 成果物（`docs/plans/<slug>.md` の critic 節）に必ず残す。** 同じ Opus が発注者と最終審を兼ねる構造的な限界に対する最低限の歯止め。
+- team-lead が **Opus 以上でない**（Pro/Sonnet 運用、ADR-018）: **強（CRITICAL）指摘を team-lead は却下できない。** 修正して再反証するか、オーナーへエスカレーションする（plan に「CRITICAL 未解消・オーナー判断待ち」と記録）。弱い側が強い側の CRITICAL を却下できない、という非対称ルール。
+
+## 従量 API から呼ばれる場合（scripts/critic.sh）
+
+Pro 運用では本ファイルの本文（frontmatter を除く）が `scripts/critic.sh` の system prompt としてそのまま使われ、`claude-opus-5` 等の従量 API モデルで実行される。その場合 Read/Grep/Glob は使えず、裏取りは呼び出し側が `--ctx` で添付したファイルの範囲に限られる。添付されていない事実は推測せず「未確認」と明記すること（ラッパがこの注意書きを system prompt 末尾に追記する）。

@@ -179,14 +179,17 @@ scripts/queue.sh next                                            # 次に実行�
 
 ---
 
-## モデル運用（ADR-017）
+## モデル運用（ADR-017 / ADR-018）
 
-Fable 5 が利用できない環境では、team-lead（メインセッション）を Opus で運用しても工程を強制すれば同等品質を維持できる、という方針です。詳細は `docs/adr/ADR-017-opus-fable-parity.md`。
+品質はモデルではなく強制された工程から生まれる、という方針です。team-lead（メインセッション）の実効モデルに応じて運用が3段階に分かれ、`scripts/model-mode.sh` が毎ターン1行でどのモードかを注入します。
 
-- **推奨設定**: `~/.claude/settings.json` の `"model"` は `"opus"`。`effortLevel` は `"high"` のまま据え置く（深い局面は `ultrathink` を都度使う）
-- **fable-class の自動発動**: Fable 5 が使えない環境では、`.claude/skills/fable-class/SKILL.md` が complexity M 以上または risk_level medium 以上のタスクで自動発動する。`risk_level` 連動のモデルルーティング表 v2 も同ファイルに定義
-- **Fable 5 復帰時**: `"model"` を `"best"` に変更するだけでよい
-- **Stage 2（1スプリント計測後に判断）**: `advisorModel: "opus"` の有効化、`qa`/`security` エージェントの `effort: xhigh` 化
+- **Fable 5 がメイン**: fable-class は中〜大規模タスクで発動
+- **Opus がメイン（ADR-017、`docs/adr/ADR-017-opus-fable-parity.md`）**: `"model"` は `"opus"`、`effortLevel` は `"high"` のまま（深い局面は `ultrathink`）。fable-class は complexity M 以上または risk_level medium 以上で発動。ルーティング表 v2、critic は Kagami サブエージェント（opus）
+- **Opus 以上でない＝Pro/Sonnet 運用（ADR-018、`docs/adr/ADR-018-pro-sonnet-operation.md`）**: team-lead 自身が最弱の環になるため、判断をセッション外に出す。fable-class は complexity S 以上＝ほぼ全タスクで発動し、免除は「1ファイル・既存関数の局所修正・テスト有・設計判断なし」の4条件を客観的に確認したときのみ。ルーティング表 v3（設計＝`ultrathink`／実装＝Codex（herdr ペイン）／レビュー＝fresh Sonnet／探索・列挙＝`rg`/`fd`/`jq`／critic＝従量 API）。risk high の設計判断は `scripts/critic.sh` で従量 API の critic（既定 `claude-opus-5`）に反証させ、`docs/plans/<slug>-critic.md` を残す。**team-lead は critic の CRITICAL を却下できない**（修正して再 critic か、オーナーへエスカレーション）
+  - **critic.sh の準備（オーナー作業）**: Console で API キーを発行し Spend limit を設定 → `~/.config/agent-crew/critic.env` に `ANTHROPIC_API_KEY=sk-ant-...`（`chmod 600`）。**シェルプロファイルで export しない**（Claude Code 本体が拾って従量課金に切り替わりうる）。動作確認は `scripts/critic.sh --target <md> --dry-run`
+  - 実体確認できない初回ターン等は fail-closed で Pro 運用に倒れる（settings に `opus`/`fable` と書いてあっても実体は Sonnet でありうるため）
+- **Fable 5 復帰時**: `"model"` を `"best"` に変更するだけでよい（`model-mode.sh` が自動でモードを戻す）
+- **Stage 2（1スプリント計測後に判断）**: ADR-017: `advisorModel: "opus"` の有効化、`qa`/`security` の `effort: xhigh` 化。ADR-018: サブエージェント critic の従量 API 化が確認できれば併用、Stop フックでの critic 未実施検出
 
 ---
 

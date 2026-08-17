@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/model-mode.sh
 #
-# team-lead（メインセッション）の実効モデルを検知し、モデル運用モードを1行で出力する（ADR-017）。
+# team-lead（メインセッション）の実効モデルを検知し、モデル運用モードを1行で出力する（ADR-017 / ADR-018）。
 # 用途:
 #   - UserPromptSubmit フック: 毎ターン1行をコンテキストに注入する（工程の想起）
 #   - SessionStart フック（session_start.sh から呼ぶ）: セッション開始時の表示
@@ -70,13 +70,20 @@ case "$MODEL" in
   *)        FAMILY="$MODEL" ;;
 esac
 
-# fail-closed: Fable モードと断定してよいのは実体（hook 入力 / transcript）で確認できたときだけ。
-# settings.json のみ（初回ターン等）では「fable」と書いてあっても実体は Opus でありうるため、fable-class ON 側に倒す。
-if [[ "$FAMILY" == "fable" && ( "$SOURCE" == "hook" || "$SOURCE" == "transcript" ) ]]; then
+# fail-closed（ADR-017 → ADR-018 で拡張）:
+#   - Fable/Opus モードと断定してよいのは実体（hook 入力 / transcript）で確認できたときだけ。
+#   - settings.json のみ（初回ターン等）では「fable」「opus」と書いてあっても実体は Sonnet でありうるため、
+#     最も厳しい側＝Pro 運用（ADR-018）に倒す。誤検知の害は厳しい側にしか出ない。
+CONFIRMED=0
+[[ "$SOURCE" == "hook" || "$SOURCE" == "transcript" ]] && CONFIRMED=1
+
+if [[ "$FAMILY" == "fable" && "$CONFIRMED" == "1" ]]; then
   echo "[team-lead=${FAMILY} effort=${EFFORT} src=${SOURCE}] Fable モード: fable-class は中〜大規模タスクで発動（ADR-017）"
+elif [[ "$FAMILY" == "opus" && "$CONFIRMED" == "1" ]]; then
+  echo "[team-lead=${FAMILY} effort=${EFFORT} src=${SOURCE}] Opus モード（ADR-017）: fable-class ON: complexity≥M or risk≥medium → SPEC/PLAN を docs/plans/ に残す, ミニADRは critic(Kagami,opus) で反証してから確定, ルーティング表 v2 = docs/adr/ADR-017-opus-fable-parity.md §5"
 else
-  [[ "$FAMILY" == "fable" ]] && FAMILY="fable?(未確認)"
-  echo "[team-lead=${FAMILY} effort=${EFFORT} src=${SOURCE}] fable-class ON: complexity≥M or risk≥medium → SPEC/PLAN を docs/plans/ に残す, ミニADRは critic(Kagami,opus) で反証してから確定, ルーティング表 v2 = .claude/skills/fable-class/SKILL.md（ADR-017）"
+  if [[ "$CONFIRMED" == "0" && ( "$FAMILY" == "fable" || "$FAMILY" == "opus" ) ]]; then FAMILY="${FAMILY}?(未確認)"; fi
+  echo "[team-lead=${FAMILY} effort=${EFFORT} src=${SOURCE}] Pro 運用（ADR-018）: fable-class ON: complexity≥S（ほぼ全タスク）→ SPEC/PLAN を docs/plans/ に残す。免除は「1ファイル・既存関数の局所修正・テスト有・設計判断なし」の4条件全てを rg/fd/git status で確認したときのみ。設計=ultrathink, 実装=Codex(herdr), 探索・列挙=rg/fd/jq（LLMに投げない）, レビュー=fresh Sonnet, risk high の critic=scripts/critic.sh（従量API, CRITICAL は却下不可）, ルーティング表 v3 = .claude/skills/fable-class/SKILL.md"
 fi
 
 exit 0

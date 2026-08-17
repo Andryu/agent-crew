@@ -25,13 +25,22 @@
 
 ## 独立クリティーク（critic）
 
-- **発動**: PLAN のミニADRが risk_level medium 以上のとき、確定前に `critic` エージェント（`.claude/agents/critic.md`、Kagami、opus）に「この決定を反証せよ」と依頼する。渡すもの: ミニADR本文・却下案・関連ファイルパス。賛成意見は求めない。
-- **採否**: team-lead が判断する。**非対称ルール**: critic の CRITICAL を却下する場合は反論1文を plan 成果物に必ず残す。
-- **効果指標**: レトロで「事後に見つかった欠陥のうち critic が事前に指摘していた割合」を数える。2スプリント連続 0/N（N≥3）なら別系統モデルへの切替を検討（ADR-017）。
+- **発動**: PLAN のミニADRが risk_level **high** のとき、確定前に critic に「この決定を反証せよ」と依頼する（medium は推奨。省略時は plan に理由を1行残す）。渡すもの: ミニADR本文・却下案・関連ファイル。賛成意見は求めない。
+- **呼び方は team-lead の実効モデルで分かれる**（`scripts/model-mode.sh` の注入行に従う）:
+  - **Opus 以上（ADR-017）**: `critic` サブエージェント（`.claude/agents/critic.md`、Kagami、opus）を `Agent` で呼ぶ。
+  - **Opus 以上でない（Pro/Sonnet 運用、ADR-018）**: `scripts/critic.sh` で従量 API の critic を呼ぶ。API 側はリポジトリを読めないので、関連ファイルは `rg -l`/`fd` で列挙して `--ctx` に添付する。成果物は `docs/plans/<slug>-critic.md` に生成され、指摘は plan の critic 節に採否付きで転記する。
+    ```bash
+    scripts/critic.sh --slug <slug> --target docs/plans/<日付>-<slug>.md \
+      --ctx docs/adr/ADR-0xx.md --ctx path/to/related.py
+    ```
+- **採否**: team-lead が判断する。**非対称ルール**:
+  - team-lead が Opus 以上のとき: critic の CRITICAL を却下する場合は反論1文を plan 成果物に必ず残す（ADR-017）。
+  - team-lead が Opus 以上でないとき: **critic の CRITICAL は却下できない**（弱い側が強い側の CRITICAL を却下できない、ADR-018）。取れる行動は (a) 修正して再 critic、(b) オーナーへエスカレーション（plan の critic 節に「CRITICAL 未解消・オーナー判断待ち」と記録し、PR は Draft のまま）のみ。MAJOR/MINOR は従来どおり team-lead が採否を判断する。
+- **効果指標**: レトロで「事後に見つかった欠陥のうち critic が事前に指摘していた割合」を数える。2スプリント連続 0/N（N≥3）なら別系統モデルへの切替を検討（ADR-017）。`*-critic.md` が残るので集計は機械的に行える。
 
 ## 判定はオーケストレーターが行う
 
-レビュアーからの指摘は、そのまま鵜呑みにして修正タスクに変換してはならない。オーケストレーター（Fable、なければ Opus）が、各指摘について採否を判断してから修正タスクを切る。
+レビュアーからの指摘は、そのまま鵜呑みにして修正タスクに変換してはならない。オーケストレーター（team-lead）が、各指摘について採否を判断してから修正タスクを切る（例外: Pro 運用時の critic CRITICAL は却下不可、上記）。
 
 指摘の採否判断こそが意思決定である。レビュアーは問題の候補を挙げる役割であり、それが本当に直すべき問題か、優先度はどうか、対応範囲はどこまでかを決めるのは、最も知能の高いモデル、すなわちオーケストレーター自身の仕事である。
 

@@ -23,4 +23,4 @@ Closes #
 - [ ] QA承認済み（Sora の APPROVED を確認した）
 - [ ] ブランチ名が `feat/` または `fix/` で始まっている（mainへの直接コミット禁止）
 - [ ] Test plan の全項目がチェック済みである
-- [ ] fable-class 対象（complexity M以上 / risk medium以上 / 設計判断あり）なら `docs/plans/<日付>-<slug>.md` へのリンクを本文に記載した（対象外なら complexity/risk と理由を一行）
+- [ ] fable-class 対象（Opus 運用: complexity M以上 / risk medium以上 / 設計判断あり。Pro 運用: 免除4条件〔1ファイル・既存関数の局所修正・テスト有・設計判断なし〕を全て満たすもの以外すべて）なら `docs/plans/<日付>-<slug>.md` へのリンクを本文に記載した（対象外なら complexity/risk と理由を一行。Pro 運用では免除判定コマンドの出力を一行）
