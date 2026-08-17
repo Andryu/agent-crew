@@ -85,6 +85,8 @@ checks:
     node: test_name       # pytest のみ
     points: 1             # 省略時 1
     regression: true      # 省略時 false
+    optional: true        # 省略時 false。加点項目。pytest が skip した場合
+                          # （依存ライブラリ不在等）は分母からも除外される
 ```
 
 テストスクリプト/pytest が受け取る環境変数:
@@ -105,10 +107,13 @@ checks:
 | 03 | task-completed-hook | #98 | TaskCompleted フックの新規作成 |
 | 05 | lessons-set-status | #74 | lessons.sh の status フィールドと set-status |
 | 07 | lessons-to-vault | #123 | 教訓の vault 自動転記スクリプト |
+| 10 | subagent-tokens | #179 | サブエージェント別トークン集計（難問。server 検証は加点） |
+| 12 | rule-candidates | #182 | 抽出条件の一元化と信頼境界（難問） |
 
 ## 残タスク（未構築）
 
-選定レポートで候補に挙がった 02 / 04 / 06 / 08 / 09 / 10 / 11 / 12 は未構築。
+選定レポートで候補に挙がった 02 / 04 / 06 / 08 / 09 は未構築。
+11（PR #153）は親コミットが main の履歴外にあるため対象外とした。
 追加する際は既存タスクの構成（meta.yaml / prompt.md / setup.sh / visible_test /
 holdout_test / rubric.yaml）に合わせ、**holdout を正解実装（マージコミットの
 該当ファイル）に対して実行し全チェックが通ることを確認**してから追加すること。

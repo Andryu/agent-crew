@@ -21,6 +21,8 @@ rubric.yaml の書式（PyYAML 非依存の限定サブセット。行頭コメ�
         node: test_name       # pytest のみ（ファイル内の関数名）
         points: 1             # 省略時 1
         regression: true      # 省略時 false
+        optional: true        # 省略時 false。pytest が skip した場合に
+                              # 分母（満点）からも除外する加点項目
 """
 from __future__ import annotations
 
@@ -76,6 +78,7 @@ def load_rubric(path: Path) -> list:
                 raise ValueError(f"{path}: check に {required} がありません: {c}")
         c.setdefault("points", 1)
         c.setdefault("regression", False)
+        c.setdefault("optional", False)
     if not checks:
         raise ValueError(f"{path}: checks が空です")
     return checks
@@ -119,18 +122,33 @@ def run_check(check: dict, task_dir: Path, work_dir: Path, seed: int,
         )
         passed = proc.returncode == 0
         output = proc.stdout
+        # pytest が全テストを skip した場合（例: 依存ライブラリ不在）は
+        # 「合格」ではなく「skip」として区別する。optional チェックなら
+        # 分母からも除外し、非 optional なら安全側で不合格として扱う。
+        skipped = (
+            check["type"] == "pytest"
+            and proc.returncode == 0
+            and " passed" not in output
+            and "skipped" in output
+        )
     except subprocess.TimeoutExpired:
         passed = False
+        skipped = False
         output = f"TIMEOUT ({timeout}s)"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+    if skipped:
+        passed = False
 
     return {
         "id": check["id"],
         "type": check["type"],
         "points": check["points"],
         "regression": check["regression"],
+        "optional": check["optional"],
         "passed": passed,
+        "skipped": skipped,
         "output": output,
     }
 
@@ -165,16 +183,24 @@ def main() -> int:
     for check in checks:
         results.append(run_check(check, task_dir, work_dir, seed, pytest_cmd, args.timeout))
 
-    total = sum(r["points"] for r in results)
-    earned = sum(r["points"] for r in results if r["passed"])
-    regression_failed = [r["id"] for r in results if r["regression"] and not r["passed"]]
+    # optional チェックが skip された場合は分母（満点）からも除外する
+    counted = [r for r in results if not (r["optional"] and r["skipped"])]
+    total = sum(r["points"] for r in counted)
+    earned = sum(r["points"] for r in counted if r["passed"])
+    regression_failed = [r["id"] for r in counted if r["regression"] and not r["passed"]]
     final = 0 if regression_failed else earned
 
     print(f"# 採点結果: {task_dir.name} (seed={seed})")
     for r in results:
-        mark = "PASS" if r["passed"] else "FAIL"
+        if r["optional"] and r["skipped"]:
+            mark = "SKIP"
+        elif r["passed"]:
+            mark = "PASS"
+        else:
+            mark = "FAIL"
         gate = " [regression]" if r["regression"] else ""
-        print(f"  [{mark}] {r['id']} ({r['points']}pt){gate}")
+        opt = " [optional/対象外]" if (r["optional"] and r["skipped"]) else ""
+        print(f"  [{mark}] {r['id']} ({r['points']}pt){gate}{opt}")
         if args.verbose and not r["passed"]:
             for line in r["output"].splitlines()[-15:]:
                 print(f"         | {line}")
@@ -192,7 +218,8 @@ def main() -> int:
             "percent": pct,
             "regression_failed": regression_failed,
             "checks": [
-                {k: r[k] for k in ("id", "type", "points", "regression", "passed")}
+                {k: r[k] for k in ("id", "type", "points", "regression",
+                                   "optional", "passed", "skipped")}
                 for r in results
             ],
         }

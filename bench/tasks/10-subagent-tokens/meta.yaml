@@ -1,0 +1,9 @@
+# タスクメタ情報（採点には使わない。出典の記録用）
+id: "10"
+slug: subagent-tokens
+title: "ダッシュボードのサブエージェント別トークン集計"
+source_pr: 179
+merge_commit: 7a249a68e00d5dc16921bbf85b06ed2966a029c2
+parent_commit: 8961c6af98e9a5593ebf0e2684cd49816ca4c2ff
+requires: "python3, pytest（加点チェックのみ aiohttp）"
+difficulty: hard
