@@ -15,16 +15,20 @@ export const LANE_LENGTH = 12; // 列数と同じ。x>=LANE_LENGTHで到達
 // --- ライフ・経済 ---
 export const LIVES_START = 20;
 
+// 2026-08-18: Gate A(オーナー実プレイ「難易度5/5」)＋ボットシミュレーションで
+// 終盤の金余り・即死seedを確認 → killBase 4→5／killPerWave 0.5→0.8／waveClearBonus 40→60
 export const ECONOMY = {
   initialGoldDefault: 300,
   goldRange: [150, 600], // チャレンジリンクでの上書き範囲
   sellRatio: 0.7,
-  waveClearBonus: 40,
+  waveClearBonus: 60,
+  killBase: 5,
+  killPerWave: 0.8,
 };
 
-// 撃破報酬 = 4 + floor(wave * 0.5)
+// 撃破報酬 = killBase + floor(wave * killPerWave)（バランス調整用に ECONOMY で持つ）
 export function killReward(wave) {
-  return 4 + Math.floor(wave * 0.5);
+  return ECONOMY.killBase + Math.floor(wave * ECONOMY.killPerWave);
 }
 
 // --- 塔 ---
@@ -80,6 +84,17 @@ export const RESIST_DAMAGE_MULT = 0.5;
 
 export const TOWER_ORDER = ['basic', 'heat', 'cold', 'bolt'];
 
+// --- 塔アップグレード（2段階、分岐なし。CP5: v1.1） ---
+// costMul[level-1] が「そのlevelから次levelへ上げる費用」＝初期費用×costMul[level-1]
+// （Lv1→2はcostMul[0]、Lv2→3はcostMul[1]。初期費用に対する倍率で、累積ではない）
+// 各Lvアップでダメージ×dmgMul・射程+rangeAdd（複利: Lv3はdmgMul^2）
+export const UPGRADE = {
+  costMul: [0.8, 1.2],
+  dmgMul: 1.4,
+  rangeAdd: 0.3,
+  maxLevel: 3,
+};
+
 // wave到達で累積解禁。unlockedTowers(wave)が参照する
 export const UNLOCK_WAVES = { basic: 1, heat: 3, cold: 5, bolt: 7 };
 
@@ -126,9 +141,11 @@ export const INITIAL_RESIST_SHARE = 0.25;
 // レーン抽選のシャープさ（重み^LANE_SHARPNESS で抽選。1=線形、3=好みのレーンにほぼ従う）
 export const LANE_SHARPNESS = 3;
 
-// 実HP = (20 + wave*8) * hp * size
+// 実HP = (HP_CURVE.base + wave*HP_CURVE.slope) * hp * size
+// 2026-08-18: Gate A「難易度5/5」＋ボットシミュレーション（W3〜W8全滅）を受け傾き 8→5
+export const HP_CURVE = { base: 20, slope: 5 };
 export function hpBaseForWave(wave) {
-  return 20 + wave * 8;
+  return HP_CURVE.base + wave * HP_CURVE.slope;
 }
 
 // 耐性のコスト: resist!==0 の個体は実HP×0.85（対応する塔がなければ耐性は選択で消え、
@@ -149,7 +166,7 @@ export function populationSizeForWave(wave) {
 }
 
 // --- 到達被害 ---
-export const REACHED_DAMAGE_LARGE_SIZE_THRESHOLD = 1.2;
+export const REACHED_DAMAGE_LARGE_SIZE_THRESHOLD = 1.35; // 2026-08-18: 1.2→1.35（進化で体格が平均1.3前後まで育つため、1.2だと1ウェーブで10体×2ライフの即死が起きた）
 export const REACHED_DAMAGE_LARGE = 2;
 export const REACHED_DAMAGE_SMALL = 1;
 

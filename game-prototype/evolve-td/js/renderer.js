@@ -127,11 +127,29 @@ function drawTowerShape(ctx, cx, cy, radius, shape, color) {
   ctx.restore();
 }
 
+// CP5: 塔アップグレード。中心図形をlevel数だけ同心に描く（Lv1=1重／Lv2=2重／Lv3=3重）。
+// 外周形状（棘・六角枠・ジグザグ）はlevelに関わらず既存のまま変えない。
+function drawTowerLevelRings(ctx, cx, cy, radius, level) {
+  if (level <= 1) return;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+  ctx.lineWidth = 1.2;
+  for (let i = 1; i < level; i++) {
+    const r = radius * (0.35 + 0.3 * i);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawTower(ctx, tower) {
   const def = TOWERS[tower.id];
   if (!def) return;
   const { x, y } = cellToPx(tower.col, tower.row);
-  drawTowerShape(ctx, x, y, CELL * 0.32, TOWER_SHAPES[tower.id], TOWER_COLORS[tower.id]);
+  const radius = CELL * 0.32;
+  drawTowerShape(ctx, x, y, radius, TOWER_SHAPES[tower.id], TOWER_COLORS[tower.id]);
+  drawTowerLevelRings(ctx, x, y, radius, tower.level || 1);
 }
 
 function lerp(a, b, t) {

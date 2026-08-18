@@ -18,6 +18,7 @@ import {
   populationSizeForWave,
   SKILL,
   WAVE_COUNT,
+  UPGRADE,
 } from './config.js';
 
 function isLaneRow(row) {
@@ -102,12 +103,80 @@ export function placeTower(state, towerId, col, row) {
   return {
     ...state,
     gold: state.gold - def.cost,
-    towers: [...state.towers, { id: towerId, col, row }],
+    towers: [...state.towers, { id: towerId, col, row, level: 1 }],
   };
 }
 
 /**
- * col,rowの塔を売却する（費用の70%返金）。塔が存在しなければ状態を変更せず返す。
+ * 塔の初期費用＋支払った強化費用の合計を返す（売却額の算出に使う）。
+ * costMulは初期費用に対する倍率のため、levelから遡って再計算する（強化ごとの支払額を別途保持しない）。
+ * @param {{id:string, level?:number}} tower
+ * @returns {number}
+ */
+export function towerInvested(tower) {
+  const def = TOWERS[tower.id];
+  if (!def) return 0;
+  const level = tower.level || 1;
+  let invested = def.cost;
+  for (let lv = 1; lv < level; lv++) {
+    invested += def.cost * UPGRADE.costMul[lv - 1];
+  }
+  return invested;
+}
+
+/**
+ * 塔をLv+1へ強化する費用（Lv1→2はcostMul[0]、Lv2→3はcostMul[1]倍。共に初期費用基準）。
+ * Lv3（UPGRADE.maxLevel）の塔に対しては呼び出し側でcanUpgradeを先に確認すること。
+ * @param {{id:string, level?:number}} tower
+ * @returns {number}
+ */
+export function upgradeCost(tower) {
+  const def = TOWERS[tower.id];
+  if (!def) return Infinity;
+  const level = tower.level || 1;
+  const mul = UPGRADE.costMul[level - 1];
+  if (typeof mul !== 'number') return Infinity;
+  return Math.round(def.cost * mul);
+}
+
+/**
+ * col,rowの塔を強化できるかを判定する。塔が存在しない・Lv3(最大)・資金不足でfalse。
+ * @param {object} state
+ * @param {number} col
+ * @param {number} row
+ * @returns {boolean}
+ */
+export function canUpgrade(state, col, row) {
+  const tower = findTowerAt(state, col, row);
+  if (!tower) return false;
+  if ((tower.level || 1) >= UPGRADE.maxLevel) return false;
+  const cost = upgradeCost(tower);
+  if (state.gold < cost) return false;
+  return true;
+}
+
+/**
+ * col,rowの塔をLv+1へ強化する。canUpgradeがfalseの場合は状態を変更せず返す。
+ * @param {object} state
+ * @param {number} col
+ * @param {number} row
+ * @returns {object} GameState
+ */
+export function upgradeTower(state, col, row) {
+  if (!canUpgrade(state, col, row)) return state;
+  const tower = findTowerAt(state, col, row);
+  const cost = upgradeCost(tower);
+  return {
+    ...state,
+    gold: state.gold - cost,
+    towers: state.towers.map((t) =>
+      t.col === col && t.row === row ? { ...t, level: (t.level || 1) + 1 } : t
+    ),
+  };
+}
+
+/**
+ * col,rowの塔を売却する（投資額=towerInvested()の70%返金）。塔が存在しなければ状態を変更せず返す。
  * @param {object} state
  * @param {number} col
  * @param {number} row
@@ -116,8 +185,7 @@ export function placeTower(state, towerId, col, row) {
 export function sellTower(state, col, row) {
   const tower = findTowerAt(state, col, row);
   if (!tower) return state;
-  const def = TOWERS[tower.id];
-  const refund = Math.floor(def.cost * ECONOMY.sellRatio);
+  const refund = Math.floor(towerInvested(tower) * ECONOMY.sellRatio);
   return {
     ...state,
     gold: state.gold + refund,

@@ -19,6 +19,7 @@
         </div>
       </div>
       <button id="start-button" class="primary-button" type="button">はじめる</button>
+      <button id="howto-button" class="secondary-button" type="button">あそびかた</button>
     </section>
 
     <section id="playing-screen" class="screen hidden">
@@ -26,7 +27,8 @@
         <span id="hud-gold" class="hud-item">300G</span>
         <span id="hud-lives" class="hud-item">♥ 20</span>
         <span id="hud-wave" class="hud-item">WAVE 1/15</span>
-        <button id="mute-button" class="mute-button" type="button" aria-label="ミュート切り替え">🔊</button>
+        <button id="howto-hud-button" class="hud-icon-button" type="button" aria-label="あそびかた">?</button>
+        <button id="mute-button" class="hud-icon-button" type="button" aria-label="ミュート切り替え">🔊</button>
       </div>
 
       <div class="board-row">
@@ -35,7 +37,10 @@
           <p id="intro-bubble" class="intro-bubble hidden">塔を置いて、ウェーブ開始</p>
           <div class="board-wrap">
             <canvas id="board-canvas" width="576" height="384"></canvas>
-            <button id="sell-button" class="sell-button hidden" type="button">売る</button>
+            <div id="tower-panel" class="tower-panel hidden">
+              <button id="upgrade-button" class="tower-panel-button upgrade-button" type="button">強化</button>
+              <button id="sell-button" class="tower-panel-button sell-button" type="button">売る</button>
+            </div>
           </div>
         </div>
         <aside id="preview-panel" class="preview-panel hidden">
@@ -47,6 +52,11 @@
             <canvas class="preview-icon" width="52" height="52"></canvas>
             <canvas class="preview-icon" width="52" height="52"></canvas>
           </div>
+          <ul id="preview-lanes" class="preview-lanes">
+            <li class="preview-lane" data-lane="0"></li>
+            <li class="preview-lane" data-lane="1"></li>
+            <li class="preview-lane" data-lane="2"></li>
+          </ul>
         </aside>
       </div>
 
@@ -108,6 +118,54 @@
         </div>
         <ul id="report-lines" class="report-lines"></ul>
         <button id="report-close-button" class="primary-button" type="button">とじる</button>
+      </div>
+    </div>
+
+    <div id="howto-modal" class="modal hidden">
+      <div class="modal-box howto-box">
+        <h2>あそびかた</h2>
+        <p class="howto-promise">群れは、あなたの守り方に合わせて進化する。</p>
+        <div class="howto-section">
+          <h3>操作</h3>
+          <ul class="howto-list">
+            <li>置く: 塔パレットのアイコン→盤面のセルをタップ</li>
+            <li>売る・強化: 配置済みの塔をタップするとパネルが出る</li>
+            <li>ウェーブ開始: 配置フェーズで「ウェーブ開始」ボタン</li>
+            <li>×2: ウェーブ中の進行速度を倍速にする</li>
+            <li>発熱（W3から）: レーンを選んで一時的に減速させる</li>
+          </ul>
+        </div>
+        <div class="howto-section">
+          <h3>敵の見た目</h3>
+          <div class="howto-legend">
+            <div class="howto-legend-item">
+              <canvas class="howto-legend-icon" data-legend="fast" width="52" height="52"></canvas>
+              <span>細長い＝速い</span>
+            </div>
+            <div class="howto-legend-item">
+              <canvas class="howto-legend-icon" data-legend="tough" width="52" height="52"></canvas>
+              <span>輪郭が太い＝硬い</span>
+            </div>
+            <div class="howto-legend-item">
+              <canvas class="howto-legend-icon" data-legend="big" width="52" height="52"></canvas>
+              <span>大きい＝硬くて遅い・届くとライフ2</span>
+            </div>
+            <div class="howto-legend-item">
+              <canvas class="howto-legend-icon" data-legend="heat" width="52" height="52"></canvas>
+              <span>赤＝マクロファージに強い</span>
+            </div>
+            <div class="howto-legend-item">
+              <canvas class="howto-legend-icon" data-legend="cold" width="52" height="52"></canvas>
+              <span>青＝インターフェロンに強い</span>
+            </div>
+            <div class="howto-legend-item">
+              <canvas class="howto-legend-icon" data-legend="bolt" width="52" height="52"></canvas>
+              <span>黄＝抗体に強い</span>
+            </div>
+          </div>
+        </div>
+        <p class="howto-tip">同じ塔ばかりだと群れの突然変異が増える。3属性を混ぜよう。</p>
+        <button id="howto-close-button" class="primary-button" type="button">とじる</button>
       </div>
     </div>
 

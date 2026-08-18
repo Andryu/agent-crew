@@ -122,8 +122,7 @@ html, body {
   font-weight: 600;
 }
 
-.mute-button {
-  margin-left: auto;
+.hud-icon-button {
   font-size: 1rem;
   padding: 4px 8px;
   border-radius: 6px;
@@ -132,6 +131,16 @@ html, body {
   color: #f0f0f2;
   cursor: pointer;
   line-height: 1;
+}
+
+.hud-icon-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* 「?」ボタンをHUD右端グループの先頭にし、ミュートボタンをその右に並べる */
+#howto-hud-button {
+  margin-left: auto;
 }
 
 /* --- 教えない導入: 初回吹き出し --- */
@@ -204,6 +213,22 @@ html, body {
   border-radius: 6px;
 }
 
+/* --- プレビューのレーン分布（CP5） --- */
+.preview-lanes {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: #cfd2da;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.preview-lane {
+  letter-spacing: -0.02em;
+}
+
 /* --- 発熱: レーン選択モード --- */
 .skill-select-banner {
   position: absolute;
@@ -272,23 +297,42 @@ html, body {
   touch-action: manipulation;
 }
 
-.sell-button {
+/* --- 配置済み塔タップ時のフローティングパネル（強化・売る、CP5） --- */
+.tower-panel {
   position: absolute;
-  /* 既定はセルの下側に出す。row>=6（下2行）は.sell-button-aboveを付与し上側に反転する
-     （main.jsの座標計算で分岐。CP3確定回答#10） */
+  display: flex;
+  gap: 6px;
+  /* 既定はセルの下側に出す。row>=6（下2行）は.tower-panel-aboveを付与し上側に反転する
+     （main.jsの座標計算で分岐。CP3確定回答#10と同じ規則をCP5でも踏襲） */
   transform: translate(-50%, 0%);
+}
+
+.tower-panel.tower-panel-above {
+  transform: translate(-50%, -100%);
+}
+
+.tower-panel-button {
   padding: 8px 14px;
   border-radius: 6px;
   border: none;
-  background: #e05a3a;
-  color: #fff;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
 }
 
-.sell-button.sell-button-above {
-  transform: translate(-50%, -100%);
+.tower-panel-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tower-panel-button.upgrade-button {
+  background: #4aa8e0;
+  color: #06131c;
+}
+
+.tower-panel-button.sell-button {
+  background: #e05a3a;
+  color: #fff;
 }
 
 .controls {
@@ -464,6 +508,81 @@ html, body {
 
 .report-lines li::before {
   content: '・';
+}
+
+/* --- あそびかたmodal（CP5） --- */
+.howto-box {
+  max-width: 420px;
+  max-height: 82vh;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.howto-box h2 {
+  text-align: center;
+}
+
+.howto-promise {
+  margin: 0 0 16px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(74, 168, 224, 0.15);
+  color: #cfe6f7;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.howto-section {
+  margin-bottom: 16px;
+}
+
+.howto-section h3 {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+  color: #cfd2da;
+}
+
+.howto-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+
+.howto-list li::before {
+  content: '・';
+}
+
+.howto-legend {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 12px;
+}
+
+.howto-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #cfd2da;
+}
+
+.howto-legend-icon {
+  flex-shrink: 0;
+  background: #14161c;
+  border-radius: 6px;
+}
+
+.howto-tip {
+  margin: 0 0 18px;
+  font-size: 0.85rem;
+  color: #cfd2da;
+}
+
+.howto-box .primary-button {
+  display: block;
+  margin: 0 auto;
 }
 
 /* --- リザルト --- */

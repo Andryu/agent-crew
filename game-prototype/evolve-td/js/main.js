@@ -14,6 +14,8 @@ import {
   WAVE_COUNT,
   RESIST_COLORS,
   RESIST_LABELS,
+  LANE_LABELS,
+  GENOME_RANGES,
   killReward,
 } from './config.js';
 import { makeRng } from './rng.js';
@@ -31,6 +33,10 @@ import {
   isGameOver,
   skillUnlocked,
   useSkill,
+  canUpgrade,
+  upgradeTower,
+  upgradeCost,
+  towerInvested,
 } from './game-state.js';
 import {
   spawnFromPopulation,
@@ -77,7 +83,9 @@ const hudGold = document.getElementById('hud-gold');
 const hudLives = document.getElementById('hud-lives');
 const hudWave = document.getElementById('hud-wave');
 const muteButton = document.getElementById('mute-button');
+const towerPanel = document.getElementById('tower-panel');
 const sellButton = document.getElementById('sell-button');
+const upgradeButton = document.getElementById('upgrade-button');
 const paletteEl = document.getElementById('tower-palette');
 const paletteSlots = Array.from(document.querySelectorAll('.tower-slot'));
 const waveStartButton = document.getElementById('wave-start-button');
@@ -93,6 +101,11 @@ const challengeSendButton = document.getElementById('challenge-send-button');
 const surveyOpenButton = document.getElementById('survey-open-button');
 const previewPanel = document.getElementById('preview-panel');
 const previewCanvases = Array.from(document.querySelectorAll('.preview-icon'));
+const previewLaneEls = Array.from(document.querySelectorAll('.preview-lane'));
+const howtoButton = document.getElementById('howto-button');
+const howtoHudButton = document.getElementById('howto-hud-button');
+const howtoModal = document.getElementById('howto-modal');
+const howtoCloseButton = document.getElementById('howto-close-button');
 const skillButton = document.getElementById('skill-button');
 const skillLabel = document.getElementById('skill-label');
 const skillSelectBanner = document.getElementById('skill-select-banner');
@@ -231,12 +244,53 @@ function updateHud() {
   // エンドレス中は分母(WAVE.../15)を出さない（wave16以降は15を超えるため）
   hudWave.textContent = state.endless ? `WAVE ${state.wave}` : `WAVE ${state.wave}/${WAVE_COUNT}`;
   speedToggleButton.disabled = state.phase !== 'wave';
+  // あそびかたは配置フェーズのみ開ける（ウェーブ中は一時停止しない設計のため非活性）
+  howtoHudButton.disabled = state.phase !== 'place';
 }
 
-function hideSellButton() {
-  sellButton.classList.add('hidden');
+function hideTowerPanel() {
+  towerPanel.classList.add('hidden');
   sellTarget = null;
 }
+
+// --- あそびかた（教えない導入の補完、CP5） ---
+
+function openHowto() {
+  howtoModal.classList.remove('hidden');
+}
+
+function closeHowto() {
+  howtoModal.classList.add('hidden');
+}
+
+howtoButton.addEventListener('click', openHowto);
+howtoHudButton.addEventListener('click', () => {
+  if (howtoHudButton.disabled) return;
+  openHowto();
+});
+howtoCloseButton.addEventListener('click', closeHowto);
+
+// 敵の見た目の凡例をrenderGenomeIconで実際に描く（速い/硬い/大きい個体＋3属性の色見本）
+function renderHowtoLegend() {
+  const [minSpeed, maxSpeed] = GENOME_RANGES.speed;
+  const [minHp, maxHp] = GENOME_RANGES.hp;
+  const [minSize, maxSize] = GENOME_RANGES.size;
+  const neutralLane = [1 / 3, 1 / 3, 1 / 3];
+  const examples = {
+    fast: { speed: maxSpeed, hp: minHp, resist: 0, lane: neutralLane, size: minSize },
+    tough: { speed: (minSpeed + maxSpeed) / 2, hp: maxHp, resist: 0, lane: neutralLane, size: minSize },
+    big: { speed: minSpeed, hp: (minHp + maxHp) / 2, resist: 0, lane: neutralLane, size: maxSize },
+    heat: { speed: (minSpeed + maxSpeed) / 2, hp: (minHp + maxHp) / 2, resist: 1, lane: neutralLane, size: (minSize + maxSize) / 2 },
+    cold: { speed: (minSpeed + maxSpeed) / 2, hp: (minHp + maxHp) / 2, resist: 2, lane: neutralLane, size: (minSize + maxSize) / 2 },
+    bolt: { speed: (minSpeed + maxSpeed) / 2, hp: (minHp + maxHp) / 2, resist: 3, lane: neutralLane, size: (minSize + maxSize) / 2 },
+  };
+  document.querySelectorAll('.howto-legend-icon').forEach((canvas) => {
+    const genome = examples[canvas.dataset.legend];
+    const c = canvas.getContext('2d');
+    if (c && genome) renderGenomeIcon(c, genome, canvas.width);
+  });
+}
+renderHowtoLegend();
 
 // --- 発熱スキル ---
 
@@ -351,6 +405,15 @@ function renderPreview() {
       canvas.classList.add('hidden');
     }
   });
+
+  // CP5: レーン分布（片寄りに事前に備えられるように「上/中央/下 ▮…▮ NN%」を表示）
+  const laneShare = summarize(state.population).laneShare;
+  previewLaneEls.forEach((el, i) => {
+    const share = laneShare[i] ?? 0;
+    const pct = Math.round(share * 100);
+    const filledBlocks = Math.min(10, Math.max(0, Math.round(share * 10)));
+    el.textContent = `${LANE_LABELS[i]} ${'▮'.repeat(filledBlocks)} ${pct}%`;
+  });
 }
 
 // --- 変異レポートmodal ---
@@ -397,18 +460,28 @@ function cellCenterToClientPx(col, row, above) {
   return { x, y };
 }
 
-function showSellButtonFor(col, row, towerId) {
-  const def = TOWERS[towerId];
-  const refund = Math.floor(def.cost * ECONOMY.sellRatio);
-  sellButton.textContent = `売る (+${refund}G)`;
-  const above = row >= 6; // 下2行はボタンをセルの上側に出す（main.jsの座標計算で分岐）
+// 配置済み塔タップ時のフローティングパネル（「強化」「売る」の2ボタン、CP5）。
+// 強化費用・売却額は塔のlevelに応じて動的に変わるため、開くたび（強化直後の再表示含む）に再計算する。
+function showTowerPanelFor(col, row) {
+  const tower = findTowerAt(col, row);
+  if (!tower) return;
+  const refund = Math.floor(towerInvested(tower) * ECONOMY.sellRatio);
+  sellButton.textContent = `売る ${refund}G`;
+  const atMaxLevel = (tower.level || 1) >= 3;
+  upgradeButton.classList.toggle('hidden', atMaxLevel); // Lv3は強化ボタンを非表示
+  if (!atMaxLevel) {
+    const cost = upgradeCost(tower);
+    upgradeButton.textContent = `強化 ${cost}G`;
+    upgradeButton.disabled = state.gold < cost; // 資金不足はdisabled（UX§3の誤操作防止に準拠）
+  }
+  const above = row >= 6; // 下2行はパネルをセルの上側に出す（main.jsの座標計算で分岐）
   const { x, y } = cellCenterToClientPx(col, row, above);
   const wrapRect = canvas.parentElement.getBoundingClientRect();
   const canvasRect = canvas.getBoundingClientRect();
-  sellButton.classList.toggle('sell-button-above', above);
-  sellButton.style.left = `${canvasRect.left - wrapRect.left + x}px`;
-  sellButton.style.top = `${canvasRect.top - wrapRect.top + y}px`;
-  sellButton.classList.remove('hidden');
+  towerPanel.classList.toggle('tower-panel-above', above);
+  towerPanel.style.left = `${canvasRect.left - wrapRect.left + x}px`;
+  towerPanel.style.top = `${canvasRect.top - wrapRect.top + y}px`;
+  towerPanel.classList.remove('hidden');
   sellTarget = { col, row };
 }
 
@@ -443,19 +516,19 @@ function handleBoardTap(clientX, clientY) {
   const { col, row } = clientToCell(clientX, clientY);
   if (col < 0 || col >= GRID.cols || row < 0 || row >= GRID.rows) {
     selectedTowerId = null;
-    hideSellButton();
+    hideTowerPanel();
     updatePalette();
     return;
   }
 
   const existing = findTowerAt(col, row);
   if (existing) {
-    // 配置済みセルへのタップは常に「売る」パネルを開く（重ね置きはエラー扱いしない）
-    showSellButtonFor(col, row, existing.id);
+    // 配置済みセルへのタップは常に「強化・売る」パネルを開く（重ね置きはエラー扱いしない）
+    showTowerPanelFor(col, row);
     return;
   }
 
-  hideSellButton();
+  hideTowerPanel();
 
   if (selectedTowerId) {
     if (canPlace(state, selectedTowerId, col, row)) {
@@ -476,9 +549,19 @@ function handleBoardTap(clientX, clientY) {
 function handleSell() {
   if (!sellTarget) return;
   state = sellTower(state, sellTarget.col, sellTarget.row);
-  hideSellButton();
+  hideTowerPanel();
   selectedTowerId = null; // 売却後はパレット選択と射程円プレビューを解除する
   playPlace(true); // 配置音を低ピッチ再生（新規SEは追加しない）
+  updatePalette();
+  updateHud();
+}
+
+function handleUpgrade() {
+  if (!sellTarget) return;
+  if (!canUpgrade(state, sellTarget.col, sellTarget.row)) return;
+  state = upgradeTower(state, sellTarget.col, sellTarget.row);
+  playPlace(); // 配置音を通常ピッチで再生（新規SEは追加しない）
+  showTowerPanelFor(sellTarget.col, sellTarget.row); // 新しいlevelの費用・強化可否でパネルを更新
   updatePalette();
   updateHud();
 }
@@ -490,7 +573,7 @@ function selectTower(towerId) {
   if (!state.unlocked.includes(towerId)) return;
   if (state.gold < def.cost) return;
   selectedTowerId = selectedTowerId === towerId ? null : towerId;
-  hideSellButton();
+  hideTowerPanel();
   updatePalette();
 }
 
@@ -503,21 +586,26 @@ sellButton.addEventListener('click', (e) => {
   e.stopPropagation();
   handleSell();
 });
+upgradeButton.addEventListener('click', (e) => {
+  e.stopPropagation();
+  handleUpgrade();
+});
 
 document.addEventListener('click', (e) => {
   if (skillSelectMode && e.target !== canvas && e.target !== skillButton) {
     exitSkillSelect();
   }
   if (!sellTarget) return;
-  if (e.target === sellButton) return;
+  if (e.target === sellButton || e.target === upgradeButton) return;
   if (e.target === canvas) return; // canvasのクリックはhandleBoardTapが処理
-  hideSellButton();
+  hideTowerPanel();
 });
 
 window.addEventListener('keydown', (e) => {
   if (!state) return;
-  // 変異レポートmodal表示中は1-4/Space/Tab/F/Escをすべて無視する
+  // 変異レポートmodal・あそびかたmodal表示中は1-4/Space/Tab/F/U/Escをすべて無視する
   if (!reportModal.classList.contains('hidden')) return;
+  if (!howtoModal.classList.contains('hidden')) return;
   if (e.key >= '1' && e.key <= '4') {
     const index = Number(e.key) - 1;
     const towerId = TOWER_ORDER[index];
@@ -529,7 +617,7 @@ window.addEventListener('keydown', (e) => {
       exitSkillSelect();
     } else {
       selectedTowerId = null;
-      hideSellButton();
+      hideTowerPanel();
       updatePalette();
     }
   } else if (e.key === ' ') {
@@ -546,6 +634,12 @@ window.addEventListener('keydown', (e) => {
     if (state.phase === 'wave' || skillSelectMode) {
       e.preventDefault();
       onSkillButtonPress();
+    }
+  } else if (e.key === 'u' || e.key === 'U') {
+    // 塔を選択中（パネル表示中）にUで強化
+    if (sellTarget) {
+      e.preventDefault();
+      handleUpgrade();
     }
   }
 });
@@ -574,7 +668,7 @@ function onWaveStart() {
   speedMultiplier = 1;
   speedToggleButton.classList.remove('selected');
   selectedTowerId = null;
-  hideSellButton();
+  hideTowerPanel();
   updatePalette();
   updateHud();
   updateSkillButton();
@@ -857,9 +951,10 @@ function startGame(options = {}) {
   laneFlash = null;
   skillSelectBanner.classList.add('hidden');
   reportModal.classList.add('hidden');
+  howtoModal.classList.add('hidden');
   challengeBanner.classList.add('hidden');
   startButton.classList.remove('hidden');
-  hideSellButton();
+  hideTowerPanel();
   updateHud();
   updatePalette();
   updateSkillButton();

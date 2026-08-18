@@ -2,12 +2,24 @@
 // 塔の索敵・攻撃（ヒットスキャン即着弾）。弾は即着弾扱いとし、
 // 描画用に0.1秒の軌跡を shots 配列として返す（実装者裁量の範囲）。
 
-import { TOWERS, RESIST_DAMAGE_MULT } from './config.js';
+import { TOWERS, RESIST_DAMAGE_MULT, UPGRADE } from './config.js';
 import { applySlow } from './enemies.js';
 
 const TRAIL_TTL = 0.1; // 秒
 
 const ATTR_TO_RESIST = { none: 0, heat: 1, cold: 2, bolt: 3 };
+
+// CP5: 塔アップグレード。tower.levelが無い（未設定）場合はLv1として扱う。
+// ダメージはLvごとに複利（dmgMul^(level-1)）、射程はLvごとに加算（rangeAdd*(level-1)）。
+function effectiveRange(tower, def) {
+  const level = tower.level || 1;
+  return def.range + UPGRADE.rangeAdd * (level - 1);
+}
+
+function effectiveDamage(tower, def) {
+  const level = tower.level || 1;
+  return def.damage * Math.pow(UPGRADE.dmgMul, level - 1);
+}
 
 function towerCenter(tower) {
   return { x: tower.col + 0.5, y: tower.row + 0.5 };
@@ -33,12 +45,13 @@ function distance(a, b) {
  */
 function findTarget(tower, enemies, def, laneRows) {
   const center = towerCenter(tower);
+  const range = effectiveRange(tower, def);
   let best = null;
   let bestX = -Infinity;
   for (const enemy of enemies) {
     if (!enemy.alive || enemy.spawnAt > 0) continue;
     const pos = enemyPos(enemy, laneRows);
-    if (distance(center, pos) > def.range) continue;
+    if (distance(center, pos) > range) continue;
     if (enemy.x > bestX) {
       bestX = enemy.x;
       best = enemy;
@@ -82,6 +95,7 @@ export function stepTowers(towerInstances, enemies, dt, laneRows, now = 0) {
     tower.cooldown = def.interval;
     const center = towerCenter(tower);
     const targetPos = enemyPos(target, laneRows);
+    const damage = effectiveDamage(tower, def);
 
     if (def.special === 'splash') {
       const radius = def.splashRadius;
@@ -89,11 +103,11 @@ export function stepTowers(towerInstances, enemies, dt, laneRows, now = 0) {
         if (!enemy.alive || enemy.spawnAt > 0) continue;
         const pos = enemyPos(enemy, laneRows);
         if (distance(targetPos, pos) <= radius) {
-          applyDamage(enemy, def.damage, def.attr);
+          applyDamage(enemy, damage, def.attr);
         }
       }
     } else {
-      applyDamage(target, def.damage, def.attr);
+      applyDamage(target, damage, def.attr);
       if (def.special === 'slow' && target.alive) {
         applySlow(target, def.slowFactor, def.slowDuration, now);
       }

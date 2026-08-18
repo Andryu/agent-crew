@@ -148,8 +148,8 @@ console.log('--- enemies.js ---');
   check('collectResults: progressがx/laneLength', Math.abs(results[2].progress - 3 / laneLength) < 1e-9);
 
   // livesLostFor境界値
-  check('livesLostFor: size=1.19は1', Enemies.livesLostFor({ size: 1.19 }) === 1);
-  check('livesLostFor: size=1.2は2', Enemies.livesLostFor({ size: 1.2 }) === 2);
+  check('livesLostFor: size=1.34は1（閾値1.35未満）', Enemies.livesLostFor({ size: 1.34 }) === 1);
+  check('livesLostFor: size=1.35は2（閾値ちょうど）', Enemies.livesLostFor({ size: 1.35 }) === 2);
 
   // applySlowの強弱規則
   const e1 = { slowUntil: 0, slowFactor: 1 };
@@ -687,6 +687,121 @@ console.log('--- enemies.js (CP2: applyHeatToLane) ---');
     'applyHeatToLane: 同ケースでslowUntilがnow+3.0に延長される',
     Math.abs(coldThenHeat[0].slowUntil - (90 + Config.SKILL.duration)) < 1e-9
   );
+}
+
+// --- config.js（CP5: 難易度調整） ---
+console.log('--- config.js (CP5: 難易度) ---');
+{
+  check('HP_CURVE.slopeは5', Config.HP_CURVE.slope === 5);
+  check('ECONOMY.killBaseは5', Config.ECONOMY.killBase === 5);
+  check('ECONOMY.killPerWaveは0.8', Config.ECONOMY.killPerWave === 0.8);
+  check('ECONOMY.waveClearBonusは60', Config.ECONOMY.waveClearBonus === 60);
+}
+
+// --- game-state.js（CP5: 塔アップグレード） ---
+console.log('--- game-state.js (CP5: 塔アップグレード) ---');
+{
+  const base = GameState.startNewGame({ seed: 1, gold: 1000 });
+  const placed = GameState.placeTower(base, 'basic', 0, 0);
+  const tower0 = placed.towers[0];
+  check('placeTowerで配置した塔はlevel=1を持つ', tower0.level === 1);
+
+  const basicDef = Config.TOWERS.basic;
+  const expectedLv1to2 = Math.round(basicDef.cost * Config.UPGRADE.costMul[0]);
+  const expectedLv2to3 = Math.round(basicDef.cost * Config.UPGRADE.costMul[1]);
+  check('upgradeCost: Lv1→2はcost×costMul[0]', GameState.upgradeCost(tower0) === expectedLv1to2);
+
+  const afterUpgrade1 = GameState.upgradeTower(placed, 0, 0);
+  const towerLv2 = afterUpgrade1.towers[0];
+  check('upgradeTowerでlevelが+1される', towerLv2.level === 2);
+  check('upgradeTowerで資金がupgradeCost分減る', afterUpgrade1.gold === placed.gold - expectedLv1to2);
+  check('upgradeCost: Lv2→3はcost×costMul[1]', GameState.upgradeCost(towerLv2) === expectedLv2to3);
+
+  const afterUpgrade2 = GameState.upgradeTower(afterUpgrade1, 0, 0);
+  const towerLv3 = afterUpgrade2.towers[0];
+  check('2回強化でlevel=3になる', towerLv3.level === 3);
+  check('canUpgrade: Lv3では強化できない', GameState.canUpgrade(afterUpgrade2, 0, 0) === false);
+  const noopUpgradeAtMax = GameState.upgradeTower(afterUpgrade2, 0, 0);
+  check('Lv3でのupgradeTowerは状態を変えない', noopUpgradeAtMax === afterUpgrade2);
+
+  const poor = { ...placed, gold: 1 };
+  check('canUpgrade: 資金不足では強化できない', GameState.canUpgrade(poor, 0, 0) === false);
+  const noopUpgradeByGold = GameState.upgradeTower(poor, 0, 0);
+  check('資金不足時のupgradeTowerは状態を変えない', noopUpgradeByGold === poor);
+
+  check('towerInvested: Lv1は初期費用のみ', GameState.towerInvested(tower0) === basicDef.cost);
+  check(
+    'towerInvested: Lv2は初期費用+Lv1→2の強化費用',
+    GameState.towerInvested(towerLv2) === basicDef.cost + expectedLv1to2
+  );
+  check(
+    'towerInvested: Lv3は初期費用+両段の強化費用',
+    GameState.towerInvested(towerLv3) === basicDef.cost + expectedLv1to2 + expectedLv2to3
+  );
+
+  const soldLv1 = GameState.sellTower(placed, 0, 0);
+  check(
+    'sellTower: Lv1の売却額は初期費用の70%切り捨て',
+    soldLv1.gold === placed.gold + Math.floor(basicDef.cost * Config.ECONOMY.sellRatio)
+  );
+  const expectedInvestedLv3 = basicDef.cost + expectedLv1to2 + expectedLv2to3;
+  const soldLv3 = GameState.sellTower(afterUpgrade2, 0, 0);
+  check(
+    'sellTower: Lv3の売却額はtowerInvestedの70%切り捨て',
+    soldLv3.gold === afterUpgrade2.gold + Math.floor(expectedInvestedLv3 * Config.ECONOMY.sellRatio)
+  );
+}
+
+// --- towers.js（CP5: 塔アップグレードのダメージ・射程反映） ---
+console.log('--- towers.js (CP5: 塔アップグレード) ---');
+{
+  const basicDef = Config.TOWERS.basic;
+
+  const targetLv1 = { alive: true, spawnAt: 0, x: 0.5, lane: 0, hp: 1000, genome: { resist: 0 } };
+  Towers.stepTowers([{ id: 'basic', col: 0, row: 0, level: 1 }], [targetLv1], 0.016, [0], 0);
+  check('Lv1のダメージはdef.damageそのまま', Math.abs(targetLv1.hp - (1000 - basicDef.damage)) < 1e-9);
+
+  const targetLv2 = { alive: true, spawnAt: 0, x: 0.5, lane: 0, hp: 1000, genome: { resist: 0 } };
+  Towers.stepTowers([{ id: 'basic', col: 0, row: 0, level: 2 }], [targetLv2], 0.016, [0], 0);
+  check(
+    'Lv2のダメージはdef.damage×dmgMul',
+    Math.abs(targetLv2.hp - (1000 - basicDef.damage * Config.UPGRADE.dmgMul)) < 1e-9
+  );
+
+  const targetLv3 = { alive: true, spawnAt: 0, x: 0.5, lane: 0, hp: 1000, genome: { resist: 0 } };
+  Towers.stepTowers([{ id: 'basic', col: 0, row: 0, level: 3 }], [targetLv3], 0.016, [0], 0);
+  check(
+    'Lv3のダメージはdef.damage×dmgMul^2',
+    Math.abs(targetLv3.hp - (1000 - basicDef.damage * Config.UPGRADE.dmgMul ** 2)) < 1e-9
+  );
+
+  // def.range=2.0、rangeAdd=0.3。tower中心(0.5,0.5)からx=2.6(距離2.1)はLv1射程外・Lv2射程内
+  const farEnemyLv1 = { alive: true, spawnAt: 0, x: 2.6, lane: 0, hp: 1000, genome: { resist: 0 } };
+  Towers.stepTowers([{ id: 'basic', col: 0, row: 0, level: 1 }], [farEnemyLv1], 0.016, [0], 0);
+  check('Lv1は射程外(距離2.1>2.0)の個体を攻撃しない', farEnemyLv1.hp === 1000);
+
+  const farEnemyLv2 = { alive: true, spawnAt: 0, x: 2.6, lane: 0, hp: 1000, genome: { resist: 0 } };
+  Towers.stepTowers([{ id: 'basic', col: 0, row: 0, level: 2 }], [farEnemyLv2], 0.016, [0], 0);
+  check('Lv2は射程+0.3(2.3)で距離2.1に届く', farEnemyLv2.hp < 1000);
+
+  // levelフィールドが無い塔インスタンス（CP1〜3互換）はLv1として扱われる
+  const legacyTarget = { alive: true, spawnAt: 0, x: 0.5, lane: 0, hp: 1000, genome: { resist: 0 } };
+  Towers.stepTowers([{ id: 'basic', col: 0, row: 0 }], [legacyTarget], 0.016, [0], 0);
+  check(
+    'levelフィールドが無い塔インスタンスはLv1として扱われる',
+    Math.abs(legacyTarget.hp - (1000 - basicDef.damage)) < 1e-9
+  );
+}
+
+// --- evolution.js（CP5: プレビューのレーン分布） ---
+console.log('--- evolution.js (CP5: レーン分布) ---');
+{
+  const rng = makeRng(3);
+  const pop = Evolution.initialPopulation(40, rng);
+  const { laneShare } = Evolution.summarize(pop);
+  const sum = laneShare.reduce((a, b) => a + b, 0);
+  check('CP5: レーン分布(laneShare)は上/中央/下の3要素', laneShare.length === 3);
+  check('CP5: レーン分布(laneShare)の合計は1', Math.abs(sum - 1) < 1e-9);
 }
 
 // --- share.js（CP3） ---
