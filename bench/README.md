@@ -136,3 +136,24 @@ laiso の実測（2026-07-18, https://blog.lai.so/kimi-k3/）で、Kimi K3 は R
 
 配点は holdout 本体とは分け、`quality` は減点方式（満点から引く）にする。
 振る舞いが正しいものだけが品質評価に進むため、regression ゲートの後段に置く。
+
+## 引き継ぎ（handoff）モード
+
+使用量上限・障害・コスト最適化でハーネスを交代するとき、**会話履歴を渡さずに作業を継続**
+できるかを測る。仕様は `bench/handoff/PACKET.md`、実行は `bench/run_handoff.sh`。
+
+```bash
+bench/run_handoff.sh bench/tasks/05-lessons-set-status \
+  --first codex:gpt-5.6-sol --second claude:sonnet --budget-min 6
+```
+
+- 前半は「半分で止めて `docs/handoff/handoff.md` を書け」と指示され、中間スコアを記録
+- 後半は**会話履歴なし**でパケットとリポジトリの現状だけを受け取り、続きを解く
+- 単独実行時のスコア（レーン0/C は 54/54）との差が「引き継ぎで失った点」
+
+ハーネスは `bench/harness/<name>.sh <workdir> <prompt-file> <model>` の統一インターフェース。
+新しいハーネスは1ファイル足すだけで追加できる（claude / codex / hermes を実装済み）。
+
+**なぜ会話を渡さないか**: 実測で入力トークンの約96%が cache_read。会話を引き継ごうとすると
+その瞬間に全再送となり最も高くつく。モデルを替えればキャッシュは必ず失効する
+（Anthropic は `/model` 切替でリセットと明記、Hermes の fallback も同様）。
