@@ -157,3 +157,27 @@ bench/run_handoff.sh bench/tasks/05-lessons-set-status \
 **なぜ会話を渡さないか**: 実測で入力トークンの約96%が cache_read。会話を引き継ごうとすると
 その瞬間に全再送となり最も高くつく。モデルを替えればキャッシュは必ず失効する
 （Anthropic は `/model` 切替でリセットと明記、Hermes の fallback も同様）。
+
+### Hermes（ローカル）を使う準備
+
+```bash
+# 1) 64k コンテキスト版を作る（Hermes は 64k 未満を起動時に拒否。レイヤ共有で容量増は僅少）
+printf 'FROM gemma4:12b\nPARAMETER num_ctx 65536\nPARAMETER temperature 0.3\n' > Modelfile.gemma4-64k
+ollama create gemma4-64k -f Modelfile.gemma4-64k
+
+# 2) ~/.hermes/config.yaml に named provider を足す（既存の model: は変えない）
+#    providers:
+#      local:
+#        api: "http://localhost:11434/v1"
+#        key_env: "OLLAMA_API_KEY"
+#        transport: chat_completions
+#        context_length: 65536
+#    → ~/.hermes/.env に OLLAMA_API_KEY=ollama
+
+# 3) 疎通（非対話は chat -q。--yolo で承認を出さない、--in で作業ディレクトリ指定）
+hermes chat -q "..." --provider custom:local --model gemma4-64k --in "$PWD" --yolo --cli --max-turns 8
+```
+
+注意: 12B を 64k で回すと初回ロードに数分かかる。`OLLAMA_KEEP_ALIVE=30m` を推奨。
+`export` はシェルからの起動時のみ有効で、Ollama.app（launchd 起動）には効かないため、
+常用するなら LaunchAgent で `launchctl setenv` する。
