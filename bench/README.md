@@ -119,23 +119,28 @@ holdout_test / rubric.yaml）に合わせ、**holdout を正解実装（マー�
 該当ファイル）に対して実行し全チェックが通ることを確認**してから追加すること。
 グリーンでない holdout は採点器として無効。
 
-## 今後の課題: 「テストは通るが品質が悪い」の検出（2026-08-18 追記）
+## 品質チェック（減点方式・2026-08-19 実装）
 
 laiso の実測（2026-07-18, https://blog.lai.so/kimi-k3/）で、Kimi K3 は ReactBench の
 全課題でテスト合格したが**静的解析（React Doctor）では全て不合格**。Opus 4.8 は両方合格。
 「テストが通る」と「コード品質が保たれる」は乖離し、**安いモデルほど乖離が大きい**。
 
-現在の holdout は振る舞い（exit code・生成物・戻り値）のみを見るため、この乖離を検出できない。
-安いレーン（ローカル gemma4 / OpenCode Go / GLM）を測るときは、以下を rubric に
-`quality:` カテゴリとして追加することを検討する:
+holdout は振る舞い（exit code・生成物・戻り値）のみを見るため、この乖離を検出できない。
+そこで `bench/quality/check.sh <workdir> [task-dir]` を用意した（減点方式）:
 
-- Python: `ruff check` / `mypy`（既存設定に従う）で新規エラーが増えていないか
-- Bash: `shellcheck` の新規警告が増えていないか
-- 共通: 差分行数が正解実装の3倍を超えていないか（過剰実装の検出）
-- 共通: 既存関数を複製していないか（重複コードの検出）
+- **Bash**: 変更した `.sh` に `shellcheck -S warning` が出たら -1/ファイル
+- **Python**: 構文エラー -2、同名関数の重複定義 -1
+- **過剰実装**: 追加行が `meta.yaml` の `ref_lines` の3倍超なら -1
 
-配点は holdout 本体とは分け、`quality` は減点方式（満点から引く）にする。
-振る舞いが正しいものだけが品質評価に進むため、regression ゲートの後段に置く。
+```bash
+bench/quality/check.sh /path/to/workdir bench/tasks/05-lessons-set-status
+# → PENALTY 1 shellcheck: ... / QUALITY_PENALTY_TOTAL 2
+```
+
+検証済み: Opus・Codex の満点解答6件すべてで減点0（偽陽性なし）、意図的に壊したコードで
+shellcheck 警告と重複定義を検出（偽陰性なし）。
+
+注意: macOS の bash 3.2 には `mapfile` が無い。この環境で動く形に書いてある。
 
 ## 引き継ぎ（handoff）モード
 
