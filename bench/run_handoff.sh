@@ -45,12 +45,16 @@ cat > "$PDIR/first.md" <<EOF
 docs/handoff/handoff.md に作成して終了してください。書式は $BENCH/handoff/PACKET.md の
 6節（目的／現在地／次の一手／未決事項／検証方法／落とし穴）に厳密に従うこと。
 引き継ぎ書は2000トークン以内。会話の要約ではなく「作業状態」を書くこと。
+**7節「Evidence」は書かなくてよい**（git status / diff / テスト結果はスクリプトが自動で
+追記する）。あなたが書くのは「なぜ・次に何を・どこに罠があるか」であって、現在地の証拠ではない。
 EOF
 
 echo "== 前半: $FIRST =="
 "$BENCH/harness/$(h_of "$FIRST").sh" "$WORK" "$PDIR/first.md" "$(m_of "$FIRST")" > "$WORK/../${NAME}.first.log" 2>&1 || echo "(前半 exit=$?)"
 if [[ -f "$WORK/docs/handoff/handoff.md" ]]; then
-  echo "  パケット生成: $(wc -l < "$WORK/docs/handoff/handoff.md") 行 / $(wc -c < "$WORK/docs/handoff/handoff.md") bytes"
+  # 7節 Evidence はスクリプトが追記する（LLM には書かせない）
+  "$BENCH/handoff/evidence.sh" "$WORK" >> "$WORK/docs/handoff/handoff.md" 2>/dev/null || true
+  echo "  パケット生成: $(wc -l < "$WORK/docs/handoff/handoff.md") 行 / $(wc -c < "$WORK/docs/handoff/handoff.md") bytes（Evidence 付き）"
 else
   echo "  !! パケットが作られなかった（引き継ぎ失敗の主要因として記録）"
 fi
