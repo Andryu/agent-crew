@@ -1,0 +1,27 @@
+# 07-lessons-to-vault 採点表
+checks:
+  - id: regression_lessons_readonly
+    type: bash
+    file: holdout_test/test_00_regression.sh
+    points: 1
+    regression: true
+  - id: priority_threshold_boundary
+    type: bash
+    file: holdout_test/test_01_priority_boundary.sh
+    points: 2
+  - id: sprint_filter_default
+    type: bash
+    file: holdout_test/test_02_sprint_filter.sh
+    points: 2
+  - id: idempotent_second_run
+    type: bash
+    file: holdout_test/test_03_idempotent.sh
+    points: 2
+  - id: missing_prereqs_exit0
+    type: bash
+    file: holdout_test/test_04_missing_prereqs.sh
+    points: 2
+  - id: vault_dir_override
+    type: bash
+    file: holdout_test/test_05_vault_override.sh
+    points: 1
