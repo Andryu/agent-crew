@@ -234,3 +234,43 @@ bench_tasks split=hidden --unseal  # 最終評価のときだけ
    机上で難問を設計するより、実際に破れた場所から採る方が確実
 
 目安は3ヶ月で 15〜20問。
+
+## 指標（v4.1）
+
+`metrics/record.sh` が1実行を1行 JSON で `results/metrics.jsonl` に追記し、
+`metrics/summarize.py` が主要指標3つに集計する。
+
+```bash
+metrics/record.sh --lane codex --model gpt-5.6-sol --task 05-lessons-set-status \
+  --score 9 --max 9 --penalty 0 --seconds 412 --log <harness-log> [--interventions 1]
+python3 metrics/summarize.py
+```
+
+| 指標 | 取り方 |
+|---|---|
+| **$ / solved task** | ハーネスのログからトークンを抽出（Codex の `tokens used`、Claude Code の `usage` JSON）×単価 ÷ 満点タスク数 |
+| **wall-clock / task** | ランナーが記録 |
+| **人間の介入回数** | **手で記録する**（`--interventions N`）。自動計測しない |
+
+`token/request` は記録するが**指標にはしない**（「同じ枠で何回回せるか」に翻訳して初めて意味を持つ）。
+人間の介入「時間」を測らないのは、計測の仕組み自体が運用の重荷になるため。
+介入回数が2以上のレーンは、時間を測るまでもなく「安くない」と判断できる。
+
+## 変更の採否（accept_change.sh）
+
+ハーネスが自分の skill / memory / prompt を書き換えたとき、その変更を採用してよいかを判定する。
+
+```bash
+accept_change.sh --harness hermes --before baseline.jsonl --after candidate.jsonl
+# exit 0 = ACCEPT / exit 1 = REJECT
+```
+
+すべて満たしたら accept、1つでも欠けたら reject:
+
+1. **dev のスコアが下がっていない**（同点は可）
+2. **regression チェックがゼロ**
+3. **コスト増が +20% 以内**（`--cost-tolerance` で変更可）
+4. **品質減点が増えていない**
+
+**hidden は参照しない**（`split: hidden` のレコードは自動で除外する）。
+hidden を採否に使うと、その判断を通じて hidden にも overfit するため。
