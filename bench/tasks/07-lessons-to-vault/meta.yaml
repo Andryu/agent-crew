@@ -6,3 +6,9 @@ source_pr: 123
 merge_commit: 945bd46cacd1341a8be0cd1f24fc39fb3f08e6f4
 parent_commit: c97fcf1b61019be080493bb1ac65e35419bb3524
 requires: "bash, jq"
+
+# --- v4.1: トラックと分割 ---
+# track: historical(過去PR由来) | fresh(実務の新規issue由来) | adversarial(弁別用の難問)
+# split: train(自己改善の入力) | dev(accept/rejectの判定) | hidden(実験終了後の最終評価のみ・開封しない)
+track: historical
+split: dev

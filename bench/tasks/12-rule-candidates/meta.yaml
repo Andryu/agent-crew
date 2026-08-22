@@ -7,3 +7,9 @@ merge_commit: a41711b4c1545803e286033190edcecab38d31fe
 parent_commit: 86a481146d85c382fc1c4ffe72a856f1eda9997b
 requires: "bash, jq, git"
 difficulty: hard
+
+# --- v4.1: トラックと分割 ---
+# track: historical(過去PR由来) | fresh(実務の新規issue由来) | adversarial(弁別用の難問)
+# split: train(自己改善の入力) | dev(accept/rejectの判定) | hidden(実験終了後の最終評価のみ・開封しない)
+track: historical
+split: dev

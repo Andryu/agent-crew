@@ -26,6 +26,13 @@ shift
 TASK_DIR=$(cd "$TASK_DIR" && pwd)
 TASK_NAME=$(basename "$TASK_DIR")
 
+# v4.1: split: hidden のタスクは実験終了後の最終評価でのみ実行する（事故防止）
+if [[ -f "$BENCH_ROOT/lib/select.sh" ]]; then
+  # shellcheck source=lib/select.sh
+  BENCH_ROOT="$BENCH_ROOT" source "$BENCH_ROOT/lib/select.sh"
+  bench_assert_not_hidden "$TASK_DIR" || exit 3
+fi
+
 MODE=setup
 WORK_DIR="/tmp/bench-work/$TASK_NAME"
 SEED=""

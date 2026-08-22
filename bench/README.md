@@ -186,3 +186,51 @@ hermes chat -q "..." --provider custom:local --model gemma4-64k --in "$PWD" --yo
 注意: 12B を 64k で回すと初回ロードに数分かかる。`OLLAMA_KEEP_ALIVE=30m` を推奨。
 `export` はシェルからの起動時のみ有効で、Ollama.app（launchd 起動）には効かないため、
 常用するなら LaunchAgent で `launchctl setenv` する。
+
+## トラックと分割（v4.1・2026-08-22）
+
+各タスクの `meta.yaml` に2つのフィールドを持たせる。
+
+```yaml
+track: historical   # historical(過去PR由来) | fresh(実務の新規issue由来) | adversarial(弁別用の難問)
+split: dev          # train(自己改善の入力) | dev(accept/rejectの判定) | hidden(最終評価のみ)
+```
+
+| split | いつ実行するか | 用途 | ログを渡すか |
+|---|---|---|---|
+| `train` | ラウンドごと | 自己改善の入力（失敗分析） | 渡す |
+| `dev` | ラウンドごと | **accept / reject の判定** | 渡す |
+| **`hidden`** | **実験終了後に1回だけ** | **最終評価のみ** | **一切渡さない** |
+
+### hidden は accept/reject に使わない（重要）
+
+hidden のスコアを採否判断に使うと、**その判断を通じて hidden にも overfit する**
+（採用される変更は hidden で良かった変更だけになり、hidden が第2の dev に化ける）。
+したがって hidden は実験期間中は開封しない。
+
+**事故防止の実装**:
+- `lib/select.sh` の `bench_tasks split=hidden` は `--unseal` なしでは拒否する
+- `run_task.sh` は `split: hidden` のタスクを `BENCH_UNSEAL_HIDDEN=1` なしでは実行しない
+- `accept_change.sh`（後述）は hidden を参照しない
+
+### タスクの選び方
+
+```bash
+export BENCH_ROOT=/path/to/bench
+source "$BENCH_ROOT/lib/select.sh"
+bench_tasks split=dev            # dev のタスクディレクトリ一覧
+bench_tasks track=adversarial    # 弁別用の難問だけ
+bench_tasks split=hidden --unseal  # 最終評価のときだけ
+```
+
+### 問題の増やし方
+
+新規に大量作成はしない（作成コストが高く、問題は repo の変化で腐るため）。次の2経路のみ:
+
+1. **fresh**: 実務で「30分〜2時間かかった」作業を月2問だけ切り出す。
+   **配分は3問に1問を dev、残りを train**（現在の dev 7問は ceiling しているため dev も育てる）。
+   **hidden は固定**（追加も差し替えもしない）
+2. **adversarial**: **ベンチで満点なのに実務で失敗した事例**を問題化する。
+   机上で難問を設計するより、実際に破れた場所から採る方が確実
+
+目安は3ヶ月で 15〜20問。
