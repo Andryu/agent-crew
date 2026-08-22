@@ -274,3 +274,44 @@ accept_change.sh --harness hermes --before baseline.jsonl --after candidate.json
 
 **hidden は参照しない**（`split: hidden` のレコードは自動で除外する）。
 hidden を採否に使うと、その判断を通じて hidden にも overfit するため。
+
+## ハーネスの自己変更を Git で追跡（adaptation/snapshot.sh）
+
+Hermes / Prime / pi は skill・memory・prompt を自分で書き換える。その差分を Git に残し、
+**failure → proposed change → benchmark → accept/reject** を追跡できるようにする。
+
+```bash
+adaptation/snapshot.sh hermes "round-3 proposed"
+# → ~/Workspace/harness-state/ に許可リストのパスだけをコピーしてコミット
+adaptation/snapshot.sh agent-crew "round-3 proposed"   # 既に Git 管理下なので SHA を記録
+```
+
+保存先は `$HARNESS_STATE_REPO`（既定 `~/Workspace/harness-state`）。
+
+### 安全設計（重要）
+
+`~/.hermes` を丸ごと `git init` すると **`auth.json` や `.env` まで追跡してしまう**。
+そのため許可リスト方式にしてある。
+
+| ハーネス | 追跡するパス |
+|---|---|
+| hermes | `skills/` `memories/` `SOUL.md` `config.yaml` |
+| pi | `agent/skills/` `agent/extensions/` `agent/models.json` |
+| prime | `agent/skills/` `agent/memory/` `agent/models.json` |
+| agent-crew | （Git 管理下なので HEAD の SHA・ブランチ・dirty 状態だけ記録） |
+
+さらにコミット前に秘密情報を走査し、見つかったら**コピーごと削除して中断**する。
+検出はプレースホルダを除外する（`ghp_xxxxxxxx` や `YOUR_TOKEN` は誤検知しない）。
+実在しうる形のトークンのみ検出することを、偽陽性・偽陰性の両方で確認済み。
+
+### ラウンドの型
+
+```
+failure（train/dev の失敗ログ）
+  → proposed change（ハーネスが自分の state を書き換える）
+  → snapshot.sh <harness> "round-N proposed"
+  → accept_change.sh（dev のみで判定。hidden は見ない）
+  → accept: そのまま / reject: git revert して「何を試して何がダメだったか」を残す
+```
+
+reject した変更も履歴に残すのは、それ自体が③（将来の LoRA）の教材になるため。
