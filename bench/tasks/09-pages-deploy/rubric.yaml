@@ -1,0 +1,36 @@
+# 09-pages-deploy 採点表
+# Actions は実行しない。YAML の構造と、ビルド手順を実際に走らせた結果だけで採点する。
+checks:
+  - id: regression_existing_workflows_intact
+    type: bash
+    file: holdout_test/test_00_regression.sh
+    points: 1
+    regression: true
+  - id: push_triggers_both_branches
+    type: bash
+    file: holdout_test/test_01_triggers.sh
+    points: 1
+  - id: two_sources_checked_out_separately
+    type: bash
+    file: holdout_test/test_02_dual_checkout.sh
+    points: 2
+  - id: pages_permissions
+    type: bash
+    file: holdout_test/test_03_permissions.sh
+    points: 1
+  - id: concurrency_group
+    type: bash
+    file: holdout_test/test_04_concurrency.sh
+    points: 1
+  - id: artifact_path_is_site
+    type: bash
+    file: holdout_test/test_05_artifact_path.sh
+    points: 1
+  - id: build_produces_expected_layout
+    type: bash
+    file: holdout_test/test_06_build_layout.sh
+    points: 3
+  - id: dashboard_links_to_demo
+    type: bash
+    file: holdout_test/test_07_demo_link.sh
+    points: 1
