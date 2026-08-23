@@ -1,0 +1,16 @@
+# タスクメタ情報（採点には使わない。出典の記録用）
+id: "02"
+slug: viral-video-researcher
+title: "バイラル動画リサーチャーのエージェント定義追加"
+source_pr: 125
+merge_commit: 2f6b04d18d3a42aeebd105dfc88bbda4ff68c575
+parent_commit: 5c971e716bc8ac65ff5b93a183adcfe41b20cd23
+requires: "bash, git, python3"
+difficulty: easy
+ref_lines: 59
+
+# --- v4.1: トラックと分割 ---
+# track: historical(過去PR由来) | fresh(実務の新規issue由来) | adversarial(弁別用の難問)
+# split: train(自己改善の入力) | dev(accept/rejectの判定) | hidden(実験終了後の最終評価のみ・開封しない)
+track: historical
+split: hidden

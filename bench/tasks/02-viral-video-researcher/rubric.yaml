@@ -1,0 +1,31 @@
+# 02-viral-video-researcher 採点表
+checks:
+  - id: regression_existing_agents_untouched
+    type: bash
+    file: holdout_test/test_00_regression.sh
+    points: 1
+    regression: true
+  - id: frontmatter_schema_matches_existing
+    type: bash
+    file: holdout_test/test_01_schema.sh
+    points: 2
+  - id: name_matches_filename_and_location
+    type: bash
+    file: holdout_test/test_02_name.sh
+    points: 1
+  - id: tools_research_only
+    type: bash
+    file: holdout_test/test_03_tools.sh
+    points: 2
+  - id: model_is_known_value
+    type: bash
+    file: holdout_test/test_04_model.sh
+    points: 1
+  - id: description_trigger_and_domain
+    type: bash
+    file: holdout_test/test_05_description.sh
+    points: 2
+  - id: body_has_sections
+    type: bash
+    file: holdout_test/test_06_body.sh
+    points: 1

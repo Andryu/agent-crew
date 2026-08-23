@@ -1,0 +1,31 @@
+# 08-queue-done-git-guard 採点表
+checks:
+  - id: regression_existing_queue_tests
+    type: bash
+    file: holdout_test/test_00_regression.sh
+    points: 2
+    regression: true
+  - id: dirty_tree_warns_with_count
+    type: bash
+    file: holdout_test/test_01_dirty_warns.sh
+    points: 1
+  - id: clean_tree_no_warning
+    type: bash
+    file: holdout_test/test_02_clean_no_warn.sh
+    points: 1
+  - id: judgement_independent_of_cwd
+    type: bash
+    file: holdout_test/test_03_cwd_independent.sh
+    points: 3
+  - id: queue_outside_git_still_ok
+    type: bash
+    file: holdout_test/test_04_non_git_queue.sh
+    points: 1
+  - id: done_succeeds_without_git
+    type: bash
+    file: holdout_test/test_05_no_git_binary.sh
+    points: 1
+  - id: new_tests_added_and_green
+    type: bash
+    file: holdout_test/test_06_new_tests.sh
+    points: 1

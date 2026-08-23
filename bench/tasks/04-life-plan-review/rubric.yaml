@@ -1,0 +1,31 @@
+# 04-life-plan-review 採点表
+checks:
+  - id: regression_existing_skill_untouched
+    type: bash
+    file: holdout_test/test_00_regression.sh
+    points: 1
+    regression: true
+  - id: skill_name_matches_directory
+    type: bash
+    file: holdout_test/test_01_name.sh
+    points: 1
+  - id: description_positive_triggers
+    type: bash
+    file: holdout_test/test_02_description_positive.sh
+    points: 2
+  - id: description_scope_boundary
+    type: bash
+    file: holdout_test/test_03_description_boundary.sh
+    points: 2
+  - id: references_relative_and_resolvable
+    type: bash
+    file: holdout_test/test_04_references.sh
+    points: 2
+  - id: no_personal_information
+    type: bash
+    file: holdout_test/test_05_no_pii.sh
+    points: 1
+  - id: skill_body_is_a_procedure
+    type: bash
+    file: holdout_test/test_06_body.sh
+    points: 1

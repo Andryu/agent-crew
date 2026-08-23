@@ -1,0 +1,16 @@
+# タスクメタ情報（採点には使わない。出典の記録用）
+id: "04"
+slug: life-plan-review
+title: "ライフプラン定期レビュー用スキルの新規作成"
+source_pr: 104
+merge_commit: 9954b6d778b3ae400bcc8c01e4447bdc9c458c74
+parent_commit: 5463bd38116fd1550567313610ff3b49e5f802d9
+requires: "bash, git, python3"
+difficulty: easy
+ref_lines: 179
+
+# --- v4.1: トラックと分割 ---
+# track: historical(過去PR由来) | fresh(実務の新規issue由来) | adversarial(弁別用の難問)
+# split: train(自己改善の入力) | dev(accept/rejectの判定) | hidden(実験終了後の最終評価のみ・開封しない)
+track: historical
+split: hidden

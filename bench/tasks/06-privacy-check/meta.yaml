@@ -1,0 +1,20 @@
+# タスクメタ情報（採点には使わない。出典の記録用）
+id: "06"
+slug: privacy-check
+title: "変更ファイルの個人情報スキャナ"
+source_pr: 113
+merge_commit: fa704ba755a278fe81c55c94388de9902e291ab6
+parent_commit: 736b325821395ad5a63a1720b36b2c45e28bb562
+requires: "bash, git, file"
+difficulty: medium
+ref_lines: 75
+# 採点対象は scripts/privacy-check.sh のみ（同 PR の他ファイルは範囲外）。
+# 注: 正解 commit の実装は連想配列を使っており macOS の bash 3.2 では起動しない。
+# holdout は同じ振る舞いの bash 3.2 移植版で緑を確認してある（振る舞いのみを採点するため
+# 実装手段は問わない）。prompt でも「この環境の bash で動くこと」を条件に含めている。
+
+# --- v4.1: トラックと分割 ---
+# track: historical(過去PR由来) | fresh(実務の新規issue由来) | adversarial(弁別用の難問)
+# split: train(自己改善の入力) | dev(accept/rejectの判定) | hidden(実験終了後の最終評価のみ・開封しない)
+track: historical
+split: hidden

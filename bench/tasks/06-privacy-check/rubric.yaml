@@ -1,0 +1,31 @@
+# 06-privacy-check 採点表
+checks:
+  - id: regression_scan_is_readonly
+    type: bash
+    file: holdout_test/test_00_regression.sh
+    points: 1
+    regression: true
+  - id: detect_all_categories
+    type: bash
+    file: holdout_test/test_01_detect_patterns.sh
+    points: 3
+  - id: excluded_paths_not_reported
+    type: bash
+    file: holdout_test/test_02_excluded_paths.sh
+    points: 2
+  - id: binary_file_safe
+    type: bash
+    file: holdout_test/test_03_binary.sh
+    points: 1
+  - id: clean_tree_silent
+    type: bash
+    file: holdout_test/test_04_clean_silent.sh
+    points: 1
+  - id: always_exit_zero
+    type: bash
+    file: holdout_test/test_05_always_exit0.sh
+    points: 1
+  - id: dates_not_detected_as_phone
+    type: bash
+    file: holdout_test/test_06_dates_not_phone.sh
+    points: 2
