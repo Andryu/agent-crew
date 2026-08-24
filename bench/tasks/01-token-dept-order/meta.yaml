@@ -1,0 +1,14 @@
+# タスクメタ情報（採点には使わない。出典の記録用）
+id: "01"
+slug: token-dept-order
+title: "部門トークン会計: ゲーム/ビデオ部門追加と分類順序バグ"
+source_pr: 170
+merge_commit: dad13b93373804513e935fde5f933b0e741580e1
+parent_commit: 2564a1d4010dda3a1539d7d08a1430814e1235c1
+requires: "python3, pytest"
+
+# --- v4.1: トラックと分割 ---
+# track: historical(過去PR由来) | fresh(実務の新規issue由来) | adversarial(弁別用の難問)
+# split: train(自己改善の入力) | dev(accept/rejectの判定) | hidden(実験終了後の最終評価のみ・開封しない)
+track: historical
+split: dev

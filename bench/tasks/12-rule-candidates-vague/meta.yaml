@@ -1,0 +1,18 @@
+# タスクメタ情報（採点には使わない。出典の記録用）
+id: "12"
+derived_from: "12-rule-candidates"   # 受け入れ基準を削った vague 版
+slug: rule-candidates
+title: "ルール書き出し対象の抽出条件一元化と信頼境界"
+source_pr: 182
+merge_commit: a41711b4c1545803e286033190edcecab38d31fe
+parent_commit: 86a481146d85c382fc1c4ffe72a856f1eda9997b
+requires: "bash, jq, git"
+difficulty: hard
+
+# --- v4.1: トラックと分割 ---
+# track: adversarial(過去PR由来) | fresh(実務の新規issue由来) | adversarial(弁別用の難問)
+# split: train(自己改善の入力) | dev(accept/rejectの判定) | hidden(実験終了後の最終評価のみ・開封しない)
+track: adversarial
+split: dev
+
+vague_of: "12-rule-candidates"

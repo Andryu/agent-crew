@@ -1,0 +1,31 @@
+# 12-rule-candidates 採点表
+checks:
+  - id: regression_existing_subcommands
+    type: bash
+    file: holdout_test/test_00_regression.sh
+    points: 2
+    regression: true
+  - id: extraction_condition_combos
+    type: bash
+    file: holdout_test/test_01_combos.sh
+    points: 2
+  - id: excluded_trust_boundary_only
+    type: bash
+    file: holdout_test/test_02_excluded.sh
+    points: 1
+  - id: owner_approved_flag
+    type: bash
+    file: holdout_test/test_03_owner_approved.sh
+    points: 1
+  - id: min_priority_validation_and_default
+    type: bash
+    file: holdout_test/test_04_min_priority.sh
+    points: 1
+  - id: propose_matches_list_rule_candidates
+    type: bash
+    file: holdout_test/test_05_propose_consistency.sh
+    points: 2
+  - id: supersedes_existence_check
+    type: bash
+    file: holdout_test/test_06_supersedes.sh
+    points: 1
