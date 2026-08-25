@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>群変（ぐんぺん）</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <section id="title-screen" class="screen">
+      <h1 class="title">群変</h1>
+      <p class="copy">群れは、あなたの守り方に合わせて進化する。</p>
+      <div id="challenge-banner" class="challenge-banner hidden">
+        <p id="challenge-banner-text" class="challenge-banner-text"></p>
+        <div class="challenge-banner-actions">
+          <button id="challenge-accept-button" class="primary-button" type="button">この条件で始める</button>
+          <button id="challenge-decline-button" class="secondary-button" type="button">通常ではじめる</button>
+        </div>
+      </div>
+      <button id="start-button" class="primary-button" type="button">はじめる</button>
+      <button id="howto-button" class="secondary-button" type="button">あそびかた</button>
+    </section>
+
+    <section id="playing-screen" class="screen hidden">
+      <div class="hud">
+        <span id="hud-gold" class="hud-item">300G</span>
+        <span id="hud-lives" class="hud-item">♥ 20</span>
+        <span id="hud-wave" class="hud-item">WAVE 1/15</span>
+        <button id="howto-hud-button" class="hud-icon-button" type="button" aria-label="あそびかた">?</button>
+        <button id="mute-button" class="hud-icon-button" type="button" aria-label="ミュート切り替え">🔊</button>
+      </div>
+
+      <div class="board-row">
+        <div class="board-area">
+          <p id="skill-select-banner" class="skill-select-banner hidden">レーンを選ぶ</p>
+          <p id="intro-bubble" class="intro-bubble hidden">塔を置いて、ウェーブ開始</p>
+          <div class="board-wrap">
+            <canvas id="board-canvas" width="576" height="384"></canvas>
+            <div id="tower-panel" class="tower-panel hidden">
+              <button id="upgrade-button" class="tower-panel-button upgrade-button" type="button">強化</button>
+              <button id="sell-button" class="tower-panel-button sell-button" type="button">売る</button>
+            </div>
+          </div>
+        </div>
+        <aside id="preview-panel" class="preview-panel hidden">
+          <h3 class="preview-heading">次に来る群れ</h3>
+          <div class="preview-list">
+            <canvas class="preview-icon" width="52" height="52"></canvas>
+            <canvas class="preview-icon" width="52" height="52"></canvas>
+            <canvas class="preview-icon" width="52" height="52"></canvas>
+            <canvas class="preview-icon" width="52" height="52"></canvas>
+            <canvas class="preview-icon" width="52" height="52"></canvas>
+          </div>
+          <ul id="preview-lanes" class="preview-lanes">
+            <li class="preview-lane" data-lane="0"></li>
+            <li class="preview-lane" data-lane="1"></li>
+            <li class="preview-lane" data-lane="2"></li>
+          </ul>
+        </aside>
+      </div>
+
+      <div class="controls">
+        <div id="tower-palette" class="tower-palette">
+          <button class="tower-slot" data-tower-id="basic" type="button">
+            <span class="icon-stack">
+              <canvas class="tower-icon" width="40" height="40"></canvas>
+            </span>
+            <span class="tower-cost">50G</span>
+          </button>
+          <button class="tower-slot" data-tower-id="heat" type="button">
+            <span class="icon-stack">
+              <canvas class="tower-icon" width="40" height="40"></canvas>
+              <span class="lock-icon" aria-hidden="true">🔒</span>
+              <span class="lock-badge">3</span>
+            </span>
+            <span class="tower-cost">100G</span>
+          </button>
+          <button class="tower-slot" data-tower-id="cold" type="button">
+            <span class="icon-stack">
+              <canvas class="tower-icon" width="40" height="40"></canvas>
+              <span class="lock-icon" aria-hidden="true">🔒</span>
+              <span class="lock-badge">5</span>
+            </span>
+            <span class="tower-cost">100G</span>
+          </button>
+          <button class="tower-slot" data-tower-id="bolt" type="button">
+            <span class="icon-stack">
+              <canvas class="tower-icon" width="40" height="40"></canvas>
+              <span class="lock-icon" aria-hidden="true">🔒</span>
+              <span class="lock-badge">7</span>
+            </span>
+            <span class="tower-cost">120G</span>
+          </button>
+        </div>
+        <div class="action-buttons">
+          <button id="wave-start-button" class="primary-button" type="button">ウェーブ開始</button>
+          <button id="speed-toggle-button" class="secondary-button" type="button">×2</button>
+          <button id="skill-button" class="secondary-button skill-button locked" type="button">
+            <span class="icon-stack skill-icon-stack">
+              <span id="skill-label" class="skill-label">発熱</span>
+              <span class="lock-icon" aria-hidden="true">🔒</span>
+              <span class="lock-badge">3</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <div id="report-modal" class="modal hidden">
+      <div class="modal-box">
+        <h2 id="report-heading">第1世代の記録</h2>
+        <p id="report-intro" class="report-intro hidden">群れは、あなたの守り方に合わせて変わります</p>
+        <div class="report-compare">
+          <canvas id="report-prev-canvas" class="report-icon" width="132" height="96"></canvas>
+          <span class="report-arrow" aria-hidden="true">→</span>
+          <canvas id="report-next-canvas" class="report-icon" width="132" height="96"></canvas>
+        </div>
+        <ul id="report-lines" class="report-lines"></ul>
+        <button id="report-close-button" class="primary-button" type="button">とじる</button>
+      </div>
+    </div>
+
+    <div id="howto-modal" class="modal hidden">
+      <div class="modal-box howto-box">
+        <h2>あそびかた</h2>
+        <p class="howto-promise">群れは、あなたの守り方に合わせて進化する。</p>
+        <div class="howto-section">
+          <h3>操作</h3>
+          <ul class="howto-list">
+            <li>置く: 塔パレットのアイコン→盤面のセルをタップ</li>
+            <li>売る・強化: 配置済みの塔をタップするとパネルが出る</li>
+            <li>ウェーブ開始: 配置フェーズで「ウェーブ開始」ボタン</li>
+            <li>×2: ウェーブ中の進行速度を倍速にする</li>
+            <li>発熱（W3から）: レーンを選んで一時的に減速させる</li>
+          </ul>
+        </div>
+        <div class="howto-section">
+          <h3>敵の見た目</h3>
+          <div class="howto-legend">
+            <div class="howto-legend-item">
+              <canvas class="howto-legend-icon" data-legend="fast" width="52" height="52"></canvas>
+              <span>細長い＝速い</span>
+            </div>
+            <div class="howto-legend-item">
+              <canvas class="howto-legend-icon" data-legend="tough" width="52" height="52"></canvas>
+              <span>輪郭が太い＝硬い</span>
+            </div>
+            <div class="howto-legend-item">
+              <canvas class="howto-legend-icon" data-legend="big" width="52" height="52"></canvas>
+              <span>大きい＝硬くて遅い・届くとライフ2</span>
+            </div>
+            <div class="howto-legend-item">
+              <canvas class="howto-legend-icon" data-legend="heat" width="52" height="52"></canvas>
+              <span>赤＝マクロファージに強い</span>
+            </div>
+            <div class="howto-legend-item">
+              <canvas class="howto-legend-icon" data-legend="cold" width="52" height="52"></canvas>
+              <span>青＝インターフェロンに強い</span>
+            </div>
+            <div class="howto-legend-item">
+              <canvas class="howto-legend-icon" data-legend="bolt" width="52" height="52"></canvas>
+              <span>黄＝抗体に強い</span>
+            </div>
+          </div>
+        </div>
+        <p class="howto-tip">同じ塔ばかりだと群れの突然変異が増える。3属性を混ぜよう。</p>
+        <button id="howto-close-button" class="primary-button" type="button">とじる</button>
+      </div>
+    </div>
+
+    <section id="result-screen" class="screen hidden">
+      <h2 id="result-heading">あなたを倒した群れ</h2>
+      <canvas id="result-genome-canvas" class="result-genome-canvas" width="140" height="140"></canvas>
+      <p id="result-genome-caption" class="result-genome-caption"></p>
+      <p id="result-wave-count" class="result-wave-count">到達ウェーブ 0 / 15</p>
+      <div class="result-actions">
+        <button id="endless-button" class="primary-button hidden" type="button">エンドレスで続ける</button>
+        <button id="challenge-send-button" class="secondary-button" type="button">この条件で挑戦状を送る</button>
+        <button id="retry-button" class="primary-button" type="button">もう一度あそぶ</button>
+        <button id="survey-open-button" class="secondary-button" type="button">アンケートに答える</button>
+        <button id="title-from-result-button" class="secondary-button" type="button">タイトルへ</button>
+      </div>
+    </section>
+
+    <section id="survey-screen" class="screen hidden">
+      <h2>アンケート（任意）</h2>
+      <form id="survey-form">
+        <fieldset>
+          <legend>①また遊びたいと思いましたか（1〜5）</legend>
+          <div class="scale" data-name="wantToPlayAgain">
+            <label><input type="radio" name="wantToPlayAgain" value="1" required />1</label>
+            <label><input type="radio" name="wantToPlayAgain" value="2" />2</label>
+            <label><input type="radio" name="wantToPlayAgain" value="3" />3</label>
+            <label><input type="radio" name="wantToPlayAgain" value="4" />4</label>
+            <label><input type="radio" name="wantToPlayAgain" value="5" />5</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>②群れが自分の守り方に合わせてきたと感じましたか（1〜5）</legend>
+          <div class="scale" data-name="adaptationFelt">
+            <label><input type="radio" name="adaptationFelt" value="1" required />1</label>
+            <label><input type="radio" name="adaptationFelt" value="2" />2</label>
+            <label><input type="radio" name="adaptationFelt" value="3" />3</label>
+            <label><input type="radio" name="adaptationFelt" value="4" />4</label>
+            <label><input type="radio" name="adaptationFelt" value="5" />5</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>③難易度はどうでしたか（1〜5）</legend>
+          <div class="scale" data-name="difficultyLevel">
+            <label><input type="radio" name="difficultyLevel" value="1" required />1</label>
+            <label><input type="radio" name="difficultyLevel" value="2" />2</label>
+            <label><input type="radio" name="difficultyLevel" value="3" />3</label>
+            <label><input type="radio" name="difficultyLevel" value="4" />4</label>
+            <label><input type="radio" name="difficultyLevel" value="5" />5</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>④良かった瞬間があれば教えてください（自由記述）</legend>
+          <input type="text" id="survey-good-moment" name="goodMoment" maxlength="200" />
+        </fieldset>
+        <fieldset>
+          <legend>⑤イライラした瞬間があれば教えてください（自由記述）</legend>
+          <input type="text" id="survey-bad-moment" name="badMoment" maxlength="200" />
+        </fieldset>
+        <div class="survey-actions">
+          <button id="survey-submit" class="primary-button" type="submit">結果をコピー</button>
+          <button id="survey-skip-button" class="secondary-button" type="button">スキップ</button>
+        </div>
+      </form>
+      <div id="survey-after-submit" class="hidden">
+        <p>回答ありがとうございました。</p>
+        <p id="survey-copy-status" class="copy-status"></p>
+        <button id="survey-back-title-button" class="primary-button" type="button">タイトルへ戻る</button>
+      </div>
+    </section>
+
+    <div id="vignette-overlay" class="vignette-overlay" aria-hidden="true"></div>
+    <p id="toast" class="toast hidden">コピーしました</p>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
