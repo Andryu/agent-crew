@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>巡室 (じゅんしつ)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <section id="title-screen" class="screen">
+      <h1 class="title">巡室</h1>
+      <p class="subtitle">じゅんしつ</p>
+      <div class="rules">
+        <p>同じ部屋を何度も見せられる。</p>
+        <p>部屋に「異変」があれば「戻る」を、なければ「進む」を選べ。</p>
+        <p>判断を誤れば、そこで終わる。</p>
+        <p>部屋には家具・時計・カレンダー・窓・壁の模様がある。細部までよく見ること。</p>
+        <p>最初の2回は必ず「正常」な部屋が映る。その見た目をよく覚えておくこと。</p>
+      </div>
+      <p id="title-best-round" class="best-round">自己ベスト: 0周</p>
+      <button id="start-button" class="primary-button" type="button">はじめる</button>
+    </section>
+
+    <section id="game-screen" class="screen hidden">
+      <div class="hud">
+        <button id="mute-button" class="mute-button" type="button" aria-label="音声: ON">音声: ON</button>
+        <span id="round-display" class="round-display">周回 0</span>
+      </div>
+      <canvas id="room-canvas" width="800" height="500"></canvas>
+      <div class="choice-buttons">
+        <button id="back-button" class="choice-button" type="button">戻る</button>
+        <button id="forward-button" class="choice-button" type="button">進む</button>
+      </div>
+    </section>
+
+    <section id="gameover-screen" class="screen hidden">
+      <h2>終わり</h2>
+      <p id="gameover-round" class="gameover-round">到達周回: 0周</p>
+      <p id="gameover-best" class="gameover-best"></p>
+      <button id="retry-button" class="primary-button" type="button">もう一度</button>
+      <button id="survey-button" class="secondary-button" type="button">感想を送る</button>
+      <button id="title-from-gameover-button" class="secondary-button" type="button">タイトルへ戻る</button>
+    </section>
+
+    <section id="survey-screen" class="screen hidden">
+      <h2>アンケート</h2>
+      <form id="survey-form">
+        <fieldset>
+          <legend>①また遊びたいか（1〜5）</legend>
+          <div class="scale" data-name="wantToPlayAgain">
+            <label><input type="radio" name="wantToPlayAgain" value="1" required />1</label>
+            <label><input type="radio" name="wantToPlayAgain" value="2" />2</label>
+            <label><input type="radio" name="wantToPlayAgain" value="3" />3</label>
+            <label><input type="radio" name="wantToPlayAgain" value="4" />4</label>
+            <label><input type="radio" name="wantToPlayAgain" value="5" />5</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>②怖さ（1〜5）</legend>
+          <div class="scale" data-name="fearLevel">
+            <label><input type="radio" name="fearLevel" value="1" required />1</label>
+            <label><input type="radio" name="fearLevel" value="2" />2</label>
+            <label><input type="radio" name="fearLevel" value="3" />3</label>
+            <label><input type="radio" name="fearLevel" value="4" />4</label>
+            <label><input type="radio" name="fearLevel" value="5" />5</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>③難易度（1〜5、低すぎ〜高すぎ）</legend>
+          <div class="scale" data-name="difficultyLevel">
+            <label><input type="radio" name="difficultyLevel" value="1" required />1</label>
+            <label><input type="radio" name="difficultyLevel" value="2" />2</label>
+            <label><input type="radio" name="difficultyLevel" value="3" />3</label>
+            <label><input type="radio" name="difficultyLevel" value="4" />4</label>
+            <label><input type="radio" name="difficultyLevel" value="5" />5</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>④良かった瞬間</legend>
+          <input type="text" id="survey-good-moment" name="goodMoment" maxlength="200" />
+        </fieldset>
+        <fieldset>
+          <legend>⑤イライラした瞬間</legend>
+          <input type="text" id="survey-bad-moment" name="badMoment" maxlength="200" />
+        </fieldset>
+        <div class="survey-actions">
+          <button id="survey-submit" class="primary-button" type="submit">送信</button>
+        </div>
+      </form>
+      <div id="survey-after-submit" class="hidden">
+        <p>回答ありがとうございました。</p>
+        <button id="survey-copy-button" class="secondary-button" type="button">結果をコピー</button>
+        <button id="survey-back-title-button" class="primary-button" type="button">タイトルに戻る</button>
+        <p id="survey-copy-status" class="copy-status"></p>
+      </div>
+    </section>
+
+    <div id="flash-overlay" class="hidden"></div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
