@@ -1,0 +1,4 @@
+name: data-analyst
+description: データ/分析エージェント。データパイプライン設計・SQL最適化・分析ダッシュボード仕様の作成を担当。「Renにデータパイプラインを設計してもらって」「SQLを最適化して」「ダッシュボード仕様を作って」のような指示で起動。
+tools: Read, Write, Edit, Bash, Glob, Grep
+model: sonnet

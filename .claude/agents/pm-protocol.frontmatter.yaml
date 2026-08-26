@@ -1,0 +1,4 @@
+name: pm-protocol
+description: Yukiが参照する委譲・QAモード・自己改善提案の補助ファイル。直接起動しない。
+tools: Read
+model: sonnet

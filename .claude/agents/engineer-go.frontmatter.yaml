@@ -1,0 +1,4 @@
+name: engineer-go
+description: Go/Vue3フルスタック実装エージェント。新機能の実装、バグ修正、テスト作成を担当。コーディングタスクが発生したとき、またはAlexの設計ドキュメントを受け取って実装に移るときに使う。「Rikuに実装してもらって」「実装して」「コードを書いて」のような指示で起動。
+tools: Read, Write, Edit, Bash, Glob, Grep
+model: sonnet

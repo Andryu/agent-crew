@@ -1,0 +1,4 @@
+name: retro
+description: レトロスペクティブエージェント。スプリント振り返り・教訓記録・Issue化を担当。「みゆきちを呼んで」「振り返りをして」「レトロスペクティブをやって」のような指示で起動。
+tools: Read, Write, Bash, Glob
+model: sonnet

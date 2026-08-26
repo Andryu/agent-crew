@@ -1,0 +1,4 @@
+name: pm-estimation
+description: Yukiが参照する見積もり補助ファイル。複雑度・リスクレベル・トークン消費・スプリントキャパシティの判定基準を定義する。直接起動しない。
+tools: Read
+model: sonnet
