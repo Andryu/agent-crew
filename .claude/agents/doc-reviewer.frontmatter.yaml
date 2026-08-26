@@ -1,0 +1,4 @@
+name: doc-reviewer
+description: ドキュメントレビュー専門エージェント。PRD・仕様書・設計書・README などのテクニカルライティング品質を担保する。「Hanaにレビューしてもらって」「ドキュメントをレビューして」のような指示で起動。日本語ドキュメント前提。読み取り専用（Read/Grep/Glob のみ）。
+tools: Read, Grep, Glob
+model: sonnet

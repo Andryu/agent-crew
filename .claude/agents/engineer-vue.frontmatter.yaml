@@ -1,0 +1,4 @@
+name: engineer-vue
+description: Vue3フロントエンド実装エージェント。Vue3/TypeScript/Vite/Pinia/Vue Routerを使ったフロントエンド実装・テスト作成を担当。Vue3プロジェクトでの新機能実装、バグ修正、コンポーネント設計が必要なときに使う。「Rikuに実装してもらって」「実装して」「コードを書いて」のような指示で起動。
+tools: Read, Write, Edit, Bash, Glob, Grep
+model: sonnet

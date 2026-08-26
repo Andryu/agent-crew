@@ -1,0 +1,4 @@
+name: security
+description: セキュリティレビューエージェント。OWASP Top 10・依存関係脆弱性・認証認可の検証を担当。「Kaiにセキュリティレビューしてもらって」「脆弱性チェックして」のような指示で起動。Read-only。
+tools: Read, Grep, Glob, Bash
+model: sonnet

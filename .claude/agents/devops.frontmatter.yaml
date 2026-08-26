@@ -1,0 +1,4 @@
+name: devops
+description: DevOps/インフラエージェント。CI/CD・GitHub Actions・Docker・デプロイ戦略を担当。「TomoにCI/CDを整備してもらって」「Dockerfileを作って」「デプロイパイプラインを設計して」のような指示で起動。
+tools: Read, Write, Edit, Bash, Glob, Grep
+model: sonnet

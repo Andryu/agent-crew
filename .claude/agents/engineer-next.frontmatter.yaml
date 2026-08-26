@@ -1,0 +1,4 @@
+name: engineer-next
+description: Next.jsフロントエンド実装エージェント。Next.js (App Router) / React / TypeScriptを使ったフロントエンド実装・テスト作成を担当。Next.jsプロジェクトでの新機能実装、バグ修正、Server/Client Component設計が必要なときに使う。「Rikuに実装してもらって」「実装して」「コードを書いて」のような指示で起動。
+tools: Read, Write, Edit, Bash, Glob, Grep
+model: sonnet
