@@ -198,3 +198,57 @@ glyphs:51  broken:0  uniq:21  missing:[]   doc==win (380 light / 380 dark / 1100
 - `badHref: []` = 相対URL・空href・`#` が1つも無い。
 - `noBadge: 0` = 全98リンクに `公式`／`検索` のバッジが付いている。
 - リンクを付けなかった13件はサマリー表のカテゴリ行（抱っこ紐・ベビーカー等）と産後ケアのサービス行、および推奨しないベッドインベッド類。意図どおり。
+
+---
+
+## 追補3（2026-08-29）: 「商品リンクが飛べない」の修正
+
+### 原因（推測ではなく、公開後HTMLの実物から特定）
+
+`Artifact action:"read"` で公開済みアーティファクトのHTMLを取得し、注入されている frame-runtime のソースを読んだ。外部リンクのクリックはランタイムが横取りしている。
+
+```js
+const t=a=>{ ...
+  if((l.protocol==="http:"||l.protocol==="https:") && l.origin!==location.origin){
+    a.preventDefault();
+    const _=(v.getAttribute("target")??"").toLowerCase(),
+          d=a.type==="auxclick"||a.metaKey||a.ctrlKey||a.shiftKey||a.altKey
+            || !["","_self","_top","_parent"].includes(_);
+    y.post({__frame_nav:!0, url:l.href, newTab:d}, "*");
+  }};
+```
+
+**原因は2つあり、どちらも自分で作り込んだもの。**
+
+1. **`target="_blank"` を付けていた。** 上のコードで `newTab=true` になり、親シェルへ「新規タブを開け」と要求する。このジェスチャはクロスオリジンiframe内で発生しているため、親側の `window.open` がポップアップとしてブロックされうる。`target` を外せば `newTab=false` となり、トップレベル遷移の経路に乗る。
+2. **`公式`／`検索` バッジを `<a>` の外に置いていた。** 見た目上いちばんボタンらしい部分が、クリックしても何も起きない要素になっていた。UXバグ。
+
+### 決定
+
+- 4象限のカードは `<div class="pc">` → **`<a class="pc" href>`** に変更。カードのどこを押してもリンクが発火する（380pxでのタップターゲットとしても最大）。
+- 表のリンクはバッジを `<a>` の内側へ移動。
+- 全リンクから `target="_blank"` を削除。別タブが要るときは Ctrl/⌘ クリックでランタイム側が `newTab=true` にしてくれる（上のコードの `metaKey||ctrlKey` 分岐）。リード文にその旨を明記。
+- バッジに `pointer-events:none` を付け、クリック判定を必ず親アンカーに渡す。
+- カード全体がリンクになって名前の下線が消えたため、hover のないスマホで「押せる」と分からなくなる。`a.pc .n` に控えめな下線を戻した。
+
+### VERIFY（実測）
+
+frame-runtime の判定ロジックをそのままページ上で再現して全リンクを分類した。
+
+```
+nestedAnchors:0  cards:51  notAnchor:0  noHref:0
+links:125   wouldNav:117   wouldPopup:0   wouldIgnore:8
+```
+
+- **`wouldPopup:0`** — ブロックされうる新規タブ経路を通るリンクが1本も無くなった（修正前は98本すべてがこの経路）。
+- `wouldIgnore:8` はナビの同一ページ内アンカー（`#summary` 等）。意図どおり。
+- 実クリック試験: バッジ／図／価格／メーカー名 の4箇所すべてで、カードの href が発火することを確認。
+
+```
+バッジ   click -> OK   図 click -> OK   価格 click -> OK   メーカー名 click -> OK
+glyphs:51 broken:0 uniq:21 missing:[]  doc==win(380 light/380 dark/1100)  JS errors:0
+```
+
+### 反省
+
+前回「98本すべて絶対URL・空hrefゼロ」を確認して完了と報告したが、**リンクが実際に遷移するかは検証していなかった**。href の形式検査と「クリックして飛ぶか」は別の話で、後者こそが要件だった。今回は公開後の実行環境（frame-runtime）まで読んで判定を再現している。
