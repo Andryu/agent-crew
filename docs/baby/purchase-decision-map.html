@@ -105,7 +105,12 @@ tr.rec td:first-child{box-shadow:inset 3px 0 0 var(--mark)}
 .quad{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line-strong); border:1px solid var(--line-strong); border-radius:3px; overflow:hidden}
 .q{background:var(--surface); padding:11px 10px; display:flex; flex-direction:column; gap:7px}
 .q-t{font-size:10px; font-family:var(--mono); letter-spacing:.06em; color:var(--ink-3); text-transform:uppercase}
-.pc{border:1px solid var(--line); border-radius:2px; padding:6px 8px; background:var(--ground)}
+.sprite{position:absolute; width:0; height:0; overflow:hidden}
+.pc{border:1px solid var(--line); border-radius:2px; padding:6px 8px; background:var(--ground); display:flex; gap:9px; align-items:flex-start}
+.pt{display:block; min-width:0; flex:1 1 auto}
+.gl{flex:0 0 32px; width:32px; height:32px; color:var(--ink-3); margin-top:2px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round}
+.pc.rec .gl{color:var(--mark)}
+.glnote{font-size:11px; line-height:1.65; color:var(--ink-3); margin:10px 0 0}
 .pc.rec{border:1.5px solid var(--mark); background:var(--mark-soft)}
 .pc .n{font-size:12px; font-weight:700; line-height:1.4; display:block}
 .pc .m{font-size:10px; color:var(--ink-3); display:block; line-height:1.5}
@@ -151,11 +156,170 @@ footer a{color:var(--ink-2)}
   body{font-size:14.5px}
   .wrap{padding:0 14px 72px}
   .q{padding:9px 7px; gap:6px}
-  .pc{padding:5px 6px}
+  .pc{padding:5px 6px; flex-direction:column; gap:5px}
+  .gl{margin-top:0; flex:none; width:30px; height:30px}
   .pc .n{font-size:11.5px}
   .axlabel{font-size:10.5px}
 }
 </style>
+
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="c-structured" viewBox="0 0 48 48">
+  <path d="M15 14h18v16c0 3-4 4.5-9 4.5S15 33 15 30z"/>
+  <path d="M15 14C12 8.5 9.5 6.5 7.5 5.5M33 14c3-5.5 5.5-7.5 7.5-8.5"/>
+  <rect x="6" y="34.5" width="36" height="6.5" rx="2"/>
+  <rect x="20.5" y="36" width="7" height="3.5" rx="1" fill="currentColor" stroke="none"/>
+</symbol>
+
+<symbol id="c-structured-mesh" viewBox="0 0 48 48">
+  <path d="M15 14h18v16c0 3-4 4.5-9 4.5S15 33 15 30z"/>
+  <path d="M15 14C12 8.5 9.5 6.5 7.5 5.5M33 14c3-5.5 5.5-7.5 7.5-8.5"/>
+  <rect x="6" y="34.5" width="36" height="6.5" rx="2"/>
+  <rect x="20.5" y="36" width="7" height="3.5" rx="1" fill="currentColor" stroke="none"/>
+  <g fill="currentColor" stroke="none" opacity=".55">
+    <circle cx="20" cy="20" r="1.1"/><circle cx="28" cy="20" r="1.1"/>
+    <circle cx="24" cy="24" r="1.1"/>
+    <circle cx="20" cy="28" r="1.1"/><circle cx="28" cy="28" r="1.1"/>
+  </g>
+</symbol>
+
+<symbol id="c-mini" viewBox="0 0 48 48">
+  <path d="M16 17h16v13c0 3-3.5 4.5-8 4.5S16 33 16 30z"/>
+  <path d="M16 17C13.5 11 11 8.5 9 7.5M32 17c2.5-6 5-8.5 7-9.5"/>
+  <path d="M18.5 22h11"/>
+  <rect x="22" y="20.6" width="4" height="2.8" rx="1" fill="currentColor" stroke="none"/>
+</symbol>
+
+<symbol id="c-compact" viewBox="0 0 48 48">
+  <path d="M16 13h16v13c0 3-3.5 4.5-8 4.5S16 29 16 26z"/>
+  <path d="M16 13C13.5 8 11.5 6 9.5 5M32 13c2.5-5 4.5-7 6.5-8"/>
+  <ellipse cx="24" cy="37" rx="10" ry="4.5"/>
+  <path d="M24 32.5v9"/>
+</symbol>
+
+<symbol id="c-wrap" viewBox="0 0 48 48">
+  <path d="M10 8C18 19 30 19 38 40" stroke-width="3.4"/>
+  <path d="M38 8C30 19 18 19 10 40" stroke-width="3.4"/>
+</symbol>
+
+<symbol id="c-sling" viewBox="0 0 48 48">
+  <circle cx="14" cy="12" r="5.5" stroke-width="2.2"/>
+  <path d="M13 17.5C10.5 27 15 36 26 39c8 2 13-3 11.5-9.5"/>
+  <path d="M19 17C17 26 21 33 30 35.5"/>
+</symbol>
+
+<symbol id="c-hipseat" viewBox="0 0 48 48">
+  <rect x="6" y="20" width="36" height="7.5" rx="2"/>
+  <rect x="20.5" y="21.8" width="7" height="3.9" rx="1" fill="currentColor" stroke="none"/>
+  <path d="M13 27.5h22v8.5c0 1.4-1.1 2.5-2.5 2.5H15.5c-1.4 0-2.5-1.1-2.5-2.5z"/>
+</symbol>
+
+<symbol id="s-double" viewBox="0 0 48 48">
+  <path d="M13 21c0-6.5 5-10 11-10 4.5 0 7.5 2.5 8 6.5"/>
+  <path d="M13 21v9h17"/><path d="M32 17.5 40 13"/>
+  <path d="M30 30l6 7M13 30l-4 7"/><path d="M12.5 32h18"/>
+  <circle cx="7" cy="39.5" r="2.4"/><circle cx="12" cy="39.5" r="2.4"/>
+  <circle cx="34" cy="39.5" r="2.4"/><circle cx="39" cy="39.5" r="2.4"/>
+</symbol>
+
+<symbol id="s-single" viewBox="0 0 48 48">
+  <path d="M13 21c0-6.5 5-10 11-10 4.5 0 7.5 2.5 8 6.5"/>
+  <path d="M13 21v9h17"/><path d="M32 17.5 40 13"/>
+  <path d="M30 30l5 6M13 30l-4 6"/><path d="M12.5 32h18"/>
+  <circle cx="8.5" cy="39.5" r="3.4"/><circle cx="36" cy="39.5" r="3.4"/>
+</symbol>
+
+<symbol id="s-bigwheel" viewBox="0 0 48 48">
+  <path d="M13 19c0-6.5 5-10 11-10 4.5 0 7.5 2.5 8 6.5"/>
+  <path d="M13 19v9h17"/><path d="M32 15.5 40 11"/>
+  <path d="M30 28l4 4M13 28l-3 4"/><path d="M12.5 30h18"/>
+  <circle cx="9" cy="37" r="5.4"/><circle cx="35" cy="37" r="5.4"/>
+</symbol>
+
+<symbol id="s-compact" viewBox="0 0 48 48">
+  <path d="M17 24c0-4 2.5-6 6-6"/>
+  <path d="M17 24v8h13"/>
+  <path d="M30 32l5 6M17 32l-4 6"/>
+  <path d="M23 18 33 13"/>
+  <circle cx="12.5" cy="39.5" r="2.6"/><circle cx="35" cy="39.5" r="2.6"/>
+  <path d="M39 16l-4 3 4 3" stroke-dasharray="2 2"/>
+</symbol>
+
+<symbol id="b-playard" viewBox="0 0 48 48">
+  <rect x="7" y="15" width="34" height="21" rx="2.5"/>
+  <path d="M24 15v21"/><circle cx="24" cy="25.5" r="2.2"/>
+  <g fill="currentColor" stroke="none" opacity=".5">
+    <circle cx="13" cy="21" r="1"/><circle cx="18" cy="21" r="1"/>
+    <circle cx="30" cy="21" r="1"/><circle cx="35" cy="21" r="1"/>
+    <circle cx="13" cy="30" r="1"/><circle cx="18" cy="30" r="1"/>
+    <circle cx="30" cy="30" r="1"/><circle cx="35" cy="30" r="1"/>
+  </g>
+  <path d="M10 36v5M38 36v5"/>
+</symbol>
+
+<symbol id="b-playard-tag" viewBox="0 0 48 48">
+  <rect x="5" y="17" width="31" height="19" rx="2.5"/>
+  <path d="M20.5 17v19"/><circle cx="20.5" cy="26.5" r="2"/>
+  <g fill="currentColor" stroke="none" opacity=".5">
+    <circle cx="11" cy="22" r="1"/><circle cx="15" cy="22" r="1"/>
+    <circle cx="26" cy="22" r="1"/><circle cx="31" cy="22" r="1"/>
+    <circle cx="11" cy="31" r="1"/><circle cx="15" cy="31" r="1"/>
+  </g>
+  <path d="M8 36v5M33 36v5"/>
+  <path d="M36 6h7v7l-7 7-4-4z"/><circle cx="39.5" cy="9.5" r="1.3"/>
+</symbol>
+
+<symbol id="b-cosleeper" viewBox="0 0 48 48">
+  <path d="M6 16v15h36V16"/>
+  <path d="M6 23.5h36"/>
+  <path d="M10 23.5v7.5M14 23.5v7.5M18 23.5v7.5M22 23.5v7.5"/>
+  <path d="M10 31v11M38 31v11"/>
+  <circle cx="10" cy="34" r="1.05"/><circle cx="10" cy="37.5" r="1.05"/><circle cx="10" cy="41" r="1.05"/>
+  <circle cx="38" cy="34" r="1.05"/><circle cx="38" cy="37.5" r="1.05"/><circle cx="38" cy="41" r="1.05"/>
+</symbol>
+
+<symbol id="b-hi" viewBox="0 0 48 48">
+  <rect x="8" y="10" width="32" height="16" rx="1.5"/>
+  <path d="M14 10v16M20 10v16M26 10v16M32 10v16"/>
+  <path d="M11 26v14M37 26v14"/>
+  <rect x="15" y="30" width="18" height="9" rx="1.5" stroke-dasharray="3 2.5" opacity=".65"/>
+  <circle cx="11" cy="41.5" r="1.6"/><circle cx="37" cy="41.5" r="1.6"/>
+</symbol>
+
+<symbol id="b-crib-tag" viewBox="0 0 48 48">
+  <rect x="5" y="17" width="30" height="19" rx="1.5"/>
+  <path d="M11 17v19M17 17v19M23 17v19M29 17v19"/>
+  <path d="M8 36v5M32 36v5"/>
+  <path d="M36 6h7v7l-7 7-4-4z"/><circle cx="39.5" cy="9.5" r="1.3"/>
+</symbol>
+
+<symbol id="f-set-regular" viewBox="0 0 48 48">
+  <rect x="5" y="30" width="38" height="9" rx="2.5"/>
+  <rect x="9" y="21" width="30" height="8" rx="2"/>
+  <path d="M9 25h30" stroke-width="1.1" opacity=".6"/>
+  <rect x="16" y="13" width="16" height="6.5" rx="3.2"/>
+</symbol>
+
+<symbol id="f-set-mini" viewBox="0 0 48 48">
+  <rect x="12" y="30" width="24" height="9" rx="2.5"/>
+  <rect x="15" y="21" width="18" height="8" rx="2"/>
+  <path d="M15 25h18" stroke-width="1.1" opacity=".6"/>
+  <rect x="19" y="13" width="10" height="6.5" rx="3.2"/>
+</symbol>
+
+<symbol id="f-down" viewBox="0 0 48 48">
+  <rect x="7" y="21" width="34" height="18" rx="3.5"/>
+  <path d="M14 21l-5 18M23 21l-5 18M32 21l-5 18M41 24l-4 15" stroke-width="1.1" opacity=".55"/>
+  <path d="M24 6c-3.5 4.5-3.5 8.5 0 11 3.5-2.5 3.5-6.5 0-11z"/>
+  <path d="M24 8.5v8" stroke-width="1.1"/>
+</symbol>
+
+<symbol id="f-mattress" viewBox="0 0 48 48">
+  <rect x="5" y="19" width="38" height="14" rx="2.5"/>
+  <path d="M24 19v14" stroke-dasharray="3 2.5"/>
+  <path d="M9 36h30" stroke-width="1.2" opacity=".5"/>
+</symbol>
+</defs></svg>
 
 <header class="masthead">
   <div class="wrap">
@@ -245,32 +409,33 @@ footer a{color:var(--ink-2)}
     <div class="quad">
       <div class="q">
         <div class="q-t">安定感 × コスパ</div>
-        <div class="pc"><span class="n">ジョイン EL-E</span><span class="m">コンビ</span><span class="p">¥9,900〜</span></div>
-        <div class="pc"><span class="n">BASIC</span><span class="m">napnap</span><span class="p">約¥10,000</span></div>
-        <div class="pc"><span class="n">ADAPT SoftFlex</span><span class="m">エルゴベビー</span><span class="p">実勢¥17,500</span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#c-structured"/></svg><span class="pt"><span class="n">ジョイン EL-E</span><span class="m">コンビ</span><span class="p">¥9,900〜</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#c-structured"/></svg><span class="pt"><span class="n">BASIC</span><span class="m">napnap</span><span class="p">約¥10,000</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#c-structured-mesh"/></svg><span class="pt"><span class="n">ADAPT SoftFlex</span><span class="m">エルゴベビー</span><span class="p">実勢¥17,500</span></span></div>
       </div>
       <div class="q">
         <div class="q-t">安定感 × 機能デザイン</div>
-        <div class="pc rec"><span class="rectag">◎ 本命</span><span class="n">HARMONY</span><span class="m">ベビービョルン</span><span class="p">¥34,100</span></div>
-        <div class="pc"><span class="n">OMNI Breeze</span><span class="m">エルゴベビー</span><span class="p">¥33,990</span></div>
-        <div class="pc"><span class="n">コアラ ウルトラメッシュ EX</span><span class="m">アップリカ</span><span class="p">¥31,900</span></div>
-        <div class="pc"><span class="n">ラクリス AB</span><span class="m">アップリカ</span><span class="p">¥27,780〜</span></div>
+        <div class="pc rec"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#c-structured-mesh"/></svg><span class="pt"><span class="rectag">◎ 本命</span><span class="n">HARMONY</span><span class="m">ベビービョルン</span><span class="p">¥34,100</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#c-structured-mesh"/></svg><span class="pt"><span class="n">OMNI Breeze</span><span class="m">エルゴベビー</span><span class="p">¥33,990</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#c-structured-mesh"/></svg><span class="pt"><span class="n">コアラ ウルトラメッシュ EX</span><span class="m">アップリカ</span><span class="p">¥31,900</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#c-structured-mesh"/></svg><span class="pt"><span class="n">ラクリス AB</span><span class="m">アップリカ</span><span class="p">¥27,780〜</span></span></div>
       </div>
       <div class="q">
         <div class="q-t">軽量 × コスパ</div>
-        <div class="pc rec"><span class="rectag">◎ サブに併用</span><span class="n">FLEX AirMesh</span><span class="m">コニー</span><span class="p">¥6,980</span></div>
-        <div class="pc"><span class="n">ベビースリング</span><span class="m">ケラッタ</span><span class="p">¥3,380</span></div>
-        <div class="pc"><span class="n">ヒップシート</span><span class="m">ケラッタ</span><span class="p">¥3,480</span></div>
+        <div class="pc rec"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#c-wrap"/></svg><span class="pt"><span class="rectag">◎ サブに併用</span><span class="n">FLEX AirMesh</span><span class="m">コニー</span><span class="p">¥6,980</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#c-sling"/></svg><span class="pt"><span class="n">ベビースリング</span><span class="m">ケラッタ</span><span class="p">¥3,380</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#c-hipseat"/></svg><span class="pt"><span class="n">ヒップシート</span><span class="m">ケラッタ</span><span class="p">¥3,480</span></span></div>
       </div>
       <div class="q">
         <div class="q-t">軽量 × 機能デザイン</div>
-        <div class="pc"><span class="n">MINI AIR</span><span class="m">ベビービョルン</span><span class="p">¥13,213〜</span></div>
-        <div class="pc"><span class="n">AWAY</span><span class="m">エルゴベビー</span><span class="p">¥16,500</span></div>
-        <div class="pc"><span class="n">POLBAN ADVANCE</span><span class="m">ラッキー工業</span><span class="p">¥11,000〜</span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#c-mini"/></svg><span class="pt"><span class="n">MINI AIR</span><span class="m">ベビービョルン</span><span class="p">¥13,213〜</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#c-compact"/></svg><span class="pt"><span class="n">AWAY</span><span class="m">エルゴベビー</span><span class="p">¥16,500</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#c-hipseat"/></svg><span class="pt"><span class="n">POLBAN ADVANCE</span><span class="m">ラッキー工業</span><span class="p">¥11,000〜</span></span></div>
       </div>
     </div>
     <div class="axlabel x"><span>← コスパ重視</span><span>機能・デザイン重視 →</span></div>
     <div class="axlabel">↓ 軽量・サッと使える</div>
+    <p class="glnote">図は実写ではなく<strong>構造タイプの模式図</strong>。腰ベルト付きの構造タイプ（パネルの点はフルメッシュ地）／短胴・腰ベルトなし／収納ポーチ一体型／布を巻くラップ／リングスリング／ヒップシート、の6タイプで描き分けている。</p>
   </div>
 
   <h3>比較表（12製品）</h3>
@@ -318,31 +483,32 @@ footer a{color:var(--ink-2)}
     <div class="quad">
       <div class="q">
         <div class="q-t">安定 × コスパ</div>
-        <div class="pc rec"><span class="rectag">◎ コスパ本命</span><span class="n">スゴカルL long SL</span><span class="m">コンビ</span><span class="p">¥33,280〜</span></div>
-        <div class="pc"><span class="n">ラクーナ クッション AF</span><span class="m">アップリカ</span><span class="p">¥42,874〜</span></div>
-        <div class="pc"><span class="n">スゴカル エッグショック LA</span><span class="m">コンビ</span><span class="p">¥38,764〜</span></div>
+        <div class="pc rec"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#s-double"/></svg><span class="pt"><span class="rectag">◎ コスパ本命</span><span class="n">スゴカルL long SL</span><span class="m">コンビ</span><span class="p">¥33,280〜</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#s-double"/></svg><span class="pt"><span class="n">ラクーナ クッション AF</span><span class="m">アップリカ</span><span class="p">¥42,874〜</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#s-double"/></svg><span class="pt"><span class="n">スゴカル エッグショック LA</span><span class="m">コンビ</span><span class="p">¥38,764〜</span></span></div>
       </div>
       <div class="q">
         <div class="q-t">安定 × 機能デザイン</div>
-        <div class="pc"><span class="n">オプティア クッション</span><span class="m">アップリカ</span><span class="p">¥70,950〜</span></div>
-        <div class="pc"><span class="n">ランフィ RB5</span><span class="m">ピジョン</span><span class="p">¥67,100</span></div>
-        <div class="pc"><span class="n">ランフィ RB3</span><span class="m">ピジョン</span><span class="p">¥64,900</span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#s-bigwheel"/></svg><span class="pt"><span class="n">オプティア クッション</span><span class="m">アップリカ</span><span class="p">¥70,950〜</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#s-single"/></svg><span class="pt"><span class="n">ランフィ RB5</span><span class="m">ピジョン</span><span class="p">¥67,100</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#s-single"/></svg><span class="pt"><span class="n">ランフィ RB3</span><span class="m">ピジョン</span><span class="p">¥64,900</span></span></div>
       </div>
       <div class="q">
         <div class="q-t">軽量 × コスパ</div>
-        <div class="pc"><span class="n">リベル 2026</span><span class="m">サイベックス / B型</span><span class="p">¥29,975</span></div>
-        <div class="pc"><span class="n">スゴカルα 4キャス Light</span><span class="m">コンビ</span><span class="p">¥28,800〜</span></div>
-        <div class="pc"><span class="n">スゴカルα 4キャス compact HT</span><span class="m">コンビ</span><span class="p">価格未確認</span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#s-compact"/></svg><span class="pt"><span class="n">リベル 2026</span><span class="m">サイベックス / B型</span><span class="p">¥29,975</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#s-double"/></svg><span class="pt"><span class="n">スゴカルα 4キャス Light</span><span class="m">コンビ</span><span class="p">¥28,800〜</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#s-double"/></svg><span class="pt"><span class="n">スゴカルα 4キャス compact HT</span><span class="m">コンビ</span><span class="p">価格未確認</span></span></div>
       </div>
       <div class="q">
         <div class="q-t">軽量 × 機能デザイン</div>
-        <div class="pc rec"><span class="rectag">◎ 本命</span><span class="n">メリオ カーボン 2026</span><span class="m">サイベックス</span><span class="p">¥74,690〜</span></div>
-        <div class="pc"><span class="n">ラクーナ クッション フリー AD</span><span class="m">アップリカ</span><span class="p">¥69,300</span></div>
-        <div class="pc"><span class="n">ラクーナ クッション AH</span><span class="m">アップリカ</span><span class="p">¥59,000</span></div>
+        <div class="pc rec"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#s-single"/></svg><span class="pt"><span class="rectag">◎ 本命</span><span class="n">メリオ カーボン 2026</span><span class="m">サイベックス</span><span class="p">¥74,690〜</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#s-double"/></svg><span class="pt"><span class="n">ラクーナ クッション フリー AD</span><span class="m">アップリカ</span><span class="p">¥69,300</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#s-double"/></svg><span class="pt"><span class="n">ラクーナ クッション AH</span><span class="m">アップリカ</span><span class="p">¥59,000</span></span></div>
       </div>
     </div>
     <div class="axlabel x"><span>← コスパ重視</span><span>機能・デザイン重視 →</span></div>
     <div class="axlabel">↓ 軽量・機動力</div>
+    <p class="glnote">図は<strong>模式図</strong>。タイヤと車体で、ダブルタイヤ（オート4キャス系）／シングルタイヤ／大径タイヤ／B型コンパクト（折りたたみ）を描き分けている。タイヤ構造は取り回しと段差の越えやすさに直結する。</p>
   </div>
 
   <h3>比較表（12製品）</h3>
@@ -389,31 +555,32 @@ footer a{color:var(--ink-2)}
     <div class="quad">
       <div class="q">
         <div class="q-t">レギュラー × 購入</div>
-        <div class="pc rec"><span class="rectag">◎ 大人がベッドなら</span><span class="n">ベッドサイドベッド03</span><span class="m">ファルスカ</span><span class="p">¥25,850</span></div>
-        <div class="pc"><span class="n">ハイタイプベッド ツーオープン</span><span class="m">ヤマサキ</span><span class="p">¥46,200〜</span></div>
-        <div class="pc"><span class="n">ハイタイプ 02406</span><span class="m">カトージ</span><span class="p">価格未確認</span></div>
+        <div class="pc rec"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#b-cosleeper"/></svg><span class="pt"><span class="rectag">◎ 大人がベッドなら</span><span class="n">ベッドサイドベッド03</span><span class="m">ファルスカ</span><span class="p">¥25,850</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#b-hi"/></svg><span class="pt"><span class="n">ハイタイプベッド ツーオープン</span><span class="m">ヤマサキ</span><span class="p">¥46,200〜</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#b-hi"/></svg><span class="pt"><span class="n">ハイタイプ 02406</span><span class="m">カトージ</span><span class="p">価格未確認</span></span></div>
       </div>
       <div class="q">
         <div class="q-t">レギュラー × レンタル</div>
-        <div class="pc"><span class="n">ハイタイプ ツーオープン</span><span class="m">ヤマサキ／各社レンタル</span><span class="p">要見積</span></div>
-        <div class="pc"><span class="n">標準サイズ 3か月</span><span class="m">レンタル相場</span><span class="p">約¥10,000</span></div>
-        <div class="pc"><span class="n">標準サイズ 9か月</span><span class="m">ナイスベビー例・送料別</span><span class="p">約¥13,000</span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#b-crib-tag"/></svg><span class="pt"><span class="n">ハイタイプ ツーオープン</span><span class="m">ヤマサキ／各社レンタル</span><span class="p">要見積</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#b-crib-tag"/></svg><span class="pt"><span class="n">標準サイズ 3か月</span><span class="m">レンタル相場</span><span class="p">約¥10,000</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#b-crib-tag"/></svg><span class="pt"><span class="n">標準サイズ 9か月</span><span class="m">ナイスベビー例・送料別</span><span class="p">約¥13,000</span></span></div>
       </div>
       <div class="q">
         <div class="q-t">ミニ × 購入</div>
-        <div class="pc rec"><span class="rectag">◎ 大人が布団なら</span><span class="n">ココネル エアー AB</span><span class="m">アップリカ</span><span class="p">約¥22,000</span></div>
-        <div class="pc"><span class="n">ココネル エアープラス AB</span><span class="m">アップリカ</span><span class="p">¥36,300</span></div>
-        <div class="pc"><span class="n">そいねーる+ロング</span><span class="m">大和屋</span><span class="p">価格未確認</span></div>
+        <div class="pc rec"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#b-playard"/></svg><span class="pt"><span class="rectag">◎ 大人が布団なら</span><span class="n">ココネル エアー AB</span><span class="m">アップリカ</span><span class="p">約¥22,000</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#b-playard"/></svg><span class="pt"><span class="n">ココネル エアープラス AB</span><span class="m">アップリカ</span><span class="p">¥36,300</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#b-cosleeper"/></svg><span class="pt"><span class="n">そいねーる+ロング</span><span class="m">大和屋</span><span class="p">価格未確認</span></span></div>
       </div>
       <div class="q">
         <div class="q-t">ミニ × レンタル</div>
-        <div class="pc"><span class="n">ココネル エアー AB</span><span class="m">30日〜</span><span class="p">¥3,899〜</span></div>
-        <div class="pc"><span class="n">ハーフサイズ 3か月</span><span class="m">レンタル相場</span><span class="p">約¥6,000</span></div>
-        <div class="pc"><span class="n">ココネル エアープラス AB</span><span class="m">ベビレンタ等</span><span class="p">要見積</span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#b-playard-tag"/></svg><span class="pt"><span class="n">ココネル エアー AB</span><span class="m">30日〜</span><span class="p">¥3,899〜</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#b-crib-tag"/></svg><span class="pt"><span class="n">ハーフサイズ 3か月</span><span class="m">レンタル相場</span><span class="p">約¥6,000</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#b-playard-tag"/></svg><span class="pt"><span class="n">ココネル エアープラス AB</span><span class="m">ベビレンタ等</span><span class="p">要見積</span></span></div>
       </div>
     </div>
     <div class="axlabel x"><span>← 購入</span><span>レンタル →</span></div>
     <div class="axlabel">↓ ミニ・省スペース（60×90）</div>
+    <p class="glnote">図は<strong>模式図</strong>。折りたたみメッシュ（中央の丸はヒンジ）／添い寝タイプ（脚の目盛が高さ調整段数）／ハイタイプ（点線はベッド下の収納空間）／木製すのこ、の4タイプ。<strong>タグが付いているものはレンタル</strong>。</p>
   </div>
 
   <h3>比較表（10製品・サービス）</h3>
@@ -461,30 +628,31 @@ footer a{color:var(--ink-2)}
     <div class="quad">
       <div class="q">
         <div class="q-t">素材品質 × ミニ</div>
-        <div class="pc"><span class="n">すくすや 羽毛7点 ミニ</span><span class="m">コンビ</span><span class="p">¥43,780</span></div>
-        <div class="pc"><span class="n">8点セット スーピマコットン</span><span class="m">サンデシカ</span><span class="p">¥14,490〜</span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#f-down"/></svg><span class="pt"><span class="n">すくすや 羽毛7点 ミニ</span><span class="m">コンビ</span><span class="p">¥43,780</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#f-set-mini"/></svg><span class="pt"><span class="n">8点セット スーピマコットン</span><span class="m">サンデシカ</span><span class="p">¥14,490〜</span></span></div>
       </div>
       <div class="q">
         <div class="q-t">素材品質 × レギュラー</div>
-        <div class="pc"><span class="n">スーパープレミアム 10点</span><span class="m">たまひよ</span><span class="p">税抜¥29,686〜</span></div>
-        <div class="pc"><span class="n">すくすや 羽毛7点 レギュラー</span><span class="m">コンビ</span><span class="p">¥43,780</span></div>
-        <div class="pc"><span class="n">洗えるベビーふとん7点</span><span class="m">西川</span><span class="p">価格未確認</span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#f-set-regular"/></svg><span class="pt"><span class="n">スーパープレミアム 10点</span><span class="m">たまひよ</span><span class="p">税抜¥29,686〜</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#f-down"/></svg><span class="pt"><span class="n">すくすや 羽毛7点 レギュラー</span><span class="m">コンビ</span><span class="p">¥43,780</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#f-set-regular"/></svg><span class="pt"><span class="n">洗えるベビーふとん7点</span><span class="m">西川</span><span class="p">価格未確認</span></span></div>
       </div>
       <div class="q">
         <div class="q-t">洗いやすさ × ミニ</div>
-        <div class="pc rec"><span class="rectag">◎ ミニならこれ</span><span class="n">洗える8点セット ミニ</span><span class="m">サンデシカ</span><span class="p">¥12,990〜</span></div>
-        <div class="pc"><span class="n">ミニ9点セット</span><span class="m">un doudou</span><span class="p">¥6,790</span></div>
-        <div class="pc"><span class="n">ベビー組布団8点</span><span class="m">アイリスプラザ</span><span class="p">¥8,910</span></div>
+        <div class="pc rec"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#f-set-mini"/></svg><span class="pt"><span class="rectag">◎ ミニならこれ</span><span class="n">洗える8点セット ミニ</span><span class="m">サンデシカ</span><span class="p">¥12,990〜</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#f-set-mini"/></svg><span class="pt"><span class="n">ミニ9点セット</span><span class="m">un doudou</span><span class="p">¥6,790</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#f-set-mini"/></svg><span class="pt"><span class="n">ベビー組布団8点</span><span class="m">アイリスプラザ</span><span class="p">¥8,910</span></span></div>
       </div>
       <div class="q">
         <div class="q-t">洗いやすさ × レギュラー</div>
-        <div class="pc rec"><span class="rectag">◎ レギュラーならこれ</span><span class="n">洗える8点セット レギュラー</span><span class="m">サンデシカ</span><span class="p">¥12,990〜</span></div>
-        <div class="pc"><span class="n">イブル お昼寝6点 70×120</span><span class="m">ケラッタ</span><span class="p">¥3,880</span></div>
-        <div class="pc"><span class="n">洗える固わた敷布団 70×120</span><span class="m">ニトリ</span><span class="p">¥2,490</span></div>
+        <div class="pc rec"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#f-set-regular"/></svg><span class="pt"><span class="rectag">◎ レギュラーならこれ</span><span class="n">洗える8点セット レギュラー</span><span class="m">サンデシカ</span><span class="p">¥12,990〜</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#f-set-regular"/></svg><span class="pt"><span class="n">イブル お昼寝6点 70×120</span><span class="m">ケラッタ</span><span class="p">¥3,880</span></span></div>
+        <div class="pc"><svg class="gl" viewBox="0 0 48 48" role="img" aria-hidden="true"><use href="#f-mattress"/></svg><span class="pt"><span class="n">洗える固わた敷布団 70×120</span><span class="m">ニトリ</span><span class="p">¥2,490</span></span></div>
       </div>
     </div>
     <div class="axlabel x"><span>← ミニ 60×90</span><span>レギュラー 70×120 →</span></div>
     <div class="axlabel">↓ 洗いやすさ重視</div>
+    <p class="glnote">図は<strong>模式図</strong>。セット一式（敷＋掛＋まくら）は横幅でミニとレギュラーを描き分け、羽毛タイプは羽根、単品の敷ふとんは二つ折り線で示している。</p>
   </div>
 
   <h3>比較表（11製品）</h3>
