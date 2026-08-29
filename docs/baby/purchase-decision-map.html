@@ -1,0 +1,648 @@
+<title>出産準備 購入判断マップ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#F6F7F4; --surface:#FFFFFF; --surface-2:#EDF0EA;
+  --ink:#1B221F; --ink-2:#4B5551; --ink-3:#7B857F;
+  --line:#D9DDD5; --line-strong:#B4BCB2;
+  --accent:#2F6B57; --accent-soft:#E2EDE7;
+  --mark:#A94E27; --mark-soft:#F7E8DF;
+  --warn:#7E6417; --warn-soft:#F4EEDA;
+  --shadow:0 1px 2px rgba(27,34,31,.05);
+  --sans:"Zen Kaku Gothic New",-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  --serif:"Zen Old Mincho","Hiragino Mincho ProN","Noto Serif JP",serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#131714; --surface:#1B211E; --surface-2:#232A26;
+    --ink:#E9ECE7; --ink-2:#AFB9B3; --ink-3:#808B85;
+    --line:#323A35; --line-strong:#4B554F;
+    --accent:#74C2A3; --accent-soft:#1D2E27;
+    --mark:#E28A5C; --mark-soft:#33231A;
+    --warn:#D6B75F; --warn-soft:#2C2718;
+    --shadow:0 1px 2px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#131714; --surface:#1B211E; --surface-2:#232A26;
+  --ink:#E9ECE7; --ink-2:#AFB9B3; --ink-3:#808B85;
+  --line:#323A35; --line-strong:#4B554F;
+  --accent:#74C2A3; --accent-soft:#1D2E27;
+  --mark:#E28A5C; --mark-soft:#33231A;
+  --warn:#D6B75F; --warn-soft:#2C2718;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:var(--sans); font-size:15px; line-height:1.75;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+}
+.wrap{max-width:860px; margin:0 auto; padding:0 20px 96px}
+h1,h2,h3,h4{text-wrap:balance; margin:0}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+
+/* ---------- header ---------- */
+.masthead{border-bottom:1px solid var(--line); background:var(--surface); padding:44px 0 30px; margin-bottom:34px}
+.masthead .wrap{padding-bottom:0}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); margin:0 0 14px}
+h1{font-family:var(--serif); font-weight:700; font-size:clamp(27px,7vw,40px); line-height:1.3; letter-spacing:.01em}
+.lede{color:var(--ink-2); font-size:14.5px; margin:14px 0 0; max-width:62ch}
+.counter{display:flex; flex-wrap:wrap; gap:10px; margin-top:22px}
+.counter div{background:var(--surface-2); border:1px solid var(--line); border-radius:3px; padding:8px 13px; min-width:96px}
+.counter b{display:block; font-family:var(--mono); font-size:19px; font-weight:500; line-height:1.25; font-variant-numeric:tabular-nums}
+.counter span{font-size:10.5px; color:var(--ink-3); letter-spacing:.06em}
+
+/* ---------- nav ---------- */
+nav.toc{position:sticky; top:0; z-index:20; background:var(--ground); border-bottom:1px solid var(--line); margin:0 0 34px}
+nav.toc ul{display:flex; gap:0; list-style:none; margin:0; padding:0; overflow-x:auto; scrollbar-width:none}
+nav.toc ul::-webkit-scrollbar{display:none}
+nav.toc a{display:block; white-space:nowrap; padding:11px 13px; font-size:12.5px; text-decoration:none; color:var(--ink-2); border-bottom:2px solid transparent}
+nav.toc a:hover{color:var(--accent); border-bottom-color:var(--accent)}
+
+/* ---------- sections ---------- */
+section{margin-bottom:56px; scroll-margin-top:52px}
+.sec-head{border-top:2px solid var(--ink); padding-top:12px; margin-bottom:20px}
+.sec-num{font-family:var(--mono); font-size:11px; color:var(--ink-3); letter-spacing:.1em}
+h2{font-family:var(--serif); font-size:clamp(20px,4.6vw,26px); line-height:1.4; margin-top:3px}
+.sec-meta{display:flex; flex-wrap:wrap; gap:7px; margin-top:11px}
+h3{font-size:15px; font-weight:700; margin:30px 0 11px; letter-spacing:.02em}
+p{margin:0 0 13px}
+.note{font-size:13px; color:var(--ink-2)}
+
+/* ---------- chips ---------- */
+.chip{display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:500; padding:3px 9px; border-radius:2px; border:1px solid var(--line-strong); color:var(--ink-2); background:var(--surface); letter-spacing:.03em; white-space:nowrap}
+.chip.star{color:var(--mark); border-color:var(--mark); background:var(--mark-soft); font-family:var(--mono)}
+.chip.yen{font-family:var(--mono); font-variant-numeric:tabular-nums}
+.chip.when{color:var(--accent); border-color:var(--accent); background:var(--accent-soft)}
+
+/* ---------- summary table ---------- */
+.scroll{overflow-x:auto; border:1px solid var(--line); border-radius:3px; background:var(--surface); box-shadow:var(--shadow)}
+table{border-collapse:collapse; width:100%; font-size:13px; min-width:520px}
+th,td{text-align:left; padding:9px 11px; border-bottom:1px solid var(--line); vertical-align:top}
+thead th{background:var(--surface-2); font-size:11px; letter-spacing:.07em; color:var(--ink-2); font-weight:700; white-space:nowrap; position:sticky; top:0}
+tbody tr:last-child td{border-bottom:none}
+td.num,th.num{font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
+td .pname{font-weight:700; display:block}
+td .pmaker{font-size:11px; color:var(--ink-3)}
+tr.rec td{background:var(--mark-soft)}
+tr.rec td:first-child{box-shadow:inset 3px 0 0 var(--mark)}
+.unk{color:var(--ink-3); font-style:italic}
+#summary table{min-width:680px}
+#summary td:first-child{white-space:nowrap}
+
+/* ---------- quadrant ---------- */
+.quadbox{margin:18px 0 8px}
+.axlabel{font-size:11.5px; font-weight:700; color:var(--ink-2); text-align:center; letter-spacing:.05em; padding:6px 0}
+.axlabel.x{display:flex; justify-content:space-between; align-items:center; gap:8px; border-top:1px solid var(--line); margin-top:6px; padding-top:8px}
+.axlabel.x span{flex:1}
+.axlabel.x span:last-child{text-align:right}
+.quad{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line-strong); border:1px solid var(--line-strong); border-radius:3px; overflow:hidden}
+.q{background:var(--surface); padding:11px 10px; display:flex; flex-direction:column; gap:7px}
+.q-t{font-size:10px; font-family:var(--mono); letter-spacing:.06em; color:var(--ink-3); text-transform:uppercase}
+.pc{border:1px solid var(--line); border-radius:2px; padding:6px 8px; background:var(--ground)}
+.pc.rec{border:1.5px solid var(--mark); background:var(--mark-soft)}
+.pc .n{font-size:12px; font-weight:700; line-height:1.4; display:block}
+.pc .m{font-size:10px; color:var(--ink-3); display:block; line-height:1.5}
+.pc .p{font-family:var(--mono); font-size:11px; color:var(--ink-2); font-variant-numeric:tabular-nums}
+.pc.rec .p{color:var(--mark)}
+.rectag{font-size:9.5px; font-weight:700; color:var(--mark); letter-spacing:.08em}
+
+/* ---------- callouts ---------- */
+.call{border:1px solid var(--line); border-left:3px solid var(--accent); background:var(--surface); border-radius:0 3px 3px 0; padding:14px 16px; margin:16px 0; font-size:13.5px}
+.call.warn{border-left-color:var(--warn); background:var(--warn-soft)}
+.call.mark{border-left-color:var(--mark); background:var(--mark-soft)}
+.call h4{font-size:13px; margin-bottom:6px; letter-spacing:.03em}
+.call p:last-child{margin-bottom:0}
+.call ul{margin:8px 0 0; padding-left:19px}
+.call li{margin-bottom:5px}
+
+/* undecided = dashed */
+.undecided{border:1px dashed var(--line-strong); background:var(--surface); border-radius:3px; padding:14px 16px; margin-bottom:12px}
+.undecided h4{font-size:13.5px; margin-bottom:7px}
+.undecided .then{font-size:12.5px; color:var(--ink-2); margin-top:8px; padding-top:8px; border-top:1px dashed var(--line)}
+.undecided .then b{color:var(--ink); font-family:var(--mono); font-size:11px; letter-spacing:.05em}
+
+/* ---------- timeline ---------- */
+.tl{list-style:none; margin:18px 0 0; padding:0; border-left:2px solid var(--line-strong); margin-left:6px}
+.tl li{position:relative; padding:0 0 26px 22px}
+.tl li::before{content:""; position:absolute; left:-7px; top:6px; width:12px; height:12px; border-radius:50%; background:var(--ground); border:2px solid var(--line-strong)}
+.tl li.hot::before{background:var(--mark); border-color:var(--mark)}
+.tl .when-t{font-family:var(--mono); font-size:11.5px; letter-spacing:.06em; color:var(--accent); font-weight:500}
+.tl .what{font-weight:700; font-size:14.5px; margin:2px 0 4px}
+.tl .why{font-size:12.5px; color:var(--ink-2)}
+.tl li:last-child{padding-bottom:0}
+
+/* ---------- excluded ---------- */
+.excl{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px}
+.excl span{font-size:11.5px; color:var(--ink-3); border:1px solid var(--line); border-radius:2px; padding:3px 9px; background:var(--surface-2); text-decoration:line-through}
+
+footer{border-top:1px solid var(--line); padding-top:20px; font-size:12px; color:var(--ink-3)}
+footer ul{padding-left:18px; margin:8px 0}
+footer li{margin-bottom:4px}
+footer a{color:var(--ink-2)}
+
+@media (max-width:420px){
+  body{font-size:14.5px}
+  .wrap{padding:0 14px 72px}
+  .q{padding:9px 7px; gap:6px}
+  .pc{padding:5px 6px}
+  .pc .n{font-size:11.5px}
+  .axlabel{font-size:10.5px}
+}
+</style>
+
+<header class="masthead">
+  <div class="wrap">
+    <p class="eyebrow">2027年1月出産 / 江戸川区 / 里帰りなし</p>
+    <h1>出産準備 購入判断マップ</h1>
+    <p class="lede">2万円以上かかる5点にしぼった購入判断の地図。何を買うかはもう決まっている。決まっていないのは<strong>どの機種を、いつ、どういう順で</strong>買うか。未確定の判断軸は隠さず、点線で示している。</p>
+    <div class="counter">
+      <div><b id="c-days">140</b><span>予定日まで（日）</span></div>
+      <div><b id="c-weeks">20w0d</b><span>妊娠週数</span></div>
+      <div><b>14.2–28<span style="font-size:11px">万</span></b><span>想定総額（円）</span></div>
+      <div><b>5</b><span>判断対象（点）</span></div>
+    </div>
+  </div>
+</header>
+
+<nav class="toc"><div class="wrap" style="padding-bottom:0">
+  <ul>
+    <li><a href="#summary">全体像</a></li>
+    <li><a href="#axes">未確定の軸</a></li>
+    <li><a href="#carrier">抱っこ紐</a></li>
+    <li><a href="#stroller">ベビーカー</a></li>
+    <li><a href="#bed">ベビーベッド</a></li>
+    <li><a href="#futon">ベビー布団</a></li>
+    <li><a href="#care">産後ケア</a></li>
+    <li><a href="#timeline">タイムライン</a></li>
+  </ul>
+</div></nav>
+
+<div class="wrap">
+
+<section id="summary">
+  <div class="sec-head"><div class="sec-num">01</div><h2>全体像 — 5点と、その並び順</h2></div>
+  <p>買う順番は必要度順ではない。<strong>試着が要るもの、サイズ依存があるもの、実物を見てから決めたいもの</strong>で順序が決まる。</p>
+  <div class="scroll"><table>
+    <thead><tr><th>品目</th><th>必要度</th><th class="num">予算</th><th>時期</th><th>なぜその時期か</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pname">抱っこ紐</span></td><td class="num">★★★★</td><td class="num">2–4万</td><td>10月</td><td>夫婦2人での試着が必須。1月生まれなので<strong>厚着の上から</strong>装着して確かめる必要があり、店頭が混む年末を避ける</td></tr>
+      <tr><td><span class="pname">産後ケア・家事代行</span></td><td class="num">★★★★</td><td class="num">3–10万</td><td>10月下旬〜</td><td>江戸川区の産後ケアは<strong>妊娠28週から申請可能</strong>（2026-10-24以降）。枠取りは早いほうが有利</td></tr>
+      <tr><td><span class="pname">ベビーベッド</span></td><td class="num">★★★</td><td class="num">2.2–5万</td><td>11月上旬</td><td>ベビー布団のサイズを規定する<strong>上流の決定</strong>。先に確定させる</td></tr>
+      <tr><td><span class="pname">ベビー布団一式</span></td><td class="num">★★★★★</td><td class="num">2–3万</td><td>11月中旬</td><td>必要度は最高だが<strong>ベッド確定後</strong>。先に買うとサイズが合わない</td></tr>
+      <tr><td><span class="pname">ベビーカー</span></td><td class="num">★★★</td><td class="num">5–10万</td><td>2027年2月</td><td>新生児は外出しない。1か月健診後に、実際に赤ちゃんを乗せて決められる</td></tr>
+    </tbody>
+  </table></div>
+  <div class="call mark">
+    <h4>必要度★5のベビー布団が、買う順では4番目になる</h4>
+    <p>これは矛盾ではない。ベビー布団はミニ（60×90cm）とレギュラー（70×120cm）で互換性がなく、<strong>どちらを買うかはベビーベッドが決めてしまう</strong>。必要度の高さは「買い忘れてはいけない」を意味するのであって「先に買え」ではない。</p>
+  </div>
+</section>
+
+<section id="axes">
+  <div class="sec-head"><div class="sec-num">02</div><h2>まだ決まっていない3つの軸</h2></div>
+  <p>このページの点線枠は、すべて「まだ決まっていない」の印。決まった瞬間に何が確定するかを併記した。</p>
+
+  <div class="undecided">
+    <h4>① 寝室の大人の寝具は、ベッドか布団か</h4>
+    <p class="note">添い寝型ベビーベッドは大人のマットレス高さに床板を合わせる構造なので、この一点で候補が入れ替わる。</p>
+    <p class="then"><b>ベッドなら →</b> ファルスカ ベッドサイドベッド03（高さ9段階）が本命。<br><b>布団なら →</b> 高さ調整の意味が薄れ、ココネル エアー AB の省スペース性が効く。</p>
+  </div>
+
+  <div class="undecided">
+    <h4>② ベビーベッドをミニにするか、レギュラーにするか</h4>
+    <p class="note">①の帰結でもある。ココネル エアー系は<strong>ミニ専用布団しか使えない</strong>ため、ここが布団の型番まで規定する。</p>
+    <p class="then"><b>ミニ（60×90）なら →</b> サンデシカ8点セット ミニ / un doudou 9点セット。<br><b>レギュラー（70×120）なら →</b> サンデシカ8点セット レギュラー / 西川7点セット。</p>
+  </div>
+
+  <div class="undecided">
+    <h4>③ 保育園を0歳4月入園で狙うか</h4>
+    <p class="note">Notion上の本命は2028年4月入園。もし2027年4月（0歳）に切り替えるなら、ベビーカーの購入時期が2月では遅くなり、慣らし保育に間に合わせる必要が出る。</p>
+    <p class="then"><b>2028年4月のままなら →</b> ベビーカーは2027年2月で問題なし。<br><b>2027年4月に前倒すなら →</b> ベビーカーを1月中に確定させる。</p>
+  </div>
+
+  <div class="call warn">
+    <h4>自家用車の有無は、この5点には影響しない</h4>
+    <p>チャイルドシートは今回の対象外。タクシー等の旅客運送事業の車両は道交法上のチャイルドシート着用義務の適用除外にあたるため、退院時の移動手段としてタクシーを使う限り、この判断は5点の買い物を止めない。</p>
+  </div>
+</section>
+
+<section id="carrier">
+  <div class="sec-head">
+    <div class="sec-num">03</div><h2>抱っこ紐</h2>
+    <div class="sec-meta"><span class="chip star">★★★★</span><span class="chip yen">2–4万円</span><span class="chip when">10月</span></div>
+  </div>
+  <p>軸は Kurashi iimono の既存比較図に準拠。<strong>夫婦で共用する</strong>ため、体格差を吸収できるベルト調整幅が事実上の第一条件になる。</p>
+
+  <div class="quadbox">
+    <div class="axlabel">↑ 長時間快適・安定感</div>
+    <div class="quad">
+      <div class="q">
+        <div class="q-t">安定感 × コスパ</div>
+        <div class="pc"><span class="n">ジョイン EL-E</span><span class="m">コンビ</span><span class="p">¥9,900〜</span></div>
+        <div class="pc"><span class="n">BASIC</span><span class="m">napnap</span><span class="p">約¥10,000</span></div>
+        <div class="pc"><span class="n">ADAPT SoftFlex</span><span class="m">エルゴベビー</span><span class="p">実勢¥17,500</span></div>
+      </div>
+      <div class="q">
+        <div class="q-t">安定感 × 機能デザイン</div>
+        <div class="pc rec"><span class="rectag">◎ 本命</span><span class="n">HARMONY</span><span class="m">ベビービョルン</span><span class="p">¥34,100</span></div>
+        <div class="pc"><span class="n">OMNI Breeze</span><span class="m">エルゴベビー</span><span class="p">¥33,990</span></div>
+        <div class="pc"><span class="n">コアラ ウルトラメッシュ EX</span><span class="m">アップリカ</span><span class="p">¥31,900</span></div>
+        <div class="pc"><span class="n">ラクリス AB</span><span class="m">アップリカ</span><span class="p">¥27,780〜</span></div>
+      </div>
+      <div class="q">
+        <div class="q-t">軽量 × コスパ</div>
+        <div class="pc rec"><span class="rectag">◎ サブに併用</span><span class="n">FLEX AirMesh</span><span class="m">コニー</span><span class="p">¥6,980</span></div>
+        <div class="pc"><span class="n">ベビースリング</span><span class="m">ケラッタ</span><span class="p">¥3,380</span></div>
+        <div class="pc"><span class="n">ヒップシート</span><span class="m">ケラッタ</span><span class="p">¥3,480</span></div>
+      </div>
+      <div class="q">
+        <div class="q-t">軽量 × 機能デザイン</div>
+        <div class="pc"><span class="n">MINI AIR</span><span class="m">ベビービョルン</span><span class="p">¥13,213〜</span></div>
+        <div class="pc"><span class="n">AWAY</span><span class="m">エルゴベビー</span><span class="p">¥16,500</span></div>
+        <div class="pc"><span class="n">POLBAN ADVANCE</span><span class="m">ラッキー工業</span><span class="p">¥11,000〜</span></div>
+      </div>
+    </div>
+    <div class="axlabel x"><span>← コスパ重視</span><span>機能・デザイン重視 →</span></div>
+    <div class="axlabel">↓ 軽量・サッと使える</div>
+  </div>
+
+  <h3>比較表（12製品）</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>製品 / メーカー</th><th class="num">実売価格</th><th class="num">重量</th><th>対象</th><th>安全基準</th><th>良い / 気になる</th></tr></thead>
+    <tbody>
+      <tr class="rec"><td><span class="pname">HARMONY</span><span class="pmaker">ベビービョルン</span></td><td class="num">¥34,100</td><td class="num">892g</td><td>新生児〜36か月<br>3.2–15kg</td><td>SG基準</td><td>全面メッシュ。肩・腰のパッドが厚く体格差を吸収しやすい／ポケットが無い</td></tr>
+      <tr><td><span class="pname">OMNI Breeze</span><span class="pmaker">エルゴベビー</span></td><td class="num">¥33,990</td><td class="num unk">未確認</td><td>対面0〜48か月<br>〜20.4kg</td><td>SGマーク適合</td><td>通気性と対応期間が最長クラス。4WAY／価格が最上位帯</td></tr>
+      <tr><td><span class="pname">コアラ ウルトラメッシュ EX</span><span class="pmaker">アップリカ</span></td><td class="num">¥31,900<br><span class="pmaker">Amazon ¥29,700</span></td><td class="num unk">未確認</td><td>新生児2.5kg〜36か月</td><td class="unk">記載確認できず</td><td>ペタル構造で装着後に赤ちゃんを入れられる／装着に時間がかかる・蒸れの声</td></tr>
+      <tr><td><span class="pname">ラクリス AB</span><span class="pmaker">アップリカ</span></td><td class="num">¥32,780<br><span class="pmaker">→¥27,780</span></td><td class="num">838g</td><td>生後14日3.2kg〜15kg</td><td class="unk">記載確認できず</td><td>2025年6月発売の最新世代・フルメッシュ／新しく中古流通が少ない</td></tr>
+      <tr><td><span class="pname">ADAPT SoftFlex</span><span class="pmaker">エルゴベビー</span></td><td class="num">実勢¥17,500</td><td class="num unk">未確認</td><td>対面0〜48か月<br>〜20.4kg</td><td>製品安全協会</td><td>付属品なしで新生児から20kg超まで／前向き抱き非対応</td></tr>
+      <tr><td><span class="pname">AWAY</span><span class="pmaker">エルゴベビー</span></td><td class="num">¥16,500</td><td class="num unk">未確認</td><td>4〜36か月<br>5.5–15.9kg</td><td class="unk">記載確認できず</td><td>一体型ポーチでコンパクトに収納／首すわり後からで新生児期に使えない</td></tr>
+      <tr><td><span class="pname">MINI AIR</span><span class="pmaker">ベビービョルン</span></td><td class="num">¥13,213〜<br><span class="pmaker">MINI ¥11,000</span></td><td class="num unk">未確認</td><td>新生児〜12か月<br>3.2–11kg</td><td class="unk">記載確認できず</td><td>新生児期の着脱が最も簡単／肩の負担が大きく12か月で終わる</td></tr>
+      <tr><td><span class="pname">POLBAN ADVANCE</span><span class="pmaker">ラッキー工業</span></td><td class="num">¥11,000–13,750</td><td class="num">470–530g</td><td>7か月（腰すわり）〜36か月</td><td class="unk">記載確認できず</td><td>腰の負担を逃がせる／腰すわり後専用なので出番は2027年後半</td></tr>
+      <tr><td><span class="pname">ジョイン EL-E</span><span class="pmaker">コンビ</span></td><td class="num">¥9,900〜<br><span class="pmaker">定価¥15,000+税</span></td><td class="num unk">未確認</td><td>首すわり後〜<br>（1か月〜は別売シート）</td><td class="unk">記載確認できず</td><td>軽く装着が簡単・腰ホールドで負担減／新生児にはインファントシートが別売</td></tr>
+      <tr><td><span class="pname">BASIC / メッシュドライ</span><span class="pmaker">napnap</span></td><td class="num">約¥10,000</td><td class="num unk">未確認</td><td>首すわり（4か月頃）〜</td><td>SG基準・1年保証</td><td>日本人体型の立体裁断・肩ベルトが太い・ポケット内蔵／新生児は別売インサート</td></tr>
+      <tr class="rec"><td><span class="pname">FLEX AirMesh</span><span class="pmaker">コニー</span></td><td class="num">¥6,980</td><td class="num">336g<br><span class="pmaker">※FLEX</span></td><td>新生児〜20kg</td><td class="unk">記載確認できず</td><td>圧倒的に軽く寝かしつけに強い／着用に慣れが要る・サイズ選びが必要</td></tr>
+      <tr><td><span class="pname">ベビースリング / ヒップシート</span><span class="pmaker">ケラッタ</span></td><td class="num">¥3,380 / ¥3,480</td><td class="num unk">未確認</td><td>生後14日3.2kg〜12か月</td><td>国内安全基準適合</td><td>最安帯・6WAY／サポート性と耐久性は上位機に劣る</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="call mark">
+    <h4>推奨：ベビービョルン HARMONY を本命、コニー FLEX を室内用に併用</h4>
+    <ul>
+      <li><strong>HARMONY（¥34,100）</strong> — 892gと本格モデルでは最軽量級で、肩・腰のパッドが厚い。夫婦で共用する前提だと、体格差を吸収する調整幅とワンタッチの着脱が決め手になる。全面メッシュなので、1月生まれで厚着の上から装着しても内側に熱がこもりにくい。</li>
+      <li><strong>コニー FLEX（¥6,980）</strong> — 336gで寝かしつけ専用。室内でこれ1枚あるかどうかで、里帰りなしの最初の2か月の負担がまるで変わる。</li>
+      <li><strong>次点はエルゴベビー OMNI Breeze（¥33,990）</strong> — 対応期間が48か月と最長。長く1本で通したいならこちら。</li>
+    </ul>
+    <p style="margin-top:10px"><strong>試着時に必ず確認すること：</strong>①冬のアウターを着た状態で装着する ②夫婦それぞれでベルトを締め直し、切り替えに何秒かかるか測る ③抱っこしたまま前かがみになる。1月生まれの本番は真冬なので、半袖での試着は当てにならない。</p>
+  </div>
+  <div class="call warn">
+    <p><strong>コニーは素材違いに注意。</strong>価格を確認できた ¥6,980 は「FLEX AirMesh（サマー）」＝メッシュの夏向けモデル。1月生まれの新生児期に使うなら通年素材の FLEX を選ぶことになり、価格は別途確認が要る。</p>
+  </div>
+</section>
+
+<section id="stroller">
+  <div class="sec-head">
+    <div class="sec-num">04</div><h2>ベビーカー</h2>
+    <div class="sec-meta"><span class="chip star">★★★</span><span class="chip yen">5–10万円</span><span class="chip when">2027年2月</span></div>
+  </div>
+  <p>船堀から都心方向は電車＋エレベーターの移動が中心になる。<strong>持ち上げる場面が必ずある</strong>ので、重量は仕様表の数字以上に効く。SG基準上「AB型」という区分は存在せず、両対面のものはほぼA型に分類される。</p>
+
+  <div class="quadbox">
+    <div class="axlabel">↑ 安定・走行性</div>
+    <div class="quad">
+      <div class="q">
+        <div class="q-t">安定 × コスパ</div>
+        <div class="pc rec"><span class="rectag">◎ コスパ本命</span><span class="n">スゴカルL long SL</span><span class="m">コンビ</span><span class="p">¥33,280〜</span></div>
+        <div class="pc"><span class="n">ラクーナ クッション AF</span><span class="m">アップリカ</span><span class="p">¥42,874〜</span></div>
+        <div class="pc"><span class="n">スゴカル エッグショック LA</span><span class="m">コンビ</span><span class="p">¥38,764〜</span></div>
+      </div>
+      <div class="q">
+        <div class="q-t">安定 × 機能デザイン</div>
+        <div class="pc"><span class="n">オプティア クッション</span><span class="m">アップリカ</span><span class="p">¥70,950〜</span></div>
+        <div class="pc"><span class="n">ランフィ RB5</span><span class="m">ピジョン</span><span class="p">¥67,100</span></div>
+        <div class="pc"><span class="n">ランフィ RB3</span><span class="m">ピジョン</span><span class="p">¥64,900</span></div>
+      </div>
+      <div class="q">
+        <div class="q-t">軽量 × コスパ</div>
+        <div class="pc"><span class="n">リベル 2026</span><span class="m">サイベックス / B型</span><span class="p">¥29,975</span></div>
+        <div class="pc"><span class="n">スゴカルα 4キャス Light</span><span class="m">コンビ</span><span class="p">¥28,800〜</span></div>
+        <div class="pc"><span class="n">スゴカルα 4キャス compact HT</span><span class="m">コンビ</span><span class="p">価格未確認</span></div>
+      </div>
+      <div class="q">
+        <div class="q-t">軽量 × 機能デザイン</div>
+        <div class="pc rec"><span class="rectag">◎ 本命</span><span class="n">メリオ カーボン 2026</span><span class="m">サイベックス</span><span class="p">¥74,690〜</span></div>
+        <div class="pc"><span class="n">ラクーナ クッション フリー AD</span><span class="m">アップリカ</span><span class="p">¥69,300</span></div>
+        <div class="pc"><span class="n">ラクーナ クッション AH</span><span class="m">アップリカ</span><span class="p">¥59,000</span></div>
+      </div>
+    </div>
+    <div class="axlabel x"><span>← コスパ重視</span><span>機能・デザイン重視 →</span></div>
+    <div class="axlabel">↓ 軽量・機動力</div>
+  </div>
+
+  <h3>比較表（12製品）</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>製品 / メーカー</th><th class="num">実売価格</th><th class="num">重量</th><th>対象</th><th>型</th><th>特徴 / 注意</th></tr></thead>
+    <tbody>
+      <tr class="rec"><td><span class="pname">メリオ カーボン 2026</span><span class="pmaker">サイベックス</span></td><td class="num">¥74,690〜</td><td class="num">5.9kg</td><td>1か月〜3歳頃<br>〜15kg</td><td>A型・両対面</td><td>カーボンフレームで軽さと走行性を両立。都内で最も見かける一台／価格は最上位帯</td></tr>
+      <tr class="rec"><td><span class="pname">スゴカルL long SL</span><span class="pmaker">コンビ</span></td><td class="num">¥33,280〜<br><span class="pmaker">〜¥45,000</span></td><td class="num">5.0kg</td><td>1か月〜4歳頃<br>〜18kg</td><td>A型・両対面</td><td>この表で最軽量かつ最長ユース。エッグショック搭載／幅を取る</td></tr>
+      <tr><td><span class="pname">ラクーナ クッション フリー AD</span><span class="pmaker">アップリカ</span></td><td class="num">¥69,300<br><span class="pmaker">希望小売</span></td><td class="num">5.5kg</td><td>1か月〜<br>〜15kg</td><td>A型・両対面</td><td>狭い場所で真横に動かせる。電車・エレベーター中心なら効く</td></tr>
+      <tr><td><span class="pname">ラクーナ クッション AH</span><span class="pmaker">アップリカ</span></td><td class="num">¥59,000<br><span class="pmaker">希望小売</span></td><td class="num">5.6kg</td><td>1か月〜<br>〜15kg</td><td>A型・両対面</td><td>2025年4月発売の現行世代</td></tr>
+      <tr><td><span class="pname">ラクーナ クッション AF</span><span class="pmaker">アップリカ</span></td><td class="num">¥42,874〜<br><span class="pmaker">最安</span></td><td class="num unk">未確認</td><td>1〜36か月</td><td>A型・両対面</td><td>2023年モデル。型落ちで価格が落ちている</td></tr>
+      <tr><td><span class="pname">オプティア クッション</span><span class="pmaker">アップリカ</span></td><td class="num">¥70,950–80,300</td><td class="num">6.9–7.1kg</td><td class="unk">未確認</td><td>A型・両対面</td><td>大径タイヤで走行安定性が高い／この表で最重量。持ち上げる場面が多いなら不利</td></tr>
+      <tr><td><span class="pname">ランフィ RB5</span><span class="pmaker">ピジョン</span></td><td class="num">¥67,100<br><span class="pmaker">実勢¥62,000</span></td><td class="num">5.9kg</td><td>1か月〜<br>〜15kg</td><td>A型・シングルタイヤ</td><td>2025年2月発売。ハンドル高さ調節あり</td></tr>
+      <tr><td><span class="pname">ランフィ RB3</span><span class="pmaker">ピジョン</span></td><td class="num">¥64,900<br><span class="pmaker">値下がり中</span></td><td class="num">5.7kg</td><td>1か月〜<br>〜15kg</td><td>A型・シングルタイヤ</td><td>小回りが利く／路面の振動を拾いやすい・サイズが大きい</td></tr>
+      <tr><td><span class="pname">スゴカル エッグショック LA</span><span class="pmaker">コンビ</span></td><td class="num">¥38,764〜</td><td class="num unk">未確認</td><td class="unk">未確認</td><td>A型・両対面</td><td>色で最大¥9,280の価格差がある。色にこだわらないなら実質の値下げになる</td></tr>
+      <tr><td><span class="pname">スゴカルα 4キャス Light</span><span class="pmaker">コンビ</span></td><td class="num">¥28,800〜</td><td class="num unk">未確認</td><td class="unk">未確認</td><td>A型・両対面</td><td>2万円台でオート4キャス。軽さと価格を最優先するならここ</td></tr>
+      <tr><td><span class="pname">スゴカルα 4キャス compact HT</span><span class="pmaker">コンビ</span></td><td class="num unk">価格未確認</td><td class="num">5.1kg<br><span class="pmaker">フル5.2kg</span></td><td class="unk">未確認</td><td>A型・両対面</td><td>2019年発売の旧型。価格.comに現行価格の掲載がなく入手性に難あり</td></tr>
+      <tr><td><span class="pname">リベル 2026</span><span class="pmaker">サイベックス</span></td><td class="num">¥29,975<br><span class="pmaker">税別¥27,250</span></td><td class="num">6kg台</td><td>6か月〜4歳<br>〜22kg</td><td>B型・背面</td><td>折りたたむと自転車のカゴに入る／<strong>6か月からなので1台目にはならない</strong></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="call mark">
+    <h4>推奨：サイベックス メリオ カーボン 2026（本命） / コンビ スゴカルL long SL（コスパ本命）</h4>
+    <ul>
+      <li><strong>メリオ カーボン 2026（¥74,690〜 / 5.9kg）</strong> — 予算上限の10万円に収まる。カーボンで軽さと走行性が両立しており、駅のエレベーター待ちや改札で持ち上げる場面に効く。両対面なので新生児期の対面と、後の背面を1台で通せる。</li>
+      <li><strong>スゴカルL long SL（¥33,280〜 / 5.0kg）</strong> — 予算を半分に抑えて、しかも<strong>この表で最軽量かつ4歳18kgまで</strong>。B型への買い替えを丸ごと省ける可能性があり、総額ではメリオより安く上がる公算が高い。デザインにこだわらないならこちらが合理的。</li>
+    </ul>
+    <p style="margin-top:10px"><strong>2月に店頭で確認すること：</strong>①バスケットの背面入口が横30×縦20cm以上あるか（米袋とおむつが載るかの分岐点） ②片手でベルトを留められるか ③畳んだ状態で玄関に置けるか。賃貸の玄関幅は先に測っておく。</p>
+  </div>
+  <div class="call warn">
+    <p><strong>販売終了・生産終了の情報。</strong>ピジョンのベビーカーは在庫終了次第の販売終了、アップリカ AttO は生産終了。スゴカル 4キャス エアー HK と 4キャス compact HH も生産終了品。2027年2月の購入時点では、ここに挙げた型番自体が入れ替わっている可能性が高いので、価格は再確認すること。</p>
+  </div>
+</section>
+
+<section id="bed">
+  <div class="sec-head">
+    <div class="sec-num">05</div><h2>ベビーベッド</h2>
+    <div class="sec-meta"><span class="chip star">★★★</span><span class="chip yen">2.2–5万円</span><span class="chip when">11月上旬</span></div>
+  </div>
+  <p>5点のうち<strong>唯一、他の買い物を縛る決定</strong>。ここが決まらないとベビー布団が発注できない。軸は「サイズ」と「購入かレンタルか」を取った。使用期間が実質6〜12か月と短く、購入とレンタルが正面から競合する唯一のカテゴリでもある。</p>
+
+  <div class="quadbox">
+    <div class="axlabel">↑ レギュラー・広い（70×120）</div>
+    <div class="quad">
+      <div class="q">
+        <div class="q-t">レギュラー × 購入</div>
+        <div class="pc rec"><span class="rectag">◎ 大人がベッドなら</span><span class="n">ベッドサイドベッド03</span><span class="m">ファルスカ</span><span class="p">¥25,850</span></div>
+        <div class="pc"><span class="n">ハイタイプベッド ツーオープン</span><span class="m">ヤマサキ</span><span class="p">¥46,200〜</span></div>
+        <div class="pc"><span class="n">ハイタイプ 02406</span><span class="m">カトージ</span><span class="p">価格未確認</span></div>
+      </div>
+      <div class="q">
+        <div class="q-t">レギュラー × レンタル</div>
+        <div class="pc"><span class="n">ハイタイプ ツーオープン</span><span class="m">ヤマサキ／各社レンタル</span><span class="p">要見積</span></div>
+        <div class="pc"><span class="n">標準サイズ 3か月</span><span class="m">レンタル相場</span><span class="p">約¥10,000</span></div>
+        <div class="pc"><span class="n">標準サイズ 9か月</span><span class="m">ナイスベビー例・送料別</span><span class="p">約¥13,000</span></div>
+      </div>
+      <div class="q">
+        <div class="q-t">ミニ × 購入</div>
+        <div class="pc rec"><span class="rectag">◎ 大人が布団なら</span><span class="n">ココネル エアー AB</span><span class="m">アップリカ</span><span class="p">約¥22,000</span></div>
+        <div class="pc"><span class="n">ココネル エアープラス AB</span><span class="m">アップリカ</span><span class="p">¥36,300</span></div>
+        <div class="pc"><span class="n">そいねーる+ロング</span><span class="m">大和屋</span><span class="p">価格未確認</span></div>
+      </div>
+      <div class="q">
+        <div class="q-t">ミニ × レンタル</div>
+        <div class="pc"><span class="n">ココネル エアー AB</span><span class="m">30日〜</span><span class="p">¥3,899〜</span></div>
+        <div class="pc"><span class="n">ハーフサイズ 3か月</span><span class="m">レンタル相場</span><span class="p">約¥6,000</span></div>
+        <div class="pc"><span class="n">ココネル エアープラス AB</span><span class="m">ベビレンタ等</span><span class="p">要見積</span></div>
+      </div>
+    </div>
+    <div class="axlabel x"><span>← 購入</span><span>レンタル →</span></div>
+    <div class="axlabel">↓ ミニ・省スペース（60×90）</div>
+  </div>
+
+  <h3>比較表（10製品・サービス）</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>製品 / メーカー</th><th class="num">価格</th><th>サイズ</th><th>安全基準</th><th>良い / 気になる</th></tr></thead>
+    <tbody>
+      <tr class="rec"><td><span class="pname">ココネル エアー AB</span><span class="pmaker">アップリカ</span></td><td class="num">約¥22,000<br><span class="pmaker">実売・引き継ぎ資料</span></td><td>ミニ<br>外寸 W1041×D737×H950<br>畳 W290×D270×H950</td><td><strong>PSC・SG取得</strong></td><td>LDKのメッシュタイプ検証で1位・前枠が下がる・畳める／柵の開閉音が大きい・高さ調整が2段階のみ・下段だと腰が痛い・ベッド下に収納なし</td></tr>
+      <tr><td><span class="pname">ココネル エアープラス AB</span><span class="pmaker">アップリカ</span></td><td class="num">¥36,300<br><span class="pmaker">税抜¥33,000</span></td><td>ミニ（同上）</td><td><strong>PSC・SG取得</strong></td><td>マットを外して洗濯機で丸洗いできる／その1点で1.4万円以上高い</td></tr>
+      <tr class="rec"><td><span class="pname">ベッドサイドベッド03</span><span class="pmaker">ファルスカ</span></td><td class="num">¥25,850</td><td>75×125×91cm<br>高さ9段階</td><td class="unk">記載確認できず</td><td>添い寝／ベビーベッド／プレイペンの3WAY・ブナ材すのこ・キャスター付き／大きく部屋間の移動が難しい</td></tr>
+      <tr><td><span class="pname">ハイタイプベッド ツーオープン</span><span class="pmaker">ヤマサキ</span></td><td class="num">¥46,200〜</td><td>外寸 W125×D78×H116<br>内寸 W120×D70<br>床板 70/45cm</td><td>日本製</td><td>腰をかがめずに世話できる・左右の扉が開く／設置面積が最大・価格も上位</td></tr>
+      <tr><td><span class="pname">ハイタイプ 02406</span><span class="pmaker">カトージ</span></td><td class="num unk">価格未確認</td><td>レギュラー</td><td>PSC（要現物確認）</td><td>床板が高くベッド下に収納できる・キャスター付き</td></tr>
+      <tr><td><span class="pname">そいねーる+ロング</span><span class="pmaker">大和屋</span></td><td class="num unk">価格未確認</td><td>ベビー時 内寸900×450<br>ロング時 1300×495</td><td class="unk">記載確認できず</td><td>添い寝＋ロングユース／内寸がミニ相当なので布団はミニ</td></tr>
+      <tr><td><span class="pname">標準サイズ レンタル</span><span class="pmaker">ナイスベビー / ベビレンタ ほか</span></td><td class="num">3か月 約¥10,000<br>9か月 約¥13,000</td><td>レギュラー</td><td>各社点検清掃済</td><td>返却できるので処分が不要／往復送料が高く、総額で見ないと逆転する</td></tr>
+      <tr><td><span class="pname">ハーフサイズ レンタル</span><span class="pmaker">同上</span></td><td class="num">3か月 約¥6,000</td><td>ミニ</td><td>同上</td><td>短期なら最安／1年使うと購入と並ぶ</td></tr>
+      <tr><td><span class="pname">ココネル エアー AB レンタル</span><span class="pmaker">各社</span></td><td class="num">30日 ¥3,899〜</td><td>ミニ</td><td>PSC・SG</td><td>試してから買う判断ができる／6か月で購入価格に到達する</td></tr>
+      <tr><td><span class="pname">ベッドインベッド類</span><span class="pmaker">neomamaism ほか</span></td><td class="num">1万円前後</td><td>—</td><td class="unk">—</td><td><strong>見送り推奨。</strong>窒息リスクの議論があり、米国小児科学会は同室別床を推奨している</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="call mark">
+    <h4>推奨：大人の寝具しだいで2択。ただしどちらも「購入」</h4>
+    <ul>
+      <li><strong>大人が布団 → ココネル エアー AB（約¥22,000）</strong>。PSC・SG両方を取得しており、畳めば厚さ29cmになる。新品2.2万に対し中古がメルカリで1.5万前後で流通しているので、<strong>売却まで含めた実質負担は1万円を切る</strong>。使用期間が短いこのカテゴリで、これはレンタルより強い。</li>
+      <li><strong>大人がベッド → ファルスカ ベッドサイドベッド03（¥25,850）</strong>。高さ9段階で大人のマットレスにフラットに寄せられる。片側だけ高さを変えて吐き戻し防止の傾斜もつけられる。</li>
+    </ul>
+    <p style="margin-top:10px"><strong>レンタルを推さない理由：</strong>相場は標準3か月で約1万円。里帰りをせず自宅で通しで使うと最低6か月は必要で、そこに往復送料が乗る。ココネル エアー AB を買って売る場合の実質1万円以下を、レンタルは上回れない。</p>
+  </div>
+  <div class="call warn">
+    <p><strong>価格情報の訂正。</strong>引き継ぎ資料にある「ココネルエアープラス AB 約2.2万円」は、確認した限り<strong>無印の「ココネル エアー AB」の実売価格</strong>にあたる。「プラス」は公式で税込¥36,300（税抜¥33,000）で、差分はマットを洗濯機で丸洗いできる点。<strong>2.2万円の想定でプラスを買いに行くと1.4万円ぶん足りない。</strong>どちらを買うかを先に決めること。</p>
+  </div>
+</section>
+
+<section id="futon">
+  <div class="sec-head">
+    <div class="sec-num">06</div><h2>ベビー布団一式</h2>
+    <div class="sec-meta"><span class="chip star">★★★★★</span><span class="chip yen">2–3万円</span><span class="chip when">11月中旬</span></div>
+  </div>
+  <div class="call warn" style="margin-top:0">
+    <h4>先に買ってはいけない</h4>
+    <p>ミニ（60×90cm）とレギュラー（70×120cm）に互換性はない。ココネル エアー系を選んだ場合は<strong>ミニ専用布団しか使えない</strong>。ベビーベッドを確定させてから発注すること。必要度★5であることは、この順序を飛ばす理由にならない。</p>
+  </div>
+
+  <div class="quadbox">
+    <div class="axlabel">↑ 素材品質重視</div>
+    <div class="quad">
+      <div class="q">
+        <div class="q-t">素材品質 × ミニ</div>
+        <div class="pc"><span class="n">すくすや 羽毛7点 ミニ</span><span class="m">コンビ</span><span class="p">¥43,780</span></div>
+        <div class="pc"><span class="n">8点セット スーピマコットン</span><span class="m">サンデシカ</span><span class="p">¥14,490〜</span></div>
+      </div>
+      <div class="q">
+        <div class="q-t">素材品質 × レギュラー</div>
+        <div class="pc"><span class="n">スーパープレミアム 10点</span><span class="m">たまひよ</span><span class="p">税抜¥29,686〜</span></div>
+        <div class="pc"><span class="n">すくすや 羽毛7点 レギュラー</span><span class="m">コンビ</span><span class="p">¥43,780</span></div>
+        <div class="pc"><span class="n">洗えるベビーふとん7点</span><span class="m">西川</span><span class="p">価格未確認</span></div>
+      </div>
+      <div class="q">
+        <div class="q-t">洗いやすさ × ミニ</div>
+        <div class="pc rec"><span class="rectag">◎ ミニならこれ</span><span class="n">洗える8点セット ミニ</span><span class="m">サンデシカ</span><span class="p">¥12,990〜</span></div>
+        <div class="pc"><span class="n">ミニ9点セット</span><span class="m">un doudou</span><span class="p">¥6,790</span></div>
+        <div class="pc"><span class="n">ベビー組布団8点</span><span class="m">アイリスプラザ</span><span class="p">¥8,910</span></div>
+      </div>
+      <div class="q">
+        <div class="q-t">洗いやすさ × レギュラー</div>
+        <div class="pc rec"><span class="rectag">◎ レギュラーならこれ</span><span class="n">洗える8点セット レギュラー</span><span class="m">サンデシカ</span><span class="p">¥12,990〜</span></div>
+        <div class="pc"><span class="n">イブル お昼寝6点 70×120</span><span class="m">ケラッタ</span><span class="p">¥3,880</span></div>
+        <div class="pc"><span class="n">洗える固わた敷布団 70×120</span><span class="m">ニトリ</span><span class="p">¥2,490</span></div>
+      </div>
+    </div>
+    <div class="axlabel x"><span>← ミニ 60×90</span><span>レギュラー 70×120 →</span></div>
+    <div class="axlabel">↓ 洗いやすさ重視</div>
+  </div>
+
+  <h3>比較表（11製品）</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>製品 / メーカー</th><th class="num">価格</th><th>点数・サイズ</th><th>洗える範囲</th><th>備考</th></tr></thead>
+    <tbody>
+      <tr class="rec"><td><span class="pname">敷布団も洗濯機で洗える 8点セット</span><span class="pmaker">サンデシカ</span></td><td class="num">¥12,990〜<br><span class="pmaker">通常¥14,990</span></td><td>8点<br>ミニ・レギュラー両方</td><td><strong>敷布団まで洗濯機OK</strong></td><td>日本製。LDKベストバイ1位。両サイズ展開なのでベッド確定を待って同じ製品で選べる</td></tr>
+      <tr><td><span class="pname">同 スーピマコットン（超長綿）</span><span class="pmaker">サンデシカ</span></td><td class="num">¥14,490〜</td><td>8点<br>両サイズ</td><td>敷布団まで洗濯機OK</td><td>生地を超長綿にした上位版。差額1,500円</td></tr>
+      <tr><td><span class="pname">ミニサイズ 9点セット</span><span class="pmaker">un doudou</span></td><td class="num">¥6,790</td><td>9点<br>ミニ 60×90</td><td class="unk">要確認</td><td>オーガニックコットン。点数あたり最安。LDK上位常連</td></tr>
+      <tr><td><span class="pname">イブル お昼寝布団6点セット</span><span class="pmaker">ケラッタ</span></td><td class="num">¥3,880<br><span class="pmaker">通常¥8,880</span></td><td>6点<br>70×120・敷厚3.5cm</td><td><strong>全て洗える</strong></td><td>はっ水バッグ・お名前シール付き。後の保育園用に転用できる</td></tr>
+      <tr><td><span class="pname">ベビー組布団 8点セット</span><span class="pmaker">アイリスプラザ</span></td><td class="num">¥8,910</td><td>8点</td><td class="unk">要確認</td><td>価格重視の定番</td></tr>
+      <tr><td><span class="pname">2つ折り 洗える固わた敷布団 NL01</span><span class="pmaker">ニトリ</span></td><td class="num">¥2,490</td><td>単品<br>70×120</td><td>丸洗い可</td><td>敷布団だけ買い足したいとき用</td></tr>
+      <tr><td><span class="pname">丸洗いできる高通気ベビー敷布団 CW01</span><span class="pmaker">ニトリ</span></td><td class="num">¥5,990</td><td>単品</td><td>丸洗い可</td><td>同上・通気性重視版</td></tr>
+      <tr><td><span class="pname">洗えるベビーふとん7点セット</span><span class="pmaker">西川</span></td><td class="num unk">価格未確認</td><td>7点<br>レギュラー</td><td>フィッティングシーツ以外は洗濯機OK</td><td>日本製。掛けふとんはアトピー協会推薦品。ミニの4点・7点セットもあり</td></tr>
+      <tr><td><span class="pname">すくすや ベビー羽毛ふとん7点セット</span><span class="pmaker">コンビ</span></td><td class="num">¥43,780<br><span class="pmaker">店頭想定</span></td><td>7点<br>ミニ 掛70×85／敷60×90<br>レギュラー 掛85×115／敷70×120</td><td class="unk">要確認</td><td>窒息を防ぐ設計を掲げた2025年7月発売。<strong>予算2–3万を大きく超える</strong></td></tr>
+      <tr><td><span class="pname">スーパープレミアム 丸洗いできる体圧分散 10点セット</span><span class="pmaker">たまひよ</span></td><td class="num">税抜¥29,686〜<br><span class="pmaker">ムーミンベビー版</span></td><td>10点</td><td>丸洗い可</td><td>日本製。エアウィーヴBABY版もあり。グレードで価格差が大きい</td></tr>
+      <tr><td><span class="pname">立体ファイバー敷ふとん 6点セット</span><span class="pmaker">サンデシカ</span></td><td class="num unk">価格未確認</td><td>6点<br>両サイズ</td><td>ファイバー敷は洗いやすい</td><td>敷の素材を樹脂ファイバーにした系統</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="call mark">
+    <h4>推奨：サンデシカ「敷布団も洗濯機で洗える 8点セット」（¥12,990〜）</h4>
+    <p><strong>この製品を推す最大の理由は、ミニとレギュラーの両方で同じ型番が買えることにある。</strong>ベビーベッドが決まるまで布団の判断を保留できて、決まったらサイズだけ選べばいい。判断の依存関係を、製品選択の側で吸収してくれる唯一の候補。</p>
+    <p>敷布団まで洗濯機で洗えるのも、里帰りなし・夫婦2人の運用では効く（無印良品の「エアー」など、敷布団が洗えないセットは吐き戻しのたびに詰む）。日本製でLDKベストバイ1位。予算2〜3万に対して1.3万なので、<strong>差額でシーツと防水パッドを買い足す前提で組める</strong>。1月生まれなので、洗い替えは多いほうが良い。</p>
+  </div>
+</section>
+
+<section id="care">
+  <div class="sec-head">
+    <div class="sec-num">07</div><h2>産後ケア・家事代行</h2>
+    <div class="sec-meta"><span class="chip star">★★★★</span><span class="chip yen">3–10万円</span><span class="chip when">申請は10月下旬〜</span></div>
+  </div>
+  <p>5点で唯一の「物ではない」買い物であり、<strong>唯一、申請期限で機会が消える</strong>買い物でもある。里帰りをしない以上、ここは削るところではない。</p>
+
+  <div class="call mark">
+    <h4>妊娠28週＝2026-10-24 から申請できる</h4>
+    <p>江戸川区の産後ケア事業は妊娠28週（8か月）から利用申請を受け付けている。予定日2027-01-16 から逆算すると<strong>2026年10月24日</strong>。買い物リスト上は「11月」だが、<strong>申請だけは10月下旬に前倒しできる</strong>。枠には限りがあるので、抱っこ紐の試着と同じ月に済ませてしまうのが良い。</p>
+  </div>
+
+  <h3>江戸川区の制度（公費・要申請）</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>種別</th><th class="num">自己負担</th><th class="num">回数・期間</th><th>内容</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pname">宿泊型</span></td><td class="num">¥7,000〜</td><td class="num">1泊2日〜／5日まで</td><td>産後4か月未満が対象。最もまとまって休める形</td></tr>
+      <tr><td><span class="pname">デイサービス型（通所）</span></td><td class="num unk">要確認</td><td class="num">1回の出産につき2回まで</td><td>10:00〜15:00。日帰りで休息と授乳相談</td></tr>
+      <tr><td><span class="pname">訪問型</span></td><td class="num">¥2,000／回</td><td class="num">最大3回／産後1年未満</td><td>助産師が自宅を訪問。授乳指導・乳房ケア・育児相談</td></tr>
+      <tr><td colspan="4" class="note">対象は産後4か月未満（訪問型は1年未満）の母子。流産・死産から1年未満の方も利用できる。双子・三つ子は多胎追加料金が無料。申請は電子申請または郵送。</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>民間サービスの相場（2026年時点）</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>種別</th><th class="num">時間あたり</th><th>備考</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pname">家事代行・マッチング型</span></td><td class="num">約¥1,500–2,800</td><td>個人と直接マッチング。安いが当たり外れがある</td></tr>
+      <tr><td><span class="pname">家事代行・企業型</span></td><td class="num">約¥2,860–5,500<br><span class="pmaker">中心¥4,000–4,500</span></td><td>交通費・入会金・鍵預かり料が別途かかる場合がある</td></tr>
+      <tr><td><span class="pname">産後ドゥーラ（民間）</span></td><td class="num">¥2,500–4,500</td><td>産前産後に特化。家事だけでなく上の子のケアや相談も担う</td></tr>
+      <tr><td><span class="pname">産後ドゥーラ（マッチング）</span></td><td class="num">¥2,000〜</td><td>キッズライン等。時給2,000円以上の帯</td></tr>
+      <tr><td colspan="3" class="note">参考：新宿区は区の事業として産後ドゥーラ¥1,500/h・ヘルパー¥1,000/h の助成を行っている。江戸川区に同種の家事支援事業があるかは産後ケア事業とは別枠なので、申請時に窓口で併せて確認すること。</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="call">
+    <h4>予算3–10万円の組み立て方</h4>
+    <ul>
+      <li><strong>下限（約3万円）</strong>＝ 区の制度をフルに使う。宿泊2泊 ¥14,000 + 訪問3回 ¥6,000 + デイ2回。公費なので単価が圧倒的に安い。<strong>まずここを埋める。</strong></li>
+      <li><strong>上限（約10万円）</strong>＝ 上に民間の家事代行を足す。週1回3時間×3か月（12回）を企業型 ¥3,000/h で組むと約¥108,000。</li>
+      <li>区の制度は回数上限が小さい（宿泊5日・デイ2回・訪問3回）ので、<strong>これだけでは産後3か月は持たない</strong>。民間を併用する前提で予算を見ておくのが現実的。</li>
+    </ul>
+  </div>
+</section>
+
+<section id="timeline">
+  <div class="sec-head"><div class="sec-num">08</div><h2>購入順序のタイムライン</h2></div>
+  <ol class="tl">
+    <li class="hot">
+      <div class="when-t">2026年10月</div>
+      <div class="what">抱っこ紐 — 夫婦で試着して購入</div>
+      <div class="why">2〜4万円。冬のアウターを着た状態で、夫婦それぞれが装着して切り替え時間を測る。店頭が混む年末を避ける。</div>
+    </li>
+    <li class="hot">
+      <div class="when-t">2026年10月24日以降</div>
+      <div class="what">産後ケアの利用申請（妊娠28週）</div>
+      <div class="why">江戸川区の産後ケア事業は28週から申請できる。宿泊・デイ・訪問の3種別をまとめて押さえる。ここだけは物を買うより先に動く。</div>
+    </li>
+    <li>
+      <div class="when-t">2026年11月上旬</div>
+      <div class="what">ベビーベッドを確定 ＝ 上流の決定</div>
+      <div class="why">2.2〜5万円。先に「大人の寝具がベッドか布団か」を決める。ここが決まるまで下流の布団は動かせない。</div>
+    </li>
+    <li>
+      <div class="when-t">2026年11月中旬</div>
+      <div class="what">ベビー布団一式（ベッドのサイズ確定後）</div>
+      <div class="why">2〜3万円。ミニかレギュラーかはベッドが決める。サンデシカ8点セットなら両サイズ同型番なので、決まってから選べばいい。</div>
+    </li>
+    <li>
+      <div class="when-t">2026年11月〜12月</div>
+      <div class="what">民間の家事代行を選定・契約</div>
+      <div class="why">区の制度だけでは回数が足りない分を埋める。事業者の面談や鍵の預け入れに時間がかかるので、産後に探し始めると間に合わない。</div>
+    </li>
+    <li>
+      <div class="when-t">2026年12月</div>
+      <div class="what">入院バッグ一式</div>
+      <div class="why">2万円未満なのでこのマップの対象外。ただし既存Notionの「入院バッグ・チャイルドシート準備」は時期が2026-12-05に置かれている。<strong>抱っこ紐だけはこの項目から切り出して10月に前倒すべき</strong>——試着が要るものを12月に回すと選択肢が減る。</div>
+    </li>
+    <li>
+      <div class="when-t">2027年1月16日</div>
+      <div class="what">出産予定日</div>
+      <div class="why">退院時の移動はタクシー想定。旅客運送事業の車両はチャイルドシート着用義務の適用除外にあたる。</div>
+    </li>
+    <li>
+      <div class="when-t">2027年2月</div>
+      <div class="what">ベビーカー</div>
+      <div class="why">5〜10万円。1か月健診が済んでから、実際に赤ちゃんを乗せて決める。新生児期に外出しない以上、急いで買う理由がない。型番が入れ替わっている可能性が高いので価格は再確認する。</div>
+    </li>
+  </ol>
+
+  <div class="call warn">
+    <h4>エポスプラチナ 100万円修行との噛み合わせ</h4>
+    <p>集計期間の締切は2026-10-30、不足は約36万円。締切が「利用日」か「売上確定日」かで駆け込みが飛ぶため<strong>10月20日を実質締切</strong>とすると、このタイムラインで10月に乗せられるのは<strong>抱っこ紐（2〜4万円）</strong>のみ。ベビーベッドと布団を10月に前倒せば+4〜8万円だが、ベッドは「大人の寝具」の判断待ちで、布団はベッド待ち。<strong>判断を急がせてサイズを間違えるほうが高くつく</strong>ので、修行の穴埋めは買い物以外（保険の年払い・つみたて・支払い集約）で埋めるのが筋。なお出産費用60万円前後は次の集計期間に落ちるため、次期の達成は放っておいてもほぼ確定する。</p>
+  </div>
+</section>
+
+<section id="excluded">
+  <div class="sec-head"><div class="sec-num">09</div><h2>このマップの対象外</h2></div>
+  <p class="note">検討済みで除外が確定しているもの。再提案しない。</p>
+  <div class="excl">
+    <span>加湿器</span><span>バウンサー・ハイローチェア</span><span>ロボット掃除機</span><span>ベビーモニター</span><span>NAS増設</span><span>マタニティフォト</span><span>チャイルドシート</span>
+  </div>
+  <p class="note" style="margin-top:14px">家電はドラム式洗濯乾燥機・食洗機・セカンド冷凍庫・空気清浄機・ロボット掃除機をすべて所有済み。</p>
+  <p class="note">また、2万円未満のため対象外だが必要なもの：肌着、ツーウェイオール、おくるみ＋帽子、紙おむつ、おしりふき、ガーゼ10枚以上、ベビーバス、ベビー用ボディソープ、<strong>ベビー用保湿剤（1月生まれのため優先度高）</strong>、体温計、爪切りバサミ、哺乳瓶2〜3本＋消毒＋粉ミルク、入院バッグ一式。</p>
+</section>
+
+<footer>
+  <p><strong>価格について。</strong>本ページの価格は2026年8月29日時点で Web 検索の結果に実際に現れた数値のみを記載している。検索結果に価格が現れなかったものは「価格未確認」と明記し、推測値は一切書いていない。「引き継ぎ資料」と付記したものは既存の調査メモに由来する。実売価格は色・販売店・時期で変動するため、発注前に必ず再確認すること。</p>
+  <p style="margin-top:12px"><strong>主な参照先：</strong></p>
+  <ul>
+    <li>江戸川区公式（<a href="https://www.city.edogawa.tokyo.jp/e052/kosodate/ninshin/sangokea/shukuhaku.html">産後ケア 宿泊型</a> / <a href="https://www.city.edogawa.tokyo.jp/e052/kosodate/ninshin/sangokea/tuusyo.html">デイサービス型</a> / <a href="https://www.city.edogawa.tokyo.jp/e052/kosodate/ninshin/sangokea/houmon.html">訪問型</a>）</li>
+    <li>メーカー公式：<a href="https://www.aprica.jp/products/home/detail/bed/coconel_air_ab/">アップリカ ココネル エアー AB</a> / <a href="https://cybex-japan.com/products/melio-carbon-2026">サイベックス メリオ カーボン 2026</a> / <a href="https://www.combi.co.jp/store/stroller/sugocall/g/g119895/">コンビ スゴカルL long SL</a> / <a href="https://sandesica.jp/products/11441421">サンデシカ 8点セット</a> / <a href="https://www.ymsk.jp/c/babybed/gd4">ヤマサキ ハイタイプ ツーオープン</a> / <a href="http://www.farska.com/product/spec/bedsidebed03">ファルスカ ベッドサイドベッド03</a></li>
+    <li>比較・価格：<a href="https://kakaku.com/">価格.com</a> / <a href="https://my-best.com/">マイベスト</a> / <a href="https://360life.shinyusha.co.jp/articles/-/11046">LDK（360life）抱っこ紐比較</a> / <a href="https://pulmo.jp/11397/">江戸川区の産後ケア完全ガイド2026</a> / <a href="https://pulmo.jp/13788/">家事代行の相場2026</a></li>
+    <li>抱っこ紐の4象限の軸は Kurashi iimono の既存比較図に準拠。</li>
+  </ul>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var due = new Date(2027, 0, 16);
+  var now = new Date(); now.setHours(0,0,0,0);
+  var days = Math.round((due - now) / 86400000);
+  if (!isFinite(days)) return;
+  var el = document.getElementById('c-days');
+  if (el) el.textContent = days;
+  var gest = 280 - days;                 // 40週0日 = 280日
+  if (gest >= 0 && gest <= 300) {
+    var w = document.getElementById('c-weeks');
+    if (w) w.textContent = Math.floor(gest / 7) + 'w' + (gest % 7) + 'd';
+  }
+})();
+</script>
