@@ -192,6 +192,23 @@ a{color:var(--ai);text-underline-offset:3px}
 .dimrow .dv{font-size:13.5px;font-weight:600;color:var(--ink);white-space:nowrap}
 .dimrow .dn{font-size:11.5px;color:var(--muted);flex:1 1 100%;line-height:1.5}
 .dimrow .dn.off{opacity:.6;font-style:italic}
+.prod-top .rank{font-family:var(--f-mono);font-size:11px;font-weight:600;color:var(--muted);
+  background:var(--surface-2);border-radius:4px;padding:1px 6px;align-self:flex-start;flex-shrink:0}
+.why{font-size:11.5px;color:var(--muted);line-height:1.65;margin-top:8px;padding:7px 9px;
+  background:var(--sunken);border-radius:5px;border:1px solid var(--line-soft)}
+.why b{color:var(--ok);font-weight:700}
+.why b.dn{color:var(--warn)}
+.morebtn{width:100%;font-family:var(--f-body);font-size:13px;font-weight:700;cursor:pointer;
+  padding:9px 12px;border-radius:8px;border:1px dashed var(--ai-line);background:var(--sunken);color:var(--ai)}
+.morebtn:hover{background:var(--ai-soft)}
+.cform{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cform label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted);font-family:var(--f-mono)}
+.cform label.wide{grid-column:1 / -1}
+.cform input,.cform select{font-family:var(--f-body);font-size:14px;padding:7px 9px;border-radius:6px;
+  border:1px solid var(--line);background:var(--sunken);color:var(--ink);width:100%}
+.cform input:focus,.cform select:focus{border-color:var(--ai);background:var(--surface)}
+.cbtn{grid-column:1 / -1;font-family:var(--f-body);font-size:13.5px;font-weight:700;cursor:pointer;
+  padding:9px;border-radius:8px;border:1px solid var(--ai-fill);background:var(--ai-fill);color:var(--on-ai)}
 .plinks{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .plinks a{font-size:11.5px;font-family:var(--f-mono);text-decoration:none;line-height:1.5;
   padding:4px 10px;border-radius:5px;border:1px solid var(--ai-line);color:var(--ai);background:var(--ai-soft)}
@@ -728,7 +745,7 @@ const SOURCES = [
 ];
 
 /* ============================ 状態と保存 ============================ */
-const state = { facts:{}, p1:{}, p2:{}, who:"p1", coreOnly:false };
+const state = { facts:{}, p1:{}, p2:{}, who:"p1", coreOnly:false, showAll:false };
 const LS = "babybed.sheet.v1";
 let DB = null, dirtyUntil = 0, saveTimer = null;
 
@@ -830,6 +847,32 @@ function placement(p, roomW, roomD){
   cand.sort((a, b) => (b.side - a.side) || (b.end - a.end));  /* 横に残る通路を優先して置き方を選ぶ */
   const c = cand[0];
   return {fits:true, rot:c.rot, side:c.side, end:c.end, best:Math.max(c.side, c.end)};
+}
+
+/* その製品タイプのスコアを押し上げた／押し下げた回答を取り出す。
+   「なぜこの順位なのか」をブラックボックスにしないため。 */
+function typeDrivers(who, type){
+  const pos = [], neg = [];
+  Q.forEach(q => {
+    if(!q.opts) return;
+    const v = answerOf(q, who); if(!v) return;
+    const o = q.opts.find(x => x.v === v);
+    if(!o || !o.w || !o.w[type]) return;
+    (o.w[type] > 0 ? pos : neg).push({t:q.q.replace(/[？?]$/, ""), v:v, w:o.w[type]});
+  });
+  ((state[who] || {})._top3 || []).forEach((name, i) => {
+    const mult = [2.0, 1.4, 1.0][i] || 1;
+    const pr = PRIORITIES.find(x => x.k === name);
+    if(pr && pr.w[type]) (pr.w[type] > 0 ? pos : neg).push({t:"優先順位" + (i + 1) + "位", v:name, w:pr.w[type] * mult});
+  });
+  /* 順位差の主因は「減点」より「加点されなかったこと」であることが多い。
+     選んだ優先順位のうち、このタイプに 点が入らなかったものを挙げる。 */
+  const missed = ((state[who] || {})._top3 || []).filter(name => {
+    const pr = PRIORITIES.find(x => x.k === name);
+    return pr && !(pr.w[type] > 0);
+  });
+  pos.sort((a, b) => b.w - a.w); neg.sort((a, b) => a.w - b.w);
+  return {pos:pos.slice(0, 3), neg:neg.slice(0, 2), missed:missed};
 }
 
 function evaluateProducts(who){
@@ -1038,7 +1081,7 @@ function renderPanel(){
 
     const res = evaluateProducts(who);
     const aliveAll = res.filter(r => !r.blocks.length);
-    const alive = aliveAll.slice(0, 4);
+    const alive = state.showAll ? aliveAll : aliveAll.slice(0, 4);
     const dead  = res.filter(r => r.blocks.length);
 
     let clash = "";
@@ -1056,8 +1099,10 @@ function renderPanel(){
       order.map((k, i) => bar(TYPES[k].nm, sc[k], mn, mx, i === 0)).join("") + "</div></div>");
     mobi.title = TYPES[win].nm;
     mobi.count = aliveAll.length + "台 / " + cnt + "問";
-    const prod = r => {
+    const prod = (r, i) => {
       const p = r.p;
+      const rank = i != null ? '<span class="rank num">' + (i + 1) + "</span>" : "";
+      const dr = i != null ? typeDrivers(who, p.type) : null;
       const spec = [
         p.outer ? "外寸 " + p.outer.join("×") + "cm" : "外寸 要確認",
         p.inner ? "内寸 " + p.inner.join("×") + "cm" : null,
@@ -1073,22 +1118,50 @@ function renderPanel(){
       if(p.wash) tags.push('<span class="tag">丸洗い</span>');
       if(p.madeIn) tags.push('<span class="tag">' + esc(p.madeIn) + "製</span>");
       if(p.cert) tags.push('<span class="tag' + (p.cert === "要確認" ? " warn" : "") + '">' + esc(p.cert) + "</span>");
+      const why = dr && (dr.pos.length || dr.neg.length || dr.missed.length)
+        ? '<div class="why">' +
+          (dr.pos.length ? "<b>押し上げた回答</b>：" + dr.pos.map(x => esc(x.t) + "＝" + esc(x.v)).join("／") : "") +
+          (dr.neg.length ? (dr.pos.length ? "<br>" : "") + '<b class="dn">押し下げた回答</b>：' + dr.neg.map(x => esc(x.t) + "＝" + esc(x.v)).join("／") : "") +
+          (dr.missed.length ? ((dr.pos.length || dr.neg.length) ? "<br>" : "") + '<b class="dn">加点しなかった優先順位</b>：' + dr.missed.map(esc).join("／") +
+            "（この分だけ上位と差がついています）" : "") +
+          "</div>" : "";
       return '<div class="prod' + (r.blocks.length ? " blocked" : "") + '">' +
-        '<div class="prod-top"><span class="prod-nm">' + esc(p.nm) + '<span class="prod-brand"> / ' + esc(p.brand) + '</span></span><span class="prod-price">' + esc(p.price) + "</span></div>" +
+        '<div class="prod-top">' + rank + '<span class="prod-nm">' + esc(p.nm) + '<span class="prod-brand"> / ' + esc(p.brand) + '</span></span><span class="prod-price">' + esc(p.price) + "</span></div>" +
         '<div class="prod-spec">' + esc(spec) + "</div>" +
         '<div class="tags">' + tags.join("") + "</div>" +
         r.blocks.map(b => '<div class="reason stop">除外：' + esc(b) + "</div>").join("") +
         r.warns.map(b => '<div class="reason warn">注意：' + esc(b) + "</div>").join("") +
         (p.warnSpec ? '<div class="reason warn">要確認：' + esc(p.warnSpec) + "</div>" : "") +
         (!r.blocks.length && r.goods.length ? '<div class="reason ok">' + esc(r.goods.join("／")) + "</div>" : "") +
-        '<div class="prod-spec" style="color:var(--ink-2)">' + esc(p.note) + "</div>" + linkRow(p) + "</div>";
+        '<div class="prod-spec" style="color:var(--ink-2)">' + esc(p.note) + "</div>" + why + linkRow(p) + "</div>";
     };
     cards.push('<div class="card"><div class="card-head"><h3>候補</h3><span class="tick">' +
       (aliveAll.length > alive.length ? "上位" + alive.length + " / 適合" + aliveAll.length + "台" : alive.length + " 台") + "</span></div>" +
-      (alive.length ? alive.map(prod).join("") : '<div class="card-body"><p class="empty">寸法の条件に合う製品がありません。設置スペースか扉の条件を見直してください。</p></div>') + "</div>");
+      (alive.length ? alive.map((r, i) => prod(r, i)).join("") : '<div class="card-body"><p class="empty">寸法の条件に合う製品がありません。設置スペースか扉の条件を見直してください。</p></div>') +
+      (aliveAll.length > 4 ? '<div class="card-body" style="padding-top:12px"><button type="button" class="morebtn" id="moreBtn">' +
+        (state.showAll ? "上位4台だけ表示する" : "残り " + (aliveAll.length - 4) + " 台も表示する") + "</button></div>" : "") + "</div>");
     if(dead.length){
-      cards.push('<div class="card"><div class="card-head"><h3>寸法で落ちたもの</h3><span class="tick">' + dead.length + " 台</span></div>" + dead.map(prod).join("") + "</div>");
+      cards.push('<div class="card"><div class="card-head"><h3>寸法で落ちたもの</h3><span class="tick">' + dead.length + " 台</span></div>" + dead.map(r => prod(r)).join("") + "</div>");
     }
+
+    /* --- 候補表にない製品を、同じ条件で判定する --- */
+    const cf = state.facts._custom || {};
+    const cin = (k, lbl, ph, wide) => '<label' + (wide ? ' class="wide"' : "") + ">" + esc(lbl) +
+      '<input data-cf="' + k + '" type="' + (k === "nm" ? "text" : "number") + '" step="0.1" placeholder="' + esc(ph || "") +
+      '" value="' + esc(cf[k] != null ? cf[k] : "") + '"></label>';
+    cards.push('<div class="card"><div class="card-head"><h3>気になる製品を判定にかける</h3></div><div class="card-body">' +
+      '<p style="font-size:12.5px;color:var(--ink-2);margin-bottom:11px;line-height:1.65">候補表は私が調べた11台だけです。通販で見つけた製品は、外寸とタイプを入れれば同じ条件（設置・扉・添い寝の高さ・予算）で判定できます。</p>' +
+      '<div class="cform">' + cin("nm", "製品名", "例：johnlife ベビーベッド", true) +
+      '<label class="wide">タイプ<select data-cf="type">' +
+        '<option value="">選ぶ</option>' +
+        TKEYS.map(k => '<option value="' + k + '"' + (cf.type === k ? " selected" : "") + ">" + esc(TYPES[k].nm) + "</option>").join("") +
+      "</select></label>" +
+      cin("w", "外寸 幅 cm", "105") + cin("d", "外寸 奥行 cm", "70") +
+      cin("iw", "内寸 幅 cm（任意）", "90") + cin("id", "内寸 奥行 cm（任意）", "60") +
+      cin("fmin", "床板 最低 cm（任意）", "") + cin("fmax", "床板 最高 cm（任意）", "") +
+      cin("price", "本体価格 円（任意）", "29800", true) +
+      '<button type="button" class="cbtn" id="cfBtn">この製品を判定する</button></div>' +
+      '<div id="cfResult">' + (cf._out || "") + "</div></div></div>");
 
     /* --- 寸法チェック：どの数値がいま効いているかを見せる --- */
     const f2 = state.facts, R0 = requirements(who);
@@ -1172,6 +1245,50 @@ function renderPanel(){
   $("panel").innerHTML = cards.join("");
   $("mobiTitle").textContent = mobi.title;
   $("mobiCount").textContent = mobi.count;
+}
+
+/* 入力された任意の製品を、カタログの11台と同じ判定にかける */
+function evalCustom(){
+  const who = state.who, c = state.facts._custom || {}, f = state.facts;
+  const w = num(c.w), d = num(c.d);
+  if(!c.type || w == null || d == null)
+    return '<div class="reason warn">タイプと外寸（幅・奥行）は必須です。通販ページの「商品サイズ」に載っています。</div>';
+  const inner = (num(c.iw) != null && num(c.id) != null) ? [num(c.iw), num(c.id)] : null;
+  const fh = (num(c.fmin) != null && num(c.fmax) != null) ? [num(c.fmin), num(c.fmax)] : null;
+  const R = requirements(who), sc = typeScores(who);
+  const out = [];
+  const pl = placement({outer:[w, d]}, num(f.room_w), num(f.room_d));
+  if(pl && !pl.fits) out.push('<div class="reason stop">外寸 ' + w + "×" + d + "cm は " + f.room_w + "×" + f.room_d + "cm に入りません（向きを変えても不可）</div>");
+  else if(pl){
+    const aisle = num(f.aisle) || 0;
+    const g = "周囲に残るのは 横 " + pl.side + "cm ／ 端 " + pl.end + "cm";
+    out.push('<div class="reason ' + (aisle && pl.best < aisle ? "warn" : "ok") + '">' +
+      (pl.rot ? "長辺を奥行き方向に置けば" : "そのままの向きで") + "設置できます。" + g +
+      (aisle && pl.best < aisle ? "（希望の通路 " + aisle + "cm には届きません）" : "") + "</div>");
+  }
+  const doorW = num(f.door_w), pass = Math.min(w, d);
+  if(R.move && doorW != null)
+    out.push('<div class="reason ' + (pass > doorW ? "warn" : "ok") + '">扉の開口 ' + doorW + "cm に対し通過幅 " + pass + "cm" + (pass > doorW ? "。畳むか傾けないと通りません" : "（通ります）") + "</div>");
+  const adultH = num(f.adult_h);
+  if(R.cosleep && adultH != null)
+    out.push(fh
+      ? '<div class="reason ' + (adultH >= fh[0] && adultH <= fh[1] ? "ok" : "warn") + '">床板 ' + fh[0] + "〜" + fh[1] + "cm、大人ベッド " + adultH + "cm に" + (adultH >= fh[0] && adultH <= fh[1] ? "合わせられます" : "合いません") + "</div>"
+      : '<div class="reason warn">添い寝で使うなら床板の高さを入れてください（大人ベッドは ' + adultH + "cm）</div>");
+  const price = num(c.price);
+  if(R.budget != null && price != null && price > R.budget)
+    out.push('<div class="reason warn">本体 ' + price.toLocaleString() + "円 は予算上限を超えます（寝具代は別途）</div>");
+  if(inner && inner[0] === 120 && inner[1] === 70) out.push('<div class="reason ok">内寸120×70の標準規格。市販の寝具がそのまま使えます</div>');
+  else if(inner) out.push('<div class="reason warn">内寸 ' + inner[0] + "×" + inner[1] + "cm は標準規格（120×70）ではないため、寝具の選択肢が狭くなります</div>");
+
+  let sco = sc[c.type] || 0;
+  if(R.stdBedding) sco += (inner && inner[0] === 120 && inner[1] === 70) ? 3 : -2;
+  const others = evaluateProducts(who).filter(r => !r.blocks.length).map(r => r.s);
+  const rank = others.filter(v => v > sco).length + 1;
+  const blocked = pl && !pl.fits;
+  out.unshift('<div class="verdict-sub" style="margin:14px 0 8px;color:var(--ink)"><b>' + esc(c.nm || "入力した製品") + "</b>：" +
+    (blocked ? "寸法で不適合" : "適合。いまの回答での順位は " + rank + " 位相当（候補 " + (others.length + 1) + " 台中）") + "</div>");
+  out.push('<p style="font-size:11.5px;color:var(--muted);margin-top:9px;line-height:1.6">順位はタイプと寸法だけの概算です。収納・キャスター・丸洗いなどの加点は含めていません。安全認証は現物で確認してください。</p>');
+  return out.join("");
 }
 
 function renderCatalog(){
@@ -1261,6 +1378,28 @@ function setWho(w){
 $("who1").addEventListener("click", () => setWho("p1"));
 $("who2").addEventListener("click", () => setWho("p2"));
 $("coreOnly").addEventListener("change", e => { state.coreOnly = e.target.checked; renderSheet(); });
+
+$("panel").addEventListener("input", e => {
+  const el = e.target; if(!el.dataset || !el.dataset.cf) return;
+  const c = state.facts._custom || (state.facts._custom = {});
+  if(el.value === "") delete c[el.dataset.cf]; else c[el.dataset.cf] = el.value;
+  persist();
+});
+$("panel").addEventListener("change", e => {
+  const el = e.target; if(!el.dataset || el.dataset.cf !== "type") return;
+  const c = state.facts._custom || (state.facts._custom = {});
+  if(el.value === "") delete c.type; else c.type = el.value;
+  persist();
+});
+$("panel").addEventListener("click", e => {
+  if(e.target.id === "moreBtn"){ state.showAll = !state.showAll; renderPanel(); return; }
+  if(e.target.id === "cfBtn"){
+    const html = evalCustom();
+    (state.facts._custom || (state.facts._custom = {}))._out = html;
+    const box = document.getElementById("cfResult"); if(box) box.innerHTML = html;
+    persist();
+  }
+});
 
 const gotoPanel = () => $("panel").scrollIntoView({behavior:"smooth", block:"start"});
 $("mobibar").addEventListener("click", gotoPanel);
