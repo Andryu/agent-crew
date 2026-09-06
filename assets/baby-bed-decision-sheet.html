@@ -1,0 +1,1103 @@
+<title>ベビーベッド決定シート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;700;900&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --ground:#F2F4F7; --surface:#FFFFFF; --surface-2:#E9EDF2; --sunken:#F7F9FB;
+  --ink:#121A26; --ink-2:#3F4B5B; --muted:#6C7889;
+  --line:#D6DDE6; --line-soft:#E6EBF1;
+  --ai:#20406B; --ai-deep:#14293F; --ai-soft:#E2EAF4; --ai-line:#B9CBE2;
+  --pine:#A9743F; --pine-soft:#F4E9DC;
+  --ok:#2C6B52; --ok-soft:#DFEDE6;
+  --warn:#8B5A14; --warn-soft:#F6EBD6;
+  --stop:#963232; --stop-soft:#F5E2E2;
+  --shadow:0 1px 2px rgba(18,26,38,.05), 0 8px 24px -12px rgba(18,26,38,.18);
+  --f-disp:"Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --f-body:"Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0D131C; --surface:#151E2A; --surface-2:#1D2836; --sunken:#111A24;
+    --ink:#E4EAF2; --ink-2:#B4C0CF; --muted:#8695A8;
+    --line:#2A3644; --line-soft:#212C39;
+    --ai:#84A9D9; --ai-deep:#B3CBE8; --ai-soft:#1A2B41; --ai-line:#2F4560;
+    --pine:#D3A374; --pine-soft:#2E2419;
+    --ok:#69BC98; --ok-soft:#152A22;
+    --warn:#D3A253; --warn-soft:#2B2214;
+    --stop:#DE8686; --stop-soft:#2E1A1A;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0D131C; --surface:#151E2A; --surface-2:#1D2836; --sunken:#111A24;
+  --ink:#E4EAF2; --ink-2:#B4C0CF; --muted:#8695A8;
+  --line:#2A3644; --line-soft:#212C39;
+  --ai:#84A9D9; --ai-deep:#B3CBE8; --ai-soft:#1A2B41; --ai-line:#2F4560;
+  --pine:#D3A374; --pine-soft:#2E2419;
+  --ok:#69BC98; --ok-soft:#152A22;
+  --warn:#D3A253; --warn-soft:#2B2214;
+  --stop:#DE8686; --stop-soft:#2E1A1A;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--f-body);line-height:1.72;
+  -webkit-font-smoothing:antialiased;font-size:15px}
+h1,h2,h3,h4{font-family:var(--f-disp);font-weight:700;line-height:1.35;text-wrap:balance;margin:0}
+p{margin:0}
+a{color:var(--ai);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--ai);outline-offset:2px;border-radius:3px}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.wrap{max-width:1440px;margin:0 auto;padding:0 clamp(16px,3vw,40px)}
+
+/* ---------- masthead ---------- */
+.mast{background:var(--ai-deep);color:#EEF3FA;padding:clamp(28px,4vw,52px) 0 clamp(24px,3vw,38px);
+  border-bottom:1px solid var(--ai-deep)}
+.mast .eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#9FB8D6;
+  font-family:var(--f-mono);margin-bottom:14px}
+.mast h1{font-size:clamp(28px,4.4vw,46px);font-weight:900;color:#fff;letter-spacing:.01em}
+.mast .lede{margin-top:14px;max-width:60ch;color:#C6D6EA;font-size:15px}
+.mast-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.chip{font-size:11.5px;font-family:var(--f-mono);padding:5px 11px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.22);color:#CFDEF0;background:rgba(255,255,255,.05)}
+.chip.hot{border-color:#C99A5E;color:#F0D6B2;background:rgba(201,154,94,.12)}
+
+/* ---------- revision strip ---------- */
+.revision{background:var(--surface);border-bottom:1px solid var(--line);padding:20px 0}
+.rev-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:0}
+.rev-item{padding:2px 20px;border-left:2px solid var(--line-soft)}
+.rev-item:first-child{border-left:none;padding-left:0}
+.rev-item b{display:block;font-family:var(--f-mono);font-size:21px;color:var(--ai);font-weight:600;line-height:1.3}
+.rev-item span{font-size:12.5px;color:var(--muted);display:block}
+
+/* ---------- layout ---------- */
+.main{display:grid;grid-template-columns:minmax(0,1fr) 384px;gap:34px;align-items:start;
+  padding:34px 0 80px}
+@media (max-width:1080px){ .main{grid-template-columns:minmax(0,1fr)} }
+
+/* ---------- controls ---------- */
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+  margin-bottom:22px;box-shadow:var(--shadow)}
+.who{display:flex;gap:4px;background:var(--surface-2);border-radius:8px;padding:3px}
+.who button{font-family:var(--f-body);font-size:13.5px;font-weight:700;border:0;background:transparent;
+  color:var(--muted);padding:6px 15px;border-radius:6px;cursor:pointer}
+.who button[aria-pressed="true"]{background:var(--surface);color:var(--ai);box-shadow:var(--shadow)}
+.bar-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.toggle{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.toggle input{accent-color:var(--ai);width:15px;height:15px}
+.prog{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);font-family:var(--f-mono)}
+.prog-track{width:76px;height:5px;background:var(--surface-2);border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;background:var(--ai);width:0;transition:width .3s ease}
+
+/* ---------- sections ---------- */
+.sec{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  margin-bottom:18px;overflow:hidden;box-shadow:var(--shadow)}
+.sec-head{display:flex;align-items:baseline;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line-soft);
+  background:var(--sunken)}
+.sec-head h2{font-size:17px}
+.sec-head .kicker{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--pine);white-space:nowrap}
+.sec-head .cnt{margin-left:auto;font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
+.sec-note{padding:12px 20px;background:var(--ai-soft);border-bottom:1px solid var(--line-soft);
+  font-size:13px;color:var(--ink-2)}
+.q{padding:15px 20px;border-bottom:1px solid var(--line-soft)}
+.q:last-child{border-bottom:none}
+.q.hidden{display:none}
+.q-head{display:flex;gap:10px;align-items:flex-start;margin-bottom:9px}
+.q-id{font-family:var(--f-mono);font-size:11px;color:var(--muted);padding-top:4px;min-width:34px}
+.q-txt{font-weight:500;font-size:14.5px;flex:1}
+.q-txt .core-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--pine);
+  margin-left:6px;vertical-align:middle}
+.q-drives{font-family:var(--f-mono);font-size:10.5px;color:var(--ai);background:var(--ai-soft);
+  border:1px solid var(--ai-line);padding:2px 7px;border-radius:4px;white-space:nowrap;align-self:flex-start;margin-top:2px}
+.q-note{font-size:12.5px;color:var(--muted);margin:-4px 0 9px 44px;padding-left:9px;border-left:2px solid var(--line)}
+.q-note.evi{color:var(--ink-2);border-left-color:var(--pine);background:var(--pine-soft);
+  padding:7px 10px;border-radius:0 5px 5px 0;margin-bottom:11px}
+.opts{display:flex;flex-wrap:wrap;gap:6px;margin-left:44px}
+.opts button{font-family:var(--f-body);font-size:13px;padding:6px 13px;border-radius:7px;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink-2);transition:.14s}
+.opts button:hover{border-color:var(--ai-line);color:var(--ink)}
+.opts button[aria-pressed="true"]{background:var(--ai);border-color:var(--ai);color:#fff;font-weight:700}
+.numrow{display:flex;flex-wrap:wrap;gap:10px;margin-left:44px;align-items:center}
+.numfield{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)}
+.numfield input{font-family:var(--f-mono);font-size:14px;width:82px;padding:6px 9px;border-radius:6px;
+  border:1px solid var(--line);background:var(--sunken);color:var(--ink)}
+.numfield input:focus{border-color:var(--ai);background:var(--surface)}
+.peer{margin-left:44px;margin-top:7px;font-size:12px;color:var(--muted);font-family:var(--f-mono)}
+.peer.diff{color:var(--warn)}
+
+/* priorities */
+.prio{padding:16px 20px}
+.prio-grid{display:flex;flex-wrap:wrap;gap:6px}
+.prio-grid button{font-family:var(--f-body);font-size:13px;padding:6px 12px;border-radius:7px;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink-2);display:flex;align-items:center;gap:6px}
+.prio-grid button[data-rank]{background:var(--ai);border-color:var(--ai);color:#fff;font-weight:700}
+.prio-rank{font-family:var(--f-mono);font-size:10px;background:rgba(255,255,255,.25);border-radius:3px;padding:1px 4px}
+
+/* ---------- panel ---------- */
+.panel{position:sticky;top:18px;display:flex;flex-direction:column;gap:14px}
+@media (max-width:1080px){ .panel{position:static} }
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.card-head{padding:12px 16px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:9px;background:var(--sunken)}
+.card-head h3{font-size:14px}
+.card-head .tick{font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-left:auto}
+.card-body{padding:16px}
+.verdict-type{font-family:var(--f-disp);font-size:22px;font-weight:900;color:var(--ai);line-height:1.3}
+.verdict-sub{font-size:12.5px;color:var(--muted);margin-top:3px}
+.fitrow{display:flex;align-items:center;gap:9px;margin-top:12px;font-size:12.5px}
+.fitrow .nm{width:96px;color:var(--ink-2);flex-shrink:0}
+.fittrack{flex:1;height:6px;background:var(--surface-2);border-radius:99px;overflow:hidden}
+.fitfill{height:100%;background:var(--ai-line);border-radius:99px}
+.fitrow.top .fitfill{background:var(--ai)}
+.fitrow .pc{font-family:var(--f-mono);font-size:11px;color:var(--muted);width:32px;text-align:right}
+.empty{font-size:13px;color:var(--muted);text-align:center;padding:14px 4px}
+
+.prod{padding:13px 16px;border-bottom:1px solid var(--line-soft)}
+.prod:last-child{border-bottom:none}
+.prod.blocked{opacity:.72;background:var(--sunken)}
+.prod-top{display:flex;gap:9px;align-items:baseline}
+.prod-nm{font-weight:700;font-size:14px;flex:1}
+.prod-brand{font-size:11px;color:var(--muted);font-family:var(--f-mono)}
+.prod-price{font-family:var(--f-mono);font-size:12.5px;color:var(--pine);font-weight:600;white-space:nowrap}
+.prod-spec{font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-top:5px;line-height:1.6}
+.tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.tag{font-size:10.5px;font-family:var(--f-mono);padding:2px 7px;border-radius:4px;
+  background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line-soft)}
+.tag.good{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.tag.bad{background:var(--stop-soft);color:var(--stop);border-color:transparent}
+.tag.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.reason{font-size:12px;margin-top:7px;padding:6px 9px;border-radius:5px;line-height:1.6}
+.reason.stop{background:var(--stop-soft);color:var(--stop)}
+.reason.warn{background:var(--warn-soft);color:var(--warn)}
+.reason.ok{background:var(--ok-soft);color:var(--ok)}
+
+.money{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.money-cell{padding:10px 12px;border-radius:8px;background:var(--sunken);border:1px solid var(--line-soft)}
+.money-cell.win{border-color:var(--ok);background:var(--ok-soft)}
+.money-cell .lbl{font-size:11px;color:var(--muted);font-family:var(--f-mono);letter-spacing:.1em;text-transform:uppercase}
+.money-cell .val{font-family:var(--f-mono);font-size:18px;font-weight:600;color:var(--ink);margin-top:2px}
+.money-cell.win .val{color:var(--ok)}
+.money-cell .sub{font-size:11px;color:var(--muted)}
+
+.diffs li{font-size:12.5px;margin-bottom:8px;color:var(--ink-2)}
+.diffs li b{display:block;font-size:12px;color:var(--ink);font-weight:700}
+.diffs .vs{font-family:var(--f-mono);font-size:11.5px;color:var(--warn)}
+
+.safety li{font-size:12.5px;color:var(--ink-2);margin-bottom:9px;padding-left:15px;position:relative;line-height:1.65}
+.safety li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;border-radius:50%;background:var(--pine)}
+.safety li b{color:var(--ink)}
+.src{font-size:11px;color:var(--muted);font-family:var(--f-mono)}
+
+/* ---------- catalog table ---------- */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;min-width:940px;font-size:12.5px}
+th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+th{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  background:var(--sunken);position:sticky;top:0;white-space:nowrap;border-bottom:1px solid var(--line)}
+tbody tr:last-child td{border-bottom:none}
+td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td .pn{font-weight:700;font-size:13px;display:block}
+td .pb{font-size:11px;color:var(--muted);font-family:var(--f-mono)}
+
+.block-title{display:flex;align-items:baseline;gap:12px;margin:44px 0 16px}
+.block-title h2{font-size:21px}
+.block-title .kicker{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--pine)}
+.block-title .rule{flex:1;height:1px;background:var(--line)}
+.lead{max-width:68ch;color:var(--ink-2);font-size:14px;margin-bottom:18px}
+
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-bottom:14px}
+.flow-step{flex:1 1 150px;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:11px 13px}
+.flow-step .st{font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;color:var(--pine);text-transform:uppercase}
+.flow-step .sb{font-weight:700;font-size:13.5px;margin-top:2px}
+.flow-step .ss{font-size:12px;color:var(--muted);line-height:1.6}
+
+footer{border-top:1px solid var(--line);padding:26px 0 46px;color:var(--muted);font-size:12px}
+footer a{color:var(--ai)}
+footer .srclist{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px}
+.status{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.status.live{color:var(--ok)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="mast">
+  <div class="wrap">
+    <div class="eyebrow">夫婦ヒアリングシート ＋ 判定エンジン</div>
+    <h1>ベビーベッド決定シート</h1>
+    <p class="lede">人気ランキングからではなく、寝室の実寸・夜のお世話の担当・卒業後の使い道から逆算して決めるためのシート。答えるほど右のパネルが絞り込みます。</p>
+    <div class="mast-meta">
+      <span class="chip">質問 52問 / うちコア 18問</span>
+      <span class="chip">候補 11製品</span>
+      <span class="chip hot">子供PSCマーク 経過措置は 2027年3月まで</span>
+      <span class="chip">2026年9月時点</span>
+    </div>
+  </div>
+</header>
+
+<section class="revision">
+  <div class="wrap rev-grid">
+    <div class="rev-item"><b>+7</b><span>質問を追加（第2子予定・上の子/ペット・里帰りなど）</span></div>
+    <div class="rev-item"><b>3項目</b><span>自由記述 → 数値入力（制約フィルタの入力に）</span></div>
+    <div class="rev-item"><b>2分割</b><span>「物理的事実」と「価値観」を分離</span></div>
+    <div class="rev-item"><b>1問統合</b><span>元Q20・Q21（使用期間）は同義</span></div>
+    <div class="rev-item"><b>1問差替</b><span>元Q34「頭の形」→ 枕不使用の注意へ</span></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="main">
+    <div>
+      <div class="bar">
+        <div class="who" role="group" aria-label="回答者の切り替え">
+          <button id="who1" aria-pressed="true">回答者 1</button>
+          <button id="who2" aria-pressed="false">回答者 2</button>
+        </div>
+        <div class="bar-right">
+          <label class="toggle"><input type="checkbox" id="coreOnly"> コア質問だけ表示</label>
+          <div class="prog"><div class="prog-track"><div class="prog-fill" id="progFill"></div></div><span id="progTxt">0 / 52</span></div>
+          <span class="status" id="status">保存先を確認中…</span>
+        </div>
+      </div>
+      <div id="sheet"></div>
+    </div>
+
+    <aside class="panel" id="panel"></aside>
+  </div>
+
+  <div class="block-title"><span class="kicker">Catalog</span><h2>候補製品の実寸一覧</h2><div class="rule"></div></div>
+  <p class="lead">上のシートの判定はこの表を絞り込んでいます。数値はメーカー公表値・販売店表記から拾ったもので、購入前に必ず現物の仕様書で確認してください。出典が割れた項目には「要確認」を付けています。</p>
+  <div class="tablewrap"><table id="catalog">
+    <thead><tr>
+      <th>製品</th><th>タイプ</th><th>外寸 W×D×H</th><th>内寸</th><th>通過幅</th>
+      <th>床板高さ</th><th>重量</th><th>使用期間</th><th>寝具</th><th>価格帯</th>
+    </tr></thead><tbody></tbody>
+  </table></div>
+
+  <div class="block-title"><span class="kicker">Order of operations</span><h2>この後の決め方</h2><div class="rule"></div></div>
+  <div class="flow" id="flow"></div>
+</div>
+
+<footer><div class="wrap">
+  <p>制度・安全に関する記述は 2026年9月時点の公表情報に基づきます。価格と在庫は変動します。ベビーベッドは設置場所（エアコンの風・窓・ブラインドの紐・暖房器具）まで含めて安全が決まるため、組み立て後に取扱説明書の設置条件を必ず読み合わせてください。</p>
+  <div class="srclist" id="srclist"></div>
+</div></footer>
+
+<script>
+"use strict";
+
+/* ============================ ベッドのタイプ ============================ */
+const TYPES = {
+  HIGH_REG : {nm:"ハイタイプ 標準サイズ",  sub:"内寸120×70。腰をかばい、市販寝具が最も選べる"},
+  HIGH_MINI: {nm:"ハイタイプ ミニ",        sub:"内寸90×60。腰は守りつつ設置面積を約3割削る"},
+  COSLEEP  : {nm:"添い寝／ベッドサイド型", sub:"大人ベッドに横付けし柵を開ける。夜間授乳が多い家庭向き"},
+  FOLD     : {nm:"折りたたみ・移動型",     sub:"キャスターで部屋間を移動、使わない時は畳める"},
+  PLAYYARD : {nm:"プレイヤード兼用型",     sub:"寝床→サークルへ転用。卒業後も2歳まで働く"},
+  FLOOR    : {nm:"床置きコンパクトベッド", sub:"布団の家庭・省スペース向き。腰への負担は最大"}
+};
+const TKEYS = Object.keys(TYPES);
+
+/* ============================ 質問 ============================ */
+/* fact:true  … 物理的事実。夫婦で共有（1つの正解がある）
+   core:true  … 判定エンジンの主入力
+   drives     … その質問が何を決めるか（画面に出す）                     */
+const SECTIONS = [
+  {id:"S0", kicker:"Prerequisites", nm:"前提 — 時期と家族構成",
+   note:"元のシートに無かった項目です。ここの4問はベッドの要否そのものを左右するため、最初に置いています。"},
+  {id:"S1", kicker:"Measurements", nm:"寸法 — 実測して入れる",
+   note:"ここだけは推定ではなく実測値を。設置幅と扉の開口幅が、候補の半分を機械的に落とします。"},
+  {id:"S2", kicker:"Night", nm:"夜の寝かせ方"},
+  {id:"S3", kicker:"Daytime", nm:"日中とリビング"},
+  {id:"S4", kicker:"Lifespan", nm:"使用期間と卒業後"},
+  {id:"S5", kicker:"Mobility", nm:"移動・帰省"},
+  {id:"S6", kicker:"Care", nm:"お世話のしやすさ"},
+  {id:"S7", kicker:"Bedding", nm:"寝具・洗濯"},
+  {id:"S8", kicker:"Safety", nm:"安全と見守り"},
+  {id:"S9", kicker:"Budget", nm:"予算と入手方法"}
+];
+
+const Q = [
+/* ---------- S0 前提 ---------- */
+{id:"due", sec:"S0", fact:true, type:"date", q:"出産予定日（または赤ちゃんの生年月日）",
+ drives:"手配の締切", note:"レンタルは予定日の2〜3週間前に着くよう手配するのが安全です。木製の標準サイズは組み立てに30〜60分かかります。"},
+{id:"satogaeri", sec:"S0", fact:true, q:"里帰り出産をする？",
+ drives:"1台で足りるか", note:"里帰りする場合、最初の1〜2か月は実家の寝床を使うことになり、自宅のベッドの稼働開始が遅れます。「短期レンタル＋帰宅後に本命」という2段構えも選択肢に入ります。",
+ opts:[{v:"する（1か月以上）",w:{FOLD:1,FLOOR:1}},{v:"する（1か月未満）",w:{}},{v:"しない",w:{}},{v:"未定",w:{}}]},
+{id:"siblings", sec:"S0", fact:true, core:true, q:"上の子・ペットはいる？",
+ drives:"柵の必要性", note:"ベビーベッドを「置かない」選択が消えるいちばん強い理由がこれです。上の子の踏みつけ・おもちゃの落下・ペットの毛と乗り上がりから物理的に隔離できるのは柵のあるベッドだけです。",
+ opts:[{v:"どちらもいない",w:{FLOOR:2}},{v:"上の子がいる",w:{HIGH_REG:3,HIGH_MINI:3,PLAYYARD:3,FLOOR:-4}},
+       {v:"ペットがいる",w:{HIGH_REG:3,HIGH_MINI:2,COSLEEP:1,PLAYYARD:2,FLOOR:-4}},
+       {v:"上の子もペットもいる",w:{HIGH_REG:4,HIGH_MINI:3,PLAYYARD:3,FLOOR:-5}}]},
+{id:"second", sec:"S0", fact:true, core:true, q:"第2子の予定は？",
+ drives:"購入かレンタルか", note:"購入の元が取れるかを決める最大の変数。第2子まで使えば償却期間が2倍になり、購入が一気に有利になります。",
+ opts:[{v:"考えている",w:{HIGH_REG:2}},{v:"わからない",w:{}},{v:"考えていない",w:{}}]},
+{id:"movehome", sec:"S0", fact:true, q:"1年以内に引越しの予定は？",
+ drives:"大型家具の可否",
+ opts:[{v:"ある",w:{FOLD:2,FLOOR:2,PLAYYARD:1,HIGH_REG:-2}},{v:"ない",w:{}},{v:"未定",w:{}}]},
+
+/* ---------- S1 寸法 ---------- */
+{id:"room", sec:"S1", fact:true, core:true, type:"nums", q:"寝室でベッドを置けるスペース（実測）",
+ drives:"設置可否の足切り", fields:[{k:"room_w",lbl:"幅",unit:"cm"},{k:"room_d",lbl:"奥行",unit:"cm"}]},
+{id:"aisle", sec:"S1", fact:true, type:"nums", q:"ベッド周りに残したい通路幅",
+ drives:"実質の設置可能幅", note:"寝室の通路は最低50cm、抱っこして通るなら60cmは欲しいところ。ここに入れた分は設置可能幅から差し引いて判定します。",
+ fields:[{k:"aisle",lbl:"通路",unit:"cm"}]},
+{id:"door", sec:"S1", fact:true, core:true, type:"nums", q:"寝室⇄リビングの扉の「開口幅」（ドア枠の内側）",
+ drives:"移動できるか", note:"一般的な室内ドアの開口幅は70〜75cm。ドアノブや丁番の出っ張りで実測はさらに数cm狭くなります。標準サイズのベッド（奥行78cm前後）はここでほぼ落ちます。",
+ fields:[{k:"door_w",lbl:"開口幅",unit:"cm"}]},
+{id:"adultbed", sec:"S1", fact:true, core:true, type:"choice+num", q:"大人の寝床と、その高さ",
+ drives:"添い寝型の適合", note:"測るのは床からマットレス上面まで。添い寝型は大人のマットレス上面と赤ちゃんの床板をそろえて初めて意味が出ます。",
+ opts:[{v:"ベッド",w:{COSLEEP:1,HIGH_REG:1,HIGH_MINI:1}},{v:"敷布団（床）",w:{FLOOR:3,COSLEEP:1,HIGH_REG:-1,HIGH_MINI:-1}},{v:"未定",w:{}}],
+ fields:[{k:"adult_h",lbl:"マットレス上面の高さ",unit:"cm"}]},
+{id:"floorMat", sec:"S1", fact:true, q:"寝室の床は？",
+ drives:"キャスターの効き", note:"畳と厚手カーペットではキャスターがほぼ転がりません。「毎日移動」を前提にするなら床材のほうが先に効きます。",
+ opts:[{v:"フローリング",w:{FOLD:1}},{v:"畳",w:{FOLD:-2,FLOOR:2}},{v:"カーペット・ラグ",w:{FOLD:-1}}]},
+{id:"barrier", sec:"S1", fact:true, q:"寝室⇄リビングに段差はある？",
+ drives:"移動できるか",
+ opts:[{v:"なし（フラット）",w:{FOLD:1}},{v:"敷居などの小さな段差",w:{}},{v:"はっきりした段差・階段",w:{FOLD:-3}}]},
+{id:"rental_home", sec:"S1", fact:true, q:"「賃貸なので大きな家具を増やしたくない」はどの程度？",
+ drives:"サイズの上限",
+ opts:[{v:"強い",w:{HIGH_MINI:2,FOLD:2,FLOOR:2,HIGH_REG:-2}},{v:"普通",w:{}},{v:"気にしない",w:{HIGH_REG:1}}]},
+
+/* ---------- S2 夜 ---------- */
+{id:"where_night", sec:"S2", q:"赤ちゃんは夜どこで寝る予定？",
+ drives:"設置場所", note:"1歳までは同じ部屋の別の寝床（同室・別床）が国内外のガイドラインで共通して推奨されている形です。",
+ opts:[{v:"親と同じ寝室",w:{COSLEEP:2,HIGH_REG:1,HIGH_MINI:1}},{v:"別室",w:{HIGH_REG:2,FOLD:1}},{v:"未定",w:{}}]},
+{id:"cosleep", sec:"S2", core:true, q:"添い寝はどうしたい？",
+ drives:"ベッドタイプの分岐",
+ evi:"こども家庭庁・日本小児科学会は、大人用ベッドに赤ちゃんを入れる添い寝を窒息リスクとして注意喚起しています。「柵を開けて手が届く別床」は、添い寝の安心感と別床の安全を両立させる形です。",
+ opts:[{v:"別床にしたい",w:{HIGH_REG:2,HIGH_MINI:2,FOLD:1}},{v:"柵を開けて手が届く距離がいい",w:{COSLEEP:5}},{v:"大人ベッドに入れたい",w:{COSLEEP:3,FLOOR:1}},{v:"未定",w:{}}]},
+{id:"beside", sec:"S2", core:true, q:"ベビーベッドは大人ベッドの横に置きたい？",
+ drives:"床板高さの要件",
+ opts:[{v:"絶対に横",w:{COSLEEP:4}},{v:"できれば横",w:{COSLEEP:2}},{v:"離れていてOK",w:{HIGH_REG:1,FOLD:1}}]},
+{id:"feed", sec:"S2", q:"夜間の授乳はどうなりそう？",
+ drives:"夜の起床回数",
+ note:"母乳中心だと夜間に3〜5回起きる時期があります。1回ごとに立ち上がって別室へ行く動線かどうかで、体感の負担が大きく変わります。",
+ opts:[{v:"母乳中心",w:{COSLEEP:3}},{v:"ミルク中心",w:{HIGH_REG:1,HIGH_MINI:1}},{v:"混合",w:{COSLEEP:2}},{v:"未定",w:{}}]},
+{id:"nightduty", sec:"S2", q:"夜のお世話は誰が担当する？",
+ drives:"高さの合わせ先",
+ note:"身長差がある2人で交代するなら、床板の高さが細かく刻める機種のほうが後悔しません。",
+ opts:[{v:"交代でやる",w:{COSLEEP:1}},{v:"主に1人が担当",w:{COSLEEP:2,HIGH_REG:1}},{v:"未定",w:{}}]},
+{id:"back", sec:"S2", core:true, q:"腰への負担はどの程度重視する？",
+ drives:"床板の高さ",
+ note:"産後は腰を痛めやすく、床置きの寝床からの抱き上げは1日20回以上になります。ここを軽く見ると、あとから踏み台を買い足すことになります。",
+ opts:[{v:"かなり重視",w:{HIGH_REG:4,HIGH_MINI:4,COSLEEP:2,FLOOR:-4,FOLD:-1}},{v:"普通",w:{HIGH_REG:1,HIGH_MINI:1}},{v:"あまり気にしない",w:{FLOOR:2}}]},
+{id:"gate", sec:"S2", q:"夜中に柵を開け閉めしたい？",
+ drives:"扉の開閉方式",
+ note:"上下スライド式は静かですが両手が要る機種があります。横開き・前枠スライドの二方向に開くものは、おむつ替えの向きを変えられます。",
+ opts:[{v:"必須",w:{COSLEEP:2,HIGH_REG:2}},{v:"できれば",w:{HIGH_REG:1}},{v:"不要",w:{FOLD:1}}]},
+
+/* ---------- S3 日中 ---------- */
+{id:"daytime", sec:"S3", q:"日中、赤ちゃんは主にどの部屋にいる？",
+ drives:"寝床の数",
+ opts:[{v:"リビング",w:{FOLD:2,FLOOR:2}},{v:"寝室",w:{HIGH_REG:1}},{v:"両方",w:{FOLD:2}}]},
+{id:"living_bed", sec:"S3", core:true, q:"新生児期、リビングで寝かせるならどこ？",
+ drives:"2台目の要否",
+ note:"ここが「同じベッドを移動」なら移動できる機種が必須になり、「別の寝床」なら寝室のベッドは大きく重くても構わないという分岐点です。",
+ opts:[{v:"同じベッドを移動させる",w:{FOLD:5,PLAYYARD:2,HIGH_REG:-2}},{v:"リビング用に別の寝床を用意",w:{HIGH_REG:2,FLOOR:1}},{v:"未定",w:{}}]},
+{id:"movefreq", sec:"S3", core:true, q:"寝室⇄リビングでベッドを動かしたい？",
+ drives:"重量とキャスター",
+ opts:[{v:"毎日",w:{FOLD:5,PLAYYARD:1,HIGH_REG:-3,COSLEEP:-2}},{v:"ときどき",w:{FOLD:2}},{v:"動かさない",w:{HIGH_REG:2,COSLEEP:1}}]},
+{id:"playmat", sec:"S3", q:"リビングにプレイマットを敷く？",
+ drives:"リビング側の寝床",
+ opts:[{v:"敷く",w:{FLOOR:1,HIGH_REG:1}},{v:"未定",w:{}},{v:"敷かない",w:{FOLD:1}}]},
+{id:"bouncer", sec:"S3", q:"バウンサーも買う予定？",
+ drives:"リビング側の寝床",
+ note:"バウンサーがあるとリビングの短時間の居場所は埋まります。その場合、ベッドを毎日運ぶ必要性は下がります。",
+ opts:[{v:"買う",w:{HIGH_REG:1,FOLD:-1}},{v:"検討中",w:{}},{v:"買わない",w:{FOLD:1}}]},
+
+/* ---------- S4 期間 ---------- */
+{id:"span", sec:"S4", core:true, q:"何歳くらいまで使えたら「十分使った」と思える？",
+ drives:"サイズと償却",
+ note:"元シートのQ20とQ21は同じことを聞いていたので1問に統合しました。実際には、つかまり立ちが始まる頃（8〜10か月）に卒業する家庭がかなりあります。",
+ opts:[{v:"6か月で十分",w:{FOLD:2,FLOOR:3,HIGH_MINI:2,HIGH_REG:-1}},{v:"1歳まで",w:{HIGH_MINI:2,FOLD:2}},{v:"2歳まで使いたい",w:{HIGH_REG:3,PLAYYARD:3,FLOOR:-3}}]},
+{id:"after", sec:"S4", q:"ベッド卒業後はどこで寝かせたい？",
+ drives:"卒業のしかた",
+ opts:[{v:"床に布団",w:{FLOOR:2,HIGH_MINI:1}},{v:"ローベッド",w:{HIGH_MINI:1}},{v:"親のベッドの横",w:{COSLEEP:2}},{v:"未定",w:{}}]},
+{id:"toplayyard", sec:"S4", core:true, q:"卒業後、ベビーサークルとして使いたい？",
+ drives:"転用の可否",
+ opts:[{v:"かなり使いたい",w:{PLAYYARD:5,FOLD:2,HIGH_REG:-1}},{v:"あれば便利",w:{PLAYYARD:2,FOLD:1}},{v:"不要",w:{HIGH_REG:1}}]},
+{id:"bench", sec:"S4", q:"キッズベンチ等への転用は魅力的？",
+ drives:"付加価値",
+ note:"木製ベッドの一部にある機能ですが、実際に組み替えて使い続けた例は多くありません。決め手にはせず、同点だった時の加点程度に扱うのが無難です。",
+ opts:[{v:"魅力的",w:{HIGH_REG:1}},{v:"たぶん使わない",w:{}}]},
+{id:"disposal", sec:"S4", q:"使わなくなったらどうする？",
+ drives:"購入かレンタルか",
+ opts:[{v:"第2子用に保管",w:{HIGH_REG:2}},{v:"売る",w:{HIGH_REG:1}},{v:"譲る",w:{}},{v:"手放す手間をかけたくない",w:{}},{v:"未定",w:{}}]},
+{id:"storage_space", sec:"S4", fact:true, core:true, q:"使わない期間、保管しておくスペースはある？",
+ drives:"購入かレンタルか",
+ note:"第2子まで持ち越す前提なら、1〜2年ぶん置いておく場所が要ります。ここが「ない」なら、購入の償却計算は第1子だけで閉じます。",
+ opts:[{v:"ある",w:{}},{v:"畳めるものなら",w:{FOLD:2,FLOOR:2}},{v:"ない",w:{}}]},
+
+/* ---------- S5 移動 ---------- */
+{id:"trip", sec:"S5", q:"帰省先にも持っていきたい？",
+ drives:"サブ機の要否",
+ opts:[{v:"頻繁に",w:{FOLD:2,FLOOR:2}},{v:"年に数回",w:{}},{v:"不要",w:{}}]},
+{id:"car", sec:"S5", q:"車に積む可能性は？",
+ drives:"折りたたみサイズ",
+ opts:[{v:"ある",w:{FOLD:1,FLOOR:2}},{v:"ない",w:{}}]},
+
+/* ---------- S6 お世話 ---------- */
+{id:"understore", sec:"S6", core:true, q:"ベッド下収納は欲しい？",
+ drives:"フレーム形状",
+ note:"おむつ・着替え・ガーゼをベッド下にまとめられると、夜中に部屋を横断せずに済みます。収納棚付きは標準サイズのハイタイプに集中しています。",
+ opts:[{v:"必須",w:{HIGH_REG:3,HIGH_MINI:2,FOLD:-2,FLOOR:-2}},{v:"あると嬉しい",w:{HIGH_REG:1,HIGH_MINI:1}},{v:"不要",w:{FOLD:1,FLOOR:1}}]},
+{id:"diaper", sec:"S6", core:true, q:"おむつ替えをベッドの上でしたい？",
+ drives:"床板の広さと高さ",
+ note:"ミニサイズ（内寸90×60）は、赤ちゃんが大きくなるとベッド上でのおむつ替えがかなり窮屈になります。",
+ opts:[{v:"ベッドの上でしたい",w:{HIGH_REG:3,HIGH_MINI:-1,FLOOR:-2}},{v:"できれば",w:{HIGH_REG:1}},{v:"別の場所でやる",w:{HIGH_MINI:1,FOLD:1}}]},
+{id:"nearby", sec:"S6", q:"ベッド周りにおむつ・着替えをまとめたい？",
+ drives:"収納の位置",
+ opts:[{v:"まとめたい",w:{HIGH_REG:2,HIGH_MINI:1}},{v:"別でいい",w:{}}]},
+
+/* ---------- S7 寝具 ---------- */
+{id:"bedding", sec:"S7", core:true, q:"マットレスやシーツは市販品から自由に選びたい？",
+ drives:"内寸サイズの要件",
+ note:"内寸120×70の標準規格なら、防水シーツもキルトパッドも量販店とネットで何十種類も選べます。ミニ規格（90×60）は数が減り、特殊サイズ（例：135×60）は事実上メーカー専用品になります。買い足しのたびに効いてくる差です。",
+ opts:[{v:"かなり重要",w:{HIGH_REG:3,COSLEEP:-1}},{v:"普通",w:{}},{v:"専用品でも構わない",w:{COSLEEP:1,FOLD:1}}]},
+{id:"waterproof", sec:"S7", q:"防水シーツを複数枚買って頻繁に交換したい？",
+ drives:"寝具の入手性",
+ opts:[{v:"そうしたい",w:{HIGH_REG:2}},{v:"最低限でいい",w:{}}]},
+{id:"washable", sec:"S7", q:"マットレスが丸洗いできることの重要度は？",
+ drives:"マットレス素材",
+ note:"吐き戻しとおむつ漏れは想像より頻繁です。中材まで洗える構造かどうかは、実使用の満足度をかなり左右します。",
+ opts:[{v:"とても重要",w:{FOLD:2,FLOOR:3}},{v:"重要",w:{FOLD:1,FLOOR:1}},{v:"こだわらない",w:{HIGH_REG:1}}]},
+
+/* ---------- S8 安全 ---------- */
+{id:"psc", sec:"S8", q:"安全認証はどこまで求める？",
+ drives:"候補の足切り",
+ evi:"2025年12月25日に「子供PSCマーク」制度が始まりました。乳幼児用ベッドは2027年3月まで経過措置期間で、従来のひし形PSCマークのままでも販売できます。つまり2026年9月の今は両方が店頭に並ぶ過渡期です。中古・お下がりは製造時期によってどちらも無いことがあるため、現物のマークを必ず確認してください。",
+ opts:[{v:"子供PSCマーク付きに限定",w:{}},{v:"PSCまたはSGマークがあれば可",w:{}},{v:"こだわらない",w:{}}]},
+{id:"sensor", sec:"S8", q:"ベビーセンサーを使う予定？",
+ drives:"床板の構造",
+ note:"マットレスの下に敷く体動センサーは、床板がすのこ状で平らな機種を想定しています。メッシュ床や凹凸のある床板だと誤検知が増える機種があるため、センサーの型番とベッドの床板構造は必ずセットで確認してください。",
+ opts:[{v:"使う",w:{HIGH_REG:2,HIGH_MINI:1}},{v:"検討中",w:{}},{v:"使わない",w:{}}]},
+{id:"monitor", sec:"S8", q:"ベビーモニターを使う予定？",
+ drives:"別室運用の可否",
+ opts:[{v:"使う",w:{HIGH_REG:1}},{v:"検討中",w:{}},{v:"使わない",w:{COSLEEP:1}}]},
+{id:"pillow", sec:"S8", q:"向き癖・頭の形への対策をどう考える？",
+ drives:"（ベッド選定には影響させない）",
+ evi:"元シートのQ34を差し替えました。1歳未満に枕やドーナツ型クッションを使うのは窒息リスクとして推奨されていません。頭の形は、寝る向きを日ごとに変える・起きている時間にうつ伏せ遊びを入れる、といった運用で対応する話で、ベッドの機種選定にはほとんど影響しません。この質問は判定に加点しません。",
+ opts:[{v:"枕は使わず、向きの入れ替えで対応する",w:{}},{v:"まだ調べていない",w:{}}]},
+
+/* ---------- S9 予算 ---------- */
+{id:"newused", sec:"S9", q:"新品にこだわる？",
+ drives:"入手方法",
+ opts:[{v:"新品必須",w:{}},{v:"レンタルでもいい",w:{}},{v:"お下がり・中古でもいい",w:{}}]},
+{id:"tolerate", sec:"S9", core:true, q:"半年で卒業した場合、許容できる購入額は？",
+ drives:"購入かレンタルか",
+ note:"6か月レンタルの相場は5,000〜12,000円程度。ここが2万円を下回るなら、購入は最初から分が悪くなります。",
+ opts:[{v:"1.5万円まで",w:{}},{v:"2万円まで",w:{}},{v:"3万円まで",w:{}},{v:"4万円以上でも可",w:{}}]},
+{id:"budget", sec:"S9", core:true, q:"ベッド＋マットレス＋シーツ込みの予算上限は？",
+ drives:"価格帯の足切り",
+ note:"本体のほかに、マットレス・防水シーツ・替えシーツ2〜3枚で概ね5,000〜15,000円が上乗せされます。本体価格だけで組むと必ずはみ出します。",
+ opts:[{v:"2万円まで",w:{FLOOR:2,FOLD:1}},{v:"3万円まで",w:{FOLD:2,HIGH_MINI:1}},{v:"5万円まで",w:{HIGH_REG:1,COSLEEP:1}},{v:"5万円以上",w:{COSLEEP:2,HIGH_REG:2}}]},
+{id:"madein", sec:"S9", q:"国内メーカー・日本製の安心感にいくら払える？",
+ drives:"候補の絞り込み",
+ opts:[{v:"＋1万円払える",w:{HIGH_REG:1,COSLEEP:1}},{v:"＋5千円まで",w:{}},{v:"気にしない",w:{}}]},
+{id:"paymore", sec:"S9", q:"「毎日のお世話がラクになる」なら＋1万円払える？",
+ drives:"機能の取捨",
+ opts:[{v:"払える",w:{HIGH_REG:1,COSLEEP:1}},{v:"払えない",w:{FLOOR:1}}]},
+{id:"reviews", sec:"S9", q:"ECレビューより、長期使用者の実績をどの程度重視する？",
+ drives:"最終確認の手間",
+ note:"ECのレビューは開封直後に書かれたものが大半で、「半年後に何が起きたか」はほぼ載りません。最後に個人ブログの長期レビューを読む工程を、決定プロセスに残しておく価値があります。",
+ opts:[{v:"かなり重視する",w:{}},{v:"参考程度",w:{}}]}
+];
+
+/* ---------- 優先順位 ---------- */
+const PRIORITIES = [
+  {k:"安全性",            w:{HIGH_REG:2,HIGH_MINI:2,PLAYYARD:1,FLOOR:-1}},
+  {k:"赤ちゃんの寝心地",  w:{HIGH_REG:2,COSLEEP:1}},
+  {k:"夜のお世話のラクさ",w:{COSLEEP:4,HIGH_REG:1}},
+  {k:"腰への負担",        w:{HIGH_REG:4,HIGH_MINI:4,COSLEEP:2,FLOOR:-4}},
+  {k:"省スペース",        w:{HIGH_MINI:4,FOLD:3,FLOOR:4,HIGH_REG:-3}},
+  {k:"寝室⇄リビングの移動",w:{FOLD:5,PLAYYARD:1,HIGH_REG:-3}},
+  {k:"添い寝しやすさ",    w:{COSLEEP:5,FLOOR:1}},
+  {k:"長く使える",        w:{HIGH_REG:3,PLAYYARD:3,FLOOR:-2}},
+  {k:"サークルへの転用",  w:{PLAYYARD:5,FOLD:2}},
+  {k:"収納力",            w:{HIGH_REG:4,HIGH_MINI:2,FOLD:-2,FLOOR:-2}},
+  {k:"洗いやすさ",        w:{FLOOR:3,FOLD:2}},
+  {k:"デザイン",          w:{HIGH_REG:1,COSLEEP:1}},
+  {k:"価格",              w:{FLOOR:3,FOLD:2,HIGH_MINI:1,COSLEEP:-2}},
+  {k:"売りやすさ",        w:{HIGH_REG:2,FOLD:1}},
+  {k:"メーカー・実績",    w:{HIGH_REG:2,COSLEEP:2}}
+];
+
+/* ============================ 製品カタログ ============================ */
+/* outer:[W,D,H] cm / inner:[W,D] cm / floorH:[min,max] cm / pass: 通過に必要な最小幅 cm
+   数値はメーカー公表値・販売店表記。取得できなかった項目は null にして「要確認」を出す。 */
+const PRODUCTS = [
+{id:"soinel_l", nm:"そいねーる AD ラージ", brand:"大和屋", type:"COSLEEP",
+ outer:[147.5,70,126.5], inner:[135,60], floorH:[11.5,66], steps:28, kg:21, pass:70,
+ months:"0〜24か月", price:"5〜6万円台", priceMin:52000,
+ bedding:"専用（内寸135×60の特殊サイズ）", beddingStd:false,
+ caster:true, storage:false, fold:false, playyard:false, wash:false, madeIn:"日本", cert:"SG・PSC",
+ note:"床板を3cm刻み28段階で調整でき、床の敷布団からベッドまで大人側の高さを選ばない。内寸が135×60と標準規格から外れるため、寝具はほぼ専用品になる。"},
+
+{id:"soinel_m", nm:"そいねーる AD ミニ", brand:"大和屋", type:"COSLEEP",
+ outer:[102.5,70,126.5], inner:[90,60], floorH:[11.5,66], steps:28, kg:14.5, pass:70,
+ months:"0〜24か月", price:"4〜5万円台", priceMin:42000,
+ bedding:"ミニ規格（90×60）", beddingStd:false,
+ caster:true, storage:false, fold:false, playyard:false, wash:false, madeIn:"日本", cert:"SG・PSC",
+ note:"ラージと同じ28段階の高さ調整のまま設置面積を約3割削ったモデル。寝具はミニ規格が使えるぶんラージより選択肢がある。"},
+
+{id:"farska_bsb03", nm:"ベッドサイドベッド03", brand:"farska", type:"COSLEEP",
+ outer:[125,75,91], inner:[120,70], floorH:[9,53], steps:9, kg:17, pass:75,
+ months:"0〜24か月", price:"¥28,600", priceMin:28600,
+ bedding:"標準規格（120×70）", beddingStd:true,
+ caster:false, storage:false, fold:false, playyard:true, wash:false, madeIn:null, cert:"要確認",
+ warnSpec:"床板高さは出典によって「9〜53cm・9段階」と「最低約35cm」で記述が割れています。大人ベッドの高さに合うかは購入前に必ずメーカー仕様書で確認してください。",
+ note:"添い寝型では珍しく内寸が標準規格の120×70。市販の寝具がそのまま使えるうえ、床板を外してベビーサークルに転用できる。"},
+
+{id:"coconel_ab", nm:"ココネル エアー AB", brand:"Aprica", type:"FOLD",
+ outer:[105.2,70.4,95.1], inner:[90,60], floorH:null, steps:2, kg:14.5, pass:70.4,
+ months:"新生児(2.5kg)〜24か月(13kg)", price:"3万円前後", priceMin:28000,
+ bedding:"ミニ規格（90×60）／専用マット付", beddingStd:false,
+ caster:true, storage:false, fold:true, playyard:true, wash:true, madeIn:null, cert:"PSC・SG",
+ warnSpec:"床板は上段（新生児〜つかまり立ち・概ね生後5か月）／下段（5か月〜24か月）の2段階。段ごとの実寸は公表値を確認してください。",
+ note:"キャスターで部屋間を移動でき、使わない時は畳んで収納袋に入る。ただし下段に切り替えたあとの抱き上げは深く、腰への負担は増える。踏み台を併用する家庭が多い。"},
+
+{id:"katoji_arch", nm:"ハイポジションベビーベッド アーチ", brand:"カトージ", type:"HIGH_REG",
+ outer:[124,78,121], inner:[120,70], floorH:[43,75], steps:4, kg:null, pass:78,
+ months:"新生児〜24か月", price:"3万円前後", priceMin:27000,
+ bedding:"標準規格（120×70）", beddingStd:true,
+ caster:true, storage:true, fold:false, playyard:false, wash:false, madeIn:null, cert:"PSC・SG",
+ note:"床板が75/70/65/43cmの4段階。最上段75cmは立ったままお世話ができる高さで、腰を最優先するならこの系統。ベッド下は収納棚。奥行78cmは一般的な室内ドアを通らない。"},
+
+{id:"katoji_arch2_mini", nm:"ハイポジション ミニベッド アーチⅡ（収納板付）", brand:"カトージ", type:"HIGH_MINI",
+ outer:null, inner:[90,60], floorH:[null,70], steps:null, kg:null, pass:null,
+ months:"新生児〜24か月", price:"¥28,380（直営）", priceMin:28380,
+ bedding:"ミニ規格（90×60）", beddingStd:false,
+ caster:true, storage:true, fold:false, playyard:false, wash:false, madeIn:null, cert:"PSC・SG",
+ warnSpec:"外寸と重量の公表値が取得できませんでした。設置幅・扉の通過判定はこの機種だけ手動で確認してください。",
+ note:"床板最大70cmのハイポジションを保ったままミニサイズにしたモデル。腰と省スペースの両方を取りにいく選択肢。"},
+
+{id:"yamasaki_bside", nm:"ツーオープンベッド b-side（ハイタイプ）", brand:"ヤマサキ", type:"HIGH_REG",
+ outer:[125,78,116], inner:[120,70], floorH:[null,70], steps:4, kg:null, pass:78,
+ months:"新生児〜24か月", price:"約58,000円", priceMin:58000,
+ bedding:"標準規格（120×70）", beddingStd:true,
+ caster:true, storage:true, fold:false, playyard:false, wash:false, madeIn:"日本", cert:"PSC・SG",
+ note:"ブナ材の日本製。前枠スライドと横枠開閉の2か所が開くので、部屋のどちら側からでもおむつ替えができる。収納棚とキャスター付き。価格は高い。"},
+
+{id:"farska_cbf", nm:"コンパクトベッドフィット", brand:"farska", type:"FLOOR",
+ outer:[90,60,19], inner:[90,60], floorH:[0,0], steps:1, kg:null, pass:60,
+ folded:[60,24,45],
+ months:"0〜12か月", price:"¥19,800", priceMin:19800,
+ bedding:"付属（丸洗い可）", beddingStd:false,
+ caster:false, storage:false, fold:true, playyard:false, wash:true, madeIn:null, cert:"要確認",
+ note:"大人の布団の横にそのまま置ける床置き型。畳んで持ち運べる。寝返りが始まる5か月前後で窮屈になるという声が多く、使用期間は短い前提で見るのが正しい。"},
+
+{id:"farska_cbf_l", nm:"コンパクトベッドフィットL", brand:"farska", type:"FLOOR",
+ outer:[120,70,19], inner:[120,70], floorH:[0,0], steps:1, kg:null, pass:70,
+ folded:[70,24,60],
+ months:"0〜36か月", price:"¥31,900", priceMin:31900,
+ bedding:"付属（丸洗い可）", beddingStd:false,
+ caster:false, storage:false, fold:true, playyard:false, wash:true, madeIn:null, cert:"要確認",
+ note:"フィットの標準サイズ版。0〜36か月と使用期間が長く、寝返り後の窮屈さの問題が出にくい。床置きなので腰への負担は最大。"},
+
+{id:"playyard", nm:"プレイヤード（カトージ・日本育児ほか）", brand:"各社", type:"PLAYYARD",
+ outer:null, inner:null, floorH:null, steps:2, kg:null, pass:null,
+ months:"バシネット〜6か月／サークル〜2歳", price:"1.5〜3万円", priceMin:15000,
+ bedding:"専用マット", beddingStd:false,
+ caster:true, storage:false, fold:true, playyard:true, wash:false, madeIn:null, cert:"機種による",
+ warnSpec:"機種ごとに外寸・対象月齢・認証が大きく異なります。候補を1〜2機種に絞ってから個別に確認してください。",
+ note:"寝床としての快適性はベビーベッドに劣るが、卒業後にサークルとして2歳まで働く。「寝床」ではなく「囲い」として評価するのが正しい買い方。"},
+
+{id:"bjorn_travel", nm:"トラベルクリブライト", brand:"ベビービョルン", type:"TRAVEL",
+ outer:[112,64,82], inner:null, floorH:null, steps:1, kg:6, pass:64,
+ folded:[60,14,49],
+ months:"0〜3歳頃", price:"3万円前後", priceMin:28000,
+ bedding:"専用マットレス", beddingStd:false,
+ caster:false, storage:false, fold:true, playyard:true, wash:false, madeIn:null, cert:"要確認",
+ note:"重量6kg、畳むと厚み14cmでスーツケースに近いサイズになる。帰省と旅行に特化したサブ機で、メインのベッドの代わりにはしにくい。"}
+];
+
+/* ============================ 出典 ============================ */
+const SOURCES = [
+ ["子供PSCマーク（政府広報オンライン）","https://www.gov-online.go.jp/article/202511/radio-3237.html"],
+ ["子供PSCマークがはじまりました（消費者庁）","https://www.caa.go.jp/policies/policy/consumer_safety/child/project_001/mail/20260123/"],
+ ["赤ちゃんが安全に眠れるように（こども家庭庁）","https://www.cfa.go.jp/policies/boshihoken/kenkou/sids"],
+ ["乳児の安全な睡眠環境の確保について（日本小児科学会）","https://www.jpeds.or.jp/modules/guidelines/index.php?content_id=160"],
+ ["ベビーベッドのサイズ比較（ナイスベビー）","https://www.nicebaby.co.jp/blogs/babybed/babybed-size-2026"],
+ ["そいねーる スペック（大和屋）","https://www.yamatoya-jp.com/neru/soinel/spec/"],
+ ["ココネル エアー AB（アップリカ）","https://www.aprica.jp/products/home/detail/bed/coconel_air_ab/"],
+ ["ハイポジション アーチⅡ（カトージ）","https://www.katoji-onlineshop.com/c/category/babybed/first/02516"],
+ ["ツーオープンベッド b-side（ヤマサキ）","https://www.ymsk.jp/c/babybed/gd2"],
+ ["ベッドサイドベッド03（farska）","http://www.farska.com/product/spec/bedsidebed03"],
+ ["コンパクトベッドフィット（farska）","http://www.farska.com/product/spec/compactbedfits"],
+ ["トラベルクリブライト（ナイスベビー）","https://www.nicebaby.co.jp/products/detail/2543.html"],
+ ["レンタル料金比較（マイナビ子育て）","https://kosodate.mynavi.jp/articles/1483"]
+];
+
+/* ============================ 状態と保存 ============================ */
+const state = { facts:{}, p1:{}, p2:{}, who:"p1", coreOnly:false };
+const LS = "babybed.sheet.v1";
+let DB = null, dirtyUntil = 0, saveTimer = null;
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+const $ = id => document.getElementById(id);
+
+function setStatus(txt, live){
+  const el = $("status"); if(!el) return;
+  el.textContent = txt; el.className = "status" + (live ? " live" : "");
+}
+function saveLocal(){
+  try{ localStorage.setItem(LS, JSON.stringify({facts:state.facts,p1:state.p1,p2:state.p2})); }catch(e){}
+}
+function loadLocal(){
+  try{
+    const raw = localStorage.getItem(LS); if(!raw) return;
+    const d = JSON.parse(raw);
+    state.facts = d.facts || {}; state.p1 = d.p1 || {}; state.p2 = d.p2 || {};
+  }catch(e){}
+}
+function persist(){
+  dirtyUntil = Date.now() + 1800;
+  saveLocal();
+  if(!DB) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    DB.doc("sheet/facts").set({v:state.facts}).catch(()=>{});
+    DB.doc("sheet/p1").set({v:state.p1}).catch(()=>{});
+    DB.doc("sheet/p2").set({v:state.p2}).catch(()=>{});
+  }, 450);
+}
+async function initDB(){
+  loadLocal(); renderAll();
+  if(!(window.claude && typeof window.claude.use === "function")){
+    setStatus("この端末に保存"); return;
+  }
+  setStatus("保存先を確認中…");
+  let db = null;
+  try{ db = await window.claude.use("db"); }catch(e){ db = null; }
+  if(!db){ setStatus("この端末に保存"); return; }
+  DB = db;
+  setStatus("2人で共有保存中", true);
+  const bind = (key, target) => DB.doc("sheet/" + key).onSnapshot(snap => {
+    if(Date.now() < dirtyUntil) return;
+    const d = snap && snap.exists ? snap.data() : null;
+    if(d && d.v && typeof d.v === "object"){ state[target] = d.v; renderAll(); }
+  }, () => {});
+  bind("facts","facts"); bind("p1","p1"); bind("p2","p2");
+  persist();
+}
+
+/* ============================ 判定エンジン ============================ */
+function answerOf(q, who){ return q.fact ? state.facts[q.id] : (state[who] || {})[q.id]; }
+
+function typeScores(who){
+  const s = {}; TKEYS.forEach(k => s[k] = 0);
+  Q.forEach(q => {
+    if(!q.opts) return;
+    const v = answerOf(q, who); if(!v) return;
+    const o = q.opts.find(x => x.v === v);
+    if(o && o.w) for(const k in o.w) if(k in s) s[k] += o.w[k];
+  });
+  ((state[who] || {})._top3 || []).forEach((name, i) => {
+    const mult = [2.0, 1.4, 1.0][i] || 1;
+    const p = PRIORITIES.find(x => x.k === name);
+    if(p) for(const k in p.w) if(k in s) s[k] += p.w[k] * mult;
+  });
+  return s;
+}
+
+function requirements(who){
+  const a = state[who] || {};
+  return {
+    move      : a.movefreq === "毎日" || a.movefreq === "ときどき" || a.living_bed === "同じベッドを移動させる",
+    moveDaily : a.movefreq === "毎日",
+    cosleep   : a.beside === "絶対に横" || a.cosleep === "柵を開けて手が届く距離がいい",
+    stdBedding: a.bedding === "かなり重要",
+    storage   : a.understore === "必須",
+    playyard  : a.toplayyard === "かなり使いたい",
+    wash      : a.washable === "とても重要",
+    back      : a.back === "かなり重視",
+    travel    : a.trip === "頻繁に" || a.car === "ある",
+    budget    : ({"2万円まで":20000, "3万円まで":30000, "5万円まで":50000, "5万円以上":null})[a.budget]
+  };
+}
+
+function fitsFootprint(p, availW, roomD){
+  if(!p.outer || availW == null || roomD == null) return null;
+  const [w, d] = p.outer;
+  return (w <= availW && d <= roomD) || (d <= availW && w <= roomD);
+}
+
+function evaluateProducts(who){
+  const sc = typeScores(who), R = requirements(who), f = state.facts;
+  const aisle = num(f.aisle) || 0;
+  const availW = num(f.room_w) != null ? num(f.room_w) - aisle : null;
+  const roomD  = num(f.room_d);
+  const doorW  = num(f.door_w);
+  const adultH = num(f.adult_h);
+
+  return PRODUCTS.filter(p => p.type !== "TRAVEL").map(p => {
+    const blocks = [], warns = [], goods = [];
+    let s = sc[p.type] !== undefined ? sc[p.type] : 0;
+
+    const fit = fitsFootprint(p, availW, roomD);
+    if(fit === false) blocks.push("外寸 " + p.outer[0] + "×" + p.outer[1] + "cm が置けない（有効 " + availW + "×" + roomD + "cm）");
+    else if(fit === true) goods.push("設置OK");
+
+    if(R.move && doorW != null && p.pass != null){
+      if(p.pass > doorW){
+        if(p.fold) warns.push("扉の開口 " + doorW + "cm に対し通過幅 " + p.pass + "cm。畳めば通せるが毎日は現実的でない");
+        else blocks.push("扉の開口 " + doorW + "cm を通らない（通過幅 " + p.pass + "cm）");
+      } else goods.push("扉を通る");
+    }
+    if(R.cosleep && adultH != null){
+      if(p.floorH && p.floorH[0] != null && p.floorH[1] != null){
+        if(adultH >= p.floorH[0] && adultH <= p.floorH[1]) goods.push("大人ベッド " + adultH + "cm に高さを合わせられる");
+        else warns.push("床板 " + p.floorH[0] + "〜" + p.floorH[1] + "cm。大人ベッド " + adultH + "cm に合わない");
+      } else warns.push("床板高さの公表値が不十分。添い寝で使うなら要確認");
+    }
+    if(R.budget != null && p.priceMin > R.budget) warns.push("本体 " + p.price + " は予算上限を超える（寝具代は別途）");
+
+    if(R.stdBedding) s += p.beddingStd ? 3 : -2;
+    if(R.storage)    s += p.storage ? 3 : -3;
+    if(R.playyard)   s += p.playyard ? 3 : -1;
+    if(R.wash)       s += p.wash ? 2 : 0;
+    if(R.moveDaily)  s += p.caster ? 2 : -3;
+    if(R.back){
+      if(p.floorH && p.floorH[1] != null && p.floorH[1] >= 60) s += 3;
+      if(p.type === "FLOOR") s -= 4;
+    }
+    s -= warns.length * 1.2;
+    if(blocks.length) s -= 100;
+    return {p, s, blocks, warns, goods};
+  }).sort((a, b) => b.s - a.s);
+}
+
+function moneyView(who){
+  const a = state[who] || {}, f = state.facts;
+  const months = ({"6か月で十分":6, "1歳まで":12, "2歳まで使いたい":24})[a.span] || null;
+  if(!months) return null;
+  const rental = months <= 6 ? [5000, 12000] : months <= 12 ? [12000, 22000] : [24000, 40000];
+  const best = evaluateProducts(who).filter(x => !x.blocks.length)[0];
+  const buyBody = best ? best.p.priceMin : null;
+  const buy = buyBody != null ? [buyBody + 5000, buyBody + 15000] : null;
+
+  const reasons = [];
+  let lean = 0;
+  if(f.second === "考えている"){ lean += 2; reasons.push("第2子を考えている → 償却期間が2倍になり購入が有利"); }
+  if(f.storage_space === "ない"){ lean -= 2; reasons.push("保管スペースがない → 持ち越せないので購入の元が取りにくい"); }
+  if(f.movehome === "ある"){ lean -= 2; reasons.push("1年以内に引越し予定 → 大型家具は身軽なほうがいい"); }
+  if(months <= 6){ lean -= 2; reasons.push("使用予定が6か月 → レンタル相場の範囲に収まる"); }
+  if(months >= 24){ lean += 2; reasons.push("2歳まで使う想定 → レンタルの累計が購入額を超えやすい"); }
+  if(a.newused === "新品必須"){ lean += 1; reasons.push("新品にこだわる → レンタル品は中古扱い"); }
+  if(a.newused === "レンタルでもいい"){ lean -= 1; }
+  if(a.disposal === "手放す手間をかけたくない"){ lean -= 2; reasons.push("処分の手間を避けたい → 返却で終わるレンタルが軽い"); }
+  const tol = ({"1.5万円まで":15000, "2万円まで":20000, "3万円まで":30000, "4万円以上でも可":40000})[a.tolerate];
+  if(tol != null && buyBody != null && months <= 6 && buyBody > tol){
+    lean -= 2; reasons.push("半年で卒業した場合の許容額（" + a.tolerate + "）を候補の本体価格が超える");
+  }
+  return {months, rental, buy, lean, reasons, best};
+}
+
+function divergences(){
+  const out = [];
+  Q.forEach(q => {
+    if(q.fact || !q.opts) return;
+    const v1 = state.p1[q.id], v2 = state.p2[q.id];
+    if(v1 && v2 && v1 !== v2) out.push({q:q.q, a:v1, b:v2});
+  });
+  const t1 = (state.p1._top3 || []).join("・"), t2 = (state.p2._top3 || []).join("・");
+  if(t1 && t2 && t1 !== t2) out.push({q:"最優先の3つ", a:t1, b:t2});
+  return out;
+}
+
+function leadTime(){
+  const d = state.facts.due; if(!d) return null;
+  const t = new Date(d + "T00:00:00");
+  if(isNaN(t)) return null;
+  const days = Math.round((t - new Date()) / 86400000);
+  return {days, weeks: Math.floor(days / 7)};
+}
+
+/* ============================ 描画 ============================ */
+function answeredCount(who){
+  let n = 0;
+  Q.forEach(q => { if(answerOf(q, who)) n++; });
+  if(((state[who] || {})._top3 || []).length === 3) n++;
+  return n;
+}
+const TOTAL_Q = Q.length + 1;
+
+function peerLine(q){
+  if(q.fact || !q.opts) return "";
+  const other = state.who === "p1" ? "p2" : "p1";
+  const ov = (state[other] || {})[q.id];
+  if(!ov) return "";
+  const mine = (state[state.who] || {})[q.id];
+  const cls = mine && mine !== ov ? "peer diff" : "peer";
+  const who = other === "p1" ? "回答者1" : "回答者2";
+  return '<div class="' + cls + '" data-peer="' + q.id + '">' + who + "：" + esc(ov) + (mine && mine !== ov ? "  ← 要すり合わせ" : "") + "</div>";
+}
+
+function renderQ(q){
+  const v = answerOf(q, state.who);
+  let body = "";
+  if(q.opts){
+    body += '<div class="opts" data-q="' + q.id + '">' + q.opts.map(o =>
+      '<button type="button" data-v="' + esc(o.v) + '" aria-pressed="' + (v === o.v) + '">' + esc(o.v) + "</button>").join("") + "</div>";
+  }
+  if(q.type === "date"){
+    body += '<div class="numrow"><label class="numfield">日付 <input type="date" data-fact="' + q.id + '" value="' + esc(state.facts[q.id] || "") + '"></label></div>';
+  }
+  if(q.fields){
+    body += '<div class="numrow">' + q.fields.map(f =>
+      '<label class="numfield">' + esc(f.lbl) + ' <input type="number" inputmode="decimal" step="0.5" min="0" data-fact="' + f.k + '" value="' + esc(state.facts[f.k] != null ? state.facts[f.k] : "") + '"> ' + esc(f.unit) + "</label>").join("") + "</div>";
+  }
+  return '<div class="q' + (state.coreOnly && !q.core ? " hidden" : "") + '" data-qid="' + q.id + '">' +
+    '<div class="q-head"><span class="q-id">' + (q.fact ? "共有" : "") + '</span>' +
+    '<span class="q-txt">' + esc(q.q) + (q.core ? '<span class="core-dot" title="コア質問"></span>' : "") + "</span>" +
+    (q.drives ? '<span class="q-drives">→ ' + esc(q.drives) + "</span>" : "") + "</div>" +
+    (q.evi ? '<div class="q-note evi">' + esc(q.evi) + "</div>" : "") +
+    (q.note ? '<div class="q-note">' + esc(q.note) + "</div>" : "") +
+    body + peerLine(q) + "</div>";
+}
+
+function renderSheet(){
+  const cur = state[state.who] || {};
+  let h = SECTIONS.map(sec => {
+    const qs = Q.filter(q => q.sec === sec.id);
+    const shown = state.coreOnly ? qs.filter(q => q.core).length : qs.length;
+    if(shown === 0) return "";
+    return '<section class="sec"><div class="sec-head"><span class="kicker">' + esc(sec.kicker) + "</span>" +
+      "<h2>" + esc(sec.nm) + '</h2><span class="cnt">' + shown + " 問</span></div>" +
+      (sec.note ? '<div class="sec-note">' + esc(sec.note) + "</div>" : "") +
+      qs.map(renderQ).join("") + "</section>";
+  }).join("");
+
+  const top3 = cur._top3 || [];
+  h += '<section class="sec"><div class="sec-head"><span class="kicker">Priorities</span>' +
+    "<h2>最優先の3つ</h2>" + '<span class="cnt">' + top3.length + " / 3</span></div>" +
+    '<div class="sec-note">同点になったときに勝敗を決める重みです。順番に押すと1位→2位→3位、もう一度押すと解除。夫婦で違って構いません（違いは右の「すり合わせ」に出ます）。</div>' +
+    '<div class="prio"><div class="prio-grid" id="prioGrid">' + PRIORITIES.map(p => {
+      const r = top3.indexOf(p.k);
+      return '<button type="button" data-p="' + esc(p.k) + '"' + (r >= 0 ? ' data-rank="' + (r + 1) + '"' : "") + ">" +
+        esc(p.k) + (r >= 0 ? '<span class="prio-rank">' + (r + 1) + "位</span>" : "") + "</button>";
+    }).join("") + "</div></div></section>";
+
+  $("sheet").innerHTML = h;
+}
+
+function bar(nm, v, min, max, top){
+  const pc = max > min ? Math.round((v - min) / (max - min) * 100) : 0;
+  return '<div class="fitrow' + (top ? " top" : "") + '"><span class="nm">' + esc(nm) + "</span>" +
+    '<span class="fittrack"><span class="fitfill" style="width:' + pc + '%"></span></span>' +
+    '<span class="pc num">' + pc + "</span></div>";
+}
+
+function renderPanel(){
+  const who = state.who, cnt = answeredCount(who);
+  const cards = [];
+
+  if(cnt < 6){
+    cards.push('<div class="card"><div class="card-head"><h3>判定</h3><span class="tick">' + cnt + " / " + TOTAL_Q + '</span></div>' +
+      '<div class="card-body"><p class="empty">左のシートに6問以上答えると、ベッドのタイプと候補製品がここに出ます。<br>まずは「前提」と「寸法」のセクションから。</p></div></div>');
+  } else {
+    const sc = typeScores(who);
+    const vals = TKEYS.map(k => sc[k]);
+    const mx = Math.max.apply(null, vals), mn = Math.min.apply(null, vals);
+    const order = TKEYS.slice().sort((a, b) => sc[b] - sc[a]);
+    const win = order[0];
+
+    const res = evaluateProducts(who);
+    const aliveAll = res.filter(r => !r.blocks.length);
+    const alive = aliveAll.slice(0, 4);
+    const dead  = res.filter(r => r.blocks.length);
+
+    let clash = "";
+    if(!aliveAll.length){
+      clash = '<div class="reason stop">いまの寸法条件では、候補11台のうち1台も置けません。設置スペースか、扉を通す条件のどちらかを緩める必要があります。</div>';
+    } else if(!aliveAll.some(r => r.p.type === win)){
+      const alt = aliveAll[0].p.type;
+      clash = '<div class="reason warn">価値観のうえでは<b>' + esc(TYPES[win].nm) + "</b>が最適ですが、いまの寸法条件では該当する製品が1台も残りません。実際に置けるなかでの最善は<b>" +
+        esc(TYPES[alt] ? TYPES[alt].nm : alt) + "</b>です。寸法を優先するか、置き場所のほうを変えるかの判断になります。</div>";
+    }
+
+    cards.push('<div class="card"><div class="card-head"><h3>判定</h3><span class="tick">' + cnt + " / " + TOTAL_Q + '</span></div><div class="card-body">' +
+      '<div class="verdict-type">' + esc(TYPES[win].nm) + "</div>" +
+      '<div class="verdict-sub">' + esc(TYPES[win].sub) + "</div>" + clash +
+      order.map((k, i) => bar(TYPES[k].nm, sc[k], mn, mx, i === 0)).join("") + "</div></div>");
+    const prod = r => {
+      const p = r.p;
+      const spec = [
+        p.outer ? "外寸 " + p.outer.join("×") + "cm" : "外寸 要確認",
+        p.inner ? "内寸 " + p.inner.join("×") + "cm" : null,
+        p.floorH && p.floorH[0] != null && p.floorH[1] != null ? "床板 " + p.floorH[0] + "〜" + p.floorH[1] + "cm" + (p.steps ? "／" + p.steps + "段階" : "") : null,
+        p.kg ? p.kg + "kg" : null, p.months
+      ].filter(Boolean).join("　");
+      const tags = [];
+      if(p.beddingStd) tags.push('<span class="tag good">市販寝具OK</span>');
+      if(p.storage) tags.push('<span class="tag">下収納</span>');
+      if(p.caster) tags.push('<span class="tag">キャスター</span>');
+      if(p.fold) tags.push('<span class="tag">折りたたみ</span>');
+      if(p.playyard) tags.push('<span class="tag">サークル転用</span>');
+      if(p.wash) tags.push('<span class="tag">丸洗い</span>');
+      if(p.madeIn) tags.push('<span class="tag">' + esc(p.madeIn) + "製</span>");
+      if(p.cert) tags.push('<span class="tag' + (p.cert === "要確認" ? " warn" : "") + '">' + esc(p.cert) + "</span>");
+      return '<div class="prod' + (r.blocks.length ? " blocked" : "") + '">' +
+        '<div class="prod-top"><span class="prod-nm">' + esc(p.nm) + '<span class="prod-brand"> / ' + esc(p.brand) + '</span></span><span class="prod-price">' + esc(p.price) + "</span></div>" +
+        '<div class="prod-spec">' + esc(spec) + "</div>" +
+        '<div class="tags">' + tags.join("") + "</div>" +
+        r.blocks.map(b => '<div class="reason stop">除外：' + esc(b) + "</div>").join("") +
+        r.warns.map(b => '<div class="reason warn">注意：' + esc(b) + "</div>").join("") +
+        (p.warnSpec ? '<div class="reason warn">要確認：' + esc(p.warnSpec) + "</div>" : "") +
+        (!r.blocks.length && r.goods.length ? '<div class="reason ok">' + esc(r.goods.join("／")) + "</div>" : "") +
+        '<div class="prod-spec" style="color:var(--ink-2)">' + esc(p.note) + "</div></div>";
+    };
+    cards.push('<div class="card"><div class="card-head"><h3>候補</h3><span class="tick">' + alive.length + " 台</span></div>" +
+      (alive.length ? alive.map(prod).join("") : '<div class="card-body"><p class="empty">寸法の条件に合う製品がありません。設置スペースか扉の条件を見直してください。</p></div>') + "</div>");
+    if(dead.length){
+      cards.push('<div class="card"><div class="card-head"><h3>寸法で落ちたもの</h3><span class="tick">' + dead.length + " 台</span></div>" + dead.map(prod).join("") + "</div>");
+    }
+
+    const R = requirements(who);
+    if(R.travel){
+      const t = PRODUCTS.find(p => p.type === "TRAVEL");
+      cards.push('<div class="card"><div class="card-head"><h3>帰省用のサブ機</h3></div>' +
+        '<div class="card-body"><p style="font-size:12.5px;color:var(--ink-2);margin-bottom:10px">帰省や車移動があるので、メインとは別に軽いものを1台持つ形が現実的です。</p>' +
+        '<div class="prod-top"><span class="prod-nm">' + esc(t.nm) + '<span class="prod-brand"> / ' + esc(t.brand) + '</span></span><span class="prod-price">' + esc(t.price) + "</span></div>" +
+        '<div class="prod-spec">外寸 ' + t.outer.join("×") + "cm　折りたたみ " + t.folded.join("×") + "cm　" + t.kg + "kg</div>" +
+        '<div class="prod-spec" style="color:var(--ink-2);margin-top:6px">' + esc(t.note) + "</div></div></div>");
+    }
+
+    const m = moneyView(who);
+    if(m){
+      const rentWin = m.lean < 0, buyWin = m.lean > 0;
+      cards.push('<div class="card"><div class="card-head"><h3>レンタル or 購入</h3><span class="tick">' + m.months + " か月想定</span></div><div class=\"card-body\">" +
+        '<div class="money">' +
+        '<div class="money-cell' + (rentWin ? " win" : "") + '"><span class="lbl">Rental</span><span class="val">' +
+          (m.rental[0] / 1000) + "〜" + (m.rental[1] / 1000) + '万</span><span class="sub">' + m.months + "か月ぶんの相場（税込・送料別）</span></div>" +
+        '<div class="money-cell' + (buyWin ? " win" : "") + '"><span class="lbl">Buy</span><span class="val">' +
+          (m.buy ? Math.round(m.buy[0] / 1000) / 10 + "〜" + Math.round(m.buy[1] / 1000) / 10 + "万" : "—") +
+          '</span><span class="sub">' + (m.best ? "候補1位＋寝具一式" : "候補が未確定") + "</span></div></div>" +
+        '<div class="reason ' + (rentWin ? "ok" : buyWin ? "ok" : "warn") + '">' +
+          (rentWin ? "いまの回答ではレンタル寄りです。" : buyWin ? "いまの回答では購入寄りです。" : "いまの回答では拮抗しています。追加の判断材料は下記。") + "</div>" +
+        (m.reasons.length ? '<ul class="safety" style="margin:10px 0 0;padding:0;list-style:none">' + m.reasons.map(r => "<li>" + esc(r) + "</li>").join("") + "</ul>" : "") +
+        "</div></div>");
+    }
+  }
+
+  const d = divergences();
+  if(d.length){
+    cards.push('<div class="card"><div class="card-head"><h3>すり合わせが必要</h3><span class="tick">' + d.length + " 件</span></div>" +
+      '<div class="card-body"><ul class="diffs" style="margin:0;padding:0;list-style:none">' +
+      d.map(x => "<li><b>" + esc(x.q) + '</b><span class="vs">回答者1：' + esc(x.a) + "　／　回答者2：" + esc(x.b) + "</span></li>").join("") +
+      "</ul></div></div>");
+  }
+
+  const lt = leadTime();
+  if(lt && lt.days > -30){
+    const msg = lt.days > 0
+      ? "予定日まで " + lt.days + " 日（約 " + lt.weeks + " 週）。レンタルなら予定日の2〜3週間前に着くよう手配、購入なら組み立て（木製の標準サイズで30〜60分）と設置の日を先に押さえておくと安全です。"
+      : "もう生まれている想定です。設置済みなら、柵のロックと床板の高さが月齢に合っているかを月1回見直してください。";
+    cards.push('<div class="card"><div class="card-head"><h3>手配のタイミング</h3></div><div class="card-body"><p style="font-size:13px;color:var(--ink-2)">' + esc(msg) + "</p></div></div>");
+  }
+
+  cards.push('<div class="card"><div class="card-head"><h3>買う前に必ず確認</h3><span class="tick">2026-09</span></div><div class="card-body">' +
+    '<ul class="safety" style="margin:0;padding:0;list-style:none">' +
+    "<li><b>認証マーク。</b>子供PSCマーク制度は2025年12月25日に始まりましたが、乳幼児用ベッドは<b>2027年3月まで経過措置</b>で従来のひし形PSCマークのままでも販売できます。今は両方が流通する過渡期なので、現物にどちらかが付いているかを見てください。中古・お下がりは製造時期次第でどちらも無いことがあります。</li>" +
+    "<li><b>寝かせ方。</b>1歳までは仰向け。硬めで平坦なマットレスを使い、掛け布団の代わりにスリーパーと空調で調整します。<b>枕は使いません</b>。</li>" +
+    "<li><b>柵とロック。</b>柵は常に上げた状態で使い、可動部が完全にロックされているか毎回確認します。0歳の不慮の事故死の約8割が窒息で、その最多が就寝中です。</li>" +
+    "<li><b>ベッドインベッド。</b>2024年7月に生後5か月の窒息事故が学会の傷害速報で報告されています。安全性のエビデンスは限られており、使うなら保護者の目の届く範囲で。</li>" +
+    "<li><b>設置場所。</b>エアコンの風が直接当たらない位置、窓・ブラインドの紐から離れた位置、暖房器具から離れた位置に置いてください。</li>" +
+    "</ul></div></div>");
+
+  $("panel").innerHTML = cards.join("");
+}
+
+function renderCatalog(){
+  const tb = document.querySelector("#catalog tbody");
+  tb.innerHTML = PRODUCTS.map(p =>
+    "<tr>" +
+    '<td><span class="pn">' + esc(p.nm) + '</span><span class="pb">' + esc(p.brand) + (p.madeIn ? " / " + esc(p.madeIn) + "製" : "") + "</span></td>" +
+    "<td>" + esc(p.type === "TRAVEL" ? "旅行・帰省用" : TYPES[p.type].nm) + "</td>" +
+    '<td class="n">' + (p.outer ? p.outer.join("×") : "要確認") + (p.folded ? "<br>畳 " + p.folded.join("×") : "") + "</td>" +
+    '<td class="n">' + (p.inner ? p.inner.join("×") : "—") + "</td>" +
+    '<td class="n">' + (p.pass != null ? p.pass : "要確認") + "</td>" +
+    '<td class="n">' + (p.floorH && p.floorH[0] != null && p.floorH[1] != null ? p.floorH[0] + "〜" + p.floorH[1] : p.steps ? p.steps + "段階" : "要確認") + "</td>" +
+    '<td class="n">' + (p.kg ? p.kg : "—") + "</td>" +
+    "<td>" + esc(p.months) + "</td>" +
+    "<td>" + esc(p.bedding) + "</td>" +
+    '<td class="n">' + esc(p.price) + "</td>" +
+    "</tr>").join("");
+}
+
+const FLOW = [
+  ["Step 1", "実測する", "設置幅・扉の開口幅・大人ベッドのマットレス上面高さ。ここが全部の前提になる"],
+  ["Step 2", "タイプを決める", "このシートの判定でベッドの型を1つに絞る"],
+  ["Step 3", "認証を確認", "子供PSCマークまたは従来のPSC／SGマークを現物で確認する"],
+  ["Step 4", "長期レビューを読む", "ECレビューではなく、半年後を書いた個人ブログ・noteを2〜3本"],
+  ["Step 5", "入手方法を決める", "レンタルか購入か。使用期間と第2子の予定で決まる"],
+  ["Step 6", "寝具を同時に頼む", "内寸に合うマットレス・防水シーツ・替えシーツ2〜3枚まで含めて発注"]
+];
+function renderStatic(){
+  $("flow").innerHTML = FLOW.map(f =>
+    '<div class="flow-step"><div class="st">' + esc(f[0]) + '</div><div class="sb">' + esc(f[1]) + '</div><div class="ss">' + esc(f[2]) + "</div></div>").join("");
+  $("srclist").innerHTML = SOURCES.map(s => '<a href="' + s[1] + '" target="_blank" rel="noopener">' + esc(s[0]) + "</a>").join("");
+  document.querySelector(".mast-meta .chip").textContent = "質問 " + Q.length + "問 / うちコア " + Q.filter(q => q.core).length + "問";
+}
+
+function updateProgress(){
+  const n = answeredCount(state.who);
+  $("progFill").style.width = Math.round(n / TOTAL_Q * 100) + "%";
+  $("progTxt").textContent = n + " / " + TOTAL_Q;
+}
+function renderAll(){ renderSheet(); renderPanel(); updateProgress(); }
+
+/* ============================ イベント ============================ */
+$("sheet").addEventListener("click", e => {
+  const b = e.target.closest("button"); if(!b) return;
+  const grid = b.closest("#prioGrid");
+  if(grid){
+    const cur = state[state.who]._top3 ? state[state.who]._top3.slice() : [];
+    const k = b.dataset.p, i = cur.indexOf(k);
+    if(i >= 0) cur.splice(i, 1); else if(cur.length < 3) cur.push(k);
+    state[state.who]._top3 = cur;
+    persist(); renderSheet(); renderPanel(); updateProgress();
+    return;
+  }
+  const opts = b.closest(".opts"); if(!opts) return;
+  const qid = opts.dataset.q, q = Q.find(x => x.id === qid); if(!q) return;
+  const v = b.dataset.v;
+  const store = q.fact ? state.facts : state[state.who];
+  store[qid] = store[qid] === v ? undefined : v;
+  if(store[qid] === undefined) delete store[qid];
+  opts.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.v === store[qid])));
+  const peer = opts.parentElement.querySelector('[data-peer="' + qid + '"]');
+  if(peer){
+    const other = state.who === "p1" ? "p2" : "p1";
+    const ov = (state[other] || {})[qid], mine = store[qid];
+    peer.className = mine && mine !== ov ? "peer diff" : "peer";
+    peer.textContent = (other === "p1" ? "回答者1" : "回答者2") + "：" + ov + (mine && mine !== ov ? "  ← 要すり合わせ" : "");
+  }
+  persist(); renderPanel(); updateProgress();
+});
+
+$("sheet").addEventListener("input", e => {
+  const el = e.target; if(!el.dataset || !el.dataset.fact) return;
+  const k = el.dataset.fact;
+  if(el.value === "") delete state.facts[k]; else state.facts[k] = el.value;
+  persist(); renderPanel(); updateProgress();
+});
+
+function setWho(w){
+  state.who = w;
+  $("who1").setAttribute("aria-pressed", String(w === "p1"));
+  $("who2").setAttribute("aria-pressed", String(w === "p2"));
+  renderAll();
+}
+$("who1").addEventListener("click", () => setWho("p1"));
+$("who2").addEventListener("click", () => setWho("p2"));
+$("coreOnly").addEventListener("change", e => { state.coreOnly = e.target.checked; renderSheet(); });
+
+renderStatic();
+renderAll();
+initDB();
+</script>
