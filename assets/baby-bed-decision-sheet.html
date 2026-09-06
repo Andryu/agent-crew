@@ -192,6 +192,14 @@ a{color:var(--ai);text-underline-offset:3px}
 .dimrow .dv{font-size:13.5px;font-weight:600;color:var(--ink);white-space:nowrap}
 .dimrow .dn{font-size:11.5px;color:var(--muted);flex:1 1 100%;line-height:1.5}
 .dimrow .dn.off{opacity:.6;font-style:italic}
+.plinks{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.plinks a{font-size:11.5px;font-family:var(--f-mono);text-decoration:none;line-height:1.5;
+  padding:4px 10px;border-radius:5px;border:1px solid var(--ai-line);color:var(--ai);background:var(--ai-soft)}
+.plinks a:hover,.plinks a:focus-visible{background:var(--ai-fill);color:var(--on-ai);border-color:var(--ai-fill)}
+.plinks a.buy{border-color:var(--pine);color:var(--pine);background:var(--pine-soft)}
+.plinks a.buy:hover,.plinks a.buy:focus-visible{background:var(--pine);color:var(--on-ai);border-color:var(--pine)}
+td .pn a{color:inherit;text-decoration:none;border-bottom:1px solid var(--ai-line)}
+td .pn a:hover{color:var(--ai);border-bottom-color:var(--ai)}
 .money{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .money-cell{padding:10px 12px;border-radius:8px;background:var(--sunken);border:1px solid var(--line-soft)}
 .money-cell.win{border-color:var(--ok);background:var(--ok-soft)}
@@ -347,7 +355,7 @@ footer .srclist{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px}
 </div>
 
 <footer><div class="wrap">
-  <p>制度・安全に関する記述は 2026年9月時点の公表情報に基づきます。価格と在庫は変動します。ベビーベッドは設置場所（エアコンの風・窓・ブラインドの紐・暖房器具）まで含めて安全が決まるため、組み立て後に取扱説明書の設置条件を必ず読み合わせてください。</p>
+  <p>各製品の「メーカー公式」はスペック確認用、「価格・在庫を探す」は価格.comの検索結果です。アフィリエイトリンクは使っていません。制度・安全に関する記述は 2026年9月時点の公表情報に基づきます。価格と在庫は変動します。ベビーベッドは設置場所（エアコンの風・窓・ブラインドの紐・暖房器具）まで含めて安全が決まるため、組み立て後に取扱説明書の設置条件を必ず読み合わせてください。</p>
   <div class="srclist" id="srclist"></div>
 </div></footer>
 
@@ -596,16 +604,22 @@ const PRIORITIES = [
 const PRODUCTS = [
 {id:"soinel_l", nm:"そいねーる AD ラージ", brand:"大和屋", type:"COSLEEP",
  outer:[147.5,70,126.5], inner:[135,60], floorH:[11.5,66], steps:28, kg:21, pass:70,
- months:"0〜24か月", price:"5〜6万円台", priceMin:52000,
+ months:"ベビーベッドとして0〜24か月／その後は添い寝ベッドとして6歳頃まで", price:"5〜6万円台", priceMin:52000,
  bedding:"専用（内寸135×60の特殊サイズ）", beddingStd:false,
- caster:true, storage:false, fold:false, playyard:false, wash:false, madeIn:"日本", cert:"SG・PSC",
+ caster:true, storage:false, fold:false, playyard:false, wash:false, madeIn:"ベトナム", cert:"SG・PSC",
+ links:[["メーカー公式","https://shopyamatoya-jp.com/products/soinel-ad-large-1582"],
+        ["仕様表","https://www.yamatoya-jp.com/neru/soinel/spec/"],
+        ["レンタル","https://babyrenta.com/?mode=grp&gid=3067025"]],
  note:"床板を3cm刻み28段階で調整でき、床の敷布団からベッドまで大人側の高さを選ばない。内寸が135×60と標準規格から外れるため、寝具はほぼ専用品になる。"},
 
 {id:"soinel_m", nm:"そいねーる AD ミニ", brand:"大和屋", type:"COSLEEP",
  outer:[102.5,70,126.5], inner:[90,60], floorH:[11.5,66], steps:28, kg:14.5, pass:70,
  months:"0〜24か月", price:"4〜5万円台", priceMin:42000,
  bedding:"ミニ規格（90×60）", beddingStd:false,
- caster:true, storage:false, fold:false, playyard:false, wash:false, madeIn:"日本", cert:"SG・PSC",
+ caster:true, storage:false, fold:false, playyard:false, wash:false, madeIn:"ベトナム", cert:"SG・PSC",
+ links:[["メーカー公式","https://shopyamatoya-jp.com/collections/soinel"],
+        ["仕様表","https://www.yamatoya-jp.com/neru/soinel/spec/"],
+        ["レンタル","https://babyrenta.com/?mode=grp&gid=3067025"]],
  note:"ラージと同じ28段階の高さ調整のまま設置面積を約3割削ったモデル。寝具はミニ規格が使えるぶんラージより選択肢がある。"},
 
 {id:"farska_bsb03", nm:"ベッドサイドベッド03", brand:"farska", type:"COSLEEP",
@@ -614,6 +628,7 @@ const PRODUCTS = [
  bedding:"標準規格（120×70）", beddingStd:true,
  caster:false, storage:false, fold:false, playyard:true, wash:false, madeIn:null, cert:"要確認",
  warnSpec:"床板高さは出典によって「9〜53cm・9段階」と「最低約35cm」で記述が割れています。大人ベッドの高さに合うかは購入前に必ずメーカー仕様書で確認してください。",
+ links:[["メーカー公式","https://www.farska.com/product/spec/bedsidebed03"]],
  note:"添い寝型では珍しく内寸が標準規格の120×70。市販の寝具がそのまま使えるうえ、床板を外してベビーサークルに転用できる。"},
 
 {id:"coconel_ab", nm:"ココネル エアー AB", brand:"Aprica", type:"FOLD",
@@ -622,13 +637,20 @@ const PRODUCTS = [
  bedding:"ミニ規格（90×60）／専用マット付", beddingStd:false,
  caster:true, storage:false, fold:true, playyard:true, wash:true, madeIn:null, cert:"PSC・SG",
  warnSpec:"床板は上段（新生児〜つかまり立ち・概ね生後5か月）／下段（5か月〜24か月）の2段階。段ごとの実寸は公表値を確認してください。",
+ links:[["メーカー公式","https://www.aprica.jp/products/home/detail/bed/coconel_air_ab/"],
+        ["シリーズ比較表","https://www.aprica.jp/products/bed/comparison/"],
+        ["レンタル","https://babyrenta.com/?pid=165731278"]],
  note:"キャスターで部屋間を移動でき、使わない時は畳んで収納袋に入る。ただし下段に切り替えたあとの抱き上げは深く、腰への負担は増える。踏み台を併用する家庭が多い。"},
 
-{id:"katoji_arch", nm:"ハイポジションベビーベッド アーチ", brand:"カトージ", type:"HIGH_REG",
+{id:"katoji_arch", nm:"ハイポジションベビーベッド アーチ（廃番／現行は アーチⅡ）", brand:"カトージ", type:"HIGH_REG",
  outer:[124,78,121], inner:[120,70], floorH:[43,75], steps:4, kg:null, pass:78,
  months:"新生児〜24か月", price:"3万円前後", priceMin:27000,
  bedding:"標準規格（120×70）", beddingStd:true,
  caster:true, storage:true, fold:false, playyard:false, wash:false, madeIn:null, cert:"PSC・SG",
+ warnSpec:"ここに載せている寸法は旧「アーチ」の公表値です。この型は廃番で、現行は後継の「ハイポジションベビーベッドⅡ アーチ」。後継機の外寸・床板高さは公表値を確認できていないため、購入するなら現行機の仕様を必ず見直してください。",
+ links:[["現行機（アーチⅡ）","https://www.katoji.co.jp/products-detail_4476.html"],
+        ["直営店で買う","https://www.katoji-onlineshop.com/c/category/babybed/first/02023"],
+        ["旧アーチの仕様","https://www.katoji.co.jp/products-detail_3445.html"]],
  note:"床板が75/70/65/43cmの4段階。最上段75cmは立ったままお世話ができる高さで、腰を最優先するならこの系統。ベッド下は収納棚。奥行78cmは一般的な室内ドアを通らない。"},
 
 {id:"katoji_arch2_mini", nm:"ハイポジション ミニベッド アーチⅡ（収納板付）", brand:"カトージ", type:"HIGH_MINI",
@@ -637,6 +659,8 @@ const PRODUCTS = [
  bedding:"ミニ規格（90×60）", beddingStd:false,
  caster:true, storage:true, fold:false, playyard:false, wash:false, madeIn:null, cert:"PSC・SG",
  warnSpec:"外寸と重量の公表値が取得できませんでした。設置幅・扉の通過判定はこの機種だけ手動で確認してください。",
+ links:[["直営店で買う","https://www.katoji-onlineshop.com/c/category/babybed/first/02516"],
+        ["メーカー商品情報","https://www.katoji.co.jp/products-detail_3496.html"]],
  note:"床板最大70cmのハイポジションを保ったままミニサイズにしたモデル。腰と省スペースの両方を取りにいく選択肢。"},
 
 {id:"yamasaki_bside", nm:"ツーオープンベッド b-side（ハイタイプ）", brand:"ヤマサキ", type:"HIGH_REG",
@@ -644,6 +668,8 @@ const PRODUCTS = [
  months:"新生児〜24か月", price:"約58,000円", priceMin:58000,
  bedding:"標準規格（120×70）", beddingStd:true,
  caster:true, storage:true, fold:false, playyard:false, wash:false, madeIn:"日本", cert:"PSC・SG",
+ links:[["メーカー公式","https://www.ymsk.jp/c/babybed/gd2"],
+        ["レンタル","https://www.nicebaby.co.jp/products/0-109"]],
  note:"ブナ材の日本製。前枠スライドと横枠開閉の2か所が開くので、部屋のどちら側からでもおむつ替えができる。収納棚とキャスター付き。価格は高い。"},
 
 {id:"farska_cbf", nm:"コンパクトベッドフィット", brand:"farska", type:"FLOOR",
@@ -652,6 +678,7 @@ const PRODUCTS = [
  months:"0〜12か月", price:"¥19,800", priceMin:19800,
  bedding:"付属（丸洗い可）", beddingStd:false,
  caster:false, storage:false, fold:true, playyard:false, wash:true, madeIn:null, cert:"要確認",
+ links:[["メーカー公式","https://www.farska.com/product/spec/compactbedfits"]],
  note:"大人の布団の横にそのまま置ける床置き型。畳んで持ち運べる。寝返りが始まる5か月前後で窮屈になるという声が多く、使用期間は短い前提で見るのが正しい。"},
 
 {id:"farska_cbf_l", nm:"コンパクトベッドフィットL", brand:"farska", type:"FLOOR",
@@ -660,6 +687,7 @@ const PRODUCTS = [
  months:"0〜36か月", price:"¥31,900", priceMin:31900,
  bedding:"付属（丸洗い可）", beddingStd:false,
  caster:false, storage:false, fold:true, playyard:false, wash:true, madeIn:null, cert:"要確認",
+ links:[["メーカー公式","https://www.farska.com/product/spec/compactbedfitsl"]],
  note:"フィットの標準サイズ版。0〜36か月と使用期間が長く、寝返り後の窮屈さの問題が出にくい。床置きなので腰への負担は最大。"},
 
 {id:"playyard", nm:"プレイヤード（カトージ・日本育児ほか）", brand:"各社", type:"PLAYYARD",
@@ -668,6 +696,7 @@ const PRODUCTS = [
  bedding:"専用マット", beddingStd:false,
  caster:true, storage:false, fold:true, playyard:true, wash:false, madeIn:null, cert:"機種による",
  warnSpec:"機種ごとに外寸・対象月齢・認証が大きく異なります。候補を1〜2機種に絞ってから個別に確認してください。",
+ links:[["レンタルで探す","https://www.nicebaby.co.jp/collections/bed"]],
  note:"寝床としての快適性はベビーベッドに劣るが、卒業後にサークルとして2歳まで働く。「寝床」ではなく「囲い」として評価するのが正しい買い方。"},
 
 {id:"bjorn_travel", nm:"トラベルクリブライト", brand:"ベビービョルン", type:"TRAVEL",
@@ -676,6 +705,8 @@ const PRODUCTS = [
  months:"0〜3歳頃", price:"3万円前後", priceMin:28000,
  bedding:"専用マットレス", beddingStd:false,
  caster:false, storage:false, fold:true, playyard:true, wash:false, madeIn:null, cert:"要確認",
+ links:[["メーカー公式","https://babybjorn.jp/product/travel-crib-light"],
+        ["レンタル","https://www.nicebaby.co.jp/products/detail/2543.html"]],
  note:"重量6kg、畳むと厚み14cmでスーツケースに近いサイズになる。帰省と旅行に特化したサブ機で、メインのベッドの代わりにはしにくい。"}
 ];
 
@@ -690,8 +721,8 @@ const SOURCES = [
  ["ココネル エアー AB（アップリカ）","https://www.aprica.jp/products/home/detail/bed/coconel_air_ab/"],
  ["ハイポジション アーチⅡ（カトージ）","https://www.katoji-onlineshop.com/c/category/babybed/first/02516"],
  ["ツーオープンベッド b-side（ヤマサキ）","https://www.ymsk.jp/c/babybed/gd2"],
- ["ベッドサイドベッド03（farska）","http://www.farska.com/product/spec/bedsidebed03"],
- ["コンパクトベッドフィット（farska）","http://www.farska.com/product/spec/compactbedfits"],
+ ["ベッドサイドベッド03（farska）","https://www.farska.com/product/spec/bedsidebed03"],
+ ["コンパクトベッドフィット（farska）","https://www.farska.com/product/spec/compactbedfits"],
  ["トラベルクリブライト（ナイスベビー）","https://www.nicebaby.co.jp/products/detail/2543.html"],
  ["レンタル料金比較（マイナビ子育て）","https://kosodate.mynavi.jp/articles/1483"]
 ];
@@ -902,6 +933,18 @@ function leadTime(){
 }
 
 /* ============================ 描画 ============================ */
+/* メーカー公式などの実在リンクに加え、価格.com の検索リンクを製品名から組み立てる。
+   検索URLなので個別ページのように404にならない。 */
+function searchUrl(p){
+  const nm = p.nm.replace(/（[^）]*）/g, "").trim();
+  return "https://search.kakaku.com/" + encodeURIComponent((p.brand === "各社" ? "" : p.brand + " ") + nm) + "/";
+}
+function linkRow(p){
+  const items = (p.links || []).map(l => '<a href="' + l[1] + '" target="_blank" rel="noopener">' + esc(l[0]) + "</a>");
+  items.push('<a class="buy" href="' + searchUrl(p) + '" target="_blank" rel="noopener">価格・在庫を探す</a>');
+  return '<div class="plinks">' + items.join("") + "</div>";
+}
+
 function answeredCount(who){
   let n = 0;
   Q.forEach(q => { if(answerOf(q, who)) n++; });
@@ -1038,7 +1081,7 @@ function renderPanel(){
         r.warns.map(b => '<div class="reason warn">注意：' + esc(b) + "</div>").join("") +
         (p.warnSpec ? '<div class="reason warn">要確認：' + esc(p.warnSpec) + "</div>" : "") +
         (!r.blocks.length && r.goods.length ? '<div class="reason ok">' + esc(r.goods.join("／")) + "</div>" : "") +
-        '<div class="prod-spec" style="color:var(--ink-2)">' + esc(p.note) + "</div></div>";
+        '<div class="prod-spec" style="color:var(--ink-2)">' + esc(p.note) + "</div>" + linkRow(p) + "</div>";
     };
     cards.push('<div class="card"><div class="card-head"><h3>候補</h3><span class="tick">' +
       (aliveAll.length > alive.length ? "上位" + alive.length + " / 適合" + aliveAll.length + "台" : alive.length + " 台") + "</span></div>" +
@@ -1081,7 +1124,7 @@ function renderPanel(){
         '<div class="card-body"><p style="font-size:12.5px;color:var(--ink-2);margin-bottom:10px">帰省や車移動があるので、メインとは別に軽いものを1台持つ形が現実的です。</p>' +
         '<div class="prod-top"><span class="prod-nm">' + esc(t.nm) + '<span class="prod-brand"> / ' + esc(t.brand) + '</span></span><span class="prod-price">' + esc(t.price) + "</span></div>" +
         '<div class="prod-spec">外寸 ' + t.outer.join("×") + "cm　折りたたみ " + t.folded.join("×") + "cm　" + t.kg + "kg</div>" +
-        '<div class="prod-spec" style="color:var(--ink-2);margin-top:6px">' + esc(t.note) + "</div></div></div>");
+        '<div class="prod-spec" style="color:var(--ink-2);margin-top:6px">' + esc(t.note) + "</div>" + linkRow(t) + "</div></div>");
     }
 
     const m = moneyView(who);
@@ -1135,7 +1178,9 @@ function renderCatalog(){
   const tb = document.querySelector("#catalog tbody");
   tb.innerHTML = PRODUCTS.map(p =>
     "<tr>" +
-    '<td><span class="pn">' + esc(p.nm) + '</span><span class="pb">' + esc(p.brand) + (p.madeIn ? " / " + esc(p.madeIn) + "製" : "") + "</span></td>" +
+    '<td><span class="pn">' + (p.links && p.links.length
+        ? '<a href="' + p.links[0][1] + '" target="_blank" rel="noopener">' + esc(p.nm) + "</a>"
+        : esc(p.nm)) + '</span><span class="pb">' + esc(p.brand) + (p.madeIn ? " / " + esc(p.madeIn) + "製" : "") + "</span></td>" +
     "<td>" + esc(p.type === "TRAVEL" ? "旅行・帰省用" : TYPES[p.type].nm) + "</td>" +
     '<td class="n">' + (p.outer ? p.outer.join("×") : "要確認") + (p.folded ? "<br>畳 " + p.folded.join("×") : "") + "</td>" +
     '<td class="n">' + (p.inner ? p.inner.join("×") : "—") + "</td>" +
@@ -1157,6 +1202,7 @@ const FLOW = [
   ["Step 6", "寝具を同時に頼む", "内寸に合うマットレス・防水シーツ・替えシーツ2〜3枚まで含めて発注"]
 ];
 function renderStatic(){
+  renderCatalog();
   $("flow").innerHTML = FLOW.map(f =>
     '<div class="flow-step"><div class="st">' + esc(f[0]) + '</div><div class="sb">' + esc(f[1]) + '</div><div class="ss">' + esc(f[2]) + "</div></div>").join("");
   $("srclist").innerHTML = SOURCES.map(s => '<a href="' + s[1] + '" target="_blank" rel="noopener">' + esc(s[0]) + "</a>").join("");
