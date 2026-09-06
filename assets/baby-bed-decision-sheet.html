@@ -8,6 +8,8 @@
   --ink:#121A26; --ink-2:#3F4B5B; --muted:#6C7889;
   --line:#D6DDE6; --line-soft:#E6EBF1;
   --ai:#20406B; --ai-deep:#14293F; --ai-soft:#E2EAF4; --ai-line:#B9CBE2;
+  --mast-bg:#14293F; --mast-title:#FFFFFF; --mast-lede:#C9D9EC; --mast-eyebrow:#9FB8D6;
+  --mast-chip:rgba(255,255,255,.24); --mast-chip-ink:#D5E2F1; --mast-chip-bg:rgba(255,255,255,.06);
   --pine:#A9743F; --pine-soft:#F4E9DC;
   --ok:#2C6B52; --ok-soft:#DFEDE6;
   --warn:#8B5A14; --warn-soft:#F6EBD6;
@@ -24,6 +26,10 @@
     --ink:#E4EAF2; --ink-2:#B4C0CF; --muted:#8695A8;
     --line:#2A3644; --line-soft:#212C39;
     --ai:#84A9D9; --ai-deep:#B3CBE8; --ai-soft:#1A2B41; --ai-line:#2F4560;
+  --mast-bg:#0B1521; --mast-title:#EEF3FA; --mast-lede:#A9BCD2; --mast-eyebrow:#7C93B0;
+  --mast-chip:rgba(255,255,255,.16); --mast-chip-ink:#B6C7DA; --mast-chip-bg:rgba(255,255,255,.04);
+  --mast-bg:#0B1521; --mast-title:#EEF3FA; --mast-lede:#A9BCD2; --mast-eyebrow:#7C93B0;
+  --mast-chip:rgba(255,255,255,.16); --mast-chip-ink:#B6C7DA; --mast-chip-bg:rgba(255,255,255,.04);
     --pine:#D3A374; --pine-soft:#2E2419;
     --ok:#69BC98; --ok-soft:#152A22;
     --warn:#D3A253; --warn-soft:#2B2214;
@@ -55,16 +61,16 @@ a{color:var(--ai);text-underline-offset:3px}
 .wrap{max-width:1440px;margin:0 auto;padding:0 clamp(16px,3vw,40px)}
 
 /* ---------- masthead ---------- */
-.mast{background:var(--ai-deep);color:#EEF3FA;padding:clamp(28px,4vw,52px) 0 clamp(24px,3vw,38px);
-  border-bottom:1px solid var(--ai-deep)}
-.mast .eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#9FB8D6;
+.mast{background:var(--mast-bg);color:var(--mast-lede);padding:clamp(28px,4vw,52px) 0 clamp(24px,3vw,38px);
+  border-bottom:1px solid var(--mast-bg)}
+.mast .eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--mast-eyebrow);
   font-family:var(--f-mono);margin-bottom:14px}
-.mast h1{font-size:clamp(28px,4.4vw,46px);font-weight:900;color:#fff;letter-spacing:.01em}
-.mast .lede{margin-top:14px;max-width:60ch;color:#C6D6EA;font-size:15px}
+.mast h1{font-size:clamp(28px,4.4vw,46px);font-weight:900;color:var(--mast-title);letter-spacing:.01em}
+.mast .lede{margin-top:14px;max-width:60ch;color:var(--mast-lede);font-size:15px}
 .mast-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
 .chip{font-size:11.5px;font-family:var(--f-mono);padding:5px 11px;border-radius:999px;
-  border:1px solid rgba(255,255,255,.22);color:#CFDEF0;background:rgba(255,255,255,.05)}
-.chip.hot{border-color:#C99A5E;color:#F0D6B2;background:rgba(201,154,94,.12)}
+  border:1px solid var(--mast-chip);color:var(--mast-chip-ink);background:var(--mast-chip-bg)}
+.chip.hot{border-color:#B8894F;color:#EACAA0;background:rgba(184,137,79,.14)}
 
 /* ---------- revision strip ---------- */
 .revision{background:var(--surface);border-bottom:1px solid var(--line);padding:20px 0}
@@ -221,6 +227,43 @@ footer a{color:var(--ai)}
 footer .srclist{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px}
 .status{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
 .status.live{color:var(--ok)}
+/* ---------- mobile summary bar ---------- */
+.mobibar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:40;
+  background:var(--surface);border-top:1px solid var(--line);
+  box-shadow:0 -6px 20px -12px rgba(0,0,0,.35);
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  align-items:center;gap:12px;cursor:pointer;font-family:var(--f-body)}
+.mobibar .mv{flex:1;min-width:0}
+.mobibar .ml{font-family:var(--f-mono);font-size:10px;line-height:1.5;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.mobibar .mt{font-weight:700;font-size:14px;line-height:1.4;color:var(--ai);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mobibar .mc{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.mobibar .go{font-size:12px;font-weight:700;color:var(--ai);white-space:nowrap;
+  border:1px solid var(--ai-line);border-radius:7px;padding:6px 11px;background:var(--ai-soft)}
+
+@media (max-width:820px){
+  body{font-size:14.5px}
+  .rev-grid{display:flex;flex-direction:column;gap:0}
+  .rev-item{padding:11px 0;border-left:none;border-top:1px solid var(--line-soft);
+    display:flex;align-items:baseline;gap:12px}
+  .rev-item:first-child{border-top:none;padding-top:0}
+  .rev-item b{font-size:18px;min-width:64px}
+  .rev-item span{font-size:12.5px}
+  .main{padding-bottom:96px}
+  .bar{position:sticky;top:0;z-index:20;border-radius:0;margin:0 calc(-1*clamp(16px,3vw,40px)) 18px;
+    border-left:none;border-right:none;border-top:none}
+  .q-head{flex-wrap:wrap;gap:6px}
+  .q-id{min-width:0;padding-top:0;font-size:10.5px;order:-1;
+    background:var(--surface-2);border-radius:4px;padding:1px 6px;line-height:1.7}
+  .q-id:empty{display:none}
+  .q-txt{flex:1 1 100%;font-size:14.5px}
+  .q-drives{margin-top:0}
+  .q-note,.opts,.numrow,.peer{margin-left:0}
+  .q-note{margin-top:0}
+  .opts button{font-size:13.5px;padding:8px 13px}
+  .numfield input{font-size:16px}
+  .mobibar{display:flex}
+  .panel{scroll-margin-top:74px}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -228,7 +271,7 @@ footer .srclist{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px}
   <div class="wrap">
     <div class="eyebrow">夫婦ヒアリングシート ＋ 判定エンジン</div>
     <h1>ベビーベッド決定シート</h1>
-    <p class="lede">人気ランキングからではなく、寝室の実寸・夜のお世話の担当・卒業後の使い道から逆算して決めるためのシート。答えるほど右のパネルが絞り込みます。</p>
+    <p class="lede">人気ランキングからではなく、寝室の実寸・夜のお世話の担当・卒業後の使い道から逆算して決めるためのシート。答えるほど判定パネルが候補を絞り込みます。</p>
     <div class="mast-meta">
       <span class="chip">質問 52問 / うちコア 18問</span>
       <span class="chip">候補 11製品</span>
@@ -279,6 +322,12 @@ footer .srclist{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px}
 
   <div class="block-title"><span class="kicker">Order of operations</span><h2>この後の決め方</h2><div class="rule"></div></div>
   <div class="flow" id="flow"></div>
+</div>
+
+<div class="mobibar" id="mobibar" role="button" tabindex="0" aria-label="判定パネルへ移動">
+  <div class="mv"><div class="ml">現在の判定</div><div class="mt" id="mobiTitle">回答を待っています</div></div>
+  <div class="mc" id="mobiCount">0 / 0</div>
+  <div class="go">判定を見る</div>
 </div>
 
 <footer><div class="wrap">
@@ -892,13 +941,16 @@ function bar(nm, v, min, max, top){
     '<span class="pc num">' + pc + "</span></div>";
 }
 
+let mobi = {title:"回答を待っています", count:""};
 function renderPanel(){
   const who = state.who, cnt = answeredCount(who);
   const cards = [];
+  mobi = {title:"回答を待っています", count:cnt + " / " + TOTAL_Q};
 
   if(cnt < 6){
     cards.push('<div class="card"><div class="card-head"><h3>判定</h3><span class="tick">' + cnt + " / " + TOTAL_Q + '</span></div>' +
-      '<div class="card-body"><p class="empty">左のシートに6問以上答えると、ベッドのタイプと候補製品がここに出ます。<br>まずは「前提」と「寸法」のセクションから。</p></div></div>');
+      '<div class="card-body"><p class="empty">6問以上答えると、ベッドのタイプと候補製品がここに出ます。<br>まずは「前提」と「寸法」のセクションから。</p></div></div>');
+    mobi.title = "あと " + (6 - cnt) + " 問で判定が出ます";
   } else {
     const sc = typeScores(who);
     const vals = TKEYS.map(k => sc[k]);
@@ -924,6 +976,8 @@ function renderPanel(){
       '<div class="verdict-type">' + esc(TYPES[win].nm) + "</div>" +
       '<div class="verdict-sub">' + esc(TYPES[win].sub) + "</div>" + clash +
       order.map((k, i) => bar(TYPES[k].nm, sc[k], mn, mx, i === 0)).join("") + "</div></div>");
+    mobi.title = TYPES[win].nm;
+    mobi.count = aliveAll.length + "台 / " + cnt + "問";
     const prod = r => {
       const p = r.p;
       const spec = [
@@ -1010,6 +1064,8 @@ function renderPanel(){
     "</ul></div></div>");
 
   $("panel").innerHTML = cards.join("");
+  $("mobiTitle").textContent = mobi.title;
+  $("mobiCount").textContent = mobi.count;
 }
 
 function renderCatalog(){
@@ -1041,7 +1097,7 @@ function renderStatic(){
   $("flow").innerHTML = FLOW.map(f =>
     '<div class="flow-step"><div class="st">' + esc(f[0]) + '</div><div class="sb">' + esc(f[1]) + '</div><div class="ss">' + esc(f[2]) + "</div></div>").join("");
   $("srclist").innerHTML = SOURCES.map(s => '<a href="' + s[1] + '" target="_blank" rel="noopener">' + esc(s[0]) + "</a>").join("");
-  document.querySelector(".mast-meta .chip").textContent = "質問 " + Q.length + "問 / うちコア " + Q.filter(q => q.core).length + "問";
+  document.querySelector(".mast-meta .chip").textContent = "質問 " + Q.length + "問＋優先順位 / うちコア " + Q.filter(q => q.core).length + "問";
 }
 
 function updateProgress(){
@@ -1096,6 +1152,10 @@ function setWho(w){
 $("who1").addEventListener("click", () => setWho("p1"));
 $("who2").addEventListener("click", () => setWho("p2"));
 $("coreOnly").addEventListener("change", e => { state.coreOnly = e.target.checked; renderSheet(); });
+
+const gotoPanel = () => $("panel").scrollIntoView({behavior:"smooth", block:"start"});
+$("mobibar").addEventListener("click", gotoPanel);
+$("mobibar").addEventListener("keydown", e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); gotoPanel(); } });
 
 renderStatic();
 renderAll();
