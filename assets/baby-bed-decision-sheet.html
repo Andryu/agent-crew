@@ -198,6 +198,11 @@ a{color:var(--ai);text-underline-offset:3px}
   background:var(--sunken);border-radius:5px;border:1px solid var(--line-soft)}
 .why b{color:var(--ok);font-weight:700}
 .why b.dn{color:var(--warn)}
+.priodl{margin:14px 0 0;padding:0}
+.priodl dt{font-weight:700;font-size:13px;color:var(--ink);margin-top:13px}
+.priodl dt.on{color:var(--ai)}
+.priodl dd{margin:3px 0 0;font-size:12.5px;color:var(--ink-2);line-height:1.7}
+.priodl dd .fav{display:block;font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-top:3px}
 .morebtn{width:100%;font-family:var(--f-body);font-size:13px;font-weight:700;cursor:pointer;
   padding:9px 12px;border-radius:8px;border:1px dashed var(--ai-line);background:var(--sunken);color:var(--ai)}
 .morebtn:hover{background:var(--ai-soft)}
@@ -598,21 +603,36 @@ const Q = [
 
 /* ---------- 優先順位 ---------- */
 const PRIORITIES = [
-  {k:"安全性",            w:{HIGH_REG:2,HIGH_MINI:2,PLAYYARD:1,FLOOR:-1}},
-  {k:"赤ちゃんの寝心地",  w:{HIGH_REG:2,COSLEEP:1}},
-  {k:"夜のお世話のラクさ",w:{COSLEEP:4,HIGH_REG:1}},
-  {k:"腰への負担",        w:{HIGH_REG:4,HIGH_MINI:4,COSLEEP:2,FLOOR:-4}},
-  {k:"省スペース",        w:{HIGH_MINI:4,FOLD:3,FLOOR:4,HIGH_REG:-3}},
-  {k:"寝室⇄リビングの移動",w:{FOLD:5,PLAYYARD:1,HIGH_REG:-3}},
-  {k:"添い寝しやすさ",    w:{COSLEEP:5,FLOOR:1}},
-  {k:"長く使える",        w:{HIGH_REG:3,PLAYYARD:3,FLOOR:-2}},
-  {k:"サークルへの転用",  w:{PLAYYARD:5,FOLD:2}},
-  {k:"収納力",            w:{HIGH_REG:4,HIGH_MINI:2,FOLD:-2,FLOOR:-2}},
-  {k:"洗いやすさ",        w:{FLOOR:3,FOLD:2}},
-  {k:"デザイン",          w:{HIGH_REG:1,COSLEEP:1}},
-  {k:"価格",              w:{FLOOR:3,FOLD:2,HIGH_MINI:1,COSLEEP:-2}},
-  {k:"売りやすさ",        w:{HIGH_REG:2,FOLD:1}},
-  {k:"メーカー・実績",    w:{HIGH_REG:2,COSLEEP:2}}
+  {k:"安全性",            w:{HIGH_REG:2,HIGH_MINI:2,PLAYYARD:1,FLOOR:-1},
+   d:"柵の高さとすき間、可動部のロック、転落と窒息の防止。認証マークの有無もここ。柵のある据置型が有利で、床置きは柵がないぶん不利になる。"},
+  {k:"赤ちゃんの寝心地",  w:{HIGH_REG:2,COSLEEP:1},
+   d:"硬めで平坦なマットレス、通気性、寝返りを始めてからも窮屈にならない広さ。内寸が広い標準サイズが有利。"},
+  {k:"夜のお世話のラクさ",w:{COSLEEP:4,HIGH_REG:1},
+   d:"夜中に泣き声で起きてから、授乳・おむつ替えを終えて自分が寝るまでの1サイクルの負担。生後1か月は夜間3〜5回。手が届く距離にあるか、柵を静かに片手で開けられるか、置くときに体をひねらずに済むかで決まる。"},
+  {k:"腰への負担",        w:{HIGH_REG:4,HIGH_MINI:4,COSLEEP:2,FLOOR:-4},
+   d:"抱き上げるときにかがむ深さ。床板が高いほど楽。上の「夜のお世話」とは別物で、しばしば逆を向く（腰は床板を高く、添い寝は大人ベッドの高さに合わせるため）。"},
+  {k:"省スペース",        w:{HIGH_MINI:4,FOLD:3,FLOOR:4,HIGH_REG:-3},
+   d:"設置面積。ミニ規格（内寸90×60）は標準より約3割小さく、折りたたみは使わない時間をゼロにできる。"},
+  {k:"寝室⇄リビングの移動",w:{FOLD:5,PLAYYARD:1,HIGH_REG:-3},
+   d:"日中はリビング、夜は寝室という運用。キャスターの有無、重量、そして扉の開口幅を通るかで決まる。標準サイズは奥行78cm前後で一般的な室内ドアを通らない。"},
+  {k:"添い寝しやすさ",    w:{COSLEEP:5,FLOOR:1},
+   d:"大人の寝床と床板の高さを揃えて柵を開け、同じ高さで手が届く状態にできるか。大人ベッドのマットレス上面高さに合う調整幅が要る。"},
+  {k:"長く使える",        w:{HIGH_REG:3,PLAYYARD:3,FLOOR:-2},
+   d:"24か月まで寝床として使えるか。つかまり立ちが始まる8〜10か月で卒業する家庭も多いため、実際の使用期間は想定より短くなりやすい。"},
+  {k:"サークルへの転用",  w:{PLAYYARD:5,FOLD:2},
+   d:"寝床を卒業したあと、囲い（ベビーサークル）として使えるか。床板を外す・下げることで転用できる機種がある。"},
+  {k:"収納力",            w:{HIGH_REG:4,HIGH_MINI:2,FOLD:-2,FLOOR:-2},
+   d:"ベッド下の収納棚。おむつ・着替え・ガーゼを手元にまとめられると、夜中に部屋を横断せずに済む。折りたたみ型と床置き型には基本的にない。"},
+  {k:"洗いやすさ",        w:{FLOOR:3,FOLD:2},
+   d:"マットレスや布部分を丸洗いできるか。吐き戻しとおむつ漏れは想像より頻繁で、中材まで洗える構造かどうかが効く。"},
+  {k:"デザイン",          w:{HIGH_REG:1,COSLEEP:1},
+   d:"木の質感や色、寝室に置きっぱなしになるものとしての見え方。木製の据置型に選択肢が多い。"},
+  {k:"価格",              w:{FLOOR:3,FOLD:2,HIGH_MINI:1,COSLEEP:-2},
+   d:"本体＋マットレス＋シーツの総額。添い寝型は本体が高くなりがちで、床置き型がいちばん安い。"},
+  {k:"売りやすさ",        w:{HIGH_REG:2,FOLD:1},
+   d:"卒業後に中古で売れるか。定番モデルほど買い手が付きやすい。保管スペースがなく持ち越せない場合に効いてくる。"},
+  {k:"メーカー・実績",    w:{HIGH_REG:2,COSLEEP:2},
+   d:"国内メーカーのサポート、部品の供給、長期使用者の情報量。困ったときに調べて解決できるかどうか。"}
 ];
 
 /* ============================ 製品カタログ ============================ */
@@ -745,7 +765,7 @@ const SOURCES = [
 ];
 
 /* ============================ 状態と保存 ============================ */
-const state = { facts:{}, p1:{}, p2:{}, who:"p1", coreOnly:false, showAll:false };
+const state = { facts:{}, p1:{}, p2:{}, who:"p1", coreOnly:false, showAll:false, showPrioHelp:false };
 const LS = "babybed.sheet.v1";
 let DB = null, dirtyUntil = 0, saveTimer = null;
 
@@ -1057,9 +1077,18 @@ function renderSheet(){
     '<div class="sec-note">同点になったときに勝敗を決める重みです。順番に押すと1位→2位→3位、もう一度押すと解除。夫婦で違って構いません（違いは右の「すり合わせ」に出ます）。</div>' +
     '<div class="prio"><div class="prio-grid" id="prioGrid">' + PRIORITIES.map(p => {
       const r = top3.indexOf(p.k);
-      return '<button type="button" data-p="' + esc(p.k) + '"' + (r >= 0 ? ' data-rank="' + (r + 1) + '"' : "") + ">" +
+      return '<button type="button" title="' + esc(p.d) + '" data-p="' + esc(p.k) + '"' + (r >= 0 ? ' data-rank="' + (r + 1) + '"' : "") + ">" +
         esc(p.k) + (r >= 0 ? '<span class="prio-rank">' + (r + 1) + "位</span>" : "") + "</button>";
-    }).join("") + "</div></div></section>";
+    }).join("") + "</div>" +
+    '<button type="button" class="morebtn" id="prioHelp" style="margin-top:12px">' +
+      (state.showPrioHelp ? "説明を閉じる" : "この15項目が何を指すのか見る") + "</button>" +
+    (state.showPrioHelp ? '<dl class="priodl">' + PRIORITIES.map(p => {
+      const fav = Object.entries(p.w).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 2)
+        .map(x => TYPES[x[0]].nm).join("・");
+      const sel = top3.indexOf(p.k);
+      return "<dt" + (sel >= 0 ? ' class="on"' : "") + ">" + esc(p.k) + (sel >= 0 ? "（あなたの" + (sel + 1) + "位）" : "") + "</dt>" +
+        "<dd>" + esc(p.d) + '<span class="fav">有利になるタイプ：' + esc(fav) + "</span></dd>";
+    }).join("") + "</dl>" : "") + "</div></section>";
 
   $("sheet").innerHTML = h;
 }
@@ -1345,6 +1374,7 @@ function renderAll(){ renderSheet(); renderPanel(); updateProgress(); }
 /* ============================ イベント ============================ */
 $("sheet").addEventListener("click", e => {
   const b = e.target.closest("button"); if(!b) return;
+  if(b.id === "prioHelp"){ state.showPrioHelp = !state.showPrioHelp; renderSheet(); return; }
   const grid = b.closest("#prioGrid");
   if(grid){
     const cur = state[state.who]._top3 ? state[state.who]._top3.slice() : [];
