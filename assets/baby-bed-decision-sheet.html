@@ -8,6 +8,7 @@
   --ink:#121A26; --ink-2:#3F4B5B; --muted:#6C7889;
   --line:#D6DDE6; --line-soft:#E6EBF1;
   --ai:#20406B; --ai-deep:#14293F; --ai-soft:#E2EAF4; --ai-line:#B9CBE2;
+  --ai-fill:#20406B; --on-ai:#FFFFFF;
   --mast-bg:#14293F; --mast-title:#FFFFFF; --mast-lede:#C9D9EC; --mast-eyebrow:#9FB8D6;
   --mast-chip:rgba(255,255,255,.24); --mast-chip-ink:#D5E2F1; --mast-chip-bg:rgba(255,255,255,.06);
   --pine:#A9743F; --pine-soft:#F4E9DC;
@@ -26,10 +27,9 @@
     --ink:#E4EAF2; --ink-2:#B4C0CF; --muted:#8695A8;
     --line:#2A3644; --line-soft:#212C39;
     --ai:#84A9D9; --ai-deep:#B3CBE8; --ai-soft:#1A2B41; --ai-line:#2F4560;
-  --mast-bg:#0B1521; --mast-title:#EEF3FA; --mast-lede:#A9BCD2; --mast-eyebrow:#7C93B0;
-  --mast-chip:rgba(255,255,255,.16); --mast-chip-ink:#B6C7DA; --mast-chip-bg:rgba(255,255,255,.04);
-  --mast-bg:#0B1521; --mast-title:#EEF3FA; --mast-lede:#A9BCD2; --mast-eyebrow:#7C93B0;
-  --mast-chip:rgba(255,255,255,.16); --mast-chip-ink:#B6C7DA; --mast-chip-bg:rgba(255,255,255,.04);
+    --ai-fill:#3C6AA6; --on-ai:#FFFFFF;
+    --mast-bg:#0B1521; --mast-title:#EEF3FA; --mast-lede:#A9BCD2; --mast-eyebrow:#7C93B0;
+    --mast-chip:rgba(255,255,255,.16); --mast-chip-ink:#B6C7DA; --mast-chip-bg:rgba(255,255,255,.04);
     --pine:#D3A374; --pine-soft:#2E2419;
     --ok:#69BC98; --ok-soft:#152A22;
     --warn:#D3A253; --warn-soft:#2B2214;
@@ -43,6 +43,9 @@
   --ink:#E4EAF2; --ink-2:#B4C0CF; --muted:#8695A8;
   --line:#2A3644; --line-soft:#212C39;
   --ai:#84A9D9; --ai-deep:#B3CBE8; --ai-soft:#1A2B41; --ai-line:#2F4560;
+  --ai-fill:#3C6AA6; --on-ai:#FFFFFF;
+  --mast-bg:#0B1521; --mast-title:#EEF3FA; --mast-lede:#A9BCD2; --mast-eyebrow:#7C93B0;
+  --mast-chip:rgba(255,255,255,.16); --mast-chip-ink:#B6C7DA; --mast-chip-bg:rgba(255,255,255,.04);
   --pine:#D3A374; --pine-soft:#2E2419;
   --ok:#69BC98; --ok-soft:#152A22;
   --warn:#D3A253; --warn-soft:#2B2214;
@@ -98,7 +101,7 @@ a{color:var(--ai);text-underline-offset:3px}
 .toggle input{accent-color:var(--ai);width:15px;height:15px}
 .prog{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);font-family:var(--f-mono)}
 .prog-track{width:76px;height:5px;background:var(--surface-2);border-radius:99px;overflow:hidden}
-.prog-fill{height:100%;background:var(--ai);width:0;transition:width .3s ease}
+.prog-fill{height:100%;background:var(--ai-fill);width:0;transition:width .3s ease}
 
 /* ---------- sections ---------- */
 .sec{background:var(--surface);border:1px solid var(--line);border-radius:12px;
@@ -128,7 +131,8 @@ a{color:var(--ai);text-underline-offset:3px}
 .opts button{font-family:var(--f-body);font-size:13px;padding:6px 13px;border-radius:7px;cursor:pointer;
   border:1px solid var(--line);background:var(--surface);color:var(--ink-2);transition:.14s}
 .opts button:hover{border-color:var(--ai-line);color:var(--ink)}
-.opts button[aria-pressed="true"]{background:var(--ai);border-color:var(--ai);color:#fff;font-weight:700}
+.opts button[aria-pressed="true"]{background:var(--ai-fill);border-color:var(--ai-fill);color:var(--on-ai);font-weight:700}
+.opts button[aria-pressed="true"]::before{content:"✓";margin-right:6px;font-weight:700;opacity:.85}
 .numrow{display:flex;flex-wrap:wrap;gap:10px;margin-left:44px;align-items:center}
 .numfield{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)}
 .numfield input{font-family:var(--f-mono);font-size:14px;width:82px;padding:6px 9px;border-radius:6px;
@@ -142,7 +146,7 @@ a{color:var(--ai);text-underline-offset:3px}
 .prio-grid{display:flex;flex-wrap:wrap;gap:6px}
 .prio-grid button{font-family:var(--f-body);font-size:13px;padding:6px 12px;border-radius:7px;cursor:pointer;
   border:1px solid var(--line);background:var(--surface);color:var(--ink-2);display:flex;align-items:center;gap:6px}
-.prio-grid button[data-rank]{background:var(--ai);border-color:var(--ai);color:#fff;font-weight:700}
+.prio-grid button[data-rank]{background:var(--ai-fill);border-color:var(--ai-fill);color:var(--on-ai);font-weight:700}
 .prio-rank{font-family:var(--f-mono);font-size:10px;background:rgba(255,255,255,.25);border-radius:3px;padding:1px 4px}
 
 /* ---------- panel ---------- */
@@ -159,7 +163,7 @@ a{color:var(--ai);text-underline-offset:3px}
 .fitrow .nm{width:96px;color:var(--ink-2);flex-shrink:0}
 .fittrack{flex:1;height:6px;background:var(--surface-2);border-radius:99px;overflow:hidden}
 .fitfill{height:100%;background:var(--ai-line);border-radius:99px}
-.fitrow.top .fitfill{background:var(--ai)}
+.fitrow.top .fitfill{background:var(--ai-fill)}
 .fitrow .pc{font-family:var(--f-mono);font-size:11px;color:var(--muted);width:32px;text-align:right}
 .empty{font-size:13px;color:var(--muted);text-align:center;padding:14px 4px}
 
@@ -250,7 +254,13 @@ footer .srclist{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px}
   .rev-item span{font-size:12.5px}
   .main{padding-bottom:96px}
   .bar{position:sticky;top:0;z-index:20;border-radius:0;margin:0 calc(-1*clamp(16px,3vw,40px)) 18px;
-    border-left:none;border-right:none;border-top:none}
+    border-left:none;border-right:none;border-top:none;padding:8px 14px;gap:8px}
+  .who button{padding:5px 12px;font-size:13px}
+  .bar-right{width:100%;flex-wrap:nowrap;justify-content:space-between;gap:10px}
+  .status{font-size:10.5px;white-space:nowrap}
+  .prog{gap:7px;white-space:nowrap}
+  .prog-track{display:none}
+  .toggle{font-size:12px;white-space:nowrap}
   .q-head{flex-wrap:wrap;gap:6px}
   .q-id{min-width:0;padding-top:0;font-size:10.5px;order:-1;
     background:var(--surface-2);border-radius:4px;padding:1px 6px;line-height:1.7}
@@ -302,7 +312,7 @@ footer .srclist{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px}
         <div class="bar-right">
           <label class="toggle"><input type="checkbox" id="coreOnly"> コア質問だけ表示</label>
           <div class="prog"><div class="prog-track"><div class="prog-fill" id="progFill"></div></div><span id="progTxt">0 / 52</span></div>
-          <span class="status" id="status">保存先を確認中…</span>
+          <span class="status" id="status">確認中…</span>
         </div>
       </div>
       <div id="sheet"></div>
@@ -717,14 +727,14 @@ function persist(){
 async function initDB(){
   loadLocal(); renderAll();
   if(!(window.claude && typeof window.claude.use === "function")){
-    setStatus("この端末に保存"); return;
+    setStatus("端末に保存"); return;
   }
-  setStatus("保存先を確認中…");
+  setStatus("確認中…");
   let db = null;
   try{ db = await window.claude.use("db"); }catch(e){ db = null; }
-  if(!db){ setStatus("この端末に保存"); return; }
+  if(!db){ setStatus("端末に保存"); return; }
   DB = db;
-  setStatus("2人で共有保存中", true);
+  setStatus("共有保存", true);
   const bind = (key, target) => DB.doc("sheet/" + key).onSnapshot(snap => {
     if(Date.now() < dirtyUntil) return;
     const d = snap && snap.exists ? snap.data() : null;
