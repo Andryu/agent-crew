@@ -316,7 +316,7 @@ footer .srclist{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px}
     <div class="mast-meta">
       <span class="chip">質問 52問 / うちコア 18問</span>
       <span class="chip">候補 11製品</span>
-      <span class="chip hot">子供PSCマーク 経過措置は 2027年3月まで</span>
+      <span class="chip hot">子供PSCマーク 経過措置は 2027年3月24日まで</span>
       <span class="chip">2026年9月時点</span>
     </div>
   </div>
@@ -558,7 +558,7 @@ const Q = [
 /* ---------- S8 安全 ---------- */
 {id:"psc", sec:"S8", q:"安全認証はどこまで求める？",
  drives:"候補の足切り",
- evi:"2025年12月25日に「子供PSCマーク」制度が始まりました。乳幼児用ベッドは2027年3月まで経過措置期間で、従来のひし形PSCマークのままでも販売できます。つまり2026年9月の今は両方が店頭に並ぶ過渡期です。中古・お下がりは製造時期によってどちらも無いことがあるため、現物のマークを必ず確認してください。",
+ evi:"2025年12月25日に「子供PSCマーク」制度が始まりました。乳幼児用ベッドは2027年3月24日まで経過措置期間で、従来のひし形PSCマークのままでも販売できます。つまり2026年9月の今は両方が店頭に並ぶ過渡期です。中古・お下がりは製造時期によってどちらも無いことがあるため、現物のマークを必ず確認してください。",
  opts:[{v:"子供PSCマーク付きに限定",w:{}},{v:"PSCまたはSGマークがあれば可",w:{}},{v:"こだわらない",w:{}}]},
 {id:"sensor", sec:"S8", q:"ベビーセンサーを使う予定？",
  drives:"床板の構造",
@@ -933,10 +933,15 @@ function moneyView(who){
   const a = state[who] || {}, f = state.facts;
   const months = ({"6か月で十分":6, "1歳まで":12, "2歳まで使いたい":24})[a.span] || null;
   if(!months) return null;
-  const rental = months <= 6 ? [5000, 12000] : months <= 12 ? [12000, 22000] : [24000, 40000];
   const best = evaluateProducts(who).filter(x => !x.blocks.length)[0];
   const buyBody = best ? best.p.priceMin : null;
   const buy = buyBody != null ? [buyBody + 5000, buyBody + 15000] : null;
+  /* レンタル料は本体価格にほぼ比例する（実例：購入6万円台のベッドで12か月 約2.4万円＝約39%、
+     そいねーる級で12か月 3,300円/月＝約4万円＝約70%）。定額レンジではなく比率で見積もる。 */
+  const rate = months <= 6 ? [0.25, 0.45] : months <= 12 ? [0.40, 0.70] : [0.70, 1.10];
+  const base = buyBody != null ? buyBody : 30000;
+  const rental = [Math.max(5000, Math.round(base * rate[0] / 1000) * 1000),
+                  Math.max(9000, Math.round(base * rate[1] / 1000) * 1000)];
 
   const reasons = [];
   let lean = 0;
@@ -948,11 +953,15 @@ function moneyView(who){
   if(a.newused === "新品必須"){ lean += 1; reasons.push("新品にこだわる → レンタル品は中古扱い"); }
   if(a.newused === "レンタルでもいい"){ lean -= 1; }
   if(a.disposal === "手放す手間をかけたくない"){ lean -= 2; reasons.push("処分の手間を避けたい → 返却で終わるレンタルが軽い"); }
+  if(a.psc === "子供PSCマーク付きに限定" && a.newused !== "新品必須"){
+    lean += 3;
+    reasons.push("「子供PSCマーク付きに限定」と「レンタル・中古でも可」は両立しにくい。子供PSCマークは2025年12月25日以降に製造・輸入された個体に付くもので、レンタル在庫や中古は基本的に旧マークの個体。この条件を守るなら新品購入か、新品レンタルの取り扱いがある業者に限られる");
+  }
   const tol = ({"1.5万円まで":15000, "2万円まで":20000, "3万円まで":30000, "4万円以上でも可":40000})[a.tolerate];
   if(tol != null && buyBody != null && months <= 6 && buyBody > tol){
     lean -= 2; reasons.push("半年で卒業した場合の許容額（" + a.tolerate + "）を候補の本体価格が超える");
   }
-  return {months, rental, buy, lean, reasons, best};
+  return {months, rental, rate, buy, lean, reasons, best};
 }
 
 function divergences(){
@@ -1185,7 +1194,7 @@ function renderPanel(){
 
     if((state[who] || {}).psc === "子供PSCマーク付きに限定"){
       cards.push('<div class="card"><div class="card-head"><h3>子供PSCマーク限定について</h3></div><div class="card-body">' +
-        '<p style="font-size:12.5px;color:var(--ink-2);line-height:1.7">乳幼児用ベッドは2027年3月まで経過措置期間で、従来のひし形PSCマークの在庫も並行して流通しています。' +
+        '<p style="font-size:12.5px;color:var(--ink-2);line-height:1.7">乳幼児用ベッドは2027年3月24日まで経過措置期間で、従来のひし形PSCマークの在庫も並行して流通しています。' +
         'どちらのマークが付くかは製造ロット次第で、製品名だけでは決まりません。この条件は候補の絞り込みには使えないため、' +
         '<b>購入直前に販売店へ「子供PSCマーク付きの個体か」を確認する</b>のが唯一の確実な方法です。レンタルは在庫が古い個体である可能性が相対的に高い点にも注意してください。</p></div></div>');
     }
@@ -1206,7 +1215,7 @@ function renderPanel(){
       cards.push('<div class="card"><div class="card-head"><h3>レンタル or 購入</h3><span class="tick">' + m.months + " か月想定</span></div><div class=\"card-body\">" +
         '<div class="money">' +
         '<div class="money-cell' + (rentWin ? " win" : "") + '"><span class="lbl">Rental</span><span class="val">' +
-          (m.rental[0] / 1000) + "〜" + (m.rental[1] / 1000) + '万</span><span class="sub">' + m.months + "か月ぶんの相場（税込・送料別）</span></div>" +
+          (Math.round(m.rental[0] / 1000) / 10) + "〜" + (Math.round(m.rental[1] / 1000) / 10) + '万</span><span class="sub">' + m.months + "か月ぶん。本体価格の" + Math.round(m.rate[0] * 100) + "〜" + Math.round(m.rate[1] * 100) + "%が目安（送料別）</span></div>" +
         '<div class="money-cell' + (buyWin ? " win" : "") + '"><span class="lbl">Buy</span><span class="val">' +
           (m.buy ? Math.round(m.buy[0] / 1000) / 10 + "〜" + Math.round(m.buy[1] / 1000) / 10 + "万" : "—") +
           '</span><span class="sub">' + (m.best ? "候補1位＋寝具一式" : "候補が未確定") + "</span></div></div>" +
@@ -1235,7 +1244,7 @@ function renderPanel(){
 
   cards.push('<div class="card"><div class="card-head"><h3>買う前に必ず確認</h3><span class="tick">2026-09</span></div><div class="card-body">' +
     '<ul class="safety" style="margin:0;padding:0;list-style:none">' +
-    "<li><b>認証マーク。</b>子供PSCマーク制度は2025年12月25日に始まりましたが、乳幼児用ベッドは<b>2027年3月まで経過措置</b>で従来のひし形PSCマークのままでも販売できます。今は両方が流通する過渡期なので、現物にどちらかが付いているかを見てください。中古・お下がりは製造時期次第でどちらも無いことがあります。</li>" +
+    "<li><b>認証マーク。</b>子供PSCマーク制度は2025年12月25日に始まりましたが、乳幼児用ベッドは<b>2027年3月24日まで経過措置</b>で従来のひし形PSCマークのままでも販売できます。今は両方が流通する過渡期なので、現物にどちらかが付いているかを見てください。中古・お下がりは製造時期次第でどちらも無いことがあります。</li>" +
     "<li><b>寝かせ方。</b>1歳までは仰向け。硬めで平坦なマットレスを使い、掛け布団の代わりにスリーパーと空調で調整します。<b>枕は使いません</b>。</li>" +
     "<li><b>柵とロック。</b>柵は常に上げた状態で使い、可動部が完全にロックされているか毎回確認します。0歳の不慮の事故死の約8割が窒息で、その最多が就寝中です。</li>" +
     "<li><b>ベッドインベッド。</b>2024年7月に生後5か月の窒息事故が学会の傷害速報で報告されています。安全性のエビデンスは限られており、使うなら保護者の目の届く範囲で。</li>" +
