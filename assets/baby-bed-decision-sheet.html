@@ -362,7 +362,7 @@ footer .srclist{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px}
   <div class="tablewrap"><table id="catalog">
     <thead><tr>
       <th>製品</th><th>タイプ</th><th>外寸 W×D×H</th><th>内寸</th><th>通過幅</th>
-      <th>床板高さ</th><th>重量</th><th>使用期間</th><th>寝具</th><th>価格帯</th>
+      <th>床板高さ</th><th>重量</th><th>使用期間</th><th>寝具</th><th>引っ越し</th><th>価格帯</th>
     </tr></thead><tbody></tbody>
   </table></div>
 
@@ -429,9 +429,10 @@ const Q = [
 {id:"second", sec:"S0", fact:true, core:true, q:"第2子の予定は？",
  drives:"購入かレンタルか", note:"購入の元が取れるかを決める最大の変数。第2子まで使えば償却期間が2倍になり、購入が一気に有利になります。",
  opts:[{v:"考えている",w:{HIGH_REG:2}},{v:"わからない",w:{}},{v:"考えていない",w:{}}]},
-{id:"movehome", sec:"S0", fact:true, q:"1年以内に引越しの予定は？",
- drives:"大型家具の可否",
- opts:[{v:"ある",w:{FOLD:2,FLOOR:2,PLAYYARD:1,HIGH_REG:-2}},{v:"ない",w:{}},{v:"未定",w:{}}]},
+{id:"movehome", sec:"S0", fact:true, core:true, q:"1年以内に引越しの予定は？",
+ drives:"畳めるかどうか",
+ note:"畳んで袋に入る機種と、解体・再組立が要る20kg級の木製ベッドとでは、引っ越し時の手間がまるで違います。ここが「ある」なら、可搬性が型の違いより優先されます。",
+ opts:[{v:"ある",w:{FOLD:5,FLOOR:4,PLAYYARD:3,HIGH_MINI:1,HIGH_REG:-4,COSLEEP:-3}},{v:"ない",w:{}},{v:"未定",w:{FOLD:1,FLOOR:1}}]},
 
 /* ---------- S1 寸法 ---------- */
 {id:"room", sec:"S1", fact:true, core:true, type:"nums", q:"寝室でベッドを置けるスペース（実測）",
@@ -639,7 +640,7 @@ const PRIORITIES = [
 /* outer:[W,D,H] cm / inner:[W,D] cm / floorH:[min,max] cm / pass: 通過に必要な最小幅 cm
    数値はメーカー公表値・販売店表記。取得できなかった項目は null にして「要確認」を出す。 */
 const PRODUCTS = [
-{id:"soinel_l", nm:"そいねーる AD ラージ", brand:"大和屋", type:"COSLEEP",
+{id:"soinel_l", nm:"そいねーる AD ラージ", brand:"大和屋", type:"COSLEEP", portable:"分解",
  outer:[147.5,70,126.5], inner:[135,60], floorH:[11.5,66], steps:28, kg:21, pass:70,
  months:"ベビーベッドとして0〜24か月／その後は添い寝ベッドとして6歳頃まで", price:"5〜6万円台", priceMin:52000,
  bedding:"専用（内寸135×60の特殊サイズ）", beddingStd:false,
@@ -649,7 +650,7 @@ const PRODUCTS = [
         ["レンタル","https://babyrenta.com/?mode=grp&gid=3067025"]],
  note:"床板を3cm刻み28段階で調整でき、床の敷布団からベッドまで大人側の高さを選ばない。内寸が135×60と標準規格から外れるため、寝具はほぼ専用品になる。"},
 
-{id:"soinel_m", nm:"そいねーる AD ミニ", brand:"大和屋", type:"COSLEEP",
+{id:"soinel_m", nm:"そいねーる AD ミニ", brand:"大和屋", type:"COSLEEP", portable:"分解",
  outer:[102.5,70,126.5], inner:[90,60], floorH:[11.5,66], steps:28, kg:14.5, pass:70,
  months:"0〜24か月", price:"4〜5万円台", priceMin:42000,
  bedding:"ミニ規格（90×60）", beddingStd:false,
@@ -659,7 +660,7 @@ const PRODUCTS = [
         ["レンタル","https://babyrenta.com/?mode=grp&gid=3067025"]],
  note:"ラージと同じ28段階の高さ調整のまま設置面積を約3割削ったモデル。寝具はミニ規格が使えるぶんラージより選択肢がある。"},
 
-{id:"farska_bsb03", nm:"ベッドサイドベッド03", brand:"farska", type:"COSLEEP",
+{id:"farska_bsb03", nm:"ベッドサイドベッド03", brand:"farska", type:"COSLEEP", portable:"分解",
  outer:[125,75,91], inner:[120,70], floorH:[9,53], steps:9, kg:17, pass:75,
  months:"0〜24か月", price:"¥28,600", priceMin:28600,
  bedding:"標準規格（120×70）", beddingStd:true,
@@ -668,7 +669,7 @@ const PRODUCTS = [
  links:[["メーカー公式","https://www.farska.com/product/spec/bedsidebed03"]],
  note:"添い寝型では珍しく内寸が標準規格の120×70。市販の寝具がそのまま使えるうえ、床板を外してベビーサークルに転用できる。"},
 
-{id:"coconel_ab", nm:"ココネル エアー AB", brand:"Aprica", type:"FOLD",
+{id:"coconel_ab", nm:"ココネル エアー AB", brand:"Aprica", type:"FOLD", portable:"折りたたみ",
  outer:[105.2,70.4,95.1], inner:[90,60], floorH:null, steps:2, kg:14.5, pass:70.4,
  months:"新生児(2.5kg)〜24か月(13kg)", price:"3万円前後", priceMin:28000,
  bedding:"ミニ規格（90×60）／専用マット付", beddingStd:false,
@@ -679,7 +680,7 @@ const PRODUCTS = [
         ["レンタル","https://babyrenta.com/?pid=165731278"]],
  note:"キャスターで部屋間を移動でき、使わない時は畳んで収納袋に入る。ただし下段に切り替えたあとの抱き上げは深く、腰への負担は増える。踏み台を併用する家庭が多い。"},
 
-{id:"katoji_arch", nm:"ハイポジションベビーベッド アーチ（廃番／現行は アーチⅡ）", brand:"カトージ", type:"HIGH_REG",
+{id:"katoji_arch", nm:"ハイポジションベビーベッド アーチ（廃番／現行は アーチⅡ）", brand:"カトージ", type:"HIGH_REG", portable:"分解",
  outer:[124,78,121], inner:[120,70], floorH:[43,75], steps:4, kg:null, pass:78,
  months:"新生児〜24か月", price:"3万円前後", priceMin:27000,
  bedding:"標準規格（120×70）", beddingStd:true,
@@ -690,7 +691,7 @@ const PRODUCTS = [
         ["旧アーチの仕様","https://www.katoji.co.jp/products-detail_3445.html"]],
  note:"床板が75/70/65/43cmの4段階。最上段75cmは立ったままお世話ができる高さで、腰を最優先するならこの系統。ベッド下は収納棚。奥行78cmは一般的な室内ドアを通らない。"},
 
-{id:"katoji_arch2_mini", nm:"ハイポジション ミニベッド アーチⅡ（収納板付）", brand:"カトージ", type:"HIGH_MINI",
+{id:"katoji_arch2_mini", nm:"ハイポジション ミニベッド アーチⅡ（収納板付）", brand:"カトージ", type:"HIGH_MINI", portable:"分解",
  outer:null, inner:[90,60], floorH:[null,70], steps:null, kg:null, pass:null,
  months:"新生児〜24か月", price:"¥28,380（直営）", priceMin:28380,
  bedding:"ミニ規格（90×60）", beddingStd:false,
@@ -700,7 +701,7 @@ const PRODUCTS = [
         ["メーカー商品情報","https://www.katoji.co.jp/products-detail_3496.html"]],
  note:"床板最大70cmのハイポジションを保ったままミニサイズにしたモデル。腰と省スペースの両方を取りにいく選択肢。"},
 
-{id:"yamasaki_bside", nm:"ツーオープンベッド b-side（ハイタイプ）", brand:"ヤマサキ", type:"HIGH_REG",
+{id:"yamasaki_bside", nm:"ツーオープンベッド b-side（ハイタイプ）", brand:"ヤマサキ", type:"HIGH_REG", portable:"分解",
  outer:[125,78,116], inner:[120,70], floorH:[null,70], steps:4, kg:null, pass:78,
  months:"新生児〜24か月", price:"約58,000円", priceMin:58000,
  bedding:"標準規格（120×70）", beddingStd:true,
@@ -709,7 +710,7 @@ const PRODUCTS = [
         ["レンタル","https://www.nicebaby.co.jp/products/0-109"]],
  note:"ブナ材の日本製。前枠スライドと横枠開閉の2か所が開くので、部屋のどちら側からでもおむつ替えができる。収納棚とキャスター付き。価格は高い。"},
 
-{id:"farska_cbf", nm:"コンパクトベッドフィット", brand:"farska", type:"FLOOR",
+{id:"farska_cbf", nm:"コンパクトベッドフィット", brand:"farska", type:"FLOOR", portable:"折りたたみ",
  outer:[90,60,19], inner:[90,60], floorH:[0,0], steps:1, kg:null, pass:60,
  folded:[60,24,45],
  months:"0〜12か月", price:"¥19,800", priceMin:19800,
@@ -718,7 +719,7 @@ const PRODUCTS = [
  links:[["メーカー公式","https://www.farska.com/product/spec/compactbedfits"]],
  note:"大人の布団の横にそのまま置ける床置き型。畳んで持ち運べる。寝返りが始まる5か月前後で窮屈になるという声が多く、使用期間は短い前提で見るのが正しい。"},
 
-{id:"farska_cbf_l", nm:"コンパクトベッドフィットL", brand:"farska", type:"FLOOR",
+{id:"farska_cbf_l", nm:"コンパクトベッドフィットL", brand:"farska", type:"FLOOR", portable:"折りたたみ",
  outer:[120,70,19], inner:[120,70], floorH:[0,0], steps:1, kg:null, pass:70,
  folded:[70,24,60],
  months:"0〜36か月", price:"¥31,900", priceMin:31900,
@@ -727,7 +728,7 @@ const PRODUCTS = [
  links:[["メーカー公式","https://www.farska.com/product/spec/compactbedfitsl"]],
  note:"フィットの標準サイズ版。0〜36か月と使用期間が長く、寝返り後の窮屈さの問題が出にくい。床置きなので腰への負担は最大。"},
 
-{id:"playyard", nm:"プレイヤード（カトージ・日本育児ほか）", brand:"各社", type:"PLAYYARD",
+{id:"playyard", nm:"プレイヤード（カトージ・日本育児ほか）", brand:"各社", type:"PLAYYARD", portable:"折りたたみ",
  outer:null, inner:null, floorH:null, steps:2, kg:null, pass:null,
  months:"バシネット〜6か月／サークル〜2歳", price:"1.5〜3万円", priceMin:15000,
  bedding:"専用マット", beddingStd:false,
@@ -736,7 +737,7 @@ const PRODUCTS = [
  links:[["レンタルで探す","https://www.nicebaby.co.jp/collections/bed"]],
  note:"寝床としての快適性はベビーベッドに劣るが、卒業後にサークルとして2歳まで働く。「寝床」ではなく「囲い」として評価するのが正しい買い方。"},
 
-{id:"bjorn_travel", nm:"トラベルクリブライト", brand:"ベビービョルン", type:"TRAVEL",
+{id:"bjorn_travel", nm:"トラベルクリブライト", brand:"ベビービョルン", type:"TRAVEL", portable:"折りたたみ",
  outer:[112,64,82], inner:null, floorH:null, steps:1, kg:6, pass:64,
  folded:[60,14,49],
  months:"0〜3歳頃", price:"3万円前後", priceMin:28000,
@@ -849,6 +850,7 @@ function requirements(who){
     wash      : a.washable === "とても重要",
     back      : a.back === "かなり重視",
     travel    : a.trip === "頻繁に" || a.car === "ある",
+    moving    : state.facts.movehome === "ある",
     budget    : ({"2万円まで":20000, "3万円まで":30000, "5万円まで":50000, "5万円以上":null})[a.budget]
   };
 }
@@ -933,6 +935,17 @@ function evaluateProducts(who){
       } else warns.push("床板高さの公表値が不十分。添い寝で使うなら要確認");
     }
     if(R.budget != null && p.priceMin > R.budget) warns.push("本体 " + p.price + " は予算上限を超える（寝具代は別途）");
+
+    /* 引っ越し予定があるなら、畳めるか解体が要るかは型の違いより大きい */
+    if(R.moving && p.portable){
+      if(p.portable === "折りたたみ"){
+        s += 4;
+        goods.push("工具なしで畳めるので引っ越しに強い" + (p.folded ? "（畳むと " + p.folded.join("×") + "cm）" : ""));
+      } else {
+        s -= 4;
+        warns.push("引っ越しのたびに解体と再組立が必要" + (p.kg ? "（" + p.kg + "kg）" : "") + "。畳める機種とは手間がまるで違う");
+      }
+    }
 
     if(R.stdBedding) s += p.beddingStd ? 3 : -2;
     if(R.storage)    s += p.storage ? 3 : -3;
@@ -1152,6 +1165,7 @@ function renderPanel(){
       if(p.storage) tags.push('<span class="tag">下収納</span>');
       if(p.caster) tags.push('<span class="tag">キャスター</span>');
       if(p.fold) tags.push('<span class="tag">折りたたみ</span>');
+      if(p.portable) tags.push('<span class="tag' + (p.portable === "折りたたみ" ? " good" : "") + '">引越:' + esc(p.portable) + "</span>");
       if(p.playyard) tags.push('<span class="tag">サークル転用</span>');
       if(p.wash) tags.push('<span class="tag">丸洗い</span>');
       if(p.madeIn) tags.push('<span class="tag">' + esc(p.madeIn) + "製</span>");
@@ -1344,6 +1358,7 @@ function renderCatalog(){
     '<td class="n">' + (p.kg ? p.kg : "—") + "</td>" +
     "<td>" + esc(p.months) + "</td>" +
     "<td>" + esc(p.bedding) + "</td>" +
+    "<td>" + esc(p.portable || "—") + "</td>" +
     '<td class="n">' + esc(p.price) + "</td>" +
     "</tr>").join("");
 }
