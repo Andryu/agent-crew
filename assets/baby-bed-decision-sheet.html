@@ -507,7 +507,7 @@ const Q = [
 /* ---------- S4 期間 ---------- */
 {id:"span", sec:"S4", core:true, q:"何歳くらいまで使えたら「十分使った」と思える？",
  drives:"サイズと償却",
- note:"元シートのQ20とQ21は同じことを聞いていたので1問に統合しました。実際には、つかまり立ちが始まる頃（8〜10か月）に卒業する家庭がかなりあります。",
+ note:"元シートのQ20とQ21は同じことを聞いていたので1問に統合しました。実際には、つかまり立ちが始まる頃（8〜10か月）に卒業する家庭がかなりあります。なお内寸90×60のミニ規格は、公称が24か月でも寝返りが始まる4〜6か月で窮屈になりやすく、快適に使えるのは6か月前後までとされています。1年以上使いたいなら標準サイズ（120×70）が要ります。",
  opts:[{v:"6か月で十分",w:{FOLD:2,FLOOR:3,HIGH_MINI:2,HIGH_REG:-1}},{v:"1歳まで",w:{HIGH_MINI:2,FOLD:2}},{v:"2歳まで使いたい",w:{HIGH_REG:3,PLAYYARD:3,FLOOR:-3}}]},
 {id:"after", sec:"S4", q:"ベッド卒業後はどこで寝かせたい？",
  drives:"卒業のしかた",
@@ -671,6 +671,7 @@ const PRODUCTS = [
 
 {id:"coconel_ab", nm:"ココネル エアー AB", brand:"Aprica", type:"FOLD", portable:"折りたたみ",
  outer:[105.2,70.4,95.1], inner:[90,60], floorH:null, steps:2, kg:14.5, pass:70.4,
+ folded:[26,26,95.1],
  months:"新生児(2.5kg)〜24か月(13kg)", price:"3万円前後", priceMin:28000,
  bedding:"ミニ規格（90×60）／専用マット付", beddingStd:false,
  caster:true, storage:false, fold:true, playyard:true, wash:true, madeIn:null, cert:"PSC・SG",
@@ -678,7 +679,7 @@ const PRODUCTS = [
  links:[["メーカー公式","https://www.aprica.jp/products/home/detail/bed/coconel_air_ab/"],
         ["シリーズ比較表","https://www.aprica.jp/products/bed/comparison/"],
         ["レンタル","https://babyrenta.com/?pid=165731278"]],
- note:"キャスターで部屋間を移動でき、使わない時は畳んで収納袋に入る。ただし下段に切り替えたあとの抱き上げは深く、腰への負担は増える。踏み台を併用する家庭が多い。"},
+ note:"畳むと26×26×95cmになり収納袋に入る（宅急便160サイズ相当）。キャスターで部屋間も移動できる。ただし下段に切り替えたあとの抱き上げは深く、腰への負担は増える。踏み台を併用する家庭が多い。"},
 
 {id:"katoji_arch", nm:"ハイポジションベビーベッド アーチ（廃番／現行は アーチⅡ）", brand:"カトージ", type:"HIGH_REG", portable:"分解",
  outer:[124,78,121], inner:[120,70], floorH:[43,75], steps:4, kg:null, pass:78,
@@ -936,6 +937,13 @@ function evaluateProducts(who){
       } else warns.push("床板高さの公表値が不十分。添い寝で使うなら要確認");
     }
     if(R.budget != null && p.priceMin > R.budget) warns.push("本体 " + p.price + " は予算上限を超える（寝具代は別途）");
+
+    /* 内寸90×60のミニ規格は、公称の対象月齢まで快適に使えるとは限らない */
+    if(p.inner && p.inner[0] <= 90 && p.inner[1] <= 60){
+      const span = (state[who] || {}).span;
+      if(span === "1歳まで" || span === "2歳まで使いたい")
+        warns.push("内寸90×60のミニ規格。寝返りが始まる4〜6か月で窮屈になりやすく、快適に使えるのは生後6か月前後まで。「" + span + "」という想定には届かない可能性が高い");
+    }
 
     /* 引っ越し予定があるなら、畳めるか解体が要るかは型の違いより大きい */
     if(R.moving && p.portable){
@@ -1359,7 +1367,7 @@ function renderCatalog(){
     '<td class="n">' + (p.kg ? p.kg : "—") + "</td>" +
     "<td>" + esc(p.months) + "</td>" +
     "<td>" + esc(p.bedding) + "</td>" +
-    "<td>" + esc(p.portable || "—") + "</td>" +
+    "<td>" + esc(p.portable || "—") + (p.folded ? '<br><span class="pb">畳 ' + p.folded.join("×") + "</span>" : "") + "</td>" +
     '<td class="n">' + esc(p.price) + "</td>" +
     "</tr>").join("");
 }
