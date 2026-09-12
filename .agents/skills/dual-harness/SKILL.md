@@ -25,3 +25,16 @@ Claude CodeとCodexを併用するときは、能力の優劣を仮定せず、�
 - quota到達後にhandoffを書く前提にしない。工程の節目でcheckpointを作る。
 - quota、認証、ネットワーク、timeoutは別の失敗として記録する。
 - 自動的に別ハーネスを起動しない。明示的な人間承認または個別の自動化仕様がある場合だけ切り替える。
+
+## Codexのsandboxプロファイル
+
+用途ごとに `~/.codex/<name>.config.toml` を用意し、`-p <name>` で切り替える
+（2026-09-12 `--strict-config` で `sandbox_mode`/`approval_policy` キーが有効であることを実機確認済み）。
+
+| 用途 | プロファイル | 内容 |
+|---|---|---|
+| 対話開発 | （既定） | `workspace-write` + `on-request`。個別に承認しながら進める |
+| 無人レビュー | `codex exec -p review` | `read-only` + `never`。ファイル変更なしで完結させる |
+| 無人修正 | `codex exec -p unattended-fix` | `workspace-write` + `never`。書き込み範囲は `-C`/`--add-dir` で呼び出し側が絞る |
+
+`never` は承認待ちを無くす設定であり、sandbox自体を解除するものではない。
