@@ -1,0 +1,12 @@
+{
+  "description": "agent-crew の Codex 用ライフサイクルhook。すべてGit rootから対象を解決する。",
+  "hooks": {
+    "SessionStart": [{"hooks": [{"type": "command", "command": "bash -c 'root=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; bash \"$root/.claude/hooks/session_start.sh\"'", "timeout": 10}]}],
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "bash -c 'root=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; bash \"$root/scripts/model-mode.sh\"'", "timeout": 10}]}],
+    "Stop": [{"hooks": [
+      {"type": "command", "command": "bash -c 'root=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$root/scripts/propose-lesson-rules.sh\" --dry-run 2>/dev/null || true'", "timeout": 10},
+      {"type": "command", "command": "bash -c 'root=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; bash \"$root/scripts/privacy-check.sh\" 2>/dev/null || true'", "timeout": 10},
+      {"type": "command", "command": "bash -c 'root=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; bash \"$root/scripts/enforce-retro-stop.sh\" || true'", "timeout": 10}
+    ]}]
+  }
+}
