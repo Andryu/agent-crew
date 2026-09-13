@@ -1,0 +1,245 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #0f0f0f;
+  color: #cfcfcf;
+  font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+  touch-action: manipulation;
+}
+
+#app {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.screen {
+  width: 100%;
+  max-width: 840px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.title {
+  font-size: 3rem;
+  letter-spacing: 0.4em;
+  margin: 0;
+  color: #e0e0e0;
+}
+
+.subtitle {
+  margin: 0;
+  color: #777;
+  letter-spacing: 0.2em;
+}
+
+.rules {
+  color: #999;
+  line-height: 1.8;
+}
+
+.rules p {
+  margin: 4px 0;
+}
+
+.best-round {
+  color: #888;
+}
+
+.primary-button, .secondary-button, .choice-button {
+  font-size: 1.1rem;
+  padding: 12px 32px;
+  border-radius: 4px;
+  border: 1px solid #555;
+  background: #1e1e1e;
+  color: #ddd;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.primary-button {
+  background: #2a2a2a;
+  border-color: #666;
+}
+
+.primary-button:hover, .secondary-button:hover, .choice-button:hover {
+  background: #333;
+}
+
+.secondary-button {
+  background: transparent;
+}
+
+.hud {
+  width: 100%;
+  max-width: 800px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+}
+
+.round-display {
+  color: #999;
+  font-size: 1rem;
+}
+
+.mute-button {
+  font-size: 0.9rem;
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: 1px solid #555;
+  background: #1e1e1e;
+  color: #999;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mute-button:hover {
+  background: #333;
+}
+
+#room-canvas {
+  width: 100%;
+  max-width: 800px;
+  height: auto;
+  aspect-ratio: 800 / 500;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  touch-action: manipulation;
+}
+
+.choice-buttons {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+  max-width: 800px;
+  justify-content: center;
+}
+
+.choice-button {
+  flex: 1;
+  max-width: 200px;
+  font-size: 1.3rem;
+  padding: 16px 0;
+}
+
+#back-button {
+  border-color: #6a6a8a;
+}
+
+#forward-button {
+  border-color: #8a6a6a;
+}
+
+.gameover-round, .gameover-best {
+  color: #aaa;
+  font-size: 1.1rem;
+}
+
+#survey-form {
+  width: 100%;
+  max-width: 480px;
+  text-align: left;
+}
+
+#survey-form fieldset {
+  border: 1px solid #333;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  padding: 12px;
+}
+
+#survey-form legend {
+  color: #bbb;
+  padding: 0 6px;
+}
+
+.scale {
+  display: flex;
+  gap: 12px;
+  justify-content: space-around;
+}
+
+.scale label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #999;
+}
+
+#survey-form input[type="text"] {
+  width: 100%;
+  padding: 8px;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  color: #ddd;
+  border-radius: 4px;
+}
+
+.survey-actions {
+  display: flex;
+  justify-content: center;
+}
+
+#survey-after-submit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.copy-status {
+  color: #888;
+  font-size: 0.9rem;
+  min-height: 1.2em;
+}
+
+#flash-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0);
+  transition: background-color 0.3s ease;
+  z-index: 1000;
+}
+
+#flash-overlay.flash-gameover {
+  background: rgba(160, 0, 0, 0.55);
+}
+
+#flash-overlay.flash-blackout {
+  background: rgba(0, 0, 0, 1);
+  transition: background-color 0.15s ease;
+}
+
+@media (max-width: 480px) {
+  .title {
+    font-size: 2.2rem;
+  }
+
+  .choice-buttons {
+    gap: 12px;
+  }
+
+  .choice-button {
+    font-size: 1.1rem;
+    padding: 14px 0;
+  }
+}

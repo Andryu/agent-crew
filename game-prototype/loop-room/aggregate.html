@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>巡室 プレイテスト集計（開発者用）</title>
+<style>
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #0f0f0f;
+    color: #cfcfcf;
+    font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+    line-height: 1.7;
+  }
+
+  #app {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px 16px 64px;
+  }
+
+  h1 {
+    color: #e0e0e0;
+    font-size: 1.6rem;
+    margin: 0 0 8px;
+  }
+
+  .description {
+    color: #999;
+    margin: 0 0 20px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 220px;
+    background: #1a1a1a;
+    color: #cfcfcf;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 12px;
+    font-family: monospace;
+    font-size: 0.9rem;
+    resize: vertical;
+  }
+
+  .actions {
+    margin: 16px 0;
+  }
+
+  button {
+    background: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 10px 24px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: #4a4a4a;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  #result {
+    margin-top: 32px;
+    border-top: 1px solid #333;
+    padding-top: 24px;
+  }
+
+  .warning {
+    color: #d99a3f;
+    margin: 0 0 16px;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+
+  .stat-card {
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  .stat-label {
+    color: #999;
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+  }
+
+  .stat-value {
+    font-size: 2.2rem;
+    font-weight: bold;
+  }
+
+  .stat-sub {
+    color: #777;
+    font-size: 0.8rem;
+    margin-top: 4px;
+  }
+
+  .green { color: #4caf50; }
+  .yellow { color: #d9b93f; }
+  .red { color: #e05a5a; }
+
+  .note {
+    color: #777;
+    font-size: 0.8rem;
+    margin: 4px 0 20px;
+  }
+
+  .verdict {
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin: 20px 0;
+    padding: 12px 16px;
+    border-radius: 6px;
+    background: #1a1a1a;
+    border: 1px solid #444;
+  }
+
+  .verdict.red {
+    border-color: #e05a5a;
+  }
+
+  .verdict.green {
+    border-color: #4caf50;
+  }
+
+  .invalid-count {
+    color: #999;
+    margin: 8px 0 24px;
+  }
+
+  h2 {
+    color: #e0e0e0;
+    font-size: 1.1rem;
+    margin: 24px 0 8px;
+  }
+
+  ul.comments {
+    list-style: disc;
+    padding-left: 24px;
+    margin: 0;
+  }
+
+  ul.comments li {
+    margin: 6px 0;
+    color: #cfcfcf;
+  }
+
+  ul.comments li .empty {
+    color: #666;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>巡室 プレイテスト集計（開発者用）</h1>
+  <p class="description">
+    各プレイテスターから受け取ったJSON配列を、下のテキストエリアに1行1配列（または複数行にまたがってもよい）で貼り付けて「集計」ボタンを押してください。複数人分をまとめて貼り付けられます。
+  </p>
+
+  <textarea id="input-area" placeholder="ここにJSON配列を貼り付け（1行1配列）"></textarea>
+
+  <div class="actions">
+    <button id="aggregate-button" type="button">集計</button>
+  </div>
+
+  <div id="result" class="hidden">
+    <p id="parse-warning" class="warning hidden"></p>
+    <p id="duplicate-warning" class="warning hidden"></p>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">有効回答数（目標15件）</div>
+        <div id="stat-valid-count" class="stat-value">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">平均到達周回数</div>
+        <div id="stat-avg-rounds" class="stat-value">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">継続意向率</div>
+        <div id="stat-retention" class="stat-value">-</div>
+      </div>
+    </div>
+    <p class="note">※ 5段階評価で4以上を「意向あり」として集計しています</p>
+
+    <p id="invalid-count" class="invalid-count"></p>
+
+    <div id="verdict" class="verdict"></div>
+
+    <h2>良かった瞬間（自由記述）</h2>
+    <ul id="good-moments" class="comments"></ul>
+
+    <h2>イライラした瞬間（自由記述）</h2>
+    <ul id="bad-moments" class="comments"></ul>
+  </div>
+</div>
+
+<script>
+(function () {
+  const inputArea = document.getElementById('input-area');
+  const aggregateButton = document.getElementById('aggregate-button');
+  const resultEl = document.getElementById('result');
+  const parseWarningEl = document.getElementById('parse-warning');
+  const duplicateWarningEl = document.getElementById('duplicate-warning');
+  const statValidCountEl = document.getElementById('stat-valid-count');
+  const statAvgRoundsEl = document.getElementById('stat-avg-rounds');
+  const statRetentionEl = document.getElementById('stat-retention');
+  const invalidCountEl = document.getElementById('invalid-count');
+  const verdictEl = document.getElementById('verdict');
+  const goodMomentsEl = document.getElementById('good-moments');
+  const badMomentsEl = document.getElementById('bad-moments');
+
+  function levelClass(value, greenMin, yellowMin) {
+    if (value >= greenMin) return 'green';
+    if (value >= yellowMin) return 'yellow';
+    return 'red';
+  }
+
+  function parseLines(text) {
+    const lines = text.split('\n');
+    const responses = [];
+    let failedCount = 0;
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (line === '') continue;
+      try {
+        const parsed = JSON.parse(line);
+        if (Array.isArray(parsed)) {
+          responses.push(...parsed);
+        } else {
+          failedCount++;
+        }
+      } catch {
+        failedCount++;
+      }
+    }
+
+    return { responses, failedCount };
+  }
+
+  function dedupeByTimestamp(responses) {
+    const seen = new Set();
+    const deduped = [];
+    let duplicateCount = 0;
+
+    for (const r of responses) {
+      const timestamp = r && r.timestamp;
+      if (timestamp === undefined || timestamp === null) {
+        deduped.push(r);
+        continue;
+      }
+      if (seen.has(timestamp)) {
+        duplicateCount++;
+        continue;
+      }
+      seen.add(timestamp);
+      deduped.push(r);
+    }
+
+    return { deduped, duplicateCount };
+  }
+
+  function isValidResponse(r) {
+    return (
+      r &&
+      typeof r.wantToPlayAgain === 'number' &&
+      r.wantToPlayAgain >= 1 &&
+      r.wantToPlayAgain <= 5 &&
+      typeof r.roundsReached === 'number' &&
+      r.roundsReached >= 0
+    );
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function renderComments(listEl, values) {
+    listEl.innerHTML = '';
+    const nonEmpty = values.filter((v) => typeof v === 'string' && v.trim() !== '');
+    if (nonEmpty.length === 0) {
+      const li = document.createElement('li');
+      li.innerHTML = '<span class="empty">(記述なし)</span>';
+      listEl.appendChild(li);
+      return;
+    }
+    for (const v of nonEmpty) {
+      const li = document.createElement('li');
+      li.textContent = v;
+      listEl.appendChild(li);
+    }
+  }
+
+  aggregateButton.addEventListener('click', () => {
+    const { responses, failedCount } = parseLines(inputArea.value);
+    const { deduped, duplicateCount } = dedupeByTimestamp(responses);
+
+    const validResponses = deduped.filter(isValidResponse);
+    const invalidResponses = deduped.filter((r) => !isValidResponse(r));
+
+    const validCount = validResponses.length;
+    const avgRounds =
+      validCount > 0
+        ? validResponses.reduce((sum, r) => sum + r.roundsReached, 0) / validCount
+        : 0;
+    const retentionCount = validResponses.filter((r) => r.wantToPlayAgain >= 4).length;
+    const retentionRate = validCount > 0 ? (retentionCount / validCount) * 100 : 0;
+
+    statValidCountEl.textContent = String(validCount);
+    statValidCountEl.className = 'stat-value ' + levelClass(validCount, 15, 10);
+
+    statAvgRoundsEl.textContent = avgRounds.toFixed(1) + '周';
+    statAvgRoundsEl.className = 'stat-value ' + levelClass(avgRounds, 3, 2);
+
+    statRetentionEl.textContent = retentionRate.toFixed(1) + '%';
+    statRetentionEl.className = 'stat-value ' + levelClass(retentionRate, 50, 30);
+
+    invalidCountEl.textContent = `無効回答（roundsReached欠落等）: ${invalidResponses.length}件`;
+
+    const isBelowThreshold = validCount < 10 || retentionRate < 30 || avgRounds < 2;
+    if (isBelowThreshold) {
+      verdictEl.textContent = '撤退基準に抵触する可能性があります（2026-09-30時点で確定）';
+      verdictEl.className = 'verdict red';
+    } else {
+      verdictEl.textContent = '現時点で撤退基準には抵触していません';
+      verdictEl.className = 'verdict green';
+    }
+
+    renderComments(goodMomentsEl, validResponses.map((r) => r.goodMoment));
+    renderComments(badMomentsEl, validResponses.map((r) => r.badMoment));
+
+    if (failedCount > 0) {
+      parseWarningEl.textContent = `${failedCount}行の読み込みに失敗しました`;
+      parseWarningEl.classList.remove('hidden');
+    } else {
+      parseWarningEl.classList.add('hidden');
+    }
+
+    if (duplicateCount > 0) {
+      duplicateWarningEl.textContent = `${duplicateCount}件の重複回答を除外しました`;
+      duplicateWarningEl.classList.remove('hidden');
+    } else {
+      duplicateWarningEl.classList.add('hidden');
+    }
+
+    resultEl.classList.remove('hidden');
+  });
+})();
+</script>
+</body>
+</html>
