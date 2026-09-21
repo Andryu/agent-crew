@@ -26,7 +26,7 @@ function towerCenter(tower) {
 }
 
 function enemyPos(enemy, laneRows) {
-  return { x: enemy.x, y: laneRows[enemy.lane] + 0.5 };
+  return { x: enemy.x, y: Number.isFinite(enemy.y) ? enemy.y : laneRows[enemy.lane] + 0.5 };
 }
 
 function distance(a, b) {
@@ -36,7 +36,7 @@ function distance(a, b) {
 }
 
 /**
- * 射程内で最も臓器に近い（xが最大の）生存個体を選ぶ。
+ * 射程内で最も臓器に近い（出口までの残距離が最小（旧レーンではxが最大）の）生存個体を選ぶ。
  * @param {object} tower
  * @param {Array<object>} enemies
  * @param {object} def TOWERS[tower.id]
@@ -47,13 +47,14 @@ function findTarget(tower, enemies, def, laneRows) {
   const center = towerCenter(tower);
   const range = effectiveRange(tower, def);
   let best = null;
-  let bestX = -Infinity;
+  let bestPriority = -Infinity;
   for (const enemy of enemies) {
     if (!enemy.alive || enemy.spawnAt > 0) continue;
     const pos = enemyPos(enemy, laneRows);
     if (distance(center, pos) > range) continue;
-    if (enemy.x > bestX) {
-      bestX = enemy.x;
+    const priority = Number.isFinite(enemy.distanceToGoal) ? -enemy.distanceToGoal : enemy.x;
+    if (priority > bestPriority) {
+      bestPriority = priority;
       best = enemy;
     }
   }
@@ -62,12 +63,16 @@ function findTarget(tower, enemies, def, laneRows) {
 
 function applyDamage(enemy, rawDamage, attr) {
   const resisted = attr !== 'none' && enemy.genome.resist === ATTR_TO_RESIST[attr];
-  const damage = resisted ? rawDamage * RESIST_DAMAGE_MULT : rawDamage;
+  // 装甲は無属性だけを半減する。属性耐性とは生成時に排他。
+  const armored = attr === 'none' && enemy.genome.armor;
+  const damage = resisted || armored ? rawDamage * RESIST_DAMAGE_MULT : rawDamage;
+  const actual = Math.max(0, Math.min(enemy.hp, damage));
   enemy.hp -= damage;
   if (enemy.hp <= 0) {
     enemy.alive = false;
     enemy.reached = false;
   }
+  return actual;
 }
 
 /**
@@ -80,7 +85,7 @@ function applyDamage(enemy, rawDamage, attr) {
  * @param {number} [now] waveClock基準の現在時刻（秒）。cold の減速適用に使用
  * @returns {Array<{x1:number,y1:number,x2:number,y2:number,towerId:string,ttl:number}>} shots
  */
-export function stepTowers(towerInstances, enemies, dt, laneRows, now = 0) {
+export function stepTowers(towerInstances, enemies, dt, laneRows, now = 0, onDamage = null) {
   const shots = [];
   for (const tower of towerInstances) {
     const def = TOWERS[tower.id];
@@ -103,11 +108,13 @@ export function stepTowers(towerInstances, enemies, dt, laneRows, now = 0) {
         if (!enemy.alive || enemy.spawnAt > 0) continue;
         const pos = enemyPos(enemy, laneRows);
         if (distance(targetPos, pos) <= radius) {
-          applyDamage(enemy, damage, def.attr);
+          const actual = applyDamage(enemy, damage, def.attr);
+          if (onDamage) onDamage(tower.id, actual, enemy);
         }
       }
     } else {
-      applyDamage(target, damage, def.attr);
+      const actual = applyDamage(target, damage, def.attr);
+      if (onDamage) onDamage(tower.id, actual, target);
       if (def.special === 'slow' && target.alive) {
         applySlow(target, def.slowFactor, def.slowDuration, now);
       }

@@ -1,0 +1,278 @@
+[
+  {
+    "seed": 1,
+    "results": [
+      {
+        "kind": "armor-ignored",
+        "invested": 300,
+        "killed": 3,
+        "damage": 23
+      },
+      {
+        "kind": "armor-countered",
+        "invested": 300,
+        "killed": 6,
+        "damage": 20
+      },
+      {
+        "kind": "lane-ignored",
+        "invested": 300,
+        "killed": 3,
+        "damage": 23
+      }
+    ]
+  },
+  {
+    "seed": 2,
+    "results": [
+      {
+        "kind": "armor-ignored",
+        "invested": 300,
+        "killed": 1,
+        "damage": 24
+      },
+      {
+        "kind": "armor-countered",
+        "invested": 300,
+        "killed": 10,
+        "damage": 16
+      },
+      {
+        "kind": "lane-ignored",
+        "invested": 300,
+        "killed": 3,
+        "damage": 23
+      }
+    ]
+  },
+  {
+    "seed": 3,
+    "results": [
+      {
+        "kind": "armor-ignored",
+        "invested": 300,
+        "killed": 2,
+        "damage": 24
+      },
+      {
+        "kind": "armor-countered",
+        "invested": 300,
+        "killed": 15,
+        "damage": 11
+      },
+      {
+        "kind": "lane-ignored",
+        "invested": 300,
+        "killed": 3,
+        "damage": 23
+      }
+    ]
+  },
+  {
+    "seed": 4,
+    "results": [
+      {
+        "kind": "armor-ignored",
+        "invested": 300,
+        "killed": 3,
+        "damage": 23
+      },
+      {
+        "kind": "armor-countered",
+        "invested": 300,
+        "killed": 11,
+        "damage": 15
+      },
+      {
+        "kind": "lane-ignored",
+        "invested": 300,
+        "killed": 3,
+        "damage": 23
+      }
+    ]
+  },
+  {
+    "seed": 5,
+    "results": [
+      {
+        "kind": "armor-ignored",
+        "invested": 300,
+        "killed": 1,
+        "damage": 24
+      },
+      {
+        "kind": "armor-countered",
+        "invested": 300,
+        "killed": 7,
+        "damage": 19
+      },
+      {
+        "kind": "lane-ignored",
+        "invested": 300,
+        "killed": 4,
+        "damage": 22
+      }
+    ]
+  },
+  {
+    "seed": 6,
+    "results": [
+      {
+        "kind": "armor-ignored",
+        "invested": 300,
+        "killed": 2,
+        "damage": 24
+      },
+      {
+        "kind": "armor-countered",
+        "invested": 300,
+        "killed": 8,
+        "damage": 18
+      },
+      {
+        "kind": "lane-ignored",
+        "invested": 300,
+        "killed": 2,
+        "damage": 24
+      }
+    ]
+  },
+  {
+    "seed": 7,
+    "results": [
+      {
+        "kind": "armor-ignored",
+        "invested": 300,
+        "killed": 3,
+        "damage": 23
+      },
+      {
+        "kind": "armor-countered",
+        "invested": 300,
+        "killed": 9,
+        "damage": 17
+      },
+      {
+        "kind": "lane-ignored",
+        "invested": 300,
+        "killed": 2,
+        "damage": 24
+      }
+    ]
+  },
+  {
+    "seed": 8,
+    "results": [
+      {
+        "kind": "armor-ignored",
+        "invested": 300,
+        "killed": 1,
+        "damage": 24
+      },
+      {
+        "kind": "armor-countered",
+        "invested": 300,
+        "killed": 6,
+        "damage": 20
+      },
+      {
+        "kind": "lane-ignored",
+        "invested": 300,
+        "killed": 4,
+        "damage": 22
+      }
+    ]
+  },
+  {
+    "seed": 9,
+    "results": [
+      {
+        "kind": "armor-ignored",
+        "invested": 300,
+        "killed": 2,
+        "damage": 24
+      },
+      {
+        "kind": "armor-countered",
+        "invested": 300,
+        "killed": 6,
+        "damage": 20
+      },
+      {
+        "kind": "lane-ignored",
+        "invested": 300,
+        "killed": 2,
+        "damage": 24
+      }
+    ]
+  },
+  {
+    "seed": 10,
+    "results": [
+      {
+        "kind": "armor-ignored",
+        "invested": 300,
+        "killed": 2,
+        "damage": 24
+      },
+      {
+        "kind": "armor-countered",
+        "invested": 300,
+        "killed": 7,
+        "damage": 19
+      },
+      {
+        "kind": "lane-ignored",
+        "invested": 300,
+        "killed": 2,
+        "damage": 24
+      }
+    ]
+  },
+  {
+    "seed": 11,
+    "results": [
+      {
+        "kind": "armor-ignored",
+        "invested": 300,
+        "killed": 2,
+        "damage": 24
+      },
+      {
+        "kind": "armor-countered",
+        "invested": 300,
+        "killed": 10,
+        "damage": 16
+      },
+      {
+        "kind": "lane-ignored",
+        "invested": 300,
+        "killed": 3,
+        "damage": 23
+      }
+    ]
+  },
+  {
+    "seed": 12,
+    "results": [
+      {
+        "kind": "armor-ignored",
+        "invested": 300,
+        "killed": 3,
+        "damage": 23
+      },
+      {
+        "kind": "armor-countered",
+        "invested": 300,
+        "killed": 8,
+        "damage": 18
+      },
+      {
+        "kind": "lane-ignored",
+        "invested": 300,
+        "killed": 3,
+        "damage": 23
+      }
+    ]
+  }
+]

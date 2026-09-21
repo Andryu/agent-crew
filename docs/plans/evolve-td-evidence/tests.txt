@@ -1,0 +1,256 @@
+
+> test
+> node js/test.mjs && node --test js/campaign.test.mjs
+
+--- module load smoke ---
+PASS: config.jsが読み込める
+PASS: rng.jsが読み込める
+PASS: game-state.jsが読み込める
+PASS: towers.jsが読み込める
+PASS: enemies.jsが読み込める
+PASS: evolution.jsが読み込める
+PASS: share.jsが読み込める
+PASS: storage.jsが読み込める
+--- renderer.js / main.js / audio.js / survey.js 構文チェック（DOM参照エラーは許容） ---
+PASS: ./renderer.jsのimportがSyntaxErrorを起こさない
+PASS: ./main.jsのimportがSyntaxErrorを起こさない（発生時: ReferenceError: document is not defined）
+PASS: ./audio.jsのimportがSyntaxErrorを起こさない
+PASS: ./survey.jsのimportがSyntaxErrorを起こさない
+--- rng.js ---
+PASS: 同じseedなら同じ乱数列を返す
+PASS: 異なるseedなら異なる乱数列を返す
+PASS: rng()は[0,1)の範囲
+PASS: rng.intは指定範囲未満の整数
+--- evolution.js ---
+PASS: initialPopulationの全個体でspeedが範囲内
+PASS: initialPopulationの全個体でhpが範囲内
+PASS: initialPopulationの全個体でsizeが範囲内
+PASS: initialPopulationのresistは0〜3の整数
+PASS: initialPopulationに耐性なし(0)の個体が過半数いる
+PASS: initialPopulationのlaneは合計1・各要素0以上（均等±0.15ノイズ後に再正規化）
+PASS: evaluateの式: 到達+被害あり
+PASS: evaluateの式: 未到達progress0.5
+PASS: evaluateの式: 未到達progress0
+PASS: summarizeのresistShare合計が1
+PASS: summarizeのlaneShare合計が1
+PASS: evolveがnextSize件を返し全遺伝子が範囲内
+PASS: diffReportは変化なしで定型1行「群れに目立った変化はない」を返す
+--- enemies.js ---
+PASS: collectResults: 到達個体はreachedBase=true・progress=1
+PASS: collectResults: 到達個体でsize>=1.2は被害2
+PASS: collectResults: 未到達個体はreachedBase=false・被害0
+PASS: collectResults: progressがx/laneLength
+PASS: livesLostFor: size=1.34は1（閾値1.35未満）
+PASS: livesLostFor: size=1.35は2（閾値ちょうど）
+PASS: applySlow: 未適用状態から適用される
+PASS: applySlow: より強い効果は置換される
+PASS: applySlow: より弱い効果は無視される
+PASS: applySlow: 同じ強さはuntilが延長される（Math.max）
+PASS: spawnFromPopulationは個体数分のEnemyを返す
+PASS: spawnFromPopulationの初期xは-1
+PASS: spawnFromPopulationのspawnAtは0.4秒間隔
+PASS: stepEnemies: spawnAt<=0の個体はdt分移動する
+PASS: stepEnemies: laneLengthに到達するとreached=true・alive=false
+PASS: pickGameOverRepresentative: 到達2体同点でも例外を投げずhpが大きい方のgenomeを返す
+PASS: pickGameOverRepresentative: 出現済み該当個体が0体ならnullを返す
+--- towers.js ---
+PASS: basicがresist=0個体にフルダメージを与える
+PASS: heatがresist=1個体に半減ダメージを与える
+PASS: heatがresist=0個体にフルダメージを与える
+--- game-state.js ---
+PASS: startNewGameのphaseはplace
+PASS: startNewGameのwaveは1
+PASS: startNewGameのunlockedはbasicのみ
+PASS: startNewGameのpopulationは初期サイズ22
+PASS: unlockedTowers(1)はbasicのみ
+PASS: unlockedTowers(3)はbasic+heat
+PASS: unlockedTowers(5)はbasic+heat+cold
+PASS: unlockedTowers(7)は4種累積
+PASS: canPlace: レーン行(row=1)には置けない
+PASS: canPlace: 非レーン行には置ける
+PASS: canPlace: 未解禁の塔は置けない
+PASS: placeTowerで資金がcost分減る
+PASS: placeTowerでtowersに追加される
+PASS: canPlace: 既に塔がある場所には置けない
+PASS: canPlace: 資金不足では置けない
+PASS: sellTowerで資金が70%分戻る
+PASS: sellTowerでtowersから消える
+PASS: sellTower: 存在しない塔は状態を変えない
+PASS: startWaveでwaveDiversityがスナップショットされる（basicのみ=1/4）
+PASS: startWaveでphaseがwaveになる
+PASS: ウェーブ中の売却でwaveDiversityは変化しない
+PASS: loseLivesでlivesが減る
+PASS: isGameOver: lives>0はfalse
+PASS: loseLivesは0未満にならない
+PASS: isGameOver: lives=0はtrue
+PASS: endWave後のphaseはreport
+PASS: endWaveはwaveを変えない（closeReportで進める）
+PASS: endWaveのreportは配列
+PASS: endWaveでgoldがECONOMY.waveClearBonus分増える
+PASS: closeReportでwaveが+1される
+PASS: closeReportでphaseがplaceに戻る
+PASS: wave15のendWaveでcleared=true
+PASS: isCleared(cleared状態)はtrue
+PASS: continueEndlessでendless=trueかつcleared解除
+PASS: continueEndless後のcloseReportでwaveが進む
+--- evolution.js (CP2) ---
+PASS: ①上位個体(高fitness)の形質(speed)が次世代平均に寄る
+PASS: ②towerDiversity=0(高突然変異率)の方がtowerDiversity=1より子集団の変化(分散)が大きい
+PASS: ③evolve(seed=1)の全遺伝子が範囲内
+PASS: ③evolve(seed=2)の全遺伝子が範囲内
+PASS: ③evolve(seed=3)の全遺伝子が範囲内
+PASS: ④変化なしで定型1行「群れに目立った変化はない」
+PASS: ④閾値以上の変化(speed+boltresist)のみ含まれる
+PASS: ④閾値未満のhp/size/laneは省かれる
+PASS: ④最大3行まで（多数の変化があっても超えない）
+PASS: ⑤seed=1: 同じpopulation/fitness/ctxなら同じ子集団(JSON一致)
+PASS: ⑤seed=2: 同じpopulation/fitness/ctxなら同じ子集団(JSON一致)
+PASS: ⑤seed=3: 同じpopulation/fitness/ctxなら同じ子集団(JSON一致)
+PASS: ⑤seed=4: 同じpopulation/fitness/ctxなら同じ子集団(JSON一致)
+PASS: ⑤seed=5: 同じpopulation/fitness/ctxなら同じ子集団(JSON一致)
+--- ⑥知覚テスト（実測値） ---
+  seed=1: report=["体格が大きくなった（+14%）","群れは高速化した（+5%）"]
+PASS: ⑥知覚テスト seed=1: W1→W2のdiffReportが実質変化を含む
+  seed=2: report=["体格が大きくなった（+20%）"]
+PASS: ⑥知覚テスト seed=2: W1→W2のdiffReportが実質変化を含む
+  seed=3: report=["体格が大きくなった（+15%）","群れは高速化した（+13%）","群れは頑丈になった（+12%）"]
+PASS: ⑥知覚テスト seed=3: W1→W2のdiffReportが実質変化を含む
+  seed=4: report=["体格が大きくなった（+15%）","群れは低速化した（-4%）"]
+PASS: ⑥知覚テスト seed=4: W1→W2のdiffReportが実質変化を含む
+  seed=5: report=["体格が大きくなった（+21%）","マクロファージへの耐性を持つ個体が増えた（14%→54%）","群れは低速化した（-16%）"]
+PASS: ⑥知覚テスト seed=5: W1→W2のdiffReportが実質変化を含む
+--- ⑦理不尽化テスト（実測値） ---
+  seed=1: speedMean=1.182(cap2) hpMean=1.399(cap3) resistShare=[0.74,0.08,0.02,0.16] maxResist(1-3)=0.160
+PASS: ⑦seed=1: speedMeanが上限95%未満
+PASS: ⑦seed=1: hpMeanが上限95%未満
+PASS: ⑦seed=1: 単一resistの割合が70%以下
+  seed=2: speedMean=1.047(cap2) hpMean=0.890(cap3) resistShare=[0.94,0.02,0.04,0.00] maxResist(1-3)=0.040
+PASS: ⑦seed=2: speedMeanが上限95%未満
+PASS: ⑦seed=2: hpMeanが上限95%未満
+PASS: ⑦seed=2: 単一resistの割合が70%以下
+  seed=3: speedMean=1.374(cap2) hpMean=0.879(cap3) resistShare=[0.90,0.02,0.02,0.06] maxResist(1-3)=0.060
+PASS: ⑦seed=3: speedMeanが上限95%未満
+PASS: ⑦seed=3: hpMeanが上限95%未満
+PASS: ⑦seed=3: 単一resistの割合が70%以下
+  seed=4: speedMean=1.320(cap2) hpMean=0.911(cap3) resistShare=[0.74,0.04,0.08,0.14] maxResist(1-3)=0.140
+PASS: ⑦seed=4: speedMeanが上限95%未満
+PASS: ⑦seed=4: hpMeanが上限95%未満
+PASS: ⑦seed=4: 単一resistの割合が70%以下
+  seed=5: speedMean=0.988(cap2) hpMean=0.895(cap3) resistShare=[0.90,0.04,0.02,0.04] maxResist(1-3)=0.040
+PASS: ⑦seed=5: speedMeanが上限95%未満
+PASS: ⑦seed=5: hpMeanが上限95%未満
+PASS: ⑦seed=5: 単一resistの割合が70%以下
+  ⑧seed=1: resistShare=[0.13,0.76,0.07,0.04]
+PASS: ⑧seed=1: heat耐性が有利なら12世代で heat 耐性が 25% 以上に増える
+  ⑧seed=2: resistShare=[0.15,0.80,0.04,0.00]
+PASS: ⑧seed=2: heat耐性が有利なら12世代で heat 耐性が 25% 以上に増える
+  ⑧seed=3: resistShare=[0.09,0.85,0.04,0.02]
+PASS: ⑧seed=3: heat耐性が有利なら12世代で heat 耐性が 25% 以上に増える
+PASS: diffReport: 全項目閾値未満なら最大変化を「わずかに」1行
+PASS: diffReport: 耐性8pt増でも変化後15%未満なら本行にしない（ソフト行）
+PASS: diffReport: resistShare 2%→12%(shareMinAfter未満)は本行にもソフト行にも出ない（他に候補が無ければ定型1行）
+PASS: diffReport: 耐性4%→23%は本行
+PASS: diffReport: 変化ゼロは定型1行
+PASS: diffReport: speedMeanがNaNになる変化は候補から除外され定型1行になる
+PASS: evolve: ctx.towerDiversityが数値でなければ0.25扱いになる（同seedで同じ子集団）
+PASS: evolve: populationが空ならinitialPopulation(nextSize)相当を返す
+PASS: 耐性コスト: resist=1 の maxHp は resist=0 の 0.85 倍
+PASS: representativeは平均遺伝子に最も近い個体を返す(この例ではpop[0])
+--- game-state.js (CP2: 発熱スキル) ---
+PASS: skillUnlocked: wave1は未解禁
+PASS: skillUnlocked: wave3は解禁済み
+PASS: startWaveでskillReadyAtが0にリセットされる
+PASS: useSkill: 未解禁(wave<3)では状態を変えない
+PASS: useSkill: 条件を満たせばskillReadyAtがnow+cooldownになる
+PASS: useSkill: CD中(now<skillReadyAt)では状態を変えない
+PASS: useSkill: phase!=="wave"では状態を変えない
+PASS: useSkill: lane不正(0〜2以外)では状態を変えない
+--- enemies.js (CP2: applyHeatToLane) ---
+PASS: applyHeatToLane: 対象レーンの出現済み生存個体に減速が適用される
+PASS: applyHeatToLane: cold耐性個体は弱い減速(coldResistFactor)が適用される
+PASS: applyHeatToLane: 別レーンの個体には適用されない
+PASS: applyHeatToLane: 未出現の個体には適用されない
+PASS: applyHeatToLane: 撃破済みの個体には適用されない
+PASS: applyHeatToLane: cold塔0.6が乗ったcold耐性個体に発熱→factorは0.6のまま（小さい方優先）
+PASS: applyHeatToLane: 同ケースでslowUntilがnow+3.0に延長される
+--- config.js (CP5: 難易度) ---
+PASS: HP_CURVE.slopeは5
+PASS: ECONOMY.killBaseは5
+PASS: ECONOMY.killPerWaveは0.8
+PASS: ECONOMY.waveClearBonusは60
+--- game-state.js (CP5: 塔アップグレード) ---
+PASS: placeTowerで配置した塔はlevel=1を持つ
+PASS: upgradeCost: Lv1→2はcost×costMul[0]
+PASS: upgradeTowerでlevelが+1される
+PASS: upgradeTowerで資金がupgradeCost分減る
+PASS: upgradeCost: Lv2→3はcost×costMul[1]
+PASS: 2回強化でlevel=3になる
+PASS: canUpgrade: Lv3では強化できない
+PASS: Lv3でのupgradeTowerは状態を変えない
+PASS: canUpgrade: 資金不足では強化できない
+PASS: 資金不足時のupgradeTowerは状態を変えない
+PASS: towerInvested: Lv1は初期費用のみ
+PASS: towerInvested: Lv2は初期費用+Lv1→2の強化費用
+PASS: towerInvested: Lv3は初期費用+両段の強化費用
+PASS: sellTower: Lv1の売却額は初期費用の70%切り捨て
+PASS: sellTower: Lv3の売却額はtowerInvestedの70%切り捨て
+--- towers.js (CP5: 塔アップグレード) ---
+PASS: Lv1のダメージはdef.damageそのまま
+PASS: Lv2のダメージはdef.damage×dmgMul
+PASS: Lv3のダメージはdef.damage×dmgMul^2
+PASS: Lv1は射程外(距離2.1>2.0)の個体を攻撃しない
+PASS: Lv2は射程+0.3(2.3)で距離2.1に届く
+PASS: levelフィールドが無い塔インスタンスはLv1として扱われる
+--- evolution.js (CP5: レーン分布) ---
+PASS: CP5: レーン分布(laneShare)は上/中央/下の3要素
+PASS: CP5: レーン分布(laneShare)の合計は1
+--- share.js ---
+PASS: share: 往復(seed=12345,gold=300)が一致する
+PASS: share: 往復(seed=0,gold=600の境界値)が一致する
+PASS: share: "#c="付き文字列も受理される
+PASS: share: v!==1はnull
+PASS: share: seed非整数はnull
+PASS: share: seed範囲外(負)はnull
+PASS: share: gold範囲外はnull
+PASS: share: JSON不正(パース不能な文字列)はnull
+PASS: share: 空文字列はnull
+PASS: share: 非文字列(null)はnull
+--- storage.js（localStorage不在） ---
+PASS: storage: localStorage不在でもloadBestWaveは0を返す
+PASS: storage: saveBestWaveはlocalStorage不在でも例外を投げない
+PASS: storage: saveSurveyResponseはlocalStorage不在でも例外を投げない
+PASS: storage: markChallengeReceivedはlocalStorage不在でも例外を投げない
+PASS: storage: markSeenIntroはlocalStorage不在でも例外を投げない
+PASS: storage: recordSessionStartはlocalStorage不在でも例外を投げない
+PASS: storage: recordWave2StartedはlocalStorage不在でも例外を投げない
+PASS: storage: loadSurveyResponsesはlocalStorage不在でも空配列を返す
+PASS: storage: hasChallengeReceivedはlocalStorage不在でもfalseを返す
+PASS: storage: hasSeenIntroはlocalStorage不在でもfalseを返す
+PASS: storage: exportSurveyAsJSONはlocalStorage不在でも例外を投げない
+PASS: storage: exportSurveyAsJSONは5キー(responses,bestWave,challengeReceived,sessions,wave2Started)を持つ
+PASS: storage: exportSurveyAsJSON.responsesは配列
+---
+ok (196 tests)
+(node:97747) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 初期状態と seed・難度の正規化 (1.13625ms)
+✔ 同 seed・同防衛の生成と実戦は再現し、異 seed は個体が変わる (4.368916ms)
+✔ 偵察人数・耐性・精鋭数は生成された全個体の実数と一致する (0.421666ms)
+✔ 準備中の建設・強化・全額回収は偵察計画を変えず、資金を増殖させない (0.792417ms)
+✔ 不正な配置・重複・資金不足を拒否し、戦闘中は配置・強化・回収できない (0.613667ms)
+✔ 戦闘の個体変更は次回偵察用の計画に影響しない (0.147ms)
+✔ 装甲は無属性のみ半減し、属性耐性は一致する属性のみ半減する (0.184ms)
+✔ 無配置と同率の防衛観測は決定的で、同率時は先頭属性・先頭レーンを選ぶ (0.091667ms)
+✔ pulse は出現済みの指定レーンだけを3秒減速し、9秒間再使用できない (0.71025ms)
+✔ 9 wave を実 tick で完走し、最終報酬・スコア・終端状態が確定する (5.681833ms)
+✔ 無防衛は実 tick の到達被害で敗北し、敗北後に進行しない (0.963459ms)
+✔ 同数の固定 tick を異なる描画バッチに分けても状態が一致する (2.076958ms)
+✔ 無料移設は投資と強化を保ち、偵察・資金を変更しない (0.496917ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 63.396583

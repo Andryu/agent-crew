@@ -1,0 +1,242 @@
+[
+  {
+    "seed": 1,
+    "strategy": "static",
+    "outcome": "defeat",
+    "wave": 9,
+    "lives": 0,
+    "leaks": 24,
+    "score": 3900,
+    "seconds": 365.9
+  },
+  {
+    "seed": 1,
+    "strategy": "adaptive",
+    "outcome": "victory",
+    "wave": 9,
+    "lives": 24,
+    "leaks": 0,
+    "score": 7190,
+    "seconds": 258.1
+  },
+  {
+    "seed": 2,
+    "strategy": "static",
+    "outcome": "victory",
+    "wave": 9,
+    "lives": 1,
+    "leaks": 23,
+    "score": 6385,
+    "seconds": 379.1
+  },
+  {
+    "seed": 2,
+    "strategy": "adaptive",
+    "outcome": "victory",
+    "wave": 9,
+    "lives": 24,
+    "leaks": 0,
+    "score": 7190,
+    "seconds": 283.6
+  },
+  {
+    "seed": 3,
+    "strategy": "static",
+    "outcome": "defeat",
+    "wave": 9,
+    "lives": 0,
+    "leaks": 24,
+    "score": 4010,
+    "seconds": 353.7
+  },
+  {
+    "seed": 3,
+    "strategy": "adaptive",
+    "outcome": "victory",
+    "wave": 9,
+    "lives": 24,
+    "leaks": 0,
+    "score": 7190,
+    "seconds": 274.1
+  },
+  {
+    "seed": 4,
+    "strategy": "static",
+    "outcome": "defeat",
+    "wave": 9,
+    "lives": 0,
+    "leaks": 24,
+    "score": 4010,
+    "seconds": 353.6
+  },
+  {
+    "seed": 4,
+    "strategy": "adaptive",
+    "outcome": "victory",
+    "wave": 9,
+    "lives": 24,
+    "leaks": 0,
+    "score": 7190,
+    "seconds": 271.2
+  },
+  {
+    "seed": 5,
+    "strategy": "static",
+    "outcome": "defeat",
+    "wave": 9,
+    "lives": 0,
+    "leaks": 24,
+    "score": 3990,
+    "seconds": 369.6
+  },
+  {
+    "seed": 5,
+    "strategy": "adaptive",
+    "outcome": "victory",
+    "wave": 9,
+    "lives": 24,
+    "leaks": 0,
+    "score": 7190,
+    "seconds": 261.6
+  },
+  {
+    "seed": 6,
+    "strategy": "static",
+    "outcome": "defeat",
+    "wave": 9,
+    "lives": 0,
+    "leaks": 24,
+    "score": 3970,
+    "seconds": 364.4
+  },
+  {
+    "seed": 6,
+    "strategy": "adaptive",
+    "outcome": "victory",
+    "wave": 9,
+    "lives": 24,
+    "leaks": 0,
+    "score": 7190,
+    "seconds": 263.1
+  },
+  {
+    "seed": 7,
+    "strategy": "static",
+    "outcome": "defeat",
+    "wave": 9,
+    "lives": 0,
+    "leaks": 24,
+    "score": 3970,
+    "seconds": 366.5
+  },
+  {
+    "seed": 7,
+    "strategy": "adaptive",
+    "outcome": "victory",
+    "wave": 9,
+    "lives": 24,
+    "leaks": 0,
+    "score": 7190,
+    "seconds": 262.7
+  },
+  {
+    "seed": 8,
+    "strategy": "static",
+    "outcome": "defeat",
+    "wave": 9,
+    "lives": 0,
+    "leaks": 24,
+    "score": 3900,
+    "seconds": 354.4
+  },
+  {
+    "seed": 8,
+    "strategy": "adaptive",
+    "outcome": "victory",
+    "wave": 9,
+    "lives": 24,
+    "leaks": 0,
+    "score": 7190,
+    "seconds": 267.8
+  },
+  {
+    "seed": 9,
+    "strategy": "static",
+    "outcome": "defeat",
+    "wave": 9,
+    "lives": 0,
+    "leaks": 24,
+    "score": 3960,
+    "seconds": 378.2
+  },
+  {
+    "seed": 9,
+    "strategy": "adaptive",
+    "outcome": "victory",
+    "wave": 9,
+    "lives": 24,
+    "leaks": 0,
+    "score": 7190,
+    "seconds": 274
+  },
+  {
+    "seed": 10,
+    "strategy": "static",
+    "outcome": "defeat",
+    "wave": 9,
+    "lives": 0,
+    "leaks": 24,
+    "score": 3960,
+    "seconds": 363.7
+  },
+  {
+    "seed": 10,
+    "strategy": "adaptive",
+    "outcome": "victory",
+    "wave": 9,
+    "lives": 24,
+    "leaks": 0,
+    "score": 7190,
+    "seconds": 261.8
+  },
+  {
+    "seed": 11,
+    "strategy": "static",
+    "outcome": "defeat",
+    "wave": 9,
+    "lives": 0,
+    "leaks": 24,
+    "score": 3850,
+    "seconds": 355.4
+  },
+  {
+    "seed": 11,
+    "strategy": "adaptive",
+    "outcome": "victory",
+    "wave": 9,
+    "lives": 24,
+    "leaks": 0,
+    "score": 7190,
+    "seconds": 264.9
+  },
+  {
+    "seed": 12,
+    "strategy": "static",
+    "outcome": "defeat",
+    "wave": 9,
+    "lives": 0,
+    "leaks": 24,
+    "score": 4010,
+    "seconds": 371.8
+  },
+  {
+    "seed": 12,
+    "strategy": "adaptive",
+    "outcome": "victory",
+    "wave": 9,
+    "lives": 24,
+    "leaks": 0,
+    "score": 7190,
+    "seconds": 272.1
+  }
+]

@@ -1,1059 +1,304 @@
-// main.js
-// 画面遷移・ゲームループ・入力（配置/売却/ボタン）を担当するエントリーポイント。
-// CP2: 変異レポートmodal・次ウェーブプレビュー・発熱スキルを追加。
-// CP3: チャレンジリンク・アンケート・保存・SE・撃破ジュース・負けた画・教えない導入を追加。
+// 画面と戦闘を分離し、描画速度によらず固定ステップで更新する。
+import { GRID, TOWERS, TOWER_ORDER, RESIST_COLORS } from './config.js';
+import { render, drawTowerIcon, renderGenomeIcon } from './renderer.js';
+import { newCampaign, build, upgrade, recycle, relocate, launch, pulse, tick, scout, score, TOTAL_WAVES, STEP, LABELS, ROLES, LANES, RESIST_NAMES } from './campaign.js';
+import { MAP, placementCheck } from './maze.js';
+import { towerInvested, upgradeCost } from './game-state.js';
+import { initAudio, playPlace, playKill, playHit, playWaveStart, setMuted, isMuted } from './audio.js';
 
-import {
-  GRID,
-  TOWERS,
-  TOWER_ORDER,
-  ECONOMY,
-  LANE_LENGTH,
-  SKILL,
-  JUICE,
-  WAVE_COUNT,
-  RESIST_COLORS,
-  RESIST_LABELS,
-  LANE_LABELS,
-  GENOME_RANGES,
-  killReward,
-} from './config.js';
-import { makeRng } from './rng.js';
-import {
-  startNewGame,
-  canPlace,
-  placeTower,
-  sellTower,
-  startWave,
-  loseLives,
-  endWave,
-  closeReport,
-  continueEndless,
-  isCleared,
-  isGameOver,
-  skillUnlocked,
-  useSkill,
-  canUpgrade,
-  upgradeTower,
-  upgradeCost,
-  towerInvested,
-} from './game-state.js';
-import {
-  spawnFromPopulation,
-  stepEnemies,
-  collectResults,
-  livesLostFor,
-  applyHeatToLane,
-  pickGameOverRepresentative,
-} from './enemies.js';
-import { stepTowers } from './towers.js';
-import { render, drawTowerIcon, renderGenomeIcon, renderGenomeGroup } from './renderer.js';
-import { representative, evaluate, summarize } from './evolution.js';
-import { encodeChallenge, decodeChallenge } from './share.js';
-import {
-  saveBestWave,
-  markChallengeReceived,
-  markSeenIntro,
-  hasSeenIntro,
-  recordSessionStart,
-  recordWave2Started,
-} from './storage.js';
-import { initSurvey, resetSurveyScreen } from './survey.js';
-import {
-  initAudio,
-  playPlace,
-  playKill,
-  playHit,
-  playWaveStart,
-  setMuted,
-  isMuted,
-} from './audio.js';
-
-const screens = {
-  title: document.getElementById('title-screen'),
-  playing: document.getElementById('playing-screen'),
-  result: document.getElementById('result-screen'),
-  survey: document.getElementById('survey-screen'),
-};
-
-const startButton = document.getElementById('start-button');
-const canvas = document.getElementById('board-canvas');
+const $ = id => document.getElementById(id);
+const canvas = $('board-canvas');
 const ctx = canvas.getContext('2d');
-const hudGold = document.getElementById('hud-gold');
-const hudLives = document.getElementById('hud-lives');
-const hudWave = document.getElementById('hud-wave');
-const muteButton = document.getElementById('mute-button');
-const towerPanel = document.getElementById('tower-panel');
-const sellButton = document.getElementById('sell-button');
-const upgradeButton = document.getElementById('upgrade-button');
-const paletteEl = document.getElementById('tower-palette');
-const paletteSlots = Array.from(document.querySelectorAll('.tower-slot'));
-const waveStartButton = document.getElementById('wave-start-button');
-const speedToggleButton = document.getElementById('speed-toggle-button');
-const resultHeading = document.getElementById('result-heading');
-const resultWaveCount = document.getElementById('result-wave-count');
-const resultGenomeCanvas = document.getElementById('result-genome-canvas');
-const resultGenomeCaption = document.getElementById('result-genome-caption');
-const endlessButton = document.getElementById('endless-button');
-const retryButton = document.getElementById('retry-button');
-const titleFromResultButton = document.getElementById('title-from-result-button');
-const challengeSendButton = document.getElementById('challenge-send-button');
-const surveyOpenButton = document.getElementById('survey-open-button');
-const previewPanel = document.getElementById('preview-panel');
-const previewCanvases = Array.from(document.querySelectorAll('.preview-icon'));
-const previewLaneEls = Array.from(document.querySelectorAll('.preview-lane'));
-const howtoButton = document.getElementById('howto-button');
-const howtoHudButton = document.getElementById('howto-hud-button');
-const howtoModal = document.getElementById('howto-modal');
-const howtoCloseButton = document.getElementById('howto-close-button');
-const skillButton = document.getElementById('skill-button');
-const skillLabel = document.getElementById('skill-label');
-const skillSelectBanner = document.getElementById('skill-select-banner');
-const introBubble = document.getElementById('intro-bubble');
-const reportModal = document.getElementById('report-modal');
-const reportHeading = document.getElementById('report-heading');
-const reportIntro = document.getElementById('report-intro');
-const reportLinesEl = document.getElementById('report-lines');
-const reportPrevCanvas = document.getElementById('report-prev-canvas');
-const reportNextCanvas = document.getElementById('report-next-canvas');
-const reportCloseButton = document.getElementById('report-close-button');
-const challengeBanner = document.getElementById('challenge-banner');
-const challengeBannerText = document.getElementById('challenge-banner-text');
-const challengeAcceptButton = document.getElementById('challenge-accept-button');
-const challengeDeclineButton = document.getElementById('challenge-decline-button');
-const vignetteOverlay = document.getElementById('vignette-overlay');
-const toastEl = document.getElementById('toast');
-
-let state = null;
-let screen = 'title'; // 'title' | 'playing' | 'result' | 'survey'（画面状態はここで管理。state.phaseはplace/wave/reportのみ）
-let masterRng = null;
-let enemies = [];
-let activeShots = [];
-let particles = []; // 撃破ジュースの粒子 {x,y,color,vx,vy,ttl,life}
-let goldPopups = []; // 撃破報酬の数字ポップ {x,y,text,ttl,life}
-let waveClock = 0;
-let speedMultiplier = 1;
-let selectedTowerId = null;
-let sellTarget = null; // {col, row}
-let flashCell = null; // {col, row, until}
-let previousUnlocked = ['basic'];
-let previousSkillUnlocked = false;
-let lastTimestamp = null;
-let loopRunning = false;
-let skillSelectMode = false;
-let laneFlash = null; // {lane, until}
-let pendingChallenge = null; // {seed, gold} タイトルで検出した挑戦状
-let initialGold = ECONOMY.initialGoldDefault; // このランの開始時資金（挑戦状リンク生成に使う。state.goldは変動するため別管理）
-let seenIntroThisSession = false; // このプレイ開始前に既にhasSeenIntro()済みだったか（初回吹き出し・レポート初回1行の連動に使う）
-let introBubbleTimerId = null;
-let toastTimerId = null;
-let lastKillSoundAt = -Infinity;
-
-if (!ctx) {
-  const msg = document.createElement('p');
-  msg.textContent = 'お使いのブラウザではこのゲームを表示できません。';
-  document.getElementById('app').prepend(msg);
-  startButton.disabled = true;
-}
-
-function prefersReducedMotion() {
-  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-}
-
-// --- トースト（コピー完了通知） ---
-
-function showToast(text) {
-  toastEl.textContent = text;
-  toastEl.classList.remove('hidden');
-  if (toastTimerId !== null) clearTimeout(toastTimerId);
-  toastTimerId = setTimeout(() => {
-    toastEl.classList.add('hidden');
-    toastTimerId = null;
-  }, JUICE.toastDurationMs);
-}
-
-// --- 到達時の赤ビネット（0.25秒、box-shadow inset） ---
-
-function flashVignette() {
-  vignetteOverlay.classList.remove('flash');
-  // eslint-disable-next-line no-unused-expressions
-  void vignetteOverlay.offsetWidth; // 強制リフローで同じクラスの再付与でもアニメーションを再生させる
-  vignetteOverlay.classList.add('flash');
-}
-
-// --- ミュート ---
-
-function updateMuteButton() {
-  muteButton.textContent = isMuted() ? '🔇' : '🔊';
-  muteButton.setAttribute('aria-label', isMuted() ? 'ミュート解除' : 'ミュート');
-}
-
-muteButton.addEventListener('click', () => {
-  setMuted(!isMuted());
-  updateMuteButton();
+const screens = ['title', 'playing', 'result'];
+const STORAGE = 'gunpen-live-maze-v3';
+let state = null, screen = 'title', difficulty = 'standard', selected = 'basic', target = null;
+let hover = null, keyboardCell = { col: 3, row: 2 }, speed = 1, paused = false, accumulator = 0, last = null;
+let particles = [], toastTimer, lastKillSound = 0, records = {}, resultRecorded = false;
+const suspended = () => paused || $('help-dialog').open || $('pause-dialog').open;
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+try { const data = JSON.parse(localStorage.getItem(STORAGE)); if (data && typeof data === 'object' && !Array.isArray(data)) records = data; } catch { /* 保存不可でもプレイを継続 */ }
+const palette = $('tower-palette');
+TOWER_ORDER.forEach((id, i) => {
+  const button = document.createElement('button');
+  button.type = 'button'; button.className = 'tower-slot'; button.dataset.towerId = id;
+  button.innerHTML = `<span class="key">${i + 1}</span><span class="slot-top"><canvas width="64" height="64" aria-hidden="true"></canvas><span class="unit-name">${LABELS[id]}</span></span><span class="unit-role">${ROLES[id]}</span><span class="unit-cost">${TOWERS[id].cost} C</span>`;
+  button.setAttribute('aria-label', `${LABELS[id]}、${ROLES[id]}、${TOWERS[id].cost}クレジット`);
+  drawTowerIcon(button.querySelector('canvas').getContext('2d'), id, 64);
+  button.addEventListener('click', () => select(id)); palette.append(button);
 });
-updateMuteButton();
+function updateRecord() {
+  const values = Object.values(records).filter(r => Number.isFinite(r?.score));
+  if (values.length) $('record').textContent = `保存中の自己ベスト ${Math.max(...values.map(r => Number.isFinite(r.bestScore) ? r.bestScore : r.score)).toLocaleString()} / 完了した作戦条件 ${values.length}件`;
+}
+updateRecord();
 
-function showScreen(name) {
-  Object.entries(screens).forEach(([key, el]) => {
-    el.classList.toggle('hidden', key !== name);
+function toast(message) {
+  $('toast').textContent = message; $('toast').classList.remove('hidden');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.add('hidden'), 2200);
+}
+function show(name) {
+  screen = name;
+  screens.forEach(id => $(`${id}-screen`).classList.toggle('hidden', id !== name));
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+function randomSeed() { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0]; }
+function parseChallenge() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  const seed = params.get('seed');
+  if (seed === null || !/^\d{1,10}$/.test(seed) || Number(seed) > 0xffffffff) return null;
+  return { seed: Number(seed), difficulty: params.get('mode') === 'challenge' ? 'challenge' : 'standard' };
+}
+const challenge = parseChallenge();
+if (challenge) {
+  difficulty = challenge.difficulty;
+  $('start-button').innerHTML = '挑戦コードで開始 <span>↗</span>';
+  $('record').textContent = `作戦コード ${challenge.seed} / ${difficulty === 'challenge' ? '挑戦' : '標準'}`;
+}
+function updateDifficulty() {
+  document.querySelectorAll('[data-difficulty]').forEach(b => {
+    const active = b.dataset.difficulty === difficulty;
+    b.classList.toggle('active', active); b.setAttribute('aria-pressed', String(active));
   });
 }
+document.querySelectorAll('[data-difficulty]').forEach(b => b.addEventListener('click', () => { difficulty = b.dataset.difficulty; updateDifficulty(); }));
+updateDifficulty();
 
-// --- 塔パレットアイコン初期描画（一度だけ） ---
-paletteSlots.forEach((slot) => {
-  const towerId = slot.dataset.towerId;
-  const iconCanvas = slot.querySelector('.tower-icon');
-  const iconCtx = iconCanvas.getContext('2d');
-  if (iconCtx) drawTowerIcon(iconCtx, towerId, iconCanvas.width);
-});
-
-function updatePalette() {
-  paletteSlots.forEach((slot) => {
-    const towerId = slot.dataset.towerId;
-    const def = TOWERS[towerId];
-    const unlocked = state.unlocked.includes(towerId);
-    const affordable = state.gold >= def.cost;
-    slot.classList.toggle('locked', !unlocked);
-    slot.classList.toggle('selected', selectedTowerId === towerId);
-    slot.disabled = !unlocked || !affordable;
-  });
+function start(options = {}) {
+  initAudio();
+  state = newCampaign({ seed: options.seed ?? randomSeed(), difficulty: options.difficulty ?? difficulty });
+  selected = 'basic'; target = null; hover = null; paused = false; speed = 1;
+  accumulator = 0; last = null; particles = []; resultRecorded = false;
+  $('pause-dialog').close(); $('help-dialog').close();
+  $('share-status').textContent = '';
+  show('playing'); update();
 }
+$('start-button').addEventListener('click', () => start({ seed: challenge?.seed, difficulty }));
+$('retry-button').addEventListener('click', () => start({ seed: state.seed, difficulty: state.difficulty }));
+$('new-button').addEventListener('click', () => start({ difficulty: state.difficulty }));
+$('back-button').addEventListener('click', () => { state = null; paused = false; updateRecord(); show('title'); });
 
-function pulseNewlyUnlocked() {
-  const newlyUnlocked = state.unlocked.filter((id) => !previousUnlocked.includes(id));
-  paletteSlots.forEach((slot) => {
-    if (newlyUnlocked.includes(slot.dataset.towerId)) {
-      slot.classList.add('newly-unlocked');
-      setTimeout(() => slot.classList.remove('newly-unlocked'), 2000);
-    }
-  });
-  previousUnlocked = state.unlocked;
-
-  const nowSkillUnlocked = skillUnlocked(state);
-  if (nowSkillUnlocked && !previousSkillUnlocked) {
-    skillButton.classList.add('newly-unlocked');
-    setTimeout(() => skillButton.classList.remove('newly-unlocked'), 2000);
-  }
-  previousSkillUnlocked = nowSkillUnlocked;
-}
-
-function updateHud() {
-  hudGold.textContent = `${state.gold}G`;
-  hudLives.textContent = `♥ ${state.lives}`;
-  // エンドレス中は分母(WAVE.../15)を出さない（wave16以降は15を超えるため）
-  hudWave.textContent = state.endless ? `WAVE ${state.wave}` : `WAVE ${state.wave}/${WAVE_COUNT}`;
-  speedToggleButton.disabled = state.phase !== 'wave';
-  // あそびかたは配置フェーズのみ開ける（ウェーブ中は一時停止しない設計のため非活性）
-  howtoHudButton.disabled = state.phase !== 'place';
-}
-
-function hideTowerPanel() {
-  towerPanel.classList.add('hidden');
-  sellTarget = null;
-}
-
-// --- あそびかた（教えない導入の補完、CP5） ---
-
-function openHowto() {
-  howtoModal.classList.remove('hidden');
-}
-
-function closeHowto() {
-  howtoModal.classList.add('hidden');
-}
-
-howtoButton.addEventListener('click', openHowto);
-howtoHudButton.addEventListener('click', () => {
-  if (howtoHudButton.disabled) return;
-  openHowto();
-});
-howtoCloseButton.addEventListener('click', closeHowto);
-
-// 敵の見た目の凡例をrenderGenomeIconで実際に描く（速い/硬い/大きい個体＋3属性の色見本）
-function renderHowtoLegend() {
-  const [minSpeed, maxSpeed] = GENOME_RANGES.speed;
-  const [minHp, maxHp] = GENOME_RANGES.hp;
-  const [minSize, maxSize] = GENOME_RANGES.size;
-  const neutralLane = [1 / 3, 1 / 3, 1 / 3];
-  const examples = {
-    fast: { speed: maxSpeed, hp: minHp, resist: 0, lane: neutralLane, size: minSize },
-    tough: { speed: (minSpeed + maxSpeed) / 2, hp: maxHp, resist: 0, lane: neutralLane, size: minSize },
-    big: { speed: minSpeed, hp: (minHp + maxHp) / 2, resist: 0, lane: neutralLane, size: maxSize },
-    heat: { speed: (minSpeed + maxSpeed) / 2, hp: (minHp + maxHp) / 2, resist: 1, lane: neutralLane, size: (minSize + maxSize) / 2 },
-    cold: { speed: (minSpeed + maxSpeed) / 2, hp: (minHp + maxHp) / 2, resist: 2, lane: neutralLane, size: (minSize + maxSize) / 2 },
-    bolt: { speed: (minSpeed + maxSpeed) / 2, hp: (minHp + maxHp) / 2, resist: 3, lane: neutralLane, size: (minSize + maxSize) / 2 },
-  };
-  document.querySelectorAll('.howto-legend-icon').forEach((canvas) => {
-    const genome = examples[canvas.dataset.legend];
-    const c = canvas.getContext('2d');
-    if (c && genome) renderGenomeIcon(c, genome, canvas.width);
-  });
-}
-renderHowtoLegend();
-
-// --- 発熱スキル ---
-
-function updateSkillButton() {
+function update() {
   if (!state) return;
-  const unlocked = skillUnlocked(state);
-  skillButton.classList.toggle('locked', !unlocked);
-  skillButton.classList.toggle('selecting', skillSelectMode);
-  if (!unlocked) {
-    skillButton.disabled = true;
-    skillLabel.textContent = '発熱';
-    return;
-  }
-  if (state.phase !== 'wave') {
-    skillButton.disabled = true;
-    skillLabel.textContent = '発熱';
-    return;
-  }
-  const remaining = (state.skillReadyAt ?? 0) - waveClock;
-  if (remaining > 0 && !skillSelectMode) {
-    skillButton.disabled = true;
-    skillLabel.textContent = `発熱 ${Math.ceil(remaining)}s`;
-  } else {
-    skillButton.disabled = false;
-    skillLabel.textContent = '発熱';
-  }
-}
-
-function enterSkillSelect() {
-  skillSelectMode = true;
-  skillSelectBanner.classList.remove('hidden');
-  updateSkillButton();
-}
-
-function exitSkillSelect() {
-  skillSelectMode = false;
-  skillSelectBanner.classList.add('hidden');
-  updateSkillButton();
-}
-
-function onSkillButtonPress() {
-  if (!state) return;
-  if (!skillUnlocked(state)) return;
-  if (skillSelectMode) {
-    exitSkillSelect();
-    return;
-  }
-  if (state.phase !== 'wave') return;
-  if (waveClock < (state.skillReadyAt ?? 0)) return;
-  enterSkillSelect();
-}
-
-function rowToLane(row) {
-  if (row <= 2) return 0;
-  if (row <= 5) return 1;
-  return 2;
-}
-
-function activateSkill(lane) {
-  const before = state.skillReadyAt;
-  state = useSkill(state, lane, waveClock);
-  if (state.skillReadyAt === before) {
-    // 条件を満たさず発動しなかった（CD未了 等）
-    exitSkillSelect();
-    return;
-  }
-  applyHeatToLane(enemies, lane, waveClock);
-  laneFlash = { lane, until: waveClock + SKILL.laneFlashDuration };
-  exitSkillSelect();
-}
-
-// --- 教えない導入（初回吹き出し） ---
-
-function showIntroBubbleIfFirstTime() {
-  if (seenIntroThisSession) return; // 既にhasSeenIntro()済み（初回ではない）
-  introBubble.classList.remove('hidden');
-  introBubble.classList.remove('is-fading');
-  if (introBubbleTimerId !== null) clearTimeout(introBubbleTimerId);
-  introBubbleTimerId = setTimeout(dismissIntroBubble, JUICE.introBubbleTimeoutMs); // タイムアウト消去
-}
-
-function dismissIntroBubble() {
-  if (introBubbleTimerId !== null) {
-    clearTimeout(introBubbleTimerId);
-    introBubbleTimerId = null;
-  }
-  if (introBubble.classList.contains('hidden') || introBubble.classList.contains('is-fading')) return;
-  // 0.3秒フェードアウト後にhiddenへ切り替える（即時非表示にしない）
-  introBubble.classList.add('is-fading');
-  setTimeout(() => {
-    introBubble.classList.add('hidden');
-    introBubble.classList.remove('is-fading');
-  }, 300);
-  markSeenIntro();
-}
-
-// --- 次ウェーブ・プレビュー ---
-
-function renderPreview() {
-  if (!state) return;
-  const show = state.phase === 'place' && state.wave >= 2;
-  previewPanel.classList.toggle('hidden', !show);
-  if (!show) return;
-  const sample = state.population.slice(0, previewCanvases.length);
-  previewCanvases.forEach((canvas, i) => {
-    const c = canvas.getContext('2d');
-    if (!c) return;
-    if (sample[i]) {
-      canvas.classList.remove('hidden');
-      renderGenomeIcon(c, sample[i], canvas.width);
-    } else {
-      canvas.classList.add('hidden');
-    }
+  const planning = state.phase === 'prepare';
+  const editable = planning || state.phase === 'battle';
+  $('playing-screen').classList.toggle('in-battle', !planning);
+  $('operation-id').textContent = `OPERATION ${String(state.seed).padStart(8, '0')} / ${state.difficulty === 'challenge' ? 'CHALLENGE' : 'STANDARD'}`;
+  $('phase-title').textContent = planning ? (state.wave === 1 ? '最初の防衛線' : '適応を読み、組み替える') : '群れ、接近中。';
+  $('field-status').textContent = planning ? '防衛配置 / 待機中' : '防衛システム稼働';
+  $('hud-lives').textContent = state.lives;
+  $('hud-gold').textContent = state.credits;
+  $('hud-wave').textContent = String(state.wave).padStart(2, '0');
+  $('speed-button').textContent = `速度 ×${speed}`;
+  $('wave-start-button').disabled = !planning;
+  $('wave-start-button').innerHTML = planning ? `ウェーブ ${state.wave} を開始 <span>→</span>` : '防衛中 <span>◌</span>';
+  $('build-note').textContent = planning ? '準備中の回収は100%還元' : '戦闘中も建設可能 / 移設15 C・回収70%';
+  $('wave-track').innerHTML = Array.from({ length: TOTAL_WAVES }, (_, i) => `<div class="wave-node ${i + 1 === state.wave ? 'active' : i + 1 < state.wave ? 'done' : ''}">${String(i + 1).padStart(2, '0')}<span>${(i + 1) % 3 === 0 ? '大型種' : 'CONTACT'}</span></div>`).join('');
+  document.querySelectorAll('.tower-slot').forEach(b => {
+    b.disabled = !editable || state.credits < TOWERS[b.dataset.towerId].cost;
+    b.classList.toggle('selected', editable && selected === b.dataset.towerId);
+    b.setAttribute('aria-pressed', String(editable && selected === b.dataset.towerId));
   });
-
-  // CP5: レーン分布（片寄りに事前に備えられるように「上/中央/下 ▮…▮ NN%」を表示）
-  const laneShare = summarize(state.population).laneShare;
-  previewLaneEls.forEach((el, i) => {
-    const share = laneShare[i] ?? 0;
-    const pct = Math.round(share * 100);
-    const filledBlocks = Math.min(10, Math.max(0, Math.round(share * 10)));
-    el.textContent = `${LANE_LABELS[i]} ${'▮'.repeat(filledBlocks)} ${pct}%`;
+  const tower = target && state.towers.find(t => t.col === target.col && t.row === target.row);
+  $('tower-actions').classList.toggle('hidden', !tower || !editable);
+  if (tower && editable) {
+    $('selection-description').textContent = `${LABELS[tower.id]} Lv.${tower.level} / 空マスで移設${planning ? '無料' : '15 C'} / 射程 ${(TOWERS[tower.id].range + .3 * (tower.level - 1)).toFixed(1)}`;
+    $('upgrade-button').textContent = tower.level >= 3 ? '最大強化' : `強化 ${upgradeCost(tower)} C`;
+    $('upgrade-button').disabled = tower.level >= 3 || state.credits < upgradeCost(tower);
+    $('recycle-button').textContent = `回収 +${Math.floor(towerInvested(tower) * (planning ? 100 : 70) / 100)} C`;
+  } else $('selection-description').textContent = selected ? `${LABELS[selected]}を配置 / ${ROLES[selected]}。連続配置できます。` : 'ユニットを選ぶか、配置済みユニットを選択。';
+  updateIntel(); updatePulse();
+}
+function updateIntel() {
+  const intel = scout(state.plan);
+  $('enemy-total').textContent = intel.total;
+  $('mobile-intel').textContent = `${intel.lanes.map((n, i) => `${LANES[i]} ${n}体`).join(' / ')} · ${state.plan.resistant ? RESIST_NAMES[state.plan.resistant] : '初回観測'}`;
+  $('elite-badge').classList.toggle('hidden', !intel.elites);
+  $('elite-badge').textContent = `大型種 ${intel.elites}`;
+  $('lane-intel').innerHTML = intel.lanes.map((count, i) => `<div class="lane-row ${count === Math.max(...intel.lanes) ? 'weak' : ''}"><span>${LANES[i]}</span><div class="lane-bar"><i style="width:${count / intel.total * 100}%"></i></div><strong>${count}体</strong></div>`).join('');
+  const colors = ['#8fa7b2', '#ef967e', '#7fb9e4', '#f2d574', '#c4b4ed'];
+  $('resist-intel').innerHTML = intel.resist.map((count, i) => count ? `<span class="resist-chip" style="--chip:${colors[i]}"><i></i>${RESIST_NAMES[i]} ${count}</span>` : '').join('');
+  $('adaptation-title').textContent = state.wave === 1 ? 'まだ、あなたを知らない。' : `${RESIST_NAMES[state.plan.resistant]}への適応`;
+  $('adaptation-reason').textContent = state.plan.reason;
+  const tips = ['塔は道を塞ぐ壁。合流点に火力を集め、遠回りと集中攻撃を組み合わせよう。', '赤い敵はフレアのダメージを半減。レールやパルスに切り替え、密集には減速を。', '青い敵はフロストのダメージを半減。攻撃をフレアやレールで補おう。', '黄色い敵はレールのダメージを半減。パルスやフレアで手数を増やそう。', '装甲はパルスのダメージを半減。フレア・フロスト・レールは装甲を無視。'];
+  $('counter-tip').textContent = tips[state.plan.resistant] + (state.wave > 1 ? ` ${LANES[state.plan.weak]}の防衛を厚く。` : '');
+  const previous = state.history.at(-1);
+  $('last-report').textContent = previous ? `W${previous.wave}：${previous.kills}体撃破 / コア被害 ${previous.leaks}。${previous.leaks === 0 ? '完全防衛。次の適応にも備えよう。' : '抜けた群れの経路に射程と火力を集中しよう。'} 補給 +65 C。` : '4種類のユニットは最初から使用可能。初期資金 360 C。準備中は何度でも組み直せます。';
+}
+function updatePulse() {
+  if (!state) return;
+  const remaining = Math.max(0, state.pulseReady - state.clock);
+  document.querySelectorAll('[data-pulse]').forEach(b => b.disabled = state.phase !== 'battle' || suspended() || remaining > 0);
+  $('pulse-status').textContent = state.phase !== 'battle' ? '戦闘中に使用' : remaining > 0 ? `あと ${Math.ceil(remaining)} 秒` : '使用可能 / 3秒減速';
+}
+function select(id) {
+  if (suspended() || !['prepare', 'battle'].includes(state?.phase) || state.credits < TOWERS[id].cost) return;
+  selected = selected === id ? null : id; target = null; update();
+}
+function chooseCell(cell) {
+  if (suspended() || !['prepare', 'battle'].includes(state?.phase)) return;
+  keyboardCell = cell;
+  const existing = state.towers.find(t => t.col === cell.col && t.row === cell.row);
+  if (existing) { target = cell; selected = null; }
+  else if (selected) {
+    if (build(state, selected, cell.col, cell.row)) { playPlace(); target = null; }
+    else toast(state.lastError);
+  } else if (target) {
+    if (relocate(state, target.col, target.row, cell.col, cell.row)) { target = cell; playPlace(); }
+    else toast(state.lastError);
+  }
+  update();
+}
+function pointerCell(event) {
+  const box = canvas.getBoundingClientRect();
+  return { col: Math.floor((event.clientX - box.left) / box.width * GRID.cols), row: Math.floor((event.clientY - box.top) / box.height * GRID.rows) };
+}
+let touchPlacement = false;
+canvas.addEventListener('pointerdown', event => {
+  touchPlacement = event.pointerType === 'touch';
+  hover = pointerCell(event);
+  if (touchPlacement) canvas.setPointerCapture(event.pointerId);
+});
+canvas.addEventListener('pointermove', event => hover = pointerCell(event));
+canvas.addEventListener('pointerup', event => { if (event.pointerType === 'touch') { chooseCell(pointerCell(event)); hover = null; } });
+canvas.addEventListener('pointercancel', () => { hover = null; });
+canvas.addEventListener('contextmenu', event => event.preventDefault());
+canvas.addEventListener('pointerleave', () => hover = null);
+canvas.addEventListener('click', event => { if (!touchPlacement) chooseCell(pointerCell(event)); });
+$('upgrade-button').addEventListener('click', () => { if (target && upgrade(state, target.col, target.row)) { playPlace(); update(); } });
+$('recycle-button').addEventListener('click', () => { if (target && recycle(state, target.col, target.row)) { playPlace(true); target = null; update(); } });
+$('wave-start-button').addEventListener('click', beginWave);
+function beginWave() {
+  if (suspended() || !state || !launch(state)) return;
+  particles = []; accumulator = 0;
+  toast('戦闘補給 +60 C。迎撃しながら道を変えよう。');
+  playWaveStart(); update();
+}
+document.querySelectorAll('[data-pulse]').forEach(button => button.addEventListener('click', () => {
+  if (!suspended() && pulse(state, Number(button.dataset.pulse))) { playWaveStart(); toast(`${LANES[Number(button.dataset.pulse)]}に緊急スロー`); updatePulse(); }
+}));
+$('speed-button').addEventListener('click', () => { speed = speed === 1 ? 2 : 1; update(); });
+function pause() {
+  if (!state || screen !== 'playing') return;
+  paused = true; accumulator = 0;
+  if (!$('pause-dialog').open) $('pause-dialog').showModal();
+  updatePulse();
+}
+function resume() { paused = false; accumulator = 0; last = null; $('pause-dialog').close(); updatePulse(); }
+$('pause-button').addEventListener('click', pause);
+$('resume-button').addEventListener('click', resume);
+$('pause-dialog').addEventListener('cancel', e => { e.preventDefault(); resume(); });
+$('abandon-button').addEventListener('click', () => { $('pause-dialog').close(); state = null; paused = false; updateRecord(); show('title'); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && state?.phase === 'battle') pause(); });
+$('help').addEventListener('click', () => { $('help-dialog').showModal(); accumulator = 0; });
+function closeHelp() { $('help-dialog').close(); accumulator = 0; last = null; }
+$('close-help').addEventListener('click', closeHelp); $('help-done').addEventListener('click', closeHelp);
+$('help-dialog').addEventListener('cancel', e => { e.preventDefault(); closeHelp(); });
+$('sound').addEventListener('click', () => { initAudio(); setMuted(!isMuted()); $('sound').textContent = isMuted() ? '音 OFF' : '音 ON'; $('sound').setAttribute('aria-pressed', String(isMuted())); $('sound').setAttribute('aria-label', isMuted() ? '音をオンにする' : '音をオフにする'); });
+window.addEventListener('keydown', event => {
+  if (screen !== 'playing' || suspended() || $('help-dialog').open || $('pause-dialog').open) return;
+  if (event.key >= '1' && event.key <= '4') { event.preventDefault(); select(TOWER_ORDER[Number(event.key) - 1]); }
+  if (event.key === 'Escape') { selected = null; target = null; update(); }
+  if (event.key === ' ' && !['BUTTON', 'INPUT'].includes(document.activeElement?.tagName)) { event.preventDefault(); state.phase === 'prepare' ? beginWave() : pause(); }
+  if (document.activeElement !== canvas) return;
+  const deltas = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  if (deltas[event.key]) { event.preventDefault(); const [dx, dy] = deltas[event.key]; keyboardCell = { col: Math.max(0, Math.min(11, keyboardCell.col + dx)), row: Math.max(0, Math.min(7, keyboardCell.row + dy)) }; hover = keyboardCell; }
+  if (event.key === 'Enter') { event.preventDefault(); chooseCell(keyboardCell); }
+});
+function result() {
+  if (resultRecorded) return;
+  resultRecorded = true;
+  const won = state.phase === 'victory', points = score(state), key = `${state.seed}:${state.difficulty}`;
+  const previous = records[key];
+  $('result-emblem').textContent = won ? '◎' : '◈';
+  $('result-emblem').style.color = won ? 'var(--mint)' : 'var(--orange)';
+  $('result-code').textContent = won ? 'OPERATION COMPLETE / CORE SECURED' : 'SIGNAL LOST / RECONFIGURE';
+  $('result-heading').textContent = won ? '適応を、超えた。' : '次は、読み勝てる。';
+  $('result-description').textContent = won ? `9つの波を突破。コア耐久 ${state.lives} を残して防衛成功。` : `ウェーブ ${state.wave} でコアが停止。${state.plan.reason}`;
+  $('result-stats').innerHTML = `<div><strong>${points.toLocaleString()}</strong><span>作戦スコア</span></div><div><strong>${state.kills}</strong><span>撃破個体</span></div><div><strong>${state.wave} / 9</strong><span>到達ウェーブ</span></div>`;
+  $('previous-result').textContent = Number.isFinite(previous?.score) ? `同条件の前回 ${previous.score.toLocaleString()} → 今回 ${points.toLocaleString()}（${points - previous.score >= 0 ? '+' : ''}${points - previous.score}）` : '同じ条件でもう一度。防衛を変えれば、群れの適応も変わる。';
+  // 再戦済み条件を末尾へ移し、直近スコアと条件別ベストを別々に保持する。
+  delete records[key];
+  const bestScore = Math.max(points, Number.isFinite(previous?.bestScore) ? previous.bestScore : (Number.isFinite(previous?.score) ? previous.score : 0));
+  records[key] = { score: points, bestScore, wave: state.wave, victory: won };
+  // 保存が無制限に増えないよう最新100作戦に絞る。
+  const keys = Object.keys(records); keys.slice(0, Math.max(0, keys.length - 100)).forEach(k => delete records[k]);
+  try { localStorage.setItem(STORAGE, JSON.stringify(records)); } catch { /* ブラウザの保存制限はゲームを止めない */ }
+  show('result');
+}
+$('share-button').addEventListener('click', async () => {
+  const url = `${location.origin}${location.pathname}#seed=${state.seed}&mode=${state.difficulty}`;
+  try { await navigator.clipboard.writeText(url); $('share-status').textContent = '挑戦リンクをコピーしました。同じ初期条件で遊べます。'; }
+  catch { $('share-status').textContent = url; }
+});
+function effects() {
+  let hit = false;
+  for (const event of state.events.splice(0)) {
+    if (event.type === 'kill') {
+      if (performance.now() - lastKillSound > 70) { playKill(); lastKillSound = performance.now(); }
+      if (!reduced) for (let i = 0; i < 7; i++) { const a = Math.random() * Math.PI * 2; particles.push({ x: event.x * 48, y: event.y * 48, vx: Math.cos(a) * 45, vy: Math.sin(a) * 45, ttl: .4, life: .4, color: RESIST_COLORS[event.resist] }); }
+    } else if (event.type === 'leak') hit = true;
+  }
+  if (hit) { playHit(); if (!reduced) canvas.animate([{ opacity: .5 }, { opacity: 1 }], { duration: 180 }); }
+}
+function draw() {
+  if (!ctx || !state) return;
+  ctx.setTransform(2, 0, 0, 2, 0, 0);
+  const moving = target && state.towers.find(t => t.col === target.col && t.row === target.row);
+  const preview = hover && (selected || moving) ? placementCheck(state.towers, state.enemies, hover.col, hover.row, moving ? target : null) : null;
+  document.querySelector('.board-caption span:first-child').textContent = preview && !preview.ok ? preview.reason : '塔で道を曲げる / 戦闘中も建設可能';
+  document.querySelector('.board-caption span:last-child').textContent = (preview?.ok ? preview.paths : state.paths).map((p,i) => `${['A','B','C'][i]} ${p.length-1}`).join(' / ') + ' マス';
+  render(ctx, { maze: { paths: state.paths, rocks: MAP.rocks, previewPaths: preview?.paths, previewValid: preview?.ok }, towers: state.towers, enemies: state.phase === 'prepare' ? [] : state.enemies, shots: state.phase === 'battle' ? state.shots : [], particles,
+    planning: ['prepare', 'battle'].includes(state.phase), lives: state.lives / 24 * 20, selectedCell: target, hoverCell: hover,
+    rangePreview: hover && (selected || moving) ? { ...hover, towerId: selected || moving.id, level: moving?.level || 1 } : null });
+  // 装甲と大型種を色だけに依存せず識別できる表示。
+  if (state.phase !== 'prepare') for (const enemy of state.enemies) {
+    if (!enemy.alive || enemy.spawnAt > 0) continue;
+    const x = enemy.x * 48, y = enemy.y * 48;
+    if (enemy.genome.armor) { ctx.strokeStyle = '#c4b4ed'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 7, y - 7); ctx.lineTo(x + 7, y - 7); ctx.lineTo(x + 6, y + 3); ctx.lineTo(x, y + 8); ctx.lineTo(x - 6, y + 3); ctx.closePath(); ctx.stroke(); }
+    if (enemy.genome.elite) { ctx.fillStyle = '#f8b180'; ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center'; ctx.fillText('ELITE', x, y - 23); }
+  }
+}
+function hero(time) {
+  const c = $('hero-canvas'), h = c.getContext('2d'); if (!h) return;
+  h.clearRect(0, 0, c.width, c.height);
+  const t = reduced ? 0 : time / 1600;
+  h.strokeStyle = '#729f8720'; h.lineWidth = 1;
+  [100, 160, 225].forEach(r => { h.beginPath(); h.arc(300, 260, r, 0, Math.PI * 2); h.stroke(); });
+  for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; h.beginPath(); h.moveTo(300 + Math.cos(a) * 220, 260 + Math.sin(a) * 220); h.lineTo(300 + Math.cos(a) * 230, 260 + Math.sin(a) * 230); h.stroke(); }
+  const points = [[280,250,64],[390,205,43],[207,160,38],[190,321,40],[345,351,47],[407,304,26],[295,120,22],[142,240,23],[365,113,15],[452,360,16],[132,360,12]];
+  points.forEach(([cx, cy, radius], i) => {
+    const x = cx + Math.sin(t + i) * 4, y = cy + Math.cos(t * .8 + i) * 5;
+    h.strokeStyle = '#91d8b829'; h.beginPath(); h.moveTo(280, 250); h.lineTo(x, y); h.stroke();
+    h.save(); h.translate(x, y); h.rotate(i + t * .025);
+    const g = h.createRadialGradient(-radius * .25, -radius * .25, 2, 0, 0, radius);
+    g.addColorStop(0, '#669c7e'); g.addColorStop(.55, '#315545'); g.addColorStop(.85, '#18372c'); g.addColorStop(1, '#7dc8a8');
+    h.fillStyle = g; h.strokeStyle = '#ade9c9'; h.lineWidth = 1.2; h.shadowBlur = 22; h.shadowColor = '#6de6a746';
+    h.beginPath(); for (let n = 0; n <= 60; n++) { const a = n / 60 * Math.PI * 2; const r = radius * (1 + Math.sin(a * 7 + i) * .065); n ? h.lineTo(Math.cos(a) * r, Math.sin(a) * r) : h.moveTo(r, 0); } h.closePath(); h.fill(); h.stroke(); h.shadowBlur = 0;
+    h.fillStyle = '#bdffd98c'; for (let n = 0; n < 8; n++) { const a = n * 2.4 + i; const r = radius * (.25 + n % 3 * .15); h.beginPath(); h.ellipse(Math.cos(a) * r, Math.sin(a) * r, radius * .1, radius * .06, a, 0, Math.PI * 2); h.fill(); }
+    h.strokeStyle = '#a5e9c850'; h.beginPath(); h.ellipse(-radius * .12, radius * .05, radius * .4, radius * .3, .5, 0, Math.PI * 2); h.stroke(); h.restore();
   });
 }
-
-// --- 変異レポートmodal ---
-
-function showReportModal({ wave, lines, prevGroup, nextGroup, isFirst }) {
-  reportHeading.textContent = `第${wave}世代の記録`;
-  reportIntro.classList.toggle('hidden', !isFirst);
-  reportLinesEl.innerHTML = '';
-  lines.slice(0, 3).forEach((line) => {
-    const li = document.createElement('li');
-    li.textContent = line;
-    reportLinesEl.appendChild(li);
-  });
-  const prevCtx = reportPrevCanvas.getContext('2d');
-  const nextCtx = reportNextCanvas.getContext('2d');
-  // 2026-08-17: 代表1体ではなく前後の群れサンプル6体を並べる（色・形の変化を一目で）
-  if (prevCtx) renderGenomeGroup(prevCtx, prevGroup, reportPrevCanvas.width, reportPrevCanvas.height);
-  if (nextCtx) renderGenomeGroup(nextCtx, nextGroup, reportNextCanvas.width, reportNextCanvas.height);
-  reportModal.classList.remove('hidden');
-}
-
-function closeReportModal() {
-  if (reportModal.classList.contains('hidden')) return;
-  reportModal.classList.add('hidden');
-  state = closeReport(state);
-  pulseNewlyUnlocked();
-  updatePalette();
-  updateHud();
-  updateSkillButton();
-  renderPreview();
-}
-
-reportCloseButton.addEventListener('click', closeReportModal);
-skillButton.addEventListener('click', onSkillButtonPress);
-
-// aboveがtrueならセルの上側に出す座標（cellの上端）、falseなら下側に出す座標（cellの下端）を返す。
-// CP3確定回答#10: row>=6（下2行）はaboveをtrueにして呼ぶ。それ以外（現状どおり）はfalse。
-function cellCenterToClientPx(col, row, above) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = rect.width / (GRID.cols * GRID.cellSize);
-  const scaleY = rect.height / (GRID.rows * GRID.cellSize);
-  const x = (col + 0.5) * GRID.cellSize * scaleX;
-  const y = (above ? row : row + 1) * GRID.cellSize * scaleY;
-  return { x, y };
-}
-
-// 配置済み塔タップ時のフローティングパネル（「強化」「売る」の2ボタン、CP5）。
-// 強化費用・売却額は塔のlevelに応じて動的に変わるため、開くたび（強化直後の再表示含む）に再計算する。
-function showTowerPanelFor(col, row) {
-  const tower = findTowerAt(col, row);
-  if (!tower) return;
-  const refund = Math.floor(towerInvested(tower) * ECONOMY.sellRatio);
-  sellButton.textContent = `売る ${refund}G`;
-  const atMaxLevel = (tower.level || 1) >= 3;
-  upgradeButton.classList.toggle('hidden', atMaxLevel); // Lv3は強化ボタンを非表示
-  if (!atMaxLevel) {
-    const cost = upgradeCost(tower);
-    upgradeButton.textContent = `強化 ${cost}G`;
-    upgradeButton.disabled = state.gold < cost; // 資金不足はdisabled（UX§3の誤操作防止に準拠）
-  }
-  const above = row >= 6; // 下2行はパネルをセルの上側に出す（main.jsの座標計算で分岐）
-  const { x, y } = cellCenterToClientPx(col, row, above);
-  const wrapRect = canvas.parentElement.getBoundingClientRect();
-  const canvasRect = canvas.getBoundingClientRect();
-  towerPanel.classList.toggle('tower-panel-above', above);
-  towerPanel.style.left = `${canvasRect.left - wrapRect.left + x}px`;
-  towerPanel.style.top = `${canvasRect.top - wrapRect.top + y}px`;
-  towerPanel.classList.remove('hidden');
-  sellTarget = { col, row };
-}
-
-function clientToCell(clientX, clientY) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  const x = (clientX - rect.left) * scaleX;
-  const y = (clientY - rect.top) * scaleY;
-  return {
-    col: Math.floor(x / GRID.cellSize),
-    row: Math.floor(y / GRID.cellSize),
-  };
-}
-
-function findTowerAt(col, row) {
-  return state.towers.find((t) => t.col === col && t.row === row) || null;
-}
-
-function handleBoardTap(clientX, clientY) {
-  if (!state) return;
-  if (skillSelectMode) {
-    const { col, row } = clientToCell(clientX, clientY);
-    if (col < 0 || col >= GRID.cols || row < 0 || row >= GRID.rows) {
-      exitSkillSelect();
-      return;
-    }
-    activateSkill(rowToLane(row));
-    return;
-  }
-  if (state.phase !== 'place' && state.phase !== 'wave') return;
-  const { col, row } = clientToCell(clientX, clientY);
-  if (col < 0 || col >= GRID.cols || row < 0 || row >= GRID.rows) {
-    selectedTowerId = null;
-    hideTowerPanel();
-    updatePalette();
-    return;
-  }
-
-  const existing = findTowerAt(col, row);
-  if (existing) {
-    // 配置済みセルへのタップは常に「強化・売る」パネルを開く（重ね置きはエラー扱いしない）
-    showTowerPanelFor(col, row);
-    return;
-  }
-
-  hideTowerPanel();
-
-  if (selectedTowerId) {
-    if (canPlace(state, selectedTowerId, col, row)) {
-      state = placeTower(state, selectedTowerId, col, row);
-      selectedTowerId = null;
-      playPlace();
-      dismissIntroBubble();
-    } else if (GRID.laneRows.includes(row)) {
-      // レーン上セルへの配置拒否: 赤フラッシュ＋振動50ms、選択は継続
-      flashCell = { col, row, until: performance.now() + 150 };
-      if (navigator.vibrate) navigator.vibrate(JUICE.vibrateMs);
-    }
-    updatePalette();
-    updateHud();
-  }
-}
-
-function handleSell() {
-  if (!sellTarget) return;
-  state = sellTower(state, sellTarget.col, sellTarget.row);
-  hideTowerPanel();
-  selectedTowerId = null; // 売却後はパレット選択と射程円プレビューを解除する
-  playPlace(true); // 配置音を低ピッチ再生（新規SEは追加しない）
-  updatePalette();
-  updateHud();
-}
-
-function handleUpgrade() {
-  if (!sellTarget) return;
-  if (!canUpgrade(state, sellTarget.col, sellTarget.row)) return;
-  state = upgradeTower(state, sellTarget.col, sellTarget.row);
-  playPlace(); // 配置音を通常ピッチで再生（新規SEは追加しない）
-  showTowerPanelFor(sellTarget.col, sellTarget.row); // 新しいlevelの費用・強化可否でパネルを更新
-  updatePalette();
-  updateHud();
-}
-
-function selectTower(towerId) {
-  if (!state) return;
-  const def = TOWERS[towerId];
-  if (!def) return;
-  if (!state.unlocked.includes(towerId)) return;
-  if (state.gold < def.cost) return;
-  selectedTowerId = selectedTowerId === towerId ? null : towerId;
-  hideTowerPanel();
-  updatePalette();
-}
-
-paletteSlots.forEach((slot) => {
-  slot.addEventListener('click', () => selectTower(slot.dataset.towerId));
-});
-
-canvas.addEventListener('click', (e) => handleBoardTap(e.clientX, e.clientY));
-sellButton.addEventListener('click', (e) => {
-  e.stopPropagation();
-  handleSell();
-});
-upgradeButton.addEventListener('click', (e) => {
-  e.stopPropagation();
-  handleUpgrade();
-});
-
-document.addEventListener('click', (e) => {
-  if (skillSelectMode && e.target !== canvas && e.target !== skillButton) {
-    exitSkillSelect();
-  }
-  if (!sellTarget) return;
-  if (e.target === sellButton || e.target === upgradeButton) return;
-  if (e.target === canvas) return; // canvasのクリックはhandleBoardTapが処理
-  hideTowerPanel();
-});
-
-window.addEventListener('keydown', (e) => {
-  if (!state) return;
-  // 変異レポートmodal・あそびかたmodal表示中は1-4/Space/Tab/F/U/Escをすべて無視する
-  if (!reportModal.classList.contains('hidden')) return;
-  if (!howtoModal.classList.contains('hidden')) return;
-  if (e.key >= '1' && e.key <= '4') {
-    const index = Number(e.key) - 1;
-    const towerId = TOWER_ORDER[index];
-    if (towerId) selectTower(towerId);
-  } else if (e.key === 'Escape') {
-    // Escは1段階のみ解除する: レーン選択モード中はそれだけ解除し、
-    // そうでなければ塔選択/売却パネルだけを解除する
-    if (skillSelectMode) {
-      exitSkillSelect();
-    } else {
-      selectedTowerId = null;
-      hideTowerPanel();
-      updatePalette();
-    }
-  } else if (e.key === ' ') {
-    if (state.phase === 'place') {
-      e.preventDefault();
-      onWaveStart();
-    }
-  } else if (e.key === 'Tab') {
-    if (state.phase === 'wave') {
-      e.preventDefault();
-      toggleSpeed();
-    }
-  } else if (e.key === 'f' || e.key === 'F') {
-    if (state.phase === 'wave' || skillSelectMode) {
-      e.preventDefault();
-      onSkillButtonPress();
-    }
-  } else if (e.key === 'u' || e.key === 'U') {
-    // 塔を選択中（パネル表示中）にUで強化
-    if (sellTarget) {
-      e.preventDefault();
-      handleUpgrade();
-    }
-  }
-});
-
-function toggleSpeed() {
-  speedMultiplier = speedMultiplier === 1 ? 2 : 1;
-  speedToggleButton.classList.toggle('selected', speedMultiplier === 2);
-}
-
-speedToggleButton.addEventListener('click', () => {
-  if (!state || state.phase !== 'wave') return;
-  toggleSpeed();
-});
-
-function onWaveStart() {
-  if (!state || state.phase !== 'place') return;
-  dismissIntroBubble();
-  if (state.wave === 2) recordWave2Started(); // 離脱計測点「ウェーブ2開始率」
-  state = startWave(state);
-  enemies = spawnFromPopulation(state.population, state.wave, masterRng);
-  activeShots = [];
-  particles = [];
-  goldPopups = [];
-  playWaveStart();
-  waveClock = 0;
-  speedMultiplier = 1;
-  speedToggleButton.classList.remove('selected');
-  selectedTowerId = null;
-  hideTowerPanel();
-  updatePalette();
-  updateHud();
-  updateSkillButton();
-  renderPreview();
-}
-
-waveStartButton.addEventListener('click', onWaveStart);
-
-// --- 撃破ジュース（粒子・資金ポップ） ---
-
-function enemyCenterPx(enemy) {
-  return {
-    x: enemy.x * GRID.cellSize + GRID.cellSize / 2,
-    y: GRID.laneRows[enemy.lane] * GRID.cellSize + GRID.cellSize / 2,
-  };
-}
-
-function spawnKillParticles(enemy) {
-  if (prefersReducedMotion()) return; // reduced-motionでは粒子を省略
-  const { x, y } = enemyCenterPx(enemy);
-  const color = RESIST_COLORS[enemy.genome.resist];
-  const count = JUICE.particleMin + Math.floor(Math.random() * (JUICE.particleMax - JUICE.particleMin + 1));
-  for (let i = 0; i < count; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = JUICE.particleSpeedMin + Math.random() * (JUICE.particleSpeedMax - JUICE.particleSpeedMin);
-    particles.push({
-      x,
-      y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      color,
-      life: JUICE.particleLife,
-      ttl: JUICE.particleLife,
-    });
-  }
-}
-
-function spawnGoldPopup(enemy, amount) {
-  const { x, y } = enemyCenterPx(enemy);
-  goldPopups.push({ x, y, text: `+${amount}`, life: JUICE.goldPopupLife, ttl: JUICE.goldPopupLife });
-}
-
-function playKillThrottled(now) {
-  // 同時多数撃破は約40ms間隔でクランプし音の飽和を防ぐ
-  if (now - lastKillSoundAt < JUICE.killSoundThrottleSec) return;
-  lastKillSoundAt = now;
-  playKill();
-}
-
-function processReachedAndKilled() {
-  for (const enemy of enemies) {
-    if (enemy.reached && !enemy._lifeGiven) {
-      enemy._lifeGiven = true;
-      const n = livesLostFor(enemy.genome);
-      state = loseLives(state, n);
-      flashVignette();
-      playHit();
-      if (isGameOver(state)) {
-        return true;
+function frame(time) {
+  const dt = Math.min(.1, Math.max(0, (time - (last ?? time)) / 1000)); last = time;
+  if (screen === 'title') hero(time);
+  if (screen === 'playing' && state) {
+    if (!suspended() && state.phase === 'battle') {
+      accumulator += dt * speed;
+      const before = state.phase;
+      while (accumulator >= STEP && state.phase === 'battle') { tick(state); accumulator -= STEP; }
+      effects();
+      if (state.phase !== before) {
+        accumulator = 0;
+        if (state.phase === 'victory' || state.phase === 'defeat') result();
+        else { update(); toast(`W${state.wave - 1} 完了。次の適応を偵察しました。`); }
       }
-    } else if (!enemy.alive && !enemy.reached && !enemy._rewardGiven) {
-      enemy._rewardGiven = true;
-      const reward = killReward(state.wave);
-      state = { ...state, gold: state.gold + reward };
-      spawnKillParticles(enemy);
-      spawnGoldPopup(enemy, reward);
-      playKillThrottled(waveClock);
+      if ($('hud-gold').textContent !== String(state.credits)) update();
+      $('hud-lives').textContent = state.lives; updatePulse();
     }
+    if (!suspended()) particles = particles.filter(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.ttl -= dt; return p.ttl > 0; });
+    draw();
   }
-  return false;
-}
-
-// --- 負けた画／クリア画面の代表個体 ---
-
-// ゲームオーバー時点の代表個体genomeを選ぶ（選出ロジック本体はenemies.jsの純粋関数）。
-// 出現済み個体が1体もいない極端なケースはフォールバックする。
-function pickGameOverRepresentativeGenome() {
-  return pickGameOverRepresentative(enemies, LANE_LENGTH) ?? representative(state.population, summarize(state.population));
-}
-
-// クリア時: W15のcollectResultsに基づくevaluate最大の1体
-function pickClearRepresentative(prevPopulation) {
-  const results = collectResults(enemies, LANE_LENGTH);
-  const fitness = evaluate(results);
-  let bestIndex = 0;
-  let bestFitness = -Infinity;
-  fitness.forEach((f, i) => {
-    if (f > bestFitness) {
-      bestFitness = f;
-      bestIndex = i;
-    }
-  });
-  return prevPopulation[bestIndex] ?? representative(prevPopulation, summarize(prevPopulation));
-}
-
-// 「第{n}世代・速度×{speedMean 小数1桁}・{resist最多}耐性」を生成する。
-// resist最多がnone(index0)の場合は耐性句を省略する。
-function formatResultCaption(wave, summary) {
-  const speedStr = summary.speedMean.toFixed(1);
-  const shares = summary.resistShare;
-  let maxIndex = 0;
-  for (let i = 1; i < shares.length; i++) {
-    if (shares[i] > shares[maxIndex]) maxIndex = i;
-  }
-  const resistPart = maxIndex === 0 ? '' : `・${RESIST_LABELS[maxIndex]}耐性`;
-  return `第${wave}世代・速度×${speedStr}${resistPart}`;
-}
-
-function showResultGenome(genome, summary) {
-  const genomeCtx = resultGenomeCanvas.getContext('2d');
-  if (genomeCtx && genome) renderGenomeIcon(genomeCtx, genome, resultGenomeCanvas.width);
-  resultGenomeCaption.textContent = formatResultCaption(state.wave, summary);
-}
-
-function goToGameOver() {
-  exitSkillSelect();
-  laneFlash = null;
-  screen = 'result';
-  resultHeading.textContent = 'あなたを倒した群れ';
-  // エンドレス中はWAVE_COUNTを超え得るため分母を出さない
-  resultWaveCount.textContent = state.endless
-    ? `到達ウェーブ ${state.wave}（エンドレス）`
-    : `到達ウェーブ ${state.wave} / ${WAVE_COUNT}`;
-  endlessButton.classList.add('hidden');
-  retryButton.classList.remove('hidden');
-  showResultGenome(pickGameOverRepresentativeGenome(), summarize(state.population));
-  saveBestWave(state.wave);
-  showScreen('result');
-}
-
-function goToClearResult(prevPopulation) {
-  screen = 'result';
-  resultHeading.textContent = '防衛完了';
-  resultWaveCount.textContent = `到達ウェーブ ${WAVE_COUNT}`;
-  endlessButton.classList.remove('hidden');
-  retryButton.classList.add('hidden'); // UX§7.2: クリア画面はエンドレス／挑戦状／アンケート／タイトルの4つ
-  showResultGenome(pickClearRepresentative(prevPopulation), state.prevSummary);
-  saveBestWave(state.wave);
-  showScreen('result');
-}
-
-function finishWave() {
-  exitSkillSelect();
-  laneFlash = null;
-  const prevPopulation = state.population;
-  const results = collectResults(enemies, LANE_LENGTH);
-  const { state: newState, report } = endWave(state, results, masterRng);
-  state = newState;
-
-  if (isCleared(state)) {
-    goToClearResult(prevPopulation);
-    return;
-  }
-
-  showReportModal({
-    wave: state.wave,
-    lines: report,
-    prevGroup: prevPopulation.slice(0, 6),
-    nextGroup: state.population.slice(0, 6),
-    // CP3: 初回1行はセッション開始時点でhasSeenIntro()が未設定だった場合のみ（storage.seenIntroに連動）
-    isFirst: state.wave === 1 && !seenIntroThisSession,
-  });
-  updateHud();
-}
-
-function gameStep(dt) {
-  waveClock += dt;
-  const laneRows = GRID.laneRows;
-  const newShots = stepTowers(state.towers, enemies, dt, laneRows, waveClock);
-  for (const shot of newShots) activeShots.push(shot);
-  activeShots = activeShots
-    .map((s) => ({ ...s, ttl: s.ttl - dt }))
-    .filter((s) => s.ttl > 0);
-  particles = particles
-    .map((p) => ({ ...p, x: p.x + p.vx * dt, y: p.y + p.vy * dt, ttl: p.ttl - dt }))
-    .filter((p) => p.ttl > 0);
-  goldPopups = goldPopups
-    .map((p) => ({ ...p, y: p.y + JUICE.goldPopupRiseSpeed * dt, ttl: p.ttl - dt }))
-    .filter((p) => p.ttl > 0);
-
-  stepEnemies(enemies, dt, LANE_LENGTH, waveClock);
-
-  const overNow = processReachedAndKilled();
-  updateHud();
-  if (overNow) {
-    goToGameOver();
-    return;
-  }
-
-  const waveComplete = enemies.every((en) => !en.alive);
-  if (waveComplete) {
-    finishWave();
-  }
-}
-
-function laneSelectAlphaAt(t) {
-  if (prefersReducedMotion()) return SKILL.laneBlinkAlphaReducedMotion;
-  const period = SKILL.laneBlinkPeriod;
-  const phase = ((t % period) + period) % period / period; // 0..1
-  const triangle = phase < 0.5 ? phase * 2 : 2 - phase * 2; // 0->1->0
-  return SKILL.laneBlinkAlphaMin + triangle * (SKILL.laneBlinkAlphaMax - SKILL.laneBlinkAlphaMin);
-}
-
-function frame(timestamp) {
-  if (!loopRunning) return;
-  if (lastTimestamp === null) lastTimestamp = timestamp;
-  const rawDt = Math.min((timestamp - lastTimestamp) / 1000, 0.05);
-  lastTimestamp = timestamp;
-
-  if (screen === 'playing' && state && state.phase === 'wave') {
-    gameStep(rawDt * speedMultiplier);
-  }
-
-  if (state) {
-    if (flashCell && performance.now() > flashCell.until) flashCell = null;
-    if (laneFlash && waveClock >= laneFlash.until) laneFlash = null;
-    render(ctx, {
-      towers: state.towers,
-      enemies,
-      shots: activeShots,
-      rangePreview: selectedTowerId ? lastHoverCell && { ...lastHoverCell, towerId: selectedTowerId } : null,
-      laneSelectAlpha: skillSelectMode ? laneSelectAlphaAt(waveClock) : null,
-      laneFlash: laneFlash ? { lane: laneFlash.lane, alpha: 0.6 } : null,
-      particles,
-      goldPopups,
-    });
-    if (flashCell) drawFlash();
-    updateSkillButton();
-  }
-
   requestAnimationFrame(frame);
 }
-
-function drawFlash() {
-  ctx.save();
-  ctx.fillStyle = 'rgba(224, 90, 58, 0.5)';
-  ctx.fillRect(flashCell.col * GRID.cellSize, flashCell.row * GRID.cellSize, GRID.cellSize, GRID.cellSize);
-  ctx.restore();
-}
-
-let lastHoverCell = null;
-// pointermoveはmouse/touch/penを統一して扱うため、mousemoveとtouchmoveを個別実装せず共通化する
-canvas.addEventListener('pointermove', (e) => {
-  lastHoverCell = clientToCell(e.clientX, e.clientY);
-});
-// pointerdownでも更新する（タッチの単純タップではpointermoveが発火しないため、
-// タップ時にも射程プレビューが一瞬表示されるようにする）
-canvas.addEventListener('pointerdown', (e) => {
-  lastHoverCell = clientToCell(e.clientX, e.clientY);
-});
-
-function startLoop() {
-  if (loopRunning) return;
-  loopRunning = true;
-  lastTimestamp = null;
-  requestAnimationFrame(frame);
-}
-
-/**
- * @param {{seed?:number, gold?:number}} [options] 挑戦状受領時にseed/goldを上書きする
- */
-function startGame(options = {}) {
-  const seed = typeof options.seed === 'number' ? options.seed : Math.floor(Math.random() * 0xffffffff) >>> 0;
-  const gold = typeof options.gold === 'number' ? options.gold : ECONOMY.initialGoldDefault;
-  initialGold = gold; // チャレンジリンク生成に使う開始時資金（state.goldは以後変動する）
-  seenIntroThisSession = hasSeenIntro(); // マーク前に捕捉（初回吹き出し・レポート初回1行の判定に使う）
-  recordSessionStart();
-  initAudio(); // ユーザー操作(クリック)ハンドラ内なのでAudioContext初期化が許可される
-  masterRng = makeRng(seed);
-  state = startNewGame({ seed, gold });
-  screen = 'playing';
-  previousUnlocked = ['basic'];
-  previousSkillUnlocked = false;
-  enemies = [];
-  activeShots = [];
-  particles = [];
-  goldPopups = [];
-  selectedTowerId = null;
-  skillSelectMode = false;
-  laneFlash = null;
-  skillSelectBanner.classList.add('hidden');
-  reportModal.classList.add('hidden');
-  howtoModal.classList.add('hidden');
-  challengeBanner.classList.add('hidden');
-  startButton.classList.remove('hidden');
-  hideTowerPanel();
-  updateHud();
-  updatePalette();
-  updateSkillButton();
-  renderPreview();
-  showScreen('playing');
-  showIntroBubbleIfFirstTime();
-  startLoop();
-}
-
-startButton.addEventListener('click', () => startGame());
-retryButton.addEventListener('click', () => startGame());
-endlessButton.addEventListener('click', () => {
-  state = continueEndless(state);
-  state = closeReport(state);
-  screen = 'playing';
-  updateHud();
-  updatePalette();
-  updateSkillButton();
-  renderPreview();
-  showScreen('playing');
-});
-
-function goToTitle() {
-  loopRunning = false;
-  screen = 'title';
-  skillSelectMode = false;
-  skillSelectBanner.classList.add('hidden');
-  checkForChallenge();
-  showScreen('title');
-}
-
-titleFromResultButton.addEventListener('click', goToTitle);
-
-// --- チャレンジリンク（届け方） ---
-
-function clearChallengeHash() {
-  if (window.location.hash) {
-    history.replaceState(null, '', window.location.pathname + window.location.search);
-  }
-}
-
-function checkForChallenge() {
-  const decoded = decodeChallenge(window.location.hash);
-  if (!decoded) {
-    pendingChallenge = null;
-    challengeBanner.classList.add('hidden');
-    startButton.classList.remove('hidden');
-    return;
-  }
-  pendingChallenge = decoded;
-  challengeBannerText.textContent = `挑戦状が届いています（seed: ${decoded.seed}）`;
-  challengeBanner.classList.remove('hidden');
-  startButton.classList.add('hidden');
-}
-
-challengeAcceptButton.addEventListener('click', () => {
-  if (!pendingChallenge) return;
-  const { seed, gold } = pendingChallenge;
-  markChallengeReceived();
-  clearChallengeHash();
-  startGame({ seed, gold });
-});
-
-challengeDeclineButton.addEventListener('click', () => {
-  // 通常ではじめる: ハッシュを消してランダムseedで開始する
-  clearChallengeHash();
-  pendingChallenge = null;
-  challengeBanner.classList.add('hidden');
-  startButton.classList.remove('hidden');
-  startGame();
-});
-
-async function handleChallengeSend() {
-  if (!state) return;
-  const encoded = encodeChallenge({ seed: state.seed, gold: initialGold });
-  const url = `${window.location.origin}${window.location.pathname}#c=${encoded}`;
-  const text = `群変 seed:${state.seed} で ${state.wave} ウェーブ耐えた。あなたは？ ${url}`;
-  try {
-    await navigator.clipboard.writeText(text);
-    showToast('コピーしました');
-  } catch {
-    showToast('コピーに失敗しました');
-  }
-}
-
-challengeSendButton.addEventListener('click', handleChallengeSend);
-
-// --- アンケート ---
-
-initSurvey({
-  onBackToTitle: goToTitle,
-  getReachedWave: () => (state ? state.wave : 0),
-});
-
-surveyOpenButton.addEventListener('click', () => {
-  resetSurveyScreen();
-  screen = 'survey';
-  showScreen('survey');
-});
-
-checkForChallenge();
-showScreen('title');
+if (!ctx) { $('start-button').disabled = true; $('record').textContent = 'このブラウザはCanvas描画に対応していません。別のブラウザでお試しください。'; }
+requestAnimationFrame(frame);
