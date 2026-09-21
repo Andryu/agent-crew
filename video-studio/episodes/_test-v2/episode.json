@@ -1,0 +1,78 @@
+{
+  "id": "_test-v2",
+  "title": "v2機能テスト（セリフ劇・口パク・動画埋め込み・ゆらぎ・紙テクスチャ）",
+  "fps": 30,
+  "width": 1080,
+  "height": 1920,
+  "audio": {
+    "bgm": null
+  },
+  "cuts": [
+    {
+      "index": 1,
+      "durationSec": 14.5,
+      "images": [],
+      "placeholder": {
+        "color": "#FCEFE0",
+        "text": "dialogue配列テスト：kanojo(口パクあり)→kareshi→mob"
+      },
+      "caption": "セリフ劇テスト（3話者シーケンス）",
+      "camera": "none",
+      "dialogue": [
+        {
+          "speaker": "kanojo",
+          "wav": "assets/voice/kanojo_dummy.wav",
+          "startSec": 0,
+          "durationSec": 4.5,
+          "mouthLayer": {
+            "mouthClosed": "assets/mouth_closed.png",
+            "mouthOpen": "assets/mouth_open.png",
+            "toggleFps": 8
+          }
+        },
+        {
+          "speaker": "kareshi",
+          "wav": "assets/voice/kareshi_dummy.wav",
+          "startSec": 4.6,
+          "durationSec": 5.22
+        },
+        {
+          "speaker": "mob",
+          "wav": "assets/voice/mob_dummy.wav",
+          "startSec": 9.92,
+          "durationSec": 4.16
+        }
+      ],
+      "note": "検証: 0-4.5sはmouthLayerでmouth_closed/mouth_open画像が8fpsトグル表示される。4.6s以降はdialogueのみでmouthLayerなし→imagesが空なのでplaceholder(紙テクスチャ+ゆらぎ)にフォールバックする"
+    },
+    {
+      "index": 2,
+      "durationSec": 6,
+      "images": ["assets/motion_dummy.mp4"],
+      "videoLoopSec": 1,
+      "caption": "動画埋め込みテスト（OffthreadVideo + Loop 1秒周期）",
+      "camera": "pan",
+      "note": "検証: testsrcのダミーmp4(1秒)が6秒間ループ再生される。カメラpan演出との重ねがけも確認"
+    },
+    {
+      "index": 3,
+      "durationSec": 3,
+      "images": ["assets/still.png"],
+      "caption": "常時ゆらゆらテスト（カメラ演出なし）",
+      "camera": "none",
+      "note": "検証: cameraがnoneでも画像レイヤーが上下±%+微小回転でステップ的に揺れる"
+    },
+    {
+      "index": 4,
+      "durationSec": 3,
+      "images": [],
+      "placeholder": {
+        "color": "#DCEFFB",
+        "text": "紙テクスチャ背景テスト"
+      },
+      "caption": "紙テクスチャ確認",
+      "camera": "none",
+      "note": "検証: 単色ではなくうっすらノイズ+周辺陰影の紙風テクスチャが背景に乗る"
+    }
+  ]
+}

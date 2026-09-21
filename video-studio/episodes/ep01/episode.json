@@ -1,0 +1,86 @@
+{
+  "id": "ep01",
+  "title": "初ハウステンボスで彼氏が天然すぎた話",
+  "fps": 30,
+  "width": 1080,
+  "height": 1920,
+  "audio": {
+    "bgm": null,
+    "bgmVolume": 0.35
+  },
+  "cuts": [
+    {
+      "index": 1,
+      "durationSec": 4.0,
+      "images": ["assets/genB/scene_walk.png"],
+      "caption": "初めてハウステンボス行ったんだけど",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。絵コンテcut1相当。完成イラスト1枚+下部字幕+控えめKen Burnsズームのみ。dialogue/mouthLayer/pose toggle/background/se/常時swayは不使用"
+    },
+    {
+      "index": 2,
+      "durationSec": 4.0,
+      "images": ["assets/genB/scene_town.png"],
+      "caption": "彼氏が、天然すぎた",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。絵コンテcut2相当"
+    },
+    {
+      "index": 3,
+      "durationSec": 4.0,
+      "images": ["assets/genB/scene_vr.png"],
+      "caption": "VR乗ってはしゃいで",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。絵コンテcut3相当"
+    },
+    {
+      "index": 4,
+      "durationSec": 4.5,
+      "images": ["assets/genB/scene_selfie.png"],
+      "caption": "傘の写真スポットで自撮りしよ、ってなって",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。絵コンテcut4相当"
+    },
+    {
+      "index": 5,
+      "durationSec": 5.0,
+      "images": ["assets/genB/scene_camera.png"],
+      "caption": "彼が、何かの機械をじーっと覗いてて",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。絵コンテcut5〜6a相当"
+    },
+    {
+      "index": 6,
+      "durationSec": 5.5,
+      "images": ["assets/genB/scene_awkward.png"],
+      "caption": "それ、他の子たちのカメラだった",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。絵コンテ6b相当、オチのため気持ち長めの尺"
+    },
+    {
+      "index": 7,
+      "durationSec": 5.0,
+      "images": ["assets/genB/scene_ferris.png"],
+      "caption": "そのあと観覧車の知らない人にも手振ってた",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。絵コンテcut7相当"
+    },
+    {
+      "index": 8,
+      "durationSec": 4.0,
+      "images": ["assets/genB/endcard.png"],
+      "caption": "この人と来てよかった。……たぶん",
+      "credit": "フォローで次のエピソード",
+      "camera": "kenburns",
+      "sway": false,
+      "note": "イラスト日記モード。締め+エンドカード。creditフィールドを流用し、字幕の下に小さくフォロー訴求を添える"
+    }
+  ]
+}
