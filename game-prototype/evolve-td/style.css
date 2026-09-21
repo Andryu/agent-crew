@@ -1,0 +1,766 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #0b0c10;
+  color: #f0f0f2;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.screen {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* --- タイトル --- */
+#title-screen {
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.title {
+  font-size: 3rem;
+  letter-spacing: 0.1em;
+  margin: 0;
+}
+
+.copy {
+  color: #b8bac2;
+  margin: 0 0 8px;
+}
+
+.primary-button, .secondary-button {
+  font-size: 1rem;
+  padding: 12px 28px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.primary-button {
+  background: #4aa8e0;
+  color: #06131c;
+}
+
+.secondary-button {
+  background: #2a2d36;
+  color: #f0f0f2;
+}
+
+.primary-button:disabled, .secondary-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* --- チャレンジリンク（タイトル） --- */
+.challenge-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(74, 168, 224, 0.12);
+  border: 1px solid rgba(74, 168, 224, 0.3);
+  max-width: 320px;
+}
+
+.challenge-banner-text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #cfe6f7;
+}
+
+.challenge-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* --- プレイ画面 --- */
+#playing-screen {
+  padding: 8px;
+  gap: 8px;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.hud {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  height: 36px;
+  padding: 0 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-item {
+  font-weight: 600;
+}
+
+.hud-icon-button {
+  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: none;
+  background: #1b1d24;
+  color: #f0f0f2;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.hud-icon-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* 「?」ボタンをHUD右端グループの先頭にし、ミュートボタンをその右に並べる */
+#howto-hud-button {
+  margin-left: auto;
+}
+
+/* --- 教えない導入: 初回吹き出し --- */
+.intro-bubble {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translate(-50%, 100%);
+  z-index: 6;
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.75);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.3s ease-out;
+}
+
+/* 消滅時: is-fadingでopacityを0にし、300ms後にJS側で.hiddenを付与する */
+.intro-bubble.is-fading {
+  opacity: 0;
+}
+
+.board-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.board-area {
+  position: relative;
+  width: 100%;
+}
+
+.board-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  aspect-ratio: 576 / 384;
+  margin: 0 auto;
+}
+
+/* --- 次ウェーブ・プレビュー --- */
+.preview-panel {
+  width: 100%;
+}
+
+.preview-heading {
+  margin: 0 0 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #cfd2da;
+  text-align: center;
+}
+
+.preview-list {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.preview-icon {
+  background: #14161c;
+  border-radius: 6px;
+}
+
+/* --- プレビューのレーン分布（CP5） --- */
+.preview-lanes {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: #cfd2da;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.preview-lane {
+  letter-spacing: -0.02em;
+}
+
+/* --- 発熱: レーン選択モード --- */
+.skill-select-banner {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.65);
+  font-size: 0.8rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.skill-button.locked {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.skill-button.selecting {
+  outline: 2px solid #e05a3a;
+  outline-offset: -2px;
+}
+
+/* 発熱ボタン: 塔スロットと同じ icon-stack + lock-icon + lock-badge 構造
+   （lock-icon/lock-badgeの基本スタイルは.tower-slot用の共通ルールを流用） */
+.skill-icon-stack {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.skill-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+
+.skill-button.locked .skill-label {
+  opacity: 0;
+}
+
+.skill-button.locked .lock-icon {
+  opacity: 1;
+}
+
+.skill-button.locked .lock-badge {
+  display: block;
+}
+
+#board-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #14161c;
+  border-radius: 4px;
+  touch-action: manipulation;
+}
+
+/* --- 配置済み塔タップ時のフローティングパネル（強化・売る、CP5） --- */
+.tower-panel {
+  position: absolute;
+  display: flex;
+  gap: 6px;
+  /* 既定はセルの下側に出す。row>=6（下2行）は.tower-panel-aboveを付与し上側に反転する
+     （main.jsの座標計算で分岐。CP3確定回答#10と同じ規則をCP5でも踏襲） */
+  transform: translate(-50%, 0%);
+}
+
+.tower-panel.tower-panel-above {
+  transform: translate(-50%, -100%);
+}
+
+.tower-panel-button {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tower-panel-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tower-panel-button.upgrade-button {
+  background: #4aa8e0;
+  color: #06131c;
+}
+
+.tower-panel-button.sell-button {
+  background: #e05a3a;
+  color: #fff;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.tower-palette {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.tower-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: #1b1d24;
+  cursor: pointer;
+}
+
+.tower-slot.selected {
+  border-color: #4aa8e0;
+}
+
+.tower-slot:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.icon-stack {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.tower-icon {
+  position: absolute;
+  inset: 0;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+
+.lock-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.tower-slot.locked .tower-icon {
+  opacity: 0;
+}
+
+.tower-slot.locked .lock-icon {
+  opacity: 1;
+}
+
+.tower-cost {
+  font-size: 0.75rem;
+  color: #cfd2da;
+}
+
+.lock-badge {
+  display: none;
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  font-size: 0.65rem;
+  line-height: 1.3;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  padding: 0 3px;
+  pointer-events: none;
+}
+
+.tower-slot.locked .lock-badge {
+  display: block;
+}
+
+.tower-slot.newly-unlocked,
+.skill-button.newly-unlocked {
+  animation: pulse 0.5s ease-in-out 4;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* --- 変異レポートmodal --- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.modal-box {
+  width: 100%;
+  max-width: 340px;
+  padding: 24px;
+  border-radius: 12px;
+  background: #1b1d24;
+  text-align: center;
+}
+
+.modal-box h2 {
+  margin: 0 0 12px;
+  font-size: 1.2rem;
+}
+
+.report-intro {
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(74, 168, 224, 0.15);
+  color: #cfe6f7;
+  font-size: 0.8rem;
+}
+
+.report-compare {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.report-icon {
+  background: #14161c;
+  border-radius: 8px;
+}
+
+.report-arrow {
+  font-size: 1.4rem;
+  color: #cfd2da;
+}
+
+.report-lines {
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.report-lines li::before {
+  content: '・';
+}
+
+/* --- あそびかたmodal（CP5） --- */
+.howto-box {
+  max-width: 420px;
+  max-height: 82vh;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.howto-box h2 {
+  text-align: center;
+}
+
+.howto-promise {
+  margin: 0 0 16px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(74, 168, 224, 0.15);
+  color: #cfe6f7;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.howto-section {
+  margin-bottom: 16px;
+}
+
+.howto-section h3 {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+  color: #cfd2da;
+}
+
+.howto-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+
+.howto-list li::before {
+  content: '・';
+}
+
+.howto-legend {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 12px;
+}
+
+.howto-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #cfd2da;
+}
+
+.howto-legend-icon {
+  flex-shrink: 0;
+  background: #14161c;
+  border-radius: 6px;
+}
+
+.howto-tip {
+  margin: 0 0 18px;
+  font-size: 0.85rem;
+  color: #cfd2da;
+}
+
+.howto-box .primary-button {
+  display: block;
+  margin: 0 auto;
+}
+
+/* --- リザルト --- */
+#result-screen {
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.result-genome-canvas {
+  background: #14161c;
+  border-radius: 12px;
+}
+
+.result-genome-caption {
+  margin: 0;
+  color: #cfd2da;
+  font-size: 0.95rem;
+}
+
+.result-wave-count {
+  font-size: 1.25rem;
+  color: #cfd2da;
+}
+
+.result-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 240px;
+}
+
+/* --- アンケート --- */
+#survey-screen {
+  gap: 12px;
+}
+
+#survey-form {
+  width: 100%;
+  max-width: 420px;
+  text-align: left;
+}
+
+#survey-form fieldset {
+  border: 1px solid #2a2d36;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  padding: 12px;
+}
+
+#survey-form legend {
+  color: #cfd2da;
+  padding: 0 6px;
+  font-size: 0.85rem;
+}
+
+.scale {
+  display: flex;
+  gap: 12px;
+  justify-content: space-around;
+}
+
+.scale label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #b8bac2;
+}
+
+#survey-form input[type="text"] {
+  width: 100%;
+  padding: 8px;
+  background: #14161c;
+  border: 1px solid #2a2d36;
+  color: #f0f0f2;
+  border-radius: 6px;
+}
+
+.survey-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+#survey-after-submit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.copy-status {
+  color: #b8bac2;
+  font-size: 0.9rem;
+  min-height: 1.2em;
+}
+
+/* --- 到達時の赤ビネット --- */
+.vignette-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  opacity: 0;
+}
+
+.vignette-overlay.flash {
+  opacity: 1;
+  box-shadow: inset 0 0 0 12px rgba(224, 90, 58, 0.6);
+  animation: vignette-fade 0.25s ease-out forwards;
+}
+
+@keyframes vignette-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* --- トースト --- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 50;
+  margin: 0;
+  padding: 8px 18px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #f0f0f2;
+  font-size: 0.9rem;
+}
+
+/* --- PC横（デスクトップ） --- */
+@media (min-width: 720px) and (orientation: landscape) {
+  .controls {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .board-row {
+    flex-direction: row;
+    align-items: flex-start;
+    max-width: 960px;
+  }
+
+  .board-area {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .preview-panel {
+    width: 160px;
+    flex-shrink: 0;
+  }
+
+  .preview-list {
+    flex-direction: column;
+  }
+}
+
+/* --- スマホ縦 --- */
+@media (max-width: 719px) {
+  .hud {
+    font-size: 0.85rem;
+    gap: 10px;
+  }
+
+  .tower-slot {
+    padding: 4px 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tower-slot.newly-unlocked,
+  .skill-button.newly-unlocked {
+    animation: none;
+  }
+}
