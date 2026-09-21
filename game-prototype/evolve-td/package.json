@@ -1,1 +1,10 @@
-{"type":"module"}
+{
+  "name": "gunpen-reevolve",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node js/test.mjs && node --test js/campaign.test.mjs js/maze.test.mjs",
+    "balance": "node js/balance.mjs",
+    "start": "python3 -m http.server 8768 --bind 127.0.0.1"
+  }
+}

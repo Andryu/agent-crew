@@ -1,0 +1,31 @@
+{
+  "branch": "codex/evolve-td-reimagined",
+  "worktree": ".worktrees/evolve-td-reimagined",
+  "validation": {
+    "legacy_assertions": 196,
+    "campaign_tests": 21,
+    "maze_tests": 10,
+    "browser_checks": 24,
+    "engine_review": "APPROVED",
+    "spec_review": "APPROVED"
+  },
+  "sha256": {
+    "index.html": "72eae39ceda1572c3142a84e0d9d901d9ed307b5479b4cbda04c1b593a0d955f",
+    "style.css": "10dd427d9a2fd26b705eebaa2eb19b821569a03a5824d74446ce7b553489d014",
+    "README.md": "f6eab141c1f784314b93fdcd8b1a324d134ae2f8d0724be52ae1b60fabfdffe3",
+    "package.json": "7fc99ddacbfae3bddbd7585dcb0e4490db9b996e188883c3e899dad3cada66f3",
+    "js/main.js": "2b612407d3ec0fa12dadc8556682486f5067208d35ee3ee3697388433cf25b20",
+    "js/campaign.js": "e8604e8ea1ecca8e49a82a759250b1956f9f9a7f2506623a4cd6eadc0d2c0fc7",
+    "js/maze.js": "5073db213c4cad3d69b49c07c910b0e1fc2b6fcf03c03233c02f4feeb624bd9e",
+    "js/towers.js": "d18d0214f49a746bc1516f74e4032c68eaed943161f3e0aa688ff3752a336ab4",
+    "js/renderer.js": "3993a5b86c24835f1a4563c18ddc53a36aa99974c8ef5ba79894304a5dcbd175",
+    "js/campaign.test.mjs": "654966ceb1bded343a91eab2154d11ffa3b2fca1ee634afbeb202e796cf77263",
+    "js/maze.test.mjs": "1e4294883f49c6ec7b943eee1254adb4b3e831b78ae50d47ca82ee89b1d57386",
+    "js/balance.mjs": "6fd30ecf7f84338f3ac0e89656f58cf131d532e20c0e9bce12791a225fb2e8bc",
+    "js/maze-balance.mjs": "eba732a7d8eb47452905ac777188f475b74c0b5c7841ab3597debf0975e17de4",
+    "js/counter-balance.mjs": "f6086b6da8b32ea77d35e53236770ab552dc3461aef9f5fa8bfbaac67b902dcc",
+    "tests/browser-live-maze.mjs": "dad0b13600dbcb602c9ea0adc7eb333e79debc28674b4dda3799c01812a9f80c",
+    "tests/browser-smoke.mjs": "0d2a6f185d773cef38a4c4a6a3ad152fbe886ba894216dc0cf43761c2208a779",
+    "tests/browser-edge.mjs": "90f539191a3ace55a7afdf33111382998bbc4b24e6bb9e5ef04587e4604104d0"
+  }
+}

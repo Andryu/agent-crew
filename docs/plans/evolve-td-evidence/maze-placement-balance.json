@@ -1,0 +1,482 @@
+[
+  {
+    "seed": 1,
+    "strategy": "length",
+    "composition": "basic",
+    "budget": 350,
+    "layout": [
+      [
+        7,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        1,
+        7
+      ]
+    ],
+    "lengths": [
+      32,
+      29,
+      28
+    ],
+    "kills": 16,
+    "leaks": 8,
+    "seconds": 41.52
+  },
+  {
+    "seed": 1,
+    "strategy": "coverage",
+    "composition": "basic",
+    "budget": 350,
+    "layout": [
+      [
+        9,
+        3
+      ],
+      [
+        10,
+        2
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        8,
+        1
+      ],
+      [
+        7,
+        2
+      ],
+      [
+        10,
+        3
+      ],
+      [
+        7,
+        4
+      ]
+    ],
+    "lengths": [
+      22,
+      19,
+      22
+    ],
+    "kills": 16,
+    "leaks": 8,
+    "seconds": 31.72
+  },
+  {
+    "seed": 7,
+    "strategy": "length",
+    "composition": "basic",
+    "budget": 350,
+    "layout": [
+      [
+        7,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        1,
+        7
+      ]
+    ],
+    "lengths": [
+      32,
+      29,
+      28
+    ],
+    "kills": 17,
+    "leaks": 7,
+    "seconds": 43.95
+  },
+  {
+    "seed": 7,
+    "strategy": "coverage",
+    "composition": "basic",
+    "budget": 350,
+    "layout": [
+      [
+        9,
+        3
+      ],
+      [
+        10,
+        2
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        8,
+        1
+      ],
+      [
+        7,
+        2
+      ],
+      [
+        10,
+        3
+      ],
+      [
+        7,
+        4
+      ]
+    ],
+    "lengths": [
+      22,
+      19,
+      22
+    ],
+    "kills": 19,
+    "leaks": 5,
+    "seconds": 31.72
+  },
+  {
+    "seed": 42,
+    "strategy": "length",
+    "composition": "basic",
+    "budget": 350,
+    "layout": [
+      [
+        7,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        1,
+        7
+      ]
+    ],
+    "lengths": [
+      32,
+      29,
+      28
+    ],
+    "kills": 14,
+    "leaks": 10,
+    "seconds": 40.43
+  },
+  {
+    "seed": 42,
+    "strategy": "coverage",
+    "composition": "basic",
+    "budget": 350,
+    "layout": [
+      [
+        9,
+        3
+      ],
+      [
+        10,
+        2
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        8,
+        1
+      ],
+      [
+        7,
+        2
+      ],
+      [
+        10,
+        3
+      ],
+      [
+        7,
+        4
+      ]
+    ],
+    "lengths": [
+      22,
+      19,
+      22
+    ],
+    "kills": 16,
+    "leaks": 8,
+    "seconds": 32.17
+  },
+  {
+    "seed": 1,
+    "strategy": "length",
+    "composition": "mixed",
+    "budget": 350,
+    "layout": [
+      [
+        7,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        6,
+        1
+      ]
+    ],
+    "lengths": [
+      30,
+      27,
+      26
+    ],
+    "kills": 20,
+    "leaks": 4,
+    "seconds": 40.02
+  },
+  {
+    "seed": 1,
+    "strategy": "coverage",
+    "composition": "mixed",
+    "budget": 350,
+    "layout": [
+      [
+        9,
+        3
+      ],
+      [
+        10,
+        2
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        8,
+        1
+      ],
+      [
+        7,
+        2
+      ]
+    ],
+    "lengths": [
+      22,
+      19,
+      22
+    ],
+    "kills": 18,
+    "leaks": 6,
+    "seconds": 31.97
+  },
+  {
+    "seed": 7,
+    "strategy": "length",
+    "composition": "mixed",
+    "budget": 350,
+    "layout": [
+      [
+        7,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        6,
+        1
+      ]
+    ],
+    "lengths": [
+      30,
+      27,
+      26
+    ],
+    "kills": 24,
+    "leaks": 0,
+    "seconds": 31.82
+  },
+  {
+    "seed": 7,
+    "strategy": "coverage",
+    "composition": "mixed",
+    "budget": 350,
+    "layout": [
+      [
+        9,
+        3
+      ],
+      [
+        10,
+        2
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        8,
+        1
+      ],
+      [
+        7,
+        2
+      ]
+    ],
+    "lengths": [
+      22,
+      19,
+      22
+    ],
+    "kills": 17,
+    "leaks": 7,
+    "seconds": 32.28
+  },
+  {
+    "seed": 42,
+    "strategy": "length",
+    "composition": "mixed",
+    "budget": 350,
+    "layout": [
+      [
+        7,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        6,
+        1
+      ]
+    ],
+    "lengths": [
+      30,
+      27,
+      26
+    ],
+    "kills": 18,
+    "leaks": 6,
+    "seconds": 38.07
+  },
+  {
+    "seed": 42,
+    "strategy": "coverage",
+    "composition": "mixed",
+    "budget": 350,
+    "layout": [
+      [
+        9,
+        3
+      ],
+      [
+        10,
+        2
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        8,
+        1
+      ],
+      [
+        7,
+        2
+      ]
+    ],
+    "lengths": [
+      22,
+      19,
+      22
+    ],
+    "kills": 13,
+    "leaks": 11,
+    "seconds": 32.78
+  }
+]

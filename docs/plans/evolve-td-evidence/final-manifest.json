@@ -1,0 +1,50 @@
+{
+  "branch": "codex/evolve-td-reimagined",
+  "base": "8dc3722aa0fbe2b6206f6d20af32cb16389b613e",
+  "files": {
+    "game-prototype/evolve-td/README.md": "a6e718b81f2730fb7d77317e851b7431caf2a8cd95f49f726b4f5956b169a72d",
+    "game-prototype/evolve-td/index.html": "280d44244d002a8f20f8d432c284d65ae6fdc4a13eab7692716c38a634aaff0e",
+    "game-prototype/evolve-td/js/audio.js": "728471c4fa3e8cacabc3094bba52a67e3b82da10a3545e0c898262c524aaa58a",
+    "game-prototype/evolve-td/js/balance.mjs": "c67d6b400ee47f85d9b499f6f5bad4fbd2e5b6941a6a7cc339eb970738f6b3d2",
+    "game-prototype/evolve-td/js/campaign.js": "d06063c547d4847b949036750f116200928ca5eb81537b55e872f91e3d13c68e",
+    "game-prototype/evolve-td/js/campaign.test.mjs": "3c8904d99594a4db7abbffafcbf358b61d57ac11d63700db8340230063289147",
+    "game-prototype/evolve-td/js/config.js": "eb3aae8613938e60106c6af0231f11cf5775f0814a2dc6bc38a5257ebffd777b",
+    "game-prototype/evolve-td/js/counter-balance.mjs": "5be6eea5541999c0a76627dfcc3e76b3ca9d14a60429d74cd7c10b7fa0d1349b",
+    "game-prototype/evolve-td/js/enemies.js": "b2e635cad7813de6d26d4fc4cdb0e53c579356b9b6b1b73084b1a54796f707a5",
+    "game-prototype/evolve-td/js/evolution.js": "f2a2242066ca7984340db58ba4d000ad8634f870cdd881a312833ddb1b51a8c3",
+    "game-prototype/evolve-td/js/game-state.js": "671ee8e2338c583dcdcdae1e70e8ba7d33d29641f195d9435d9c4f60b84f53bb",
+    "game-prototype/evolve-td/js/main.js": "901d273e378e1339051f51008590b5455b0598dc2a5db0827bb72847d6902985",
+    "game-prototype/evolve-td/js/renderer.js": "1596323140cdc1eea6fcd2d48cf028c18a1221c43aeba13d9e50b2ec0dba0489",
+    "game-prototype/evolve-td/js/rng.js": "d018d4db069bd25e1e606a59735a6c250a7fe476cf568bd3cc8ad8c464e8b29e",
+    "game-prototype/evolve-td/js/share.js": "3b91548fecd20c5bd6b923247411482ffeaf7fbfbe7899d28bd4dc9d2e5738e3",
+    "game-prototype/evolve-td/js/storage.js": "e5920f17d21dc5cc4f0396cdce024b8fb9f506afeee80e1011ed29f3adc2e89d",
+    "game-prototype/evolve-td/js/survey.js": "71b973a662fa7fdd6cdeb2d667d4584bce5fb022e5013eb9e688b33cb342d09d",
+    "game-prototype/evolve-td/js/test.mjs": "61c5194ba48bfbb83bbeaffe330987a6ea12022941e15ab2e99f1372f2d32c2d",
+    "game-prototype/evolve-td/js/towers.js": "c711326e3587d7c324619555d51931b751c4174abe47d9f76fa41681285ec82c",
+    "game-prototype/evolve-td/package.json": "a57ffe668041de0a05846cb4df57f32ee7b0f5d4775b7c529f6f72f9a4370113",
+    "game-prototype/evolve-td/style.css": "badc7b6cce062238e688e9f2f87de132b9b81b72c57eeb274ef7c0520e3d57a1",
+    "game-prototype/evolve-td/tests/browser-edge.mjs": "968282a50b7bc9e0beaae1fe78a1b299da2a2aa5a39d6ff44a369a53826a7356",
+    "game-prototype/evolve-td/tests/browser-smoke.mjs": "0d2a6f185d773cef38a4c4a6a3ad152fbe886ba894216dc0cf43761c2208a779"
+  },
+  "verification": {
+    "legacy_assertions": 196,
+    "campaign_tests": 13,
+    "browser_basic_checks": 11,
+    "browser_edge_checks": 6,
+    "spec_review": "APPROVED",
+    "quality_review": "APPROVED"
+  },
+  "evidence": [
+    "balance-initial.json",
+    "battle-desktop.png",
+    "browser-check.json",
+    "browser-edge.json",
+    "counter-balance.json",
+    "defense-desktop.png",
+    "defense-mobile.png",
+    "tests.txt",
+    "title-desktop.png",
+    "title-mobile.png",
+    "victory-desktop.png"
+  ]
+}
