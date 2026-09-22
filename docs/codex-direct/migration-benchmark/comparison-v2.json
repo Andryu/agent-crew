@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "status": "新campaignのC6採点仕様。P0 comparison.json と smoke.py は変更しない",
+  "base_comparison": "../migration-baseline/comparison.json",
+  "effective_inputs": {
+    "snapshot_index": "../migration-baseline/snapshot-index.json",
+    "synthetic_state": "../migration-baseline/fixtures/board-state.json",
+    "reason": "manifestを読まず、snapshot-indexでhash固定されたprogress.py・READMEと合成stateだけをC6 fixtureへ復元する"
+  },
+  "tasks": [
+    {
+      "id": "C6",
+      "kind": "引継ぎ/進捗",
+      "repo": "agent_crew",
+      "input": ["migration-progress/progress.py"],
+      "fixture": ["migration-progress/README.md"],
+      "model_writes": ["migration-progress/state.json"],
+      "extra_fixture": "../migration-baseline/fixtures/board-state.json",
+      "work": "合成した表示台帳fixtureでP0を検証中へ更新し、--onceで読取り、実台帳は変更しない",
+      "validate": "python3.12 -B validate_c6.py",
+      "accept": "モデル終了後にcampaign siblingへ固定したaccepted snapshotのstate.jsonが更新されP0が検証中となり、そのsnapshotのCLIで再読込できる。queueを変更しない"
+    }
+  ]
+}

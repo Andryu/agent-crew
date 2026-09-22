@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "files": {
+    "agent_crew/.agents/skills/fable-class/SKILL.md": "2eacac42182afb8a69ddad5101ee62c5035a2f73cba5eb2eb8ea9a82d2d775d1",
+    "agent_crew/.agents/skills/fable-class/references/delegation.md": "eeab5755a8ce148b62543ac6a1eabcafc545fc29238a82d9cce57344fa0bc46e",
+    "agent_crew/.agents/skills/fable-class/references/planning.md": "ff1c705ea6434008ae2a2b2c7a4ca796d222fa047caf82064d1f5add1623f3d4",
+    "agent_crew/.agents/skills/fable-class/references/verification.md": "83f018a6910011a8b3093741657b3f1de5044330939f03ce4857a9e8a7e73bf8",
+    "agent_crew/AGENTS.md": "bb067ce35b66e1767ceaaa03bdd97f0502d63e5b7b0c4c36a552f43c88205e68",
+    "wealth_advisor/.agents/skills/wealth-advisor/SKILL.md": "5166d26c43782238c057272061a988e6108c8d1e327b219d97d6335d430395a2",
+    "wealth_advisor/AGENTS.md": "5e3959e48cdd2952dcce21353d060d763c8823f1c099f05832315dcdd0368525"
+  }
+}
