@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "runtimes": {
+    "claude": {
+      "events": ["SessionStart", "Stop", "SubagentStop", "TaskCompleted"]
+    },
+    "codex": {
+      "events": ["SessionStart", "Stop", "SubagentStop"]
+    }
+  }
+}

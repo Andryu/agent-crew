@@ -1,0 +1,31 @@
+# P0時点のwealth installer管理値。旧marker検証専用。再適用しない。
+approval_policy = "on-request"
+approvals_reviewer = "user"
+default_permissions = "developer"
+
+[permissions.developer]
+description = "通常開発・Git・ネットワーク・開発設定の編集"
+extends = ":workspace"
+
+[permissions.developer.filesystem.':workspace_roots']
+".git" = "write"
+".agents" = "write"
+".codex" = "write"
+
+[permissions.developer.filesystem]
+"~/.cache" = "write"
+"~/.npm" = "write"
+"~/.local/share/uv" = "write"
+"~/Library/Caches" = "write"
+"~/.codex/config.toml" = "write"
+"~/.codex/AGENTS.md" = "write"
+"~/.codex/rules" = "write"
+"~/.codex/skills" = "write"
+"~/.codex/agents" = "write"
+"~/.agents/skills" = "write"
+"~/.claude/settings.json" = "write"
+"~/.claude/skills" = "write"
+"~/.claude/agents" = "write"
+
+[permissions.developer.network]
+enabled = true

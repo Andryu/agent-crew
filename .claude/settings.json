@@ -1,29 +1,13 @@
 {
   "hooks": {
-    "TaskCompleted": [
+    "SessionStart": [
       {
         "hooks": [
           {
+            "statusMessage": "crew-hooks:claude:SessionStart",
             "type": "command",
-            "command": ".claude/hooks/task_completed.sh"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/subagent_stop.sh"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "scripts/enforce-queue-done-stop.sh || true"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/crew_hooks.py\" --runtime claude --event SessionStart --root \"$CLAUDE_PROJECT_DIR\"",
+            "timeout": 15
           }
         ]
       }
@@ -32,63 +16,34 @@
       {
         "hooks": [
           {
+            "statusMessage": "crew-hooks:claude:Stop",
             "type": "command",
-            "command": ".claude/hooks/subagent_stop.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null)\" && scripts/propose-lesson-rules.sh --dry-run 2>/dev/null || true'"
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null)\" && bash scripts/privacy-check.sh 2>/dev/null || true'"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null)\" && scripts/enforce-retro-stop.sh || true'"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/crew_hooks.py\" --runtime claude --event Stop --root \"$CLAUDE_PROJECT_DIR\"",
+            "timeout": 15
           }
         ]
       }
     ],
-    "SessionStart": [
+    "SubagentStop": [
       {
         "hooks": [
           {
+            "statusMessage": "crew-hooks:claude:SubagentStop",
             "type": "command",
-            "command": "echo 'スプリント計画・レトロの前に必読: ~/Workspace/Obsidian/knowledge/agent-crew-failure-patterns.md（繰り返し失敗パターン）と ~/Workspace/Obsidian/decisions/agent-crew-adr-index.md（ADR索引）'"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\" && bash .claude/hooks/session_start.sh'"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/crew_hooks.py\" --runtime claude --event SubagentStop --root \"$CLAUDE_PROJECT_DIR\"",
+            "timeout": 15
           }
         ]
       }
     ],
-    "UserPromptSubmit": [
+    "TaskCompleted": [
       {
         "hooks": [
           {
+            "statusMessage": "crew-hooks:claude:TaskCompleted",
             "type": "command",
-            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\" && bash scripts/model-mode.sh'",
-            "timeout": 10
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/crew_hooks.py\" --runtime claude --event TaskCompleted --root \"$CLAUDE_PROJECT_DIR\"",
+            "timeout": 15
           }
         ]
       }

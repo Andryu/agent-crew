@@ -1,0 +1,123 @@
+{
+  "schema": 1,
+  "entries": [
+    {
+      "repo": "agent_crew",
+      "source": "AGENTS.md",
+      "snapshot": "snapshot/agent_crew/AGENTS.md",
+      "sha256": "3bb53637cc6b91734163e4149cc825c0638ae061466059db9308359586365d4e"
+    },
+    {
+      "repo": "agent_crew",
+      "source": "config/crew-hooks.json",
+      "snapshot": "snapshot/agent_crew/config/crew-hooks.json",
+      "sha256": "7ef2af27c4c5313a428df6e8805584e7a58e193ceca3d3f3654010e3f2602bab"
+    },
+    {
+      "repo": "agent_crew",
+      "source": "scripts/crew",
+      "snapshot": "snapshot/agent_crew/scripts/crew",
+      "sha256": "325b5a2d703969c25be4d9181b5b62a24730d18beb2bf5a6cd324beeaf2ac98b"
+    },
+    {
+      "repo": "agent_crew",
+      "source": "scripts/crew_hooks.py",
+      "snapshot": "snapshot/agent_crew/scripts/crew_hooks.py",
+      "sha256": "aecc87c7907aae66c10a173928524a7457d87577e713be90d3660fedec6ee041"
+    },
+    {
+      "repo": "agent_crew",
+      "source": "scripts/install_crew_hooks.py",
+      "snapshot": "snapshot/agent_crew/scripts/install_crew_hooks.py",
+      "sha256": "2583d8ab14f795ed8455343836fe4d04cab7ebe5f2d0cbe2c4f4b93e6c2316c4"
+    },
+    {
+      "repo": "agent_crew",
+      "source": "scripts/codex_hook_state.py",
+      "snapshot": "snapshot/agent_crew/scripts/codex_hook_state.py",
+      "sha256": "ef0eb453737d3ec4ed55f40ef8eac6c4a9a5fe837636154701e8f3ba4532273c"
+    },
+    {
+      "repo": "agent_crew",
+      "source": "tests/test_crew_launcher.py",
+      "snapshot": "snapshot/agent_crew/tests/test_crew_launcher.py",
+      "sha256": "98295b6adaffea2f589dd4031a25c0a478c0d8f035fd819ce9a6545b613b09fd"
+    },
+    {
+      "repo": "agent_crew",
+      "source": "tests/test_install_crew_hooks.py",
+      "snapshot": "snapshot/agent_crew/tests/test_install_crew_hooks.py",
+      "sha256": "ebfbf375fe59da8324c7ac20bbd3420672e90febeb29eff220c7f8ab7bd56a80"
+    },
+    {
+      "repo": "agent_crew",
+      "source": "tests/test_codex_hook_state.py",
+      "snapshot": "snapshot/agent_crew/tests/test_codex_hook_state.py",
+      "sha256": "104ffefccf7ac950b125eb680ee70a128f1f0868e341c3f3af528162c0924d9a"
+    },
+    {
+      "repo": "agent_crew",
+      "source": "migration-progress/progress.py",
+      "snapshot": "snapshot/agent_crew/migration-progress/progress.py",
+      "sha256": "bfea2ddbf1cc8686ca93383db6803a08288929ce0989c2dd49aa87f1f3505575"
+    },
+    {
+      "repo": "agent_crew",
+      "source": "migration-progress/README.md",
+      "snapshot": "snapshot/agent_crew/migration-progress/README.md",
+      "sha256": "f852a334418e7113c9dbafa1aa0215bb7f300e4642256a3ae4030848c0128b46"
+    },
+    {
+      "repo": "wealth_advisor",
+      "source": "AGENTS.md",
+      "snapshot": "snapshot/wealth_advisor/AGENTS.md",
+      "sha256": "b454a3e54154e4caf5c57804c8adb09ec1bca0ca5549012d50a5c0f22c2229c4"
+    },
+    {
+      "repo": "wealth_advisor",
+      "source": "scripts/check_operational_readiness.py",
+      "snapshot": "snapshot/wealth_advisor/scripts/check_operational_readiness.py",
+      "sha256": "86f1f68efef40e3768f3a184d0da88497a8319e5af545d61ee25299cfd662bff"
+    },
+    {
+      "repo": "wealth_advisor",
+      "source": "tests/test_operational_readiness.py",
+      "snapshot": "snapshot/wealth_advisor/tests/test_operational_readiness.py",
+      "sha256": "c722b654fb284f9e36ec9523f69f7625af0e6455b4530cffa8c619a3c16a422c"
+    },
+    {
+      "repo": "agent_crew",
+      "source": ".agents/skills/fable-class/SKILL.md",
+      "snapshot": "snapshot/agent_crew/.agents/skills/fable-class/SKILL.md",
+      "sha256": "0beaebacc99d339279becde7d0fac41f62bfa03655981dd9f3a0ea938f845dbd"
+    },
+    {
+      "repo": "agent_crew",
+      "source": ".agents/skills/fable-class/references/planning.md",
+      "snapshot": "snapshot/agent_crew/.agents/skills/fable-class/references/planning.md",
+      "sha256": "c3ff9d1392c1a3cf139c5a954288f92583dbb2300535cb5bf1b32fc83ad9b198"
+    },
+    {
+      "repo": "agent_crew",
+      "source": ".agents/skills/fable-class/references/delegation.md",
+      "snapshot": "snapshot/agent_crew/.agents/skills/fable-class/references/delegation.md",
+      "sha256": "5a1a17c42ad029d400ebc617516669d6db956f3ae82b39e733333d92e5f7934d"
+    },
+    {
+      "repo": "agent_crew",
+      "source": ".agents/skills/fable-class/references/verification.md",
+      "snapshot": "snapshot/agent_crew/.agents/skills/fable-class/references/verification.md",
+      "sha256": "534372db5d30ebfa29e119f753fd839fa2c5fa535ba7d0e2309b79c418355400"
+    }
+  ],
+  "synthetic_fixture": {
+    "path": "fixtures/board-state.json",
+    "sha256": "95d84ce2bf8ab2de32a6cc379953b82285b9f113b62e8471f1523ab9a7e04fe3",
+    "description": "非資産の表示台帳fixture"
+  },
+  "publication": {
+    "kind": "public_derivative",
+    "original_index_sha256": "273b627b173605014a4061e964d744fd53bc4567b70c78811993fa575a8d9e3f",
+    "transformation_manifest": "../pr-publication-manifest.json"
+  }
+}

@@ -1,0 +1,60 @@
+# agent-crew が管理する開発権限。model/provider/MCP/hooks は所有しない。
+# 通常profileのwriteはagent-crew root（.git含む）・既存cache・:tmpdir/:slash_tmpだけ。.codex配下は読取りも拒否する。
+# maintenanceはdeveloperを継承せず:read-only基底の兄弟profileとし、必要なwriteをすべて明示する。
+# private repoはそのrepo内の同名profile layerで追加し、ここへ書かない。worktreeの別場所は対象外。
+approval_policy = "on-request"
+approvals_reviewer = "user"
+default_permissions = "developer"
+
+[permissions.developer]
+description = "通常開発（agent-crew・cache・network）"
+extends = ":read-only"
+
+[permissions.developer.filesystem]
+"~/Workspace/agent-crew" = "write"
+"~/Workspace/agent-crew/.git" = "write"
+"~/Workspace/agent-crew/.codex" = "read"
+"~/Workspace/agent-crew/.codex/config.toml" = "read"
+# 既存・新規の入れ子やrepo外worktreeの.codexがtrust済みproject設定として次回権限を広げる経路を塞ぐ。
+"/**/.codex/**" = "deny"
+"~/.cache" = "write"
+"~/.npm" = "write"
+"~/.local/share/uv" = "write"
+"~/Library/Caches" = "write"
+":tmpdir" = "write"
+":slash_tmp" = "write"
+
+[permissions.developer.network]
+enabled = true
+
+[permissions.maintenance]
+description = "明示保守時のglobal設定編集"
+extends = ":read-only"
+
+[permissions.maintenance.filesystem]
+"~/Workspace/agent-crew" = "write"
+"~/Workspace/agent-crew/.git" = "write"
+"~/Workspace/agent-crew/.codex" = "write"
+"~/.cache" = "write"
+"~/.npm" = "write"
+"~/.local/share/uv" = "write"
+"~/Library/Caches" = "write"
+":tmpdir" = "write"
+":slash_tmp" = "write"
+"~/.codex/config.toml" = "write"
+"~/.codex/config-composer" = "write"
+"~/.codex/AGENTS.md" = "write"
+"~/.codex/rules" = "write"
+"~/.codex/skills" = "write"
+"~/.codex/agents" = "write"
+"~/.agents/skills" = "write"
+"~/.claude/settings.json" = "write"
+"~/.claude/skills" = "write"
+"~/.claude/agents" = "write"
+
+[permissions.maintenance.network]
+enabled = true
+
+[permissions.review]
+description = "読み取り専用の独立レビュー"
+extends = ":read-only"

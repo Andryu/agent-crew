@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "date": "2026-09-21",
+  "repo_legacy_originals": {
+    "travel-itinerary-artifact": {
+      "CHANGELOG.md": "434b48b28a32b70555be1e80202c8cb2d2852543969f236c1902f48f912e1669",
+      "README.md": "3f6f2e12fb7e9053024fcb6866783928fdc3ee47819018e15e7bac8015b3f779",
+      "SKILL.md": "f451ff206571b76207ff08a2989f476284d2c1a174f352d69382bbe30c070660"
+    },
+    "travel-plan-review": {
+      "SKILL.md": "459bd2bc705869bd0c0b695ef449e451f726b4caf37253c0472efa574c4bfceb"
+    },
+    "life-planner": {
+      "SKILL.md": "0bc44f3677f5ec01534ce9c05603d52156ca227952bcd0f4aa6bef3dc3b80a00",
+      "references/jp-money-systems.md": "e429592dd81f25c937c399697c7184dc4904f4f0b71569b20309780cfd66a926",
+      "references/notion-recipe.md": "c0b4b9c8edbab60ea40229f1bed039c51b6e538a465b24ed7505dfb90a470b36"
+    },
+    "life-plan-review": {
+      "SKILL.md": "6cbe4a4f3732e8480abb701b0c2bfff95cc8e158a4039affdb2512f88d758cf8",
+      "references/review-recipe.md": "fff12046a324012e75fe194b56a1b3e29a26c649f4c1b282d4f301254ec57764"
+    }
+  },
+  "travel_global_synced_skill_sha256": {
+    "travel-itinerary-artifact": "97d298aed4a28350f41b9adbd1fb2e07690008c95fd755b6205ce8b130fcbcdb",
+    "travel-plan-review": "37d9fa58fdc2cf87a6be2231fb3516c99782eb841504537fbf17de2ded1a31bd"
+  },
+  "life_claude_canonical": {
+    "life-planner": {
+      "SKILL.md": "0bc44f3677f5ec01534ce9c05603d52156ca227952bcd0f4aa6bef3dc3b80a00",
+      "references/jp-money-systems.md": "e429592dd81f25c937c399697c7184dc4904f4f0b71569b20309780cfd66a926",
+      "references/notion-recipe.md": "c0b4b9c8edbab60ea40229f1bed039c51b6e538a465b24ed7505dfb90a470b36"
+    },
+    "life-plan-review": {
+      "SKILL.md": "6cbe4a4f3732e8480abb701b0c2bfff95cc8e158a4039affdb2512f88d758cf8",
+      "references/review-recipe.md": "fff12046a324012e75fe194b56a1b3e29a26c649f4c1b282d4f301254ec57764"
+    }
+  },
+  "preexisting_global_life_plan_review": {
+    "type": "directory",
+    "entries": [
+      "references/"
+    ],
+    "files": []
+  },
+  "global_life_planner_before": "absent"
+}

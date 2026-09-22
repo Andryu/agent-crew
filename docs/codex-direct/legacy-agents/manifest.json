@@ -1,0 +1,23 @@
+{
+  "source": ".codex/agents",
+  "reason": "P2: 旧Codex agent定義を自動発見範囲から退避。direct-reviewerは保持。",
+  "files": {
+    "architect.toml": "3f5cfff68f900e2c63c0a5a9d5e972c75ab3d8a863e7420bc59a0933a085a5d0",
+    "coo.toml": "9f4f20cb575963e27c06ff1031904f10a4c40aa496685711d63bd0a7a2a9d494",
+    "critic.toml": "7a0ba028d51c75de568fa70beab6a791476428e2fd841996e9794d462076e420",
+    "data-analyst.toml": "0ceb6b59f286ab36ea681f74f17da8bf8bbc8c00ec32c77a7099fc3940caa03a",
+    "devops.toml": "6ed1ce76f69d3f1efea6b38fd0c2a06d1771fd20b252b694cf4b5056b72e7fd3",
+    "doc-reviewer.toml": "25527921340009bb62eced90071a15b103130f8d2b3cee8b7f80a457a6fbcdec",
+    "engineer-go.toml": "643aacc4012f8d3218902946281c6b4b0c0d048a4cc1afe3ca8c14dab30baa5e",
+    "engineer-next.toml": "2d612702ab9e6b2d6f86c84143eb0581e6ebb49704559a19d0e8685582ef0cf0",
+    "engineer-vue.toml": "7c225486efbf06c587f7e41f1676364e31f3f83e55019fda185e34193acd5d77",
+    "pm-estimation.toml": "147e83bcbbc0f7ca085c779c593956ad6bd99660b80c94eb8ed4bc2ab03c546a",
+    "pm-protocol.toml": "eb9be0a7cf61242c285e56f46a5965c5a9391d83d7b521f23a825f65e9f9fe59",
+    "pm.toml": "448a9b71ca56625941b3be2ba33fcfac2fe3c21f00cffa21034d49eda8fffbce",
+    "qa.toml": "3782178b6a0c6ab4efbd85c36e6d78d3cae583083c531ea7b83f5ad1e3be2e97",
+    "retro.toml": "6975756fcd7ed4505acb0375b32909825f0d65756093ba20c4df57d67a031839",
+    "security.toml": "247db1170cd37ff9374a8dff7fe776a8ac70e091641e709964197d841ee2e606",
+    "ux-designer.toml": "bc61e383b9b8502b1fa640b470202d9591d3c1f6046cc916ab4c30a4116214fa",
+    "viral-video-researcher.toml": "50a227a2019250231bd39a6c1072a24f677d44fde5e26a80ff20b9054eb5e742"
+  }
+}
