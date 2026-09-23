@@ -10,7 +10,7 @@ P0の`migration-baseline/snapshot-index.json`とSHA-256が一致する非機密�
 
 Bは`b-contract/{agent_crew,wealth_advisor}/`と`b-contract-index.json`、Aのwealth skillは`a-contract/`と`a-contract-index.json`でpath/hashを固定する。wealthのA入力はP0 manifest記載HEADのGit blobから取得した非機密skillで、元P0 manifestとsnapshotを変更しない。A/Bのwealth開始script/testは同じbytesとし、契約とskillだけを条件差にする。
 
-旧campaign `p5-cd6cbf5b9eec05c0`、旧C1 smoke、2026-09-21のpreflightは歴史的証跡として保持し、新campaignへ合算しない。旧campaignの安全判定unknownとC5/C6利用上限失敗は[formal-report](formal-report.md)を参照する。
+旧campaign `p5-cd6cbf5b9eec05c0`、旧C1 smoke、2026-09-21のpreflightは歴史的証跡として保持し、新campaignへ合算しない。旧campaignの安全判定unknownとC5/C6利用上限失敗は[formal-report](formal-report.md)、旧ハーネスの当時説明は[README v1](README-v1-2026-09-21.md)を参照する。
 
 ## 実行順序
 
