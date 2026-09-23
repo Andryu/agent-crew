@@ -36,16 +36,154 @@ if os.getenv("FAKE_CLI_MODE") == "sleep":
     raise SystemExit(0)
 if os.getenv("FAKE_CLI_MODE") == "fail":
     raise SystemExit(1)
+recorded_command = "python3.12 -B -m unittest discover -s tests -p test_crew_launcher.py -v"
 if os.getenv("FAKE_CLI_MODE") == "c6":
     root = sys.argv[sys.argv.index("-C") + 1]
-    subprocess.run([sys.executable, "-B", "migration-progress/progress.py", "set",
-                    "--task", "P0", "--status", "検証中", "--current", "fake更新",
-                    "--next", "fake再読込", "--blocker", "なし"], cwd=root, check=True)
+    update = [sys.executable, "-B", "migration-progress/progress.py", "set",
+              "--task", "P0", "--status", "検証中", "--current", "fake更新",
+              "--next", "fake再読込", "--blocker", "なし"]
+    subprocess.run(update, cwd=root, check=True,
+                   capture_output=True, text=True)
+    recorded_command = "python3.12 -B migration-progress/progress.py set --task P0 --status 検証中 --current fake更新 --next fake再読込 --blocker なし"
 answer = sys.argv[sys.argv.index("-o")+1]
 open(answer,"w").write("目的 検証 次の一手\\n")
-print(json.dumps({"type":"item.completed","item":{"type":"command_execution","command":"python3.12 -B -m unittest discover -s tests -p test_crew_launcher.py -v","exit_code":0,"aggregated_output":"OK"}}))
+print(json.dumps({"type":"thread.started","thread_id":"fixture"}))
+print(json.dumps({"type":"turn.started"}))
+print(json.dumps({"type":"item.started","item":{"id":"cmd-1","type":"command_execution","command":recorded_command,"cwd":".","status":"in_progress"}}))
+print(json.dumps({"type":"item.completed","item":{"id":"cmd-1","type":"command_execution","command":recorded_command,"cwd":".","status":"completed","exit_code":0,"aggregated_output":"OK"}}))
+print(json.dumps({"type":"item.completed","item":{"type":"agent_message","text":"目的 検証 次"}}))
 print(json.dumps({"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":3}}))
 '''
+
+
+def event_audit_selftest():
+    """未知・伏字・失敗eventを安全合格へ混ぜない。"""
+    with tempfile.TemporaryDirectory(prefix="p5-event-audit-", dir="/private/tmp",
+                                     ignore_cleanup_errors=True) as directory:
+        root = Path(directory)
+
+        def audit(name, events):
+            destination = root / f"{name}.json"
+            result = runner.safe_events("\n".join(
+                event if isinstance(event, str) else json.dumps(event) for event in events
+            ), destination, expected_cwd=root)
+            assert destination.stat().st_mode & 0o777 == 0o600
+            return result
+
+        normal = audit("normal", [
+            {"type": "thread.started", "thread_id": "fixture"},
+            {"type": "turn.started"},
+            {"type": "item.completed", "item": {"type": "reasoning", "text": "hidden"}},
+            {"type": "item.started", "item": {"id": "cmd-1", "type": "command_execution",
+             "command": "python3.12 -B -m unittest -q", "cwd": ".", "status": "in_progress"}},
+            {"type": "item.completed", "item": {"id": "cmd-1", "type": "command_execution",
+             "command": "python3.12 -B -m unittest -q", "cwd": ".", "status": "completed", "exit_code": 0,
+             "aggregated_output": "OK"}},
+            {"type": "item.completed", "item": {"type": "agent_message", "text": "done"}},
+            {"type": "turn.completed", "usage": {"input_tokens": 1, "output_tokens": 1}},
+        ])
+        assert normal["event_audit"]["status"] == "pass"
+        assert normal["safety_gate"]["passed"] is True
+        c6_command = ("python3.12 -B migration-progress/progress.py set --task P0 --status 検証中 "
+                      "--current 確認 --next 再読込 --blocker なし")
+        assert runner._command_safety(c6_command) == (True, None)
+        for unsafe_command in (
+            "git -C . fetch || true",
+            "node -p 'require(\"net\").connect(1234,\"127.0.0.1\")'",
+            "/usr/bin/python3 -c 'print(1)'",
+            "cat README.md;node -p 'require(\"net\").connect(1234,\"127.0.0.1\")'",
+            "find . -maxdepth 0 -exec node -p 'require(\"net\").connect(1234,\"127.0.0.1\")' +",
+            "cat ../outside.txt",
+            "rg --pre node pattern .",
+            "git diff --ext-diff",
+        ):
+            assert runner._command_safety(unsafe_command)[0] is False, unsafe_command
+
+        cases = {
+            "malformed": ["not-json", {"type": "turn.completed", "usage": {}}],
+            "unknown-event": [{"type": "mystery.event"}, {"type": "turn.completed", "usage": {}}],
+            "unknown-item": [{"type": "item.completed", "item": {"type": "mystery_tool"}},
+                             {"type": "turn.completed", "usage": {}}],
+            "mcp": [{"type": "item.completed", "item": {"type": "mcp_tool_call"}},
+                    {"type": "turn.completed", "usage": {}}],
+            "network": [{"type": "item.started", "item": {"id": "cmd-2", "type": "command_execution",
+                         "command": "curl https://example.invalid", "status": "in_progress"}},
+                        {"type": "item.completed", "item": {"id": "cmd-2", "type": "command_execution",
+                         "command": "curl https://example.invalid", "status": "failed", "exit_code": 1,
+                         "aggregated_output": "blocked"}},
+                        {"type": "turn.completed", "usage": {}}],
+            "secret": [{"type": "item.started", "item": {"id": "cmd-3", "type": "command_execution",
+                        "command": "echo token=fixture", "status": "in_progress"}},
+                       {"type": "item.completed", "item": {"id": "cmd-3", "type": "command_execution",
+                        "command": "echo token=fixture", "status": "completed", "exit_code": 0,
+                        "aggregated_output": ""}},
+                       {"type": "turn.completed", "usage": {}}],
+            "user-path": [{"type": "item.started", "item": {"id": "cmd-4", "type": "command_execution",
+                           "command": "cat " + "/Users" + "/example/private", "status": "in_progress"}},
+                          {"type": "item.completed", "item": {"id": "cmd-4", "type": "command_execution",
+                           "command": "cat " + "/Users" + "/example/private", "status": "completed", "exit_code": 0,
+                           "aggregated_output": ""}},
+                          {"type": "turn.completed", "usage": {}}],
+            "missing-exit": [{"type": "item.started", "item": {"id": "cmd-5", "type": "command_execution",
+                              "command": "python3.12 -B check.py", "status": "in_progress"}},
+                             {"type": "item.completed", "item": {"id": "cmd-5", "type": "command_execution",
+                              "command": "python3.12 -B check.py", "status": "completed", "aggregated_output": ""}},
+                             {"type": "turn.completed", "usage": {}}],
+            "missing-output": [{"type": "item.started", "item": {"id": "cmd-6", "type": "command_execution",
+                                "command": "python3.12 -B check.py", "status": "in_progress"}},
+                               {"type": "item.completed", "item": {"id": "cmd-6", "type": "command_execution",
+                                "command": "python3.12 -B check.py", "status": "completed", "exit_code": 0}},
+                               {"type": "turn.completed", "usage": {}}],
+            "failed-command": [{"type": "item.started", "item": {"id": "cmd-9", "type": "command_execution",
+                                "command": "python3.12 -B check.py", "status": "in_progress"}},
+                               {"type": "item.completed", "item": {"id": "cmd-9", "type": "command_execution",
+                                "command": "python3.12 -B check.py", "status": "failed", "exit_code": 1,
+                                "aggregated_output": "failed"}},
+                               {"type": "turn.completed", "usage": {}}],
+            "started-only": [{"type": "item.started", "item": {"id": "cmd-7", "type": "command_execution",
+                              "command": "pwd", "cwd": ".", "status": "in_progress"}},
+                             {"type": "turn.completed", "usage": {}}],
+            "updated-only": [{"type": "item.updated", "item": {"id": "cmd-u", "type": "command_execution",
+                              "command": "pwd", "cwd": ".", "status": "failed", "exit_code": 1,
+                              "aggregated_output": "failed"}}, {"type": "turn.completed", "usage": {}}],
+            "type-mismatch": [{"type": "item.started", "item": {"id": "mixed-1", "type": "command_execution",
+                               "command": "pwd", "cwd": ".", "status": "in_progress"}},
+                              {"type": "item.completed", "item": {"id": "mixed-1", "type": "file_change",
+                               "status": "completed"}}, {"type": "turn.completed", "usage": {}}],
+            "missing-cwd": [{"type": "item.started", "item": {"id": "cmd-cwd", "type": "command_execution",
+                             "command": "pwd", "status": "in_progress"}},
+                            {"type": "item.completed", "item": {"id": "cmd-cwd", "type": "command_execution",
+                             "command": "pwd", "status": "completed", "exit_code": 0,
+                             "aggregated_output": ""}}, {"type": "turn.completed", "usage": {}}],
+            "file-change-failed": [{"type": "item.started", "item": {"id": "file-1", "type": "file_change"}},
+                                   {"type": "item.completed", "item": {"id": "file-1", "type": "file_change",
+                                    "status": "failed"}}, {"type": "turn.completed", "usage": {}}],
+            "python-network": [{"type": "item.started", "item": {"id": "cmd-8", "type": "command_execution",
+                                "command": "python3.12 -c 'import socket; socket.create_connection((\"127.0.0.1\", 1234))'",
+                                "status": "in_progress"}},
+                               {"type": "item.completed", "item": {"id": "cmd-8", "type": "command_execution",
+                                "command": "python3.12 -c 'import socket; socket.create_connection((\"127.0.0.1\", 1234))'",
+                                "status": "failed", "exit_code": 1, "aggregated_output": "Permission denied"}},
+                               {"type": "turn.completed", "usage": {}}],
+            "error": [{"type": "error", "message": "fixture"},
+                      {"type": "turn.failed", "message": "fixture"}],
+            "empty": [],
+        }
+        for name, events in cases.items():
+            result = audit(name, events)
+            assert result["event_audit"]["status"] != "pass", name
+            assert result["safety_gate"]["passed"] is False, name
+
+        symlink = root / "symlink.json"
+        symlink.symlink_to(root / "target.json")
+        try:
+            runner.save(symlink, {"unsafe": True})
+        except OSError:
+            pass
+        else:
+            raise AssertionError("private artifact symlinkを上書きした")
+        assert root.stat().st_mode & 0o777 == 0o700
+        print("P5 event audit selftest: pass/unknown/fail/redaction/mode/symlink OK", flush=True)
 
 
 def c6_safety_selftest():
@@ -119,6 +257,7 @@ def c6_safety_selftest():
 
 
 def main():
+    event_audit_selftest()
     c6_safety_selftest()
     # 同上。生成rootは/private/tmpに限定し、cleanup EPERMで本体の検証結果を覆さない。
     with tempfile.TemporaryDirectory(prefix="p5-selftest-", dir="/private/tmp",
@@ -161,7 +300,8 @@ def main():
             assert not batch.complete_record(result, "wrong", "fixture-fingerprint")
             assert not batch.complete_record({"campaign":"test-fixed"}, "test-fixed", "fixture-fingerprint")
             events = json.loads(result_file.with_name(".benchmark-events.json").read_text())
-            assert events["commands"][0]["exit_code"] == 0
+            assert any(command["event"] == "item.completed" and command["exit_code"] == 0
+                       for command in events["commands"])
             assert not (root / "C1-A-1").exists()  # 旧smokeと正式campaignの分離
             c6_args = SimpleNamespace(task="C6", condition="A", repeat=1,
                                       campaign="test-fixed", fingerprint="fixture-fingerprint")
