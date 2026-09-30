@@ -19,6 +19,7 @@ SPEC = importlib.util.spec_from_file_location("p5_run", HERE / "run.py")
 runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
 import sandbox_preflight as preflight
+from harness_fingerprint import HARNESS_INPUTS, compute_harness_fingerprint
 
 FAKE = '''#!/usr/bin/env python3
 import json,os,pathlib,subprocess,sys,time
@@ -71,6 +72,31 @@ def expect_rejected(call):
 
 def c1_task():
     return next(task for task in runner.load(runner.BASE / "comparison.json")["tasks"] if task["id"] == "C1")
+
+
+def fingerprint_test(root):
+    copied = root / "repo/docs/codex-direct/migration-benchmark"
+    for name in HARNESS_INPUTS:
+        destination = Path(os.path.abspath(copied / name))
+        runner._write_private(destination, runner.safe_read(Path(os.path.abspath(HERE / name))))
+    original = compute_harness_fingerprint(copied)
+    assert len(original) == 64 and compute_harness_fingerprint(copied) == original
+    module = copied / "harness_fingerprint.py"
+    runner._write_private(module, runner.safe_read(module) + b"\n# self-inclusion canary\n")
+    assert compute_harness_fingerprint(copied) != original
+    input_file = copied / "run.py"
+    data = runner.safe_read(input_file)
+    changed = compute_harness_fingerprint(copied)
+    runner._write_private(input_file, data + b"\n# runtime input canary\n")
+    assert compute_harness_fingerprint(copied) != changed
+    input_file.unlink()
+    input_file.symlink_to(module)
+    expect_rejected(lambda: compute_harness_fingerprint(copied))
+    input_file.unlink()
+    runner._write_private(input_file, data)
+    os.link(input_file, copied / "hardlink-canary")
+    expect_rejected(lambda: compute_harness_fingerprint(copied))
+    print("fingerprint: ordered inputs/self inclusion/source change/link rejection OK", flush=True)
 
 
 def permission_test(root):
@@ -256,13 +282,16 @@ def integration_test(root):
     originals = runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS
     runner.CODEX_EXECUTABLE = str(fake)
     runner.per_run_preflight = lambda spec: {"passed": True, "binding": spec["binding"]}
-    campaign = root / "campaign"
+    fingerprint = compute_harness_fingerprint(HERE)
+    campaign = root / ("p5-" + fingerprint[:16])
+    summary_path = campaign / "batch-summary.json"
+    runner.save(summary_path, {"schema": 2, "campaign": campaign.name, "fingerprint": fingerprint})
     serial = 0
     def invoke(task="C1", mode="normal"):
         nonlocal serial
         serial += 1
         (root / "mode").write_text(mode)
-        args = SimpleNamespace(task=task, condition="A", repeat=1, run_id=f"run-{serial:02}", campaign=str(campaign), fingerprint="fixture-fingerprint")
+        args = SimpleNamespace(task=task, condition="A", repeat=1, run_id=f"run-{serial:02}", campaign=str(campaign), fingerprint=fingerprint)
         with contextlib.redirect_stdout(io.StringIO()):
             runner.run(args)
         path = campaign / args.run_id / ".benchmark-result.json"
@@ -282,8 +311,47 @@ def integration_test(root):
         assert replay["raw_event_sha256"] == raw_hash and replay["source_result_sha256"] == record_hash
         assert replay["event_audit"] == result["event_audit"] and replay["attempt_policy"] == result["attempt_policy"]
         assert runner.sha(result_path) == record_hash and runner.sha(raw) == raw_hash
+        assert replay["classifier_sha256"] == runner.sha(HERE / "run.py")
+        assert replay["harness_fingerprint"] == fingerprint and replay["run_id"] == args.run_id
         assert report_path.stat().st_mode & 0o777 == 0o600
-        expect_rejected(lambda: runner.reclassify_result(result_path, raw.parent / "../run-01/events.raw.jsonl"))
+        assert report_path.parent.stat().st_mode & 0o777 == 0o700
+        # 出力先をaccepted/evidence/元run/別run/共有parentへ広げられない。
+        accepted_before = runner.tree_manifest(campaign / ".accepted/run-01", exclude_bookkeeping=False)
+        for wrong in (campaign / ".accepted/run-01/replay.json", raw, result_path,
+                      campaign / "run-02/replay.json", campaign / ".reviews/run-02-replay.json",
+                      campaign / ".reviews/arbitrary.json", root / "replay.json",
+                      raw.parent / "../run-01/events.raw.jsonl"):
+            expect_rejected(lambda wrong=wrong: runner.reclassify_result(result_path, wrong))
+        assert runner.tree_manifest(campaign / ".accepted/run-01", exclude_bookkeeping=False) == accepted_before
+        assert runner.sha(result_path) == record_hash and runner.sha(raw) == raw_hash
+        # record、campaign summary、現行harnessのいずれのfingerprint不一致も拒否する。
+        result_original = runner.safe_read(result_path)
+        summary_original = runner.safe_read(summary_path)
+        runner.save(result_path, {**result, "fingerprint": "0" * 64})
+        expect_rejected(lambda: runner.reclassify_result(result_path, report_path))
+        runner._write_private(result_path, result_original)
+        runner.save(summary_path, {"schema": 2, "campaign": campaign.name, "fingerprint": "0" * 64})
+        expect_rejected(lambda: runner.reclassify_result(result_path, report_path))
+        runner._write_private(summary_path, summary_original)
+        original_compute = runner.compute_harness_fingerprint
+        runner.compute_harness_fingerprint = lambda _here: "0" * 64
+        try:
+            expect_rejected(lambda: runner.reclassify_result(result_path, report_path))
+        finally:
+            runner.compute_harness_fingerprint = original_compute
+        # exact pathでもsymlinkを介してrawへ書けない。共有parentのmodeも変えない。
+        report_original = runner.safe_read(report_path)
+        report_path.unlink()
+        report_path.symlink_to(raw)
+        expect_rejected(lambda: runner.reclassify_result(result_path, report_path))
+        report_path.unlink()
+        runner._write_private(report_path, report_original)
+        root_mode = root.stat().st_mode & 0o777
+        report_path.parent.chmod(0o755)
+        runner.reclassify_result(result_path, report_path)
+        assert report_path.parent.stat().st_mode & 0o777 == 0o700
+        assert root.stat().st_mode & 0o777 == root_mode
+        assert runner.sha(result_path) == record_hash and runner.sha(raw) == raw_hash
         raw_original = runner.safe_read(raw)
         runner._write_private(raw, raw_original + b"\n")
         expect_rejected(lambda: runner.reclassify_result(result_path))
@@ -329,7 +397,7 @@ def integration_test(root):
             runner.execute_group = original_execute
     finally:
         runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS = originals
-    print("integration: 4 gates/raw replay+tamper/non-mutating result/C6 scratch validator/full manifest/timeout/binding block OK", flush=True)
+    print("integration: 4 gates/exact replay path/fingerprint+hash tamper/non-mutating result/C6 scratch validator/full manifest/timeout/binding block OK", flush=True)
 
 
 def process_test(root):
@@ -349,6 +417,7 @@ def main():
     # managed macOS sandboxのmount cleanup停止を避け、private test rootを保持する。
     root = Path(tempfile.mkdtemp(prefix="p5-security-selftest-", dir="/private/tmp"))
     assert len(runner.verified_a_inputs()) == 1 and len(runner.verified_b_inputs()) == 7
+    fingerprint_test(root / "fingerprint")
     permission_test(root / "permissions")
     event_test(root / "events")
     snapshot_test(root / "snapshots")

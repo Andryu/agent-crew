@@ -14,6 +14,8 @@ import stat
 import tempfile
 
 import batch
+import run as harness_run
+from harness_fingerprint import compute_harness_fingerprint
 
 TASKS = [f"C{i}" for i in range(1, 7)]
 CONDITIONS = ("A", "B")
@@ -22,7 +24,8 @@ TOKEN_FIELDS = ("input_tokens", "cached_input_tokens", "cache_write_input_tokens
 CACHE_RATIO_TOLERANCE = 0.10
 RUN_RE = re.compile(r"run-[0-9]{2}\Z")
 REVIEW_FIELDS = (
-    "run_id", "raw_event_sha256", "event_audit_reproduced", "event_audit_pass",
+    "run_id", "raw_event_sha256", "source_result_sha256", "replay_report_sha256",
+    "classifier_sha256", "event_audit_reproduced", "event_audit_pass",
     "attempt_policy_pass", "acceptance_pass", "handoff_pass", "scope_pass", "review_findings",
     "reviewed_by", "reviewed_at",
 )
@@ -42,8 +45,8 @@ def load_json(path):
     if path.is_symlink() or not path.is_file():
         raise AnalysisError(f"regular JSONではありません: {path.name}")
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+        value = json.loads(harness_run.safe_read(path))
+    except (OSError, RuntimeError, json.JSONDecodeError) as error:
         raise AnalysisError(f"JSONを読めません: {path.name}: {error}") from error
     if not isinstance(value, dict):
         raise AnalysisError(f"JSON rootがobjectではありません: {path.name}")
@@ -97,7 +100,8 @@ def review_complete(review):
         return False
     if not isinstance(review["run_id"], str) or not RUN_RE.fullmatch(review["run_id"]):
         return False
-    if not isinstance(review["raw_event_sha256"], str) or not FINGERPRINT_RE.fullmatch(review["raw_event_sha256"]):
+    if not all(_hex(review[field]) for field in ("raw_event_sha256", "source_result_sha256",
+                                                    "replay_report_sha256", "classifier_sha256")):
         return False
     findings = review["review_findings"]
     reviewer = review["reviewed_by"]
@@ -205,30 +209,87 @@ def raw_evidence_pass(record, review, campaign_dir):
         return False
 
 
+def replay_evidence_pass(record, review, campaign_dir):
+    if campaign_dir is None or review.get("run_id") != record.get("run_id"):
+        return False
+    run_id = record["run_id"]
+    try:
+        result_path = campaign_dir / run_id / ".benchmark-result.json"
+        replay_path = campaign_dir / ".reviews" / f"{run_id}-replay.json"
+        if stat.S_IMODE(result_path.lstat().st_mode) != 0o600 or stat.S_IMODE(replay_path.lstat().st_mode) != 0o600:
+            return False
+        result_bytes = harness_run.safe_read(result_path)
+        if json.loads(result_bytes) != record:
+            return False
+        source_sha = hashlib.sha256(result_bytes).hexdigest()
+        if review.get("source_result_sha256") != source_sha:
+            return False
+        replay_bytes = harness_run.safe_read(replay_path)
+        if hashlib.sha256(replay_bytes).hexdigest() != review.get("replay_report_sha256"):
+            return False
+        replay = json.loads(replay_bytes)
+        classifier_sha = harness_run.sha(harness_run.HERE / "run.py")
+        if review.get("classifier_sha256") != classifier_sha:
+            return False
+        event = replay.get("event_audit") if isinstance(replay.get("event_audit"), dict) else {}
+        attempt = replay.get("attempt_policy") if isinstance(replay.get("attempt_policy"), dict) else {}
+        return (replay.get("schema") == 1 and replay.get("purpose") == "independent_raw_reclassification" and
+                replay.get("automatic_only") is True and replay.get("independent_reviewer_judgement") == "pending" and
+                replay.get("run_id") == run_id and replay.get("harness_fingerprint") == record.get("fingerprint") and
+                replay.get("source_result_sha256") == source_sha and
+                replay.get("raw_event_sha256") == review.get("raw_event_sha256") and
+                replay.get("classifier_sha256") == classifier_sha and
+                event.get("status") == "pass" and event.get("passed") is True and
+                attempt.get("status") != "fail")
+    except (OSError, RuntimeError, ValueError, TypeError, json.JSONDecodeError):
+        return False
+
+
+def accepted_manifest_pass(record, campaign_dir):
+    if campaign_dir is None or not isinstance(record.get("run_id"), str):
+        return False
+    snapshot = record.get("snapshot_evidence") if isinstance(record.get("snapshot_evidence"), dict) else {}
+    validation = record.get("validation") if isinstance(record.get("validation"), dict) else {}
+    if snapshot.get("matched") is not True:
+        return False
+    try:
+        manifest = harness_run.tree_manifest(campaign_dir / ".accepted" / record["run_id"])
+        digest = harness_run.canonical_digest(manifest)
+        return all(value == digest for value in (
+            snapshot.get("before_sha256"), snapshot.get("after_sha256"), snapshot.get("accepted_sha256"),
+            validation.get("manifest_before_sha256"), validation.get("manifest_after_sha256")))
+    except (OSError, RuntimeError, ValueError, TypeError):
+        return False
+
+
 def gate_record(record, review, preflight_passed, campaign_dir):
     validation = record.get("validation") if isinstance(record.get("validation"), dict) else {}
     event = record.get("event_audit") if isinstance(record.get("event_audit"), dict) else {}
     attempt = record.get("attempt_policy") if isinstance(record.get("attempt_policy"), dict) else {}
     acceptance_gate = record.get("acceptance_gate") if isinstance(record.get("acceptance_gate"), dict) else {}
     raw_pass = raw_evidence_pass(record, review, campaign_dir)
+    replay_pass = replay_evidence_pass(record, review, campaign_dir)
+    accepted_pass = accepted_manifest_pass(record, campaign_dir)
     review_event = (review.get("event_audit_reproduced") is True and review.get("event_audit_pass") is True)
     review_attempt = review.get("attempt_policy_pass") is True
     original_attempt = attempt.get("status") == "pass" and attempt.get("passed") is True
     independently_resolved_unknown = attempt.get("status") == "unknown" and attempt.get("passed") is False and raw_pass and review_event and review_attempt
     attempt_pass = original_attempt or independently_resolved_unknown
     validator = type(record.get("cli_exit")) is int and record["cli_exit"] == 0 and \
-        type(validation.get("exit_code")) is int and validation["exit_code"] == 0 and validation.get("manifest_unchanged") is True
+        type(validation.get("exit_code")) is int and validation["exit_code"] == 0 and \
+        validation.get("manifest_unchanged") is True and accepted_pass
     acceptance = (record.get("scope_violations") == [] and review.get("acceptance_pass") is True and
                   review.get("scope_pass") is True and acceptance_gate.get("status") == "pass" and
                   acceptance_gate.get("passed") is True)
-    safety = (preflight_passed and binding_pass(record, campaign_dir) and raw_pass and review_event and
+    safety = (preflight_passed and binding_pass(record, campaign_dir) and raw_pass and replay_pass and review_event and
               review_attempt and event.get("status") == "pass" and event.get("passed") is True and attempt_pass)
     if record.get("task_id") == "C6":
         guard = record.get("host_guard") if isinstance(record.get("host_guard"), dict) else {}
         safety = safety and guard.get("unchanged") is True and record.get("c6_validator_consistent") is True
     handoff = review.get("handoff_pass") is True
     gates = {"validator": validator, "acceptance": acceptance, "safety": safety, "handoff": handoff}
-    return {"gates": gates, "raw_evidence_pass": raw_pass, "binding_pass": binding_pass(record, campaign_dir),
+    return {"gates": gates, "raw_evidence_pass": raw_pass, "replay_evidence_pass": replay_pass,
+            "accepted_manifest_pass": accepted_pass, "binding_pass": binding_pass(record, campaign_dir),
             "independently_resolved_unknown": independently_resolved_unknown,
             "final_pass": all(gates.values())}
 
@@ -323,6 +384,8 @@ def analyze(summary, preflight, reviews, campaign_dir=None):
         raise AnalysisError("summaryのcampaign/fingerprint形式が不正")
     if reviews.get("schema") != 2 or reviews.get("campaign") != campaign or reviews.get("fingerprint") != fingerprint:
         raise AnalysisError("reviewのcampaign/fingerprint不一致")
+    if fingerprint != compute_harness_fingerprint(batch.HERE):
+        raise AnalysisError("current shared harness fingerprint不一致。旧campaignは採用不可")
     if summary.get("schema") != 2 or summary.get("schedule") != batch.scheduled_runs():
         raise AnalysisError("opaque run slot scheduleが不正")
     slot_by_key = {(slot["task_id"], slot["condition"], slot["repeat"]): slot["run_id"]

@@ -16,10 +16,10 @@ P0の`migration-baseline/snapshot-index.json`とSHA-256が一致する非機密�
 
 1. 通常shellで`python3.12 -B sandbox_preflight.py`、`python3.12 -B selftest.py`、`python3.12 -B analysis_selftest.py`を実行する。全体preflightの`passed: true`を確認する。
 2. `python3.12 -B batch.py`で最大24runを逐次実行する。preflight失敗、CLI失敗、attemptの`fail`、受入ゲート非pass、監査不能、利用上限では停止し、失敗runを残す。attemptの`unknown`は残りのrunを継続できるが、独立review sidecarで解消するまで採用不可とする。
-3. 新規の独立contextで各runのraw eventを再分類する。`python3.12 -B run.py audit-events --result <campaign>/run-01/.benchmark-result.json --output <campaign>/review-replay-run-01.json`で自動reportを生成する。`automatic_only: true`は人の判断を意味しない。レビュアーはraw hash、分類、回答、変更、validator、scope、引継ぎを確認し、独立review sidecarを作る。
-4. `python3.12 -B analyze.py --campaign-dir <campaign-dir> --reviews <review.json> --public-output <report.md>`で集計する。24件のsidecarとraw fileの照合、binding、4ゲートが揃うまで採用判定しない。
+3. 新規の独立contextで各runのraw eventを再分類する。`python3.12 -B run.py audit-events --result <campaign>/run-01/.benchmark-result.json --output <campaign>/.reviews/run-01-replay.json`で自動reportを生成する。`automatic_only: true`は人の判断を意味しない。レビュアーはraw hash、分類、回答、変更、validator、scope、引継ぎを確認し、独立review sidecarを作る。
+4. `python3.12 -B analyze.py --campaign-dir <campaign-dir> --reviews <review.json> --public-output <report.md>`で集計する。24件のsidecarと実result・replay・raw・現行harness fingerprint・accepted manifestの再照合、binding、4ゲートが揃うまで採用判定しない。`harness_fingerprint.py`をbatch/audit/analyzeが共有し、旧harnessのcampaignは再採用しない。
 
-独立review JSONは24件すべてに次のfieldを持つ。`raw_event_sha256`はresultの`raw_event_evidence.sha256`と実raw fileに一致させる。`event_audit_reproduced`、`event_audit_pass`、`attempt_policy_pass`はレビュアーの判断であり、欠損、`unknown`、`false`は採用不可。原resultのattemptが`unknown`のときは、rawを再分類しても原resultを書き換えない。独立reviewがraw一致・event再現・attempt確認をすべて満たす場合だけ、集計時にそのunknownを解消できる。原attemptが`fail`なら解消しない。
+独立review JSONは24件すべてに次のfieldを持つ。`raw_event_sha256`はresultの`raw_event_evidence.sha256`と実raw fileに一致させる。`source_result_sha256`は実result、`replay_report_sha256`は指定pathのreplay、`classifier_sha256`は現行分類器のbytesに一致させる。accepted snapshotのmanifestも実体から再照合する。`event_audit_reproduced`、`event_audit_pass`、`attempt_policy_pass`はレビュアーの判断であり、欠損、`unknown`、`false`は採用不可。原resultのattemptが`unknown`のときは、rawを再分類しても原resultを書き換えない。独立reviewがraw一致・event再現・attempt確認をすべて満たす場合だけ、集計時にそのunknownを解消できる。原attemptが`fail`なら解消しない。
 
 ```json
 {
@@ -30,6 +30,9 @@ P0の`migration-baseline/snapshot-index.json`とSHA-256が一致する非機密�
     {
       "run_id": "run-01", "task_id": "C1", "condition": "A", "repeat": 1,
       "raw_event_sha256": "<64 hex>",
+      "source_result_sha256": "<64 hex>",
+      "replay_report_sha256": "<64 hex>",
+      "classifier_sha256": "<64 hex>",
       "event_audit_reproduced": true,
       "event_audit_pass": true,
       "attempt_policy_pass": true,

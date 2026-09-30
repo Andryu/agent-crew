@@ -2,6 +2,7 @@
 """P5集計を合成24runとprivate raw証跡で検証する。モデルは呼ばない。"""
 
 import hashlib
+import json
 import importlib.util
 from pathlib import Path
 import tempfile
@@ -18,6 +19,8 @@ def load_module(name):
 
 batch = load_module("batch")
 analyze = load_module("analyze")
+from harness_fingerprint import compute_harness_fingerprint
+import run as harness_run
 HASH = "a" * 64
 
 
@@ -34,7 +37,7 @@ def binding(root, fingerprint, phase):
 
 
 def fixtures(campaign_dir, a_seconds=100.0, b_seconds=70.0):
-    fingerprint = "f" * 64
+    fingerprint = compute_harness_fingerprint(HERE)
     campaign = f"p5-{fingerprint[:16]}"
     assert campaign_dir.name == campaign
     runs, reviews = [], []
@@ -52,12 +55,16 @@ def fixtures(campaign_dir, a_seconds=100.0, b_seconds=70.0):
         digest = hashlib.sha256(raw.read_bytes()).hexdigest()
         model = binding(root, fingerprint, "model")
         validator = binding(accepted, fingerprint, "validation")
+        empty_digest = harness_run.canonical_digest(harness_run.tree_manifest(accepted))
         runs.append({
             "schema": 3, "campaign": campaign, "fingerprint": fingerprint,
             "run_id": run_id, "task_id": task, "condition": condition, "repeat": repeat,
             "cli_version": "codex-cli 0.155.1", "cli_exit": 0,
             "validation": {"exit_code": 0, "manifest_unchanged": True, "binding": validator,
-                           "derived_from_model_profile_sha256": model["profile_sha256"]},
+                           "derived_from_model_profile_sha256": model["profile_sha256"],
+                           "manifest_before_sha256": empty_digest, "manifest_after_sha256": empty_digest},
+            "snapshot_evidence": {"matched": True, "before_sha256": empty_digest,
+                                  "after_sha256": empty_digest, "accepted_sha256": empty_digest},
             "isolation_gate": {"status": "pass", "passed": True, "preflight_bound": True,
                                "binding": model, "preflight_binding": model},
             "event_audit": {"status": "pass", "passed": True},
@@ -76,7 +83,9 @@ def fixtures(campaign_dir, a_seconds=100.0, b_seconds=70.0):
         })
         reviews.append({
             "run_id": run_id, "task_id": task, "condition": condition, "repeat": repeat,
-            "raw_event_sha256": digest, "event_audit_reproduced": True,
+            "raw_event_sha256": digest, "source_result_sha256": HASH,
+            "replay_report_sha256": HASH, "classifier_sha256": HASH,
+            "event_audit_reproduced": True,
             "event_audit_pass": True, "attempt_policy_pass": True,
             "acceptance_pass": True, "handoff_pass": True, "scope_pass": True,
             "review_findings": [], "reviewed_by": "independent-reviewer",
@@ -86,7 +95,31 @@ def fixtures(campaign_dir, a_seconds=100.0, b_seconds=70.0):
                "schedule": batch.scheduled_runs(), "results": runs}
     review_file = {"schema": 2, "campaign": campaign, "fingerprint": fingerprint,
                    "reviews": reviews}
+    refresh_evidence(summary, review_file, campaign_dir)
     return summary, {"passed": True}, review_file
+
+
+def refresh_evidence(summary, reviews, campaign_dir):
+    review_by_id = {review["run_id"]: review for review in reviews["reviews"]}
+    classifier = harness_run.sha(HERE / "run.py")
+    for record in summary["results"]:
+        run_id = record["run_id"]
+        result_path = campaign_dir / run_id / ".benchmark-result.json"
+        batch.atomic_json(result_path, record)
+        source_sha = hashlib.sha256(harness_run.safe_read(result_path)).hexdigest()
+        review = review_by_id[run_id]
+        review["source_result_sha256"] = source_sha
+        review["classifier_sha256"] = classifier
+        replay = {"schema": 1, "purpose": "independent_raw_reclassification",
+                  "source_result_sha256": source_sha, "run_id": run_id,
+                  "harness_fingerprint": summary["fingerprint"], "classifier_sha256": classifier,
+                  "raw_event_sha256": record["raw_event_evidence"]["sha256"],
+                  "automatic_only": True, "independent_reviewer_judgement": "pending",
+                  "event_audit": {"status": "pass", "passed": True},
+                  "attempt_policy": record["attempt_policy"]}
+        replay_path = campaign_dir / ".reviews" / f"{run_id}-replay.json"
+        batch.atomic_json(replay_path, replay)
+        review["replay_report_sha256"] = hashlib.sha256(harness_run.safe_read(replay_path)).hexdigest()
 
 
 def decide(summary, preflight, reviews, campaign_dir):
@@ -96,7 +129,8 @@ def decide(summary, preflight, reviews, campaign_dir):
 def main():
     with tempfile.TemporaryDirectory(prefix="p5-analysis-", dir="/private/tmp",
                                      ignore_cleanup_errors=True) as temporary:
-        campaign_dir = Path(temporary) / "p5-ffffffffffffffff"
+        fingerprint = compute_harness_fingerprint(HERE)
+        campaign_dir = Path(temporary) / f"p5-{fingerprint[:16]}"
         summary, preflight, reviews = fixtures(campaign_dir)
         positive = decide(summary, preflight, reviews, campaign_dir)
         assert positive["campaign_complete"] and positive["all_runs_final_pass"]
@@ -109,17 +143,60 @@ def main():
         assert positive["usage"]["totals"]["cached_input_tokens"] == 12000
         assert batch.stop_reason(summary["results"][0]) is None
 
+        first = summary["results"][0]
+        first_review = reviews["reviews"][0]
+        stale_sidecar = dict(first_review)
+        first["output_tokens"] = 101
+        refresh_evidence(summary, reviews, campaign_dir)
+        reviews["reviews"][0] = stale_sidecar
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        reviews["reviews"][0] = first_review
+        first["output_tokens"] = 100
+        refresh_evidence(summary, reviews, campaign_dir)
+
+        result_path = campaign_dir / first["run_id"] / ".benchmark-result.json"
+        original_result_bytes = harness_run.safe_read(result_path)
+        result_path.write_text('{"changed":true}\n', encoding="utf-8")
+        result_path.chmod(0o600)
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        result_path.write_bytes(original_result_bytes)
+        result_path.chmod(0o600)
+        replay_path = campaign_dir / ".reviews" / f"{first['run_id']}-replay.json"
+        original_replay_bytes = harness_run.safe_read(replay_path)
+        replay_path.write_text('{"changed":true}\n', encoding="utf-8")
+        replay_path.chmod(0o600)
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        replay_path.write_bytes(original_replay_bytes)
+        replay_path.chmod(0o600)
+
+        accepted_change = campaign_dir / ".accepted" / first["run_id"] / "changed.txt"
+        accepted_change.write_text("tampered", encoding="utf-8")
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        accepted_change.unlink()
+        old_fingerprint = summary["fingerprint"]
+        summary["fingerprint"] = reviews["fingerprint"] = old_fingerprint[:16] + "0" * 48
+        try:
+            decide(summary, preflight, reviews, campaign_dir)
+        except analyze.AnalysisError as error:
+            assert "current shared harness fingerprint" in str(error)
+        else:
+            raise AssertionError("旧fingerprintの採用を拒否しなかった")
+        summary["fingerprint"] = reviews["fingerprint"] = old_fingerprint
+
         original = summary["results"][0]["attempt_policy"]
         summary["results"][0]["attempt_policy"] = {"status": "unknown", "passed": False}
         summary["results"][0]["safety_gate"] = {"status": "fail", "passed": False}
+        refresh_evidence(summary, reviews, campaign_dir)
         resolved = decide(summary, preflight, reviews, campaign_dir)
         assert resolved["decision"] == "adopt"
         assert resolved["run_results"][0]["independently_resolved_unknown"] is True
         assert batch.stop_reason(summary["results"][0]) is None
         summary["results"][0]["attempt_policy"] = {"status": "fail", "passed": False}
+        refresh_evidence(summary, reviews, campaign_dir)
         assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
         summary["results"][0]["attempt_policy"] = original
         summary["results"][0]["safety_gate"] = {"status": "pass", "passed": True}
+        refresh_evidence(summary, reviews, campaign_dir)
 
         raw = campaign_dir / ".evidence" / summary["results"][0]["run_id"] / "events.raw.jsonl"
         raw_bytes = raw.read_bytes()
@@ -145,25 +222,31 @@ def main():
         old_tool = model.pop("tool_environment")
         assert decide(summary, preflight, reviews, campaign_dir)["safety_gate"]["status"] == "fail"
         model["tool_environment"] = old_tool
+        refresh_evidence(summary, reviews, campaign_dir)
         summary["results"][0]["isolation_gate"]["preflight_bound"] = False
         assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
         summary["results"][0]["isolation_gate"]["preflight_bound"] = True
+        refresh_evidence(summary, reviews, campaign_dir)
         validation = summary["results"][0]["validation"]
         derived = validation.pop("derived_from_model_profile_sha256")
         assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
         validation["derived_from_model_profile_sha256"] = derived
+        refresh_evidence(summary, reviews, campaign_dir)
 
         for record in summary["results"]:
             if record["task_id"] == "C1" and record["condition"] == "B":
                 record["cached_input_tokens"] = 900
+        refresh_evidence(summary, reviews, campaign_dir)
         cache_diff = decide(summary, preflight, reviews, campaign_dir)
         assert cache_diff["cache_comparability"]["status"] == "unknown"
         assert cache_diff["speed_target"]["status"] == "unknown"
         for record in summary["results"]:
             record["cached_input_tokens"] = 500
         del summary["results"][0]["cached_input_tokens"]
+        refresh_evidence(summary, reviews, campaign_dir)
         assert decide(summary, preflight, reviews, campaign_dir)["speed_target"]["status"] == "unknown"
         summary["results"][0]["cached_input_tokens"] = 500
+        refresh_evidence(summary, reviews, campaign_dir)
 
         slots = [slot["run_id"] for slot in batch.scheduled_runs()]
         assert len(slots) == len(set(slots)) == 24 and all(len(slot) == 6 for slot in slots)

@@ -17,6 +17,8 @@ import subprocess
 import sys
 import time
 
+from harness_fingerprint import compute_harness_fingerprint
+
 HERE = Path(__file__).resolve().parent
 BASE = HERE.parent / "migration-baseline"
 WORK = Path("/private/tmp/agent-crew-p5-benchmark/formal")
@@ -772,16 +774,32 @@ def safe_events(raw, destination=None, expected_cwd=None):
 
 
 def reclassify_result(result_path, destination=None):
-    """原result/rawを変更せず、記録済みhashと結びつけて独立再監査用reportを作る。"""
-    result_path = Path(result_path).absolute()
+    """現行campaignだけを再分類し、専用review file以外には書き込まない。"""
+    result_path = Path(os.path.abspath(result_path))
     record_bytes = safe_read(result_path)
     record = json.loads(record_bytes)
     if record.get("schema") != 3 or record.get("cli_version") != CLI_VERSION:
         raise BoundaryError("この再分類器はschema=3/固定CLIの新campaignだけを受け付けます")
     run_root = result_path.parent
     campaign = run_root.parent
+    run_id = record.get("run_id")
+    if (not isinstance(run_id, str) or not re.fullmatch(r"run-[0-9]{2,}", run_id) or
+            result_path.name != ".benchmark-result.json" or run_root.name != run_id):
+        raise BoundaryError("result pathとrun_idが一致しません")
+    fingerprint = compute_harness_fingerprint(HERE)
+    expected_campaign = "p5-" + fingerprint[:16]
+    summary = load(campaign / "batch-summary.json")
+    if (record.get("fingerprint") != fingerprint or summary.get("fingerprint") != fingerprint or
+            record.get("campaign") != expected_campaign or summary.get("campaign") != expected_campaign or
+            campaign.name != expected_campaign):
+        raise BoundaryError("旧証跡または不一致campaignです。現行harness fingerprintとの完全一致が必要です")
+    expected_output = campaign / ".reviews" / (run_id + "-replay.json")
+    if destination is not None:
+        requested = Path(destination)
+        if ".." in requested.parts or Path(os.path.abspath(requested)) != expected_output:
+            raise BoundaryError("再分類の出力先はcampaign/.reviews/run-NN-replay.jsonだけです")
     relative = Path(record["raw_event_evidence"]["path_relative_to_campaign"])
-    if relative.is_absolute() or ".." in relative.parts or relative.parts[:2] != (".evidence", record["run_id"]):
+    if relative.is_absolute() or ".." in relative.parts or relative.parts[:2] != (".evidence", run_id):
         raise BoundaryError("raw証跡pathがcampaign/runの範囲外です")
     raw_path = campaign / relative
     raw = safe_read(raw_path)
@@ -789,14 +807,17 @@ def reclassify_result(result_path, destination=None):
         raise BoundaryError("raw event hash不一致")
     report = safe_events(raw.decode("utf-8"), expected_cwd=run_root)
     report.update({"schema": 1, "purpose": "independent_raw_reclassification", "source_result_sha256": digest_bytes(record_bytes),
-                   "run_id": record["run_id"], "harness_fingerprint": record["fingerprint"],
+                   "run_id": run_id, "harness_fingerprint": fingerprint,
                    "classifier_sha256": sha(HERE / "run.py"), "raw_event_sha256": digest_bytes(raw),
                    "automatic_only": True, "independent_reviewer_judgement": "pending"})
     if destination is not None:
-        destination = Path(os.path.abspath(destination))
-        if destination == result_path or destination == raw_path or destination.is_relative_to(run_root):
-            raise BoundaryError("再分類reportで元run/rawを上書きできません")
-        save(destination, report)
+        # chmodするのはこのcampaign専用の.reviewsだけ。共有parentは変更しない。
+        directory_fd = _open_directory(expected_output.parent, create=True)
+        try:
+            os.fchmod(directory_fd, 0o700)
+        finally:
+            os.close(directory_fd)
+        save(expected_output, report)
     return report
 
 def stop_group(pgid):

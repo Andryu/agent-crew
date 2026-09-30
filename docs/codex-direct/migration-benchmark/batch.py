@@ -11,6 +11,8 @@ import sys
 import tempfile
 import time
 
+from harness_fingerprint import compute_harness_fingerprint
+
 HERE = Path(__file__).resolve().parent
 WORK = Path("/private/tmp/agent-crew-p5-benchmark/formal")
 TASKS = ["C1", "C2", "C3", "C4", "C5", "C6"]
@@ -217,11 +219,7 @@ def main():
                 for path in a_tree.rglob("*") if path.is_file()}
     if a_fixed != a_actual or any(path.is_symlink() for path in a_tree.rglob("*")):
         raise SystemExit("A補足指示treeが固定indexと不一致")
-    inputs = [HERE / "run.py", HERE / "batch.py", HERE / "sandbox_preflight.py", HERE / "analyze.py", HERE / "analysis_selftest.py", HERE / "comparison-v2.json", HERE / "validate_c6.py",
-              HERE.parent / "migration-baseline/comparison.json", HERE.parent / "migration-baseline/snapshot-index.json",
-              b_index, a_index]
-    fingerprint = hashlib.sha256("".join(str(path.relative_to(HERE.parent.parent.parent)) + ":" +
-                                          hashlib.sha256(path.read_bytes()).hexdigest() for path in inputs).encode()).hexdigest()
+    fingerprint = compute_harness_fingerprint(HERE)
     campaign = f"p5-{fingerprint[:16]}"
     secure_mkdir(WORK)
     campaign_dir = secure_mkdir(WORK / campaign)
