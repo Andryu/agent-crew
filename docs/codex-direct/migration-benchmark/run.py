@@ -540,6 +540,99 @@ def is_env_canary_command(command):
             and words[1] in {"-c", "-lc"} and words[2] == ENV_CANARY_COMMAND)
 
 
+def has_shell_background_operator(command):
+    """引用・escape・通常のredirect/pipeline/logical-andとbackgroundを区別する。"""
+    quote, escaped, index = None, False, 0
+    while index < len(command):
+        value = command[index]
+        if escaped:
+            escaped = False
+        elif quote == "'":
+            if value == quote:
+                quote = None
+        elif value == "\\":
+            escaped = True
+        elif quote:
+            if value == quote:
+                quote = None
+        elif value in {"'", '"'}:
+            quote = value
+        elif value == "&":
+            before = command[index - 1] if index else ""
+            after = command[index + 1] if index + 1 < len(command) else ""
+            if after == "&":
+                index += 1
+            elif before not in {">", "<", "|"} and after != ">":
+                return True
+        index += 1
+    return False
+
+
+def lifecycle_attempts(tokens):
+    """明示的なtoken変更/継承除去とdetached実行を分類。未知codeの完全解析はしない。"""
+    result = []
+    def add(reason):
+        item = {"reason": reason, "severity": "fail"}
+        if item not in result:
+            result.append(item)
+    def assignment(value):
+        return bool(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", value, re.DOTALL))
+    current = list(tokens)
+    while current and assignment(current[0]):
+        if current[0].startswith("P5_RUN_TOKEN="):
+            add("explicit_run_token_modification")
+        current.pop(0)
+    while current and Path(current[0]).name in {"command", "builtin", "exec"}:
+        current.pop(0)
+        while current and current[0].startswith("-"):
+            current.pop(0)
+    if not current:
+        return result
+    executable = Path(current[0]).name
+    if executable == "env":
+        rest = current[1:]
+        index = 0
+        while index < len(rest):
+            value = rest[index]
+            if value in {"-i", "--ignore-environment", "-"}:
+                add("explicit_run_token_removal")
+            elif value in {"-u", "--unset"}:
+                index += 1
+                if index < len(rest) and rest[index] == "P5_RUN_TOKEN":
+                    add("explicit_run_token_removal")
+            elif value in {"--unset=P5_RUN_TOKEN", "-uP5_RUN_TOKEN"}:
+                add("explicit_run_token_removal")
+            elif assignment(value):
+                if value.startswith("P5_RUN_TOKEN="):
+                    add("explicit_run_token_modification")
+            elif value == "--":
+                index += 1
+                break
+            elif not value.startswith("-"):
+                break
+            index += 1
+        if index < len(rest):
+            for item in lifecycle_attempts(rest[index:]):
+                add(item["reason"])
+    if executable in {"unset", "export", "declare", "typeset", "readonly", "set", "setenv", "unsetenv"}:
+        if any(value == "P5_RUN_TOKEN" or value.startswith("P5_RUN_TOKEN=") or
+               (executable in {"unset", "unsetenv"} and value in {"P5_*", "P5_RUN_*", "*"}) for value in current[1:]):
+            add("explicit_run_token_modification")
+    if executable in {"setsid", "nohup", "disown", "daemon", "launchctl", "bg"}:
+        add("explicit_detached_process_attempt")
+    if executable.startswith(("python", "node", "ruby", "perl", "php")):
+        code = " ".join(current[1:])
+        if re.search(r"\b(?:setsid|fork|forkpty|daemon)\s*\(|\bstart_new_session\s*=\s*True|\bdetached\s*:\s*true|\bdaemon\s*=\s*True", code):
+            add("explicit_detached_process_attempt")
+        if re.search(r"\b(?:os\.)?environ\.clear\s*\(", code):
+            add("explicit_run_token_removal")
+        if "P5_RUN_TOKEN" in code and re.search(
+                r"\b(?:unsetenv|putenv|setenv|delete|del)\b|\.(?:pop|update|setdefault)\s*\(|"
+                r"(?:environ|process\.env)\s*\[[^]]*\]\s*=|process\.env\.P5_RUN_TOKEN\s*=", code):
+            add("explicit_run_token_modification")
+    return result
+
+
 def command_attempts(command, expected_cwd=None):
     """parse/実行内容が不明なものはunknown。全tokenのpathとredirectionを検査する。"""
     if is_env_canary_command(command):
@@ -574,6 +667,8 @@ def command_attempts(command, expected_cwd=None):
         finding("shell_wrapper_unclassified")
     if any(symbol in command for symbol in ("$", "`", "\n", "\r")) or any(token in {"(", ")", "<<", "<<<"} for token in tokens):
         finding("dynamic_shell_unclassified")
+    if has_shell_background_operator(command):
+        finding("explicit_background_process_attempt", "fail")
     segments, segment = [], []
     for token in tokens:
         if token in {";", "&&", "||", "|", "&"}:
@@ -591,6 +686,8 @@ def command_attempts(command, expected_cwd=None):
     runtime_directories = {"/bin", "/usr/bin", "/opt/homebrew/bin", "/usr/local/bin"}
     root = os.path.abspath(expected_cwd) if expected_cwd is not None else None
     for current in segments:
+        for entry in lifecycle_attempts(current):
+            finding(entry["reason"], entry["severity"])
         executable = Path(current[0]).name
         if "/" in current[0] and (not current[0].startswith("/") or
                                   str(Path(current[0]).parent) not in runtime_directories or
@@ -1030,12 +1127,12 @@ def candidate_process_ids():
     return result
 
 
-def cleanup_residual_processes(token, scan_rounds=3, interval=0.05):
-    """group外でもexact token継承processを停止。token除去後の完全検出は主張しない。"""
+def scan_residual_processes(token, scan_rounds=3, interval=0.05):
+    """exact token継承processを検出するだけ。PIDへの自動killは行わない。"""
     if not isinstance(token, str) or not re.fullmatch(r"[a-f0-9]{64}", token) or scan_rounds < 2:
         raise BoundaryError("残留process scanのtoken/回数が不正です")
     marker = ("P5_RUN_TOKEN=" + token).encode()
-    detected, killed = set(), set()
+    detected = set()
     scan_pass = True
     last_matches = set()
     for index in range(scan_rounds):
@@ -1054,23 +1151,13 @@ def cleanup_residual_processes(token, scan_rounds=3, interval=0.05):
             except (OSError, RuntimeError):
                 scan_pass = False
         detected.update(matches)
-        for pid in matches:
-            try:
-                # scanとkillの間のPID再利用にも、環境entryのexact一致を再確認する。
-                if marker in process_environment_entries(pid):
-                    os.kill(pid, signal.SIGKILL)
-                    killed.add(pid)
-            except ProcessLookupError:
-                pass
-            except (OSError, RuntimeError):
-                scan_pass = False
         last_matches = matches
         if index + 1 < scan_rounds:
             time.sleep(interval)
     clean = scan_pass and not last_matches
     passed = clean and not detected
     return {"status": "pass" if passed else "fail", "passed": passed, "scan_pass": scan_pass,
-            "detected_count": len(detected), "kill_count": len(killed), "remaining_count": len(last_matches),
+            "detected_count": len(detected), "kill_count": 0, "remaining_count": len(last_matches),
             "scan_count": scan_rounds, "clean_after_scan": clean,
             "detection_scope": "exact_inherited_environment_token_including_detached_sessions",
             "complete_descendant_detection_claimed": False}
@@ -1229,7 +1316,7 @@ def _run(args):
     try:
         cli_exit, stdout, stderr = execute_group(command, root, process_env(spec), min(CLI_TIMEOUT_SECONDS, remaining - 60), prompt)
     finally:
-        model_residual = cleanup_residual_processes(spec["env"]["P5_RUN_TOKEN"])
+        model_residual = scan_residual_processes(spec["env"]["P5_RUN_TOKEN"])
     raw_path = root.parent / ".evidence" / root.name / "events.raw.jsonl"
     _write_private(raw_path, stdout)
     events = safe_events(stdout, root / ".benchmark-events.json", root, expected_env=spec["env"])
@@ -1277,7 +1364,7 @@ def _run(args):
         scope.append("unsafe_or_unstable_snapshot")
         validation = {"exit_code": "not_run", "reason": "snapshot_boundary_failure"}
     finally:
-        validation_residual = cleanup_residual_processes(spec["env"]["P5_RUN_TOKEN"])
+        validation_residual = scan_residual_processes(spec["env"]["P5_RUN_TOKEN"])
     residual_count = model_residual["detected_count"] + validation_residual["detected_count"]
     residual_scan_pass = model_residual["scan_pass"] and validation_residual["scan_pass"]
     isolation_pass = isolation_pass and validation_residual["passed"]

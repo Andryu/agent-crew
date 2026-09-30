@@ -154,11 +154,9 @@ def stop_reason(record):
     if isolation.get("status") != "pass" or isolation.get("passed") is not True or isolation.get("preflight_bound") is not True:
         return "isolation_gate_not_pass"
     attempt = record.get("attempt_policy") if isinstance(record.get("attempt_policy"), dict) else {}
-    unresolved_script = attempt.get("status") == "unknown" and attempt.get("passed") is False
-    if not unresolved_script and (attempt.get("status") != "pass" or attempt.get("passed") is not True):
+    if attempt.get("status") != "pass" or attempt.get("passed") is not True:
         return "attempt_policy_not_pass"
-    # 原resultのunknownは独立reviewでのみ解消する。ここで停止すると24runを測定できない。
-    if not unresolved_script and (safety.get("status") != "pass" or safety.get("passed") is not True):
+    if safety.get("status") != "pass" or safety.get("passed") is not True:
         return "safety_gate_not_pass"
     acceptance = record.get("acceptance_gate") if isinstance(record.get("acceptance_gate"), dict) else {}
     if acceptance.get("status") != "pass" or acceptance.get("passed") is not True:

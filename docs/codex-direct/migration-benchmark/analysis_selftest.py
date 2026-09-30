@@ -2,6 +2,9 @@
 """P5集計を合成24runとprivate raw証跡で検証する。モデルは呼ばない。"""
 
 import hashlib
+import io
+from contextlib import redirect_stdout
+from types import SimpleNamespace
 import json
 import importlib.util
 from pathlib import Path
@@ -267,11 +270,33 @@ def main():
         first["safety_gate"] = {"status": "fail", "passed": False}
         first["raw_event_evidence"]["sha256"] = reviews["reviews"][0]["raw_event_sha256"] = hashlib.sha256(first_raw.read_bytes()).hexdigest()
         refresh_evidence(summary, reviews, campaign_dir)
-        resolved = decide(summary, preflight, reviews, campaign_dir)
-        assert resolved["decision"] == "adopt"
-        assert resolved["run_results"][0]["independently_resolved_unknown"] is True
-        assert batch.stop_reason(first) is None
+        resolved_run = analyze.gate_record(first, reviews["reviews"][0], True, campaign_dir)
+        assert resolved_run["final_pass"] is True
+        assert resolved_run["independently_resolved_unknown"] is True
+        incomplete_summary = {**summary, "results": [first], "stopped_reason": "attempt_policy_not_pass"}
+        incomplete_reviews = {**reviews, "reviews": [reviews["reviews"][0]]}
+        assert decide(incomplete_summary, preflight, incomplete_reviews, campaign_dir)["decision"] == "incomplete"
+        assert batch.stop_reason(first) == "attempt_policy_not_pass"
+        batch_work = Path(temporary) / "batch-stop"
+        first_file = batch_work / summary["campaign"] / first["run_id"] / ".benchmark-result.json"
+        batch.atomic_json(first_file, first)
+        original_work, original_preflight, original_subprocess = batch.WORK, batch.require_preflight, batch.subprocess
+        try:
+            batch.WORK = batch_work
+            batch.require_preflight = lambda _campaign_dir: None
+            def unexpected_model_start(*_args, **_kwargs):
+                raise AssertionError("unknown後に次runを起動した")
+            batch.subprocess = SimpleNamespace(Popen=unexpected_model_start)
+            with redirect_stdout(io.StringIO()):
+                batch.main()
+            batch_summary = json.loads((batch_work / summary["campaign"] / "batch-summary.json").read_text(encoding="utf-8"))
+            assert batch_summary["completed_records"] == 1
+            assert batch_summary["stopped_reason"] == "attempt_policy_not_pass"
+            assert not (batch_work / summary["campaign"] / "run-02").exists()
+        finally:
+            batch.WORK, batch.require_preflight, batch.subprocess = original_work, original_preflight, original_subprocess
         first["attempt_policy"] = {"status": "fail", "passed": False}
+        assert batch.stop_reason(first) == "attempt_policy_not_pass"
         refresh_evidence(summary, reviews, campaign_dir)
         assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
         first_raw.write_bytes(original_raw)

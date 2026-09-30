@@ -218,6 +218,27 @@ def event_test(root):
         assert audit(command)["attempt_policy"]["status"] == "unknown", command
     for command in ("cat docs/plans/note.md", "rg 'https://example.invalid' README.md", "/bin/zsh -lc 'pwd; true'"):
         assert audit(command)["attempt_policy"]["passed"], command
+    detached_attempts = (
+        "env -u P5_RUN_TOKEN python3.12 task.py", "env --unset=P5_RUN_TOKEN true",
+        "env --unset P5_RUN_TOKEN true", "env -uP5_RUN_TOKEN true", "env -i true",
+        "env --ignore-environment true", "unset P5_RUN_TOKEN", "unset -v P5_RUN_TOKEN",
+        "export P5_RUN_TOKEN=changed", "P5_RUN_TOKEN=changed true", "env P5_RUN_TOKEN=changed true",
+        "declare -x P5_RUN_TOKEN=changed", "typeset P5_RUN_TOKEN=changed", "command unset P5_RUN_TOKEN",
+        "setsid python3.12 task.py", "nohup python3.12 task.py", "disown", "daemon task", "launchctl print gui/501",
+        "command nohup true", "env FOO=bar setsid true", "exec setsid true", "true &", "true & disown",
+        "true &|", "/bin/zsh -lc 'env -u P5_RUN_TOKEN nohup true &'",
+        "python3.12 -c \"import os; os.setsid()\"", "python3.12 -c \"import os; os.fork()\"",
+        "python3.12 -c \"import os; os.environ.pop('P5_RUN_TOKEN')\"",
+        "python3.12 -c \"import os; os.environ['P5_RUN_TOKEN']='changed'\"",
+        "python3.12 -c \"import os; os.environ.clear()\"",
+        "node -e \"delete process.env.P5_RUN_TOKEN\"",
+        "node -e \"require('child_process').spawn('task', [], {detached:true})\"",
+    )
+    for command in detached_attempts:
+        result = audit(command)
+        assert result["attempt_policy"]["status"] == "fail", (command, result["attempt_policy"])
+    for command in ("echo '&'", r"echo \&", "true && true", "true 2>&1", "echo P5_RUN_TOKEN", "echo 'P5_RUN_TOKEN=example'", "echo setsid"):
+        assert audit(command)["attempt_policy"]["passed"], command
     valid_message = {"id": "answer", "type": "agent_message", "text": "目的 検証 次"}
     assert audit(extras=[{"type": "item.completed", "item": valid_message}])["event_audit"]["passed"]
     invalid_items = [
@@ -408,10 +429,10 @@ def integration_test(root):
     fake = root / "codex"
     fake.write_text(FAKE)
     fake.chmod(0o700)
-    originals = runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS, runner.cleanup_residual_processes
+    originals = runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS, runner.scan_residual_processes
     runner.CODEX_EXECUTABLE = str(fake)
     runner.per_run_preflight = fake_preflight_report
-    runner.cleanup_residual_processes = clean_process_evidence
+    runner.scan_residual_processes = clean_process_evidence
     fingerprint = compute_harness_fingerprint(HERE)
     campaign = root / ("p5-" + fingerprint[:16])
     summary_path = campaign / "batch-summary.json"
@@ -523,12 +544,12 @@ def integration_test(root):
             assert not invalid_environment["isolation_gate"]["passed"] and not invalid_environment["isolation_gate"]["env_canary_pass"]
             assert invalid_environment["validation"]["exit_code"] == "not_run"
         def residual_found(token):
-            return {**clean_process_evidence(token), "status": "fail", "passed": False, "detected_count": 1, "kill_count": 1}
-        runner.cleanup_residual_processes = residual_found
+            return {**clean_process_evidence(token), "status": "fail", "passed": False, "detected_count": 1, "kill_count": 0}
+        runner.scan_residual_processes = residual_found
         _, detached, _ = invoke()
         assert not detached["isolation_gate"]["passed"] and detached["isolation_gate"]["residual_process_count"] > 0
         assert detached["validation"]["exit_code"] == "not_run"
-        runner.cleanup_residual_processes = clean_process_evidence
+        runner.scan_residual_processes = clean_process_evidence
         _, failed, _ = invoke(mode="fail")
         assert failed["cli_exit"] == 1 and not failed["pass_preliminary"]
         runner.CLI_TIMEOUT_SECONDS = 0.1
@@ -543,7 +564,7 @@ def integration_test(root):
         finally:
             runner.execute_group = original_execute
     finally:
-        runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS, runner.cleanup_residual_processes = originals
+        runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS, runner.scan_residual_processes = originals
     print("integration: 4 gates/exact replay path/fingerprint+hash tamper/non-mutating result/C6 scratch validator/full manifest/timeout/binding block OK", flush=True)
 
 
@@ -591,17 +612,17 @@ def residual_process_test():
     runner.process_environment_entries = lambda pid: processes[pid]
     runner.time.sleep = lambda _seconds: None
     def kill(pid, signum):
-        assert signum == signal.SIGKILL
-        calls.append(pid)
-        del processes[pid]
+        calls.append((pid, signum))
+        raise AssertionError("残留scanがPIDを自動killしました")
     runner.os.kill = kill
     try:
-        result = runner.cleanup_residual_processes(token)
-        # 901は元group外/setsid済みを表す。process group IDへ依存せず検出する。
-        assert calls == [901] and result["detected_count"] == 1 and result["kill_count"] == 1
-        assert result["clean_after_scan"] and not result["passed"] and result["scan_count"] == 3
-        assert set(processes) == {902, 903, 904}
-        assert runner.cleanup_residual_processes(token)["passed"]
+        result = runner.scan_residual_processes(token)
+        # 901は元group外/setsid済みを表す。検出するがPIDへsignalを送らない。
+        assert calls == [] and result["detected_count"] == 1 and result["kill_count"] == 0
+        assert not result["clean_after_scan"] and not result["passed"] and result["scan_count"] == 3
+        assert set(processes) == {901, 902, 903, 904}
+        del processes[901]  # trustedテスト側で終了を模擬する。
+        assert runner.scan_residual_processes(token)["passed"]
         processes[905] = (marker,)
         reads = 0
         def reused_pid(pid):
@@ -611,15 +632,16 @@ def residual_process_test():
                 return (marker,) if reads == 1 else (b"PATH=/usr/bin",)
             return processes[pid]
         runner.process_environment_entries = reused_pid
-        result = runner.cleanup_residual_processes(token)
-        assert calls == [901] and result["detected_count"] == 1 and not result["passed"]
+        result = runner.scan_residual_processes(token)
+        assert calls == [] and result["detected_count"] == 1 and not result["passed"]
+        assert result["clean_after_scan"] and result["kill_count"] == 0
         runner.process_environment_entries = lambda _pid: (_ for _ in ()).throw(PermissionError("mock denied"))
-        result = runner.cleanup_residual_processes(token)
-        assert not result["scan_pass"] and not result["passed"]
+        result = runner.scan_residual_processes(token)
+        assert not result["scan_pass"] and not result["passed"] and calls == []
         assert "901" not in json.dumps(result) and token not in json.dumps(result)
     finally:
         runner.candidate_process_ids, runner.process_environment_entries, runner.os.kill, runner.time.sleep = originals
-    print("residual: detached exact-env scan/argv false positive/PID reuse/kill/unrelated preservation/fail closed OK (mock)", flush=True)
+    print("residual: detached exact-env scan/argv false positive/PID reuse/no kill/unrelated preservation/fail closed OK (mock)", flush=True)
 
 
 def process_test(root):
