@@ -15,7 +15,7 @@ P0の`migration-baseline/snapshot-index.json`とSHA-256が一致する非機密�
 ## 実行と独立レビュー
 
 1. 通常shellで`python3.12 -B sandbox_preflight.py`、`python3.12 -B selftest.py`、`python3.12 -B analysis_selftest.py`を実行する。全体preflightの`passed: true`を確認する。
-2. `python3.12 -B batch.py`で最大24runを逐次実行する。各runのpreflight失敗、CLI失敗、安全・受入ゲート非pass、監査不能、利用上限で停止し、失敗runを残す。
+2. `python3.12 -B batch.py`で最大24runを逐次実行する。preflight失敗、CLI失敗、attemptの`fail`、受入ゲート非pass、監査不能、利用上限では停止し、失敗runを残す。attemptの`unknown`は残りのrunを継続できるが、独立review sidecarで解消するまで採用不可とする。
 3. 新規の独立contextで各runのraw eventを再分類する。`python3.12 -B run.py audit-events --result <campaign>/run-01/.benchmark-result.json --output <campaign>/review-replay-run-01.json`で自動reportを生成する。`automatic_only: true`は人の判断を意味しない。レビュアーはraw hash、分類、回答、変更、validator、scope、引継ぎを確認し、独立review sidecarを作る。
 4. `python3.12 -B analyze.py --campaign-dir <campaign-dir> --reviews <review.json> --public-output <report.md>`で集計する。24件のsidecarとraw fileの照合、binding、4ゲートが揃うまで採用判定しない。
 
@@ -28,7 +28,7 @@ P0の`migration-baseline/snapshot-index.json`とSHA-256が一致する非機密�
   "fingerprint": "<full fingerprint>",
   "reviews": [
     {
-      "task_id": "C1", "condition": "A", "repeat": 1,
+      "run_id": "run-01", "task_id": "C1", "condition": "A", "repeat": 1,
       "raw_event_sha256": "<64 hex>",
       "event_audit_reproduced": true,
       "event_audit_pass": true,
