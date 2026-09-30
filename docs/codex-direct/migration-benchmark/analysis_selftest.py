@@ -7,6 +7,8 @@ from contextlib import redirect_stdout
 from types import SimpleNamespace
 import json
 import importlib.util
+import os
+import subprocess
 from pathlib import Path
 import tempfile
 
@@ -179,6 +181,137 @@ def refresh_evidence(summary, reviews, campaign_dir):
 
 def decide(summary, preflight, reviews, campaign_dir):
     return analyze.analyze(summary, preflight, reviews, campaign_dir)
+
+
+def batch_process_control_tests(parent):
+    """実processを起動せず、timeout後の子root非接触とcampaign停止を検証する。"""
+    originals = (batch.WORK, batch.require_preflight, batch.subprocess, batch.scheduled_runs,
+                 os.kill, os.killpg, Path.exists, Path.read_text, harness_run.safe_read)
+    all_slots = batch.scheduled_runs()
+    signals = []
+    state = {"forbidden_root": None, "locked": False}
+    def guard(path):
+        root = state["forbidden_root"]
+        if state["locked"] and root is not None and (Path(path) == root or root in Path(path).parents):
+            raise AssertionError("未完了/非正常終了後に子run rootへ触れた: " + str(path))
+    def guarded_exists(path):
+        guard(path)
+        return originals[6](path)
+    def guarded_text(path, *args, **kwargs):
+        guard(path)
+        return originals[7](path, *args, **kwargs)
+    def guarded_safe_read(path):
+        guard(path)
+        return originals[8](path)
+    def forbidden_signal(*args):
+        signals.append(args)
+        raise AssertionError("batchがPID/PGIDへ自動signalを送った")
+    os.kill, os.killpg = forbidden_signal, forbidden_signal
+    Path.exists, Path.read_text, harness_run.safe_read = guarded_exists, guarded_text, guarded_safe_read
+    try:
+        for mode in ("preflight_timeout", "preflight_success_run_timeout", "run_timeout", "run_nonzero", "run_signal", "normal"):
+            work = parent / mode
+            launches = []
+            state.update(forbidden_root=None, locked=False)
+            batch.WORK = work
+            batch.scheduled_runs = lambda: all_slots[:1 if mode == "normal" else 2]
+            batch.require_preflight = originals[1] if mode.startswith("preflight") else lambda _campaign: None
+            class MockProcess:
+                pid = 246813579
+                def __init__(self, command, **kwargs):
+                    self.command, self.kwargs = command, kwargs
+                    self.is_preflight = Path(command[2]).name == "sandbox_preflight.py"
+                    self.wait_calls = 0
+                    self.returncode = None
+                    launches.append(self)
+                    assert kwargs["stdout"] is not subprocess.PIPE and kwargs["stderr"] is not subprocess.PIPE
+                    for handle in (kwargs["stdout"], kwargs["stderr"]):
+                        assert os.fstat(handle.fileno()).st_mode & 0o777 == 0o600
+                    if self.is_preflight:
+                        kwargs["stdout"].write(b'{"passed": true}\n')
+                    else:
+                        campaign = Path(command[command.index("--campaign") + 1])
+                        run_id = command[command.index("--run-id") + 1]
+                        state["forbidden_root"] = campaign / run_id
+                        fingerprint = command[command.index("--fingerprint") + 1]
+                        slot = next(item for item in all_slots if item["run_id"] == run_id)
+                        record = {"schema": 3, "campaign": campaign.name, "fingerprint": fingerprint, **slot,
+                                  "ended_at": "synthetic", "cli_exit": 0, "validation": {"exit_code": 0},
+                                  "pass_preliminary": True,
+                                  "isolation_gate": {"status": "pass", "passed": True, "preflight_bound": True},
+                                  **{name: {"status": "pass", "passed": True} for name in
+                                     ("event_audit", "attempt_policy", "safety_gate", "acceptance_gate")}}
+                        # timeout後に完成して見える結果があっても、親は読まない。
+                        batch.atomic_json(campaign / run_id / ".benchmark-result.json", record)
+                def wait(self, timeout):
+                    self.wait_calls += 1
+                    assert timeout > 0 and self.wait_calls == 1
+                    if self.is_preflight:
+                        if mode == "preflight_timeout":
+                            raise subprocess.TimeoutExpired(self.command, timeout)
+                        self.returncode = 0
+                        return 0
+                    if mode in {"run_timeout", "preflight_success_run_timeout"}:
+                        state["locked"] = True
+                        raise subprocess.TimeoutExpired(self.command, timeout)
+                    if mode == "run_signal":
+                        state["locked"] = True
+                        raise batch.BatchSignal(15)
+                    if mode == "run_nonzero":
+                        state["locked"] = True
+                        self.returncode = 1
+                        return 1
+                    self.returncode = 0
+                    return 0
+                def communicate(self, **_kwargs):
+                    raise AssertionError("batchはpipe communicateを使わない")
+                def kill(self):
+                    raise AssertionError("batch Popen.kill禁止")
+                def terminate(self):
+                    raise AssertionError("batch Popen.terminate禁止")
+                def send_signal(self, _signal):
+                    raise AssertionError("batch Popen.send_signal禁止")
+            batch.subprocess = SimpleNamespace(Popen=MockProcess, TimeoutExpired=subprocess.TimeoutExpired)
+            with redirect_stdout(io.StringIO()):
+                batch.main()
+            campaign = work / ("p5-" + compute_harness_fingerprint(HERE)[:16])
+            summary_path = campaign / "batch-summary.json"
+            summary = json.loads(summary_path.read_text())
+            assert not signals
+            if mode == "normal":
+                assert summary["stopped_reason"] is None and summary["completed_records"] == 1
+                assert summary["results"][0]["pass_preliminary"]
+            elif mode == "preflight_timeout":
+                assert summary["stopped_reason"] == "preflight_failure" and summary["completed_records"] == 0
+                assert len(launches) == 1 and launches[0].is_preflight
+                assert not (campaign / "run-01").exists()
+                assert json.loads((campaign / "sandbox-preflight.json").read_text())["passed"] is False
+            else:
+                assert summary["stopped_reason"] == "infrastructure_error" and summary["completed_records"] == 1
+                record = summary["results"][0]
+                assert record["run_id"] == "run-01" and not record["pass_preliminary"]
+                assert record["process_execution"]["exit_code"] != 0
+                assert len([item for item in launches if not item.is_preflight]) == 1
+            assert not (campaign / "run-02").exists()
+            for path in (campaign / ".evidence/.batch").iterdir():
+                assert path.stat().st_mode & 0o777 == 0o600
+                if path.suffix == ".json":
+                    assert json.loads(path.read_text())["automatic_termination"] is False
+            if mode != "normal":
+                original_summary = summary_path.read_bytes()
+                count = len(launches)
+                try:
+                    with redirect_stdout(io.StringIO()):
+                        batch.main()
+                except SystemExit:
+                    pass
+                else:
+                    raise AssertionError("停止済みcampaignを再開した")
+                assert len(launches) == count and summary_path.read_bytes() == original_summary
+    finally:
+        (batch.WORK, batch.require_preflight, batch.subprocess, batch.scheduled_runs,
+         os.kill, os.killpg, Path.exists, Path.read_text, harness_run.safe_read) = originals
+    print("batch process control: no kill/killpg/private files+wait/timeout root untouched/no run-02/summary stop/no resume/normal OK")
 
 
 def main():
@@ -453,6 +586,7 @@ def main():
         assert private.stat().st_mode & 0o777 == 0o600
         markdown = analyze.public_markdown(positive)
         assert "/private/" not in markdown and "/Users/" not in markdown
+        batch_process_control_tests(Path(temporary) / "batch-process-control")
     print("P5 analysis selftest: raw/review/binding/opaque/cache/4gate OK")
 
 

@@ -33,7 +33,6 @@ ALLOWED = {"C1", "C2", "C3", "C4", "C5", "C6"}
 CLI_VERSION = "codex-cli 0.155.1"
 CLI_TIMEOUT_SECONDS = 240
 VALIDATION_TIMEOUT_SECONDS = 45
-ACTIVE_GROUP = None
 _EXECUTABLE_HASH_CACHE = {}
 CODEX_EXECUTABLE = str(Path(shutil.which("codex") or "/opt/homebrew/bin/codex").resolve())
 AUTH_HOME = os.environ.get("CODEX_HOME") or str(Path.home() / ".codex")
@@ -43,7 +42,7 @@ FIXED_PATH = os.pathsep.join(dict.fromkeys([
 ]))
 ENV_CANARY_COMMAND = shlex.join(["python3.12", "-I", "-B", "-c",
     "import json,os; print(json.dumps(dict(os.environ),sort_keys=True,separators=(',',':')))"])
-INTERNAL_FILES = {".benchmark-prompt.txt", ".benchmark-answer.txt", ".benchmark-active-pgid",
+INTERNAL_FILES = {".benchmark-prompt.txt", ".benchmark-answer.txt",
                   ".benchmark-events.json", ".benchmark-result.json", ".benchmark-isolation.json"}
 
 
@@ -496,9 +495,9 @@ def prepare(task_id, condition, repeat, campaign, run_id):
                 place(name[len(prefix):], data, digest_bytes(data))
     _prepare_environment_home(root)
     git_env = limited_env(root)
-    subprocess.run(["git", "init", "-q", str(root)], check=True, env=git_env)
-    subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True, env=git_env)
-    subprocess.run(["git", "-c", "user.name=P5 Fixture", "-c", "user.email=p5-fixture@localhost",
+    run_trusted_command(["git", "init", "-q", str(root)], check=True, env=git_env)
+    run_trusted_command(["git", "add", "-A"], cwd=root, check=True, capture_output=True, env=git_env)
+    run_trusted_command(["git", "-c", "user.name=P5 Fixture", "-c", "user.email=p5-fixture@localhost",
                     "commit", "-qm", "P0 fixture"], cwd=root, check=True, capture_output=True, env=git_env)
     return root, task, hashes
 
@@ -1062,14 +1061,6 @@ def reclassify_result(result_path, destination=None):
         save(expected_output, report)
     return report
 
-def stop_group(pgid):
-    if pgid is not None:
-        try:
-            os.killpg(pgid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-
-
 def parse_macos_procargs_environment(payload):
     """argv文字列を環境変数と誤認せずKERN_PROCARGS2を構造解析する。"""
     if len(payload) < 5:
@@ -1114,10 +1105,16 @@ def process_environment_entries(pid):
 
 
 def candidate_process_ids():
-    completed = subprocess.run(["/bin/ps", "-A", "-o", "pid=,uid="], text=True, capture_output=True,
-                               env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"}, timeout=5, check=True)
+    process = subprocess.Popen(["/bin/ps", "-A", "-o", "pid=,uid="], text=True, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
+    try:
+        stdout, _stderr = process.communicate(timeout=5)
+        if process.returncode != 0:
+            raise BoundaryError("process inventory実行失敗")
+    finally:
+        close_process_streams(process)
     result = []
-    for line in completed.stdout.splitlines():
+    for line in stdout.splitlines():
         fields = line.split()
         if len(fields) != 2 or not all(field.isdigit() for field in fields):
             raise BoundaryError("process inventoryが不正です")
@@ -1163,30 +1160,75 @@ def scan_residual_processes(token, scan_rounds=3, interval=0.05):
             "complete_descendant_detection_claimed": False}
 
 
-def terminate_handler(_signum, _frame):
-    stop_group(ACTIVE_GROUP)
-    raise SystemExit(143)
+class RunSignal(SystemExit):
+    def __init__(self, signum):
+        self.signum = signum
+        super().__init__(128 + signum)
 
 
-def execute_group(command, root, env, timeout, input_text=None):
-    global ACTIVE_GROUP
+def terminate_handler(signum, _frame):
+    # PID/PGIDの再利用に対して安全な所有証明がないためsignalを転送しない。
+    raise RunSignal(signum)
+
+
+def close_process_streams(process):
+    # communicate再開やwait/killを行わず、runnerが持つpipeだけを閉じる。
+    for name in ("stdin", "stdout", "stderr"):
+        stream = getattr(process, name, None)
+        if stream is not None:
+            try:
+                stream.close()
+            except (OSError, ValueError):
+                pass
+
+
+def run_trusted_command(command, *, cwd=None, env=None, text=False, capture_output=False, check=False):
+    """補助commandもsubprocess.runの例外時auto-killを経由させない。"""
+    process = subprocess.Popen(command, cwd=cwd, env=env, text=text,
+                               stdout=subprocess.PIPE if capture_output else None,
+                               stderr=subprocess.PIPE if capture_output else None)
+    try:
+        stdout, stderr = process.communicate()
+        if check and process.returncode != 0:
+            raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+    finally:
+        close_process_streams(process)
+
+
+def execution_incomplete(code):
+    return code == "timeout" or (isinstance(code, str) and code.startswith("signal:"))
+
+
+def record_process_interruption(root, process, reason):
+    validation = root.parent.name == ".accepted"
+    campaign = root.parent.parent if validation else root.parent
+    phase = "validation" if validation else "model"
+    save(campaign / ".evidence" / root.name / f"process-{phase}-interruption.json", {
+        "schema": 1, "observed_at": stamp(), "phase": phase, "reason": reason,
+        "leader_pid_at_launch": process.pid, "pid_current_ownership_unverified": True,
+        "automatic_termination": False, "process_may_still_be_running": True,
+        "handling": "campaign停止。現在のprocess所有関係を人が確認するまでPID/PGIDを終了対象にしない。",
+    })
+
+
+def execute_command(command, root, env, timeout, input_text=None):
     process = subprocess.Popen(command, text=True, stdin=subprocess.PIPE if input_text is not None else None,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=root, env=env, start_new_session=True)
-    ACTIVE_GROUP = process.pid
-    active = root / ".benchmark-active-pgid"
-    _write_private(active, str(process.pid))
     try:
         stdout, stderr = process.communicate(input=input_text, timeout=timeout)
-        stop_group(process.pid)
         return process.returncode, stdout, stderr
     except subprocess.TimeoutExpired as error:
-        stop_group(process.pid)
-        process.communicate()
+        record_process_interruption(root, process, "timeout")
         stdout = error.stdout.decode(errors="replace") if isinstance(error.stdout, bytes) else error.stdout or ""
-        return "timeout", stdout, "timeout"
+        stderr = error.stderr.decode(errors="replace") if isinstance(error.stderr, bytes) else error.stderr or ""
+        return "timeout", stdout, stderr
+    except RunSignal as error:
+        code = f"signal:{error.signum}"
+        record_process_interruption(root, process, code)
+        return code, "", ""
     finally:
-        ACTIVE_GROUP = None
-        active.unlink(missing_ok=True)
+        close_process_streams(process)
 
 
 def validate(task, root, timeout=VALIDATION_TIMEOUT_SECONDS, c6_state_before=None, c6_readonly=None,
@@ -1205,7 +1247,12 @@ def validate(task, root, timeout=VALIDATION_TIMEOUT_SECONDS, c6_state_before=Non
         cmd = ["python3.12", "-B", str(destination.relative_to(root)), "--state-before-sha256", c6_state_before,
                "--progress-sha256", c6_readonly["progress"], "--readme-sha256", c6_readonly["readme"]]
     before = tree_manifest(root, exclude_bookkeeping=False)
-    code, stdout, stderr = execute_group(sandbox_command(root, task, cmd, spec), root, process_env(spec), timeout)
+    code, stdout, stderr = execute_command(sandbox_command(root, task, cmd, spec), root, process_env(spec), timeout)
+    if execution_incomplete(code):
+        return {"command": cmd, "sandbox": "canonical_validation_readonly_accepted_plus_scratch_write", "binding": spec["binding"],
+                "exit_code": code, "reason": "validator_incomplete_no_automatic_termination", "stdout_tail": "", "stderr_tail": "",
+                "manifest_unchanged": False, "manifest_before_sha256": canonical_digest(before),
+                "manifest_after_sha256": None, "validator_source_sha256": validator_hash}
     after = tree_manifest(root, exclude_bookkeeping=False)
     unchanged = before == after and (destination is None or sha(destination) == validator_hash)
     return {"command": cmd, "sandbox": "canonical_validation_readonly_accepted_plus_scratch_write", "binding": spec["binding"],
@@ -1268,7 +1315,8 @@ def per_run_preflight(spec):
 
 def _run(args):
     signal.signal(signal.SIGTERM, terminate_handler)
-    version = subprocess.run([CODEX_EXECUTABLE, "--version"], capture_output=True, text=True, check=True,
+    signal.signal(signal.SIGINT, terminate_handler)
+    version = run_trusted_command([CODEX_EXECUTABLE, "--version"], capture_output=True, text=True, check=True,
                              env={"PATH": FIXED_PATH, "LANG": "en_US.UTF-8"}).stdout.strip()
     if version != CLI_VERSION:
         raise BoundaryError("CLI版が固定版と異なります")
@@ -1314,7 +1362,7 @@ def _run(args):
     if remaining < 70:
         raise BoundaryError("campaign残時間不足。runを開始しません")
     try:
-        cli_exit, stdout, stderr = execute_group(command, root, process_env(spec), min(CLI_TIMEOUT_SECONDS, remaining - 60), prompt)
+        cli_exit, stdout, stderr = execute_command(command, root, process_env(spec), min(CLI_TIMEOUT_SECONDS, remaining - 60), prompt)
     finally:
         model_residual = scan_residual_processes(spec["env"]["P5_RUN_TOKEN"])
     raw_path = root.parent / ".evidence" / root.name / "events.raw.jsonl"
@@ -1326,7 +1374,8 @@ def _run(args):
         preflight_unchanged = sha(root / ".benchmark-isolation.json") == common["preflight_evidence_sha256"]
     except (OSError, RuntimeError, ValueError):
         current_binding_matches, preflight_unchanged = False, False
-    isolation_pass = (isolation_pass and guard_before == guard_after and current_binding_matches and preflight_unchanged
+    isolation_pass = (isolation_pass and not execution_incomplete(cli_exit)
+                      and guard_before == guard_after and current_binding_matches and preflight_unchanged
                       and events["env_canary_evidence"]["passed"] and model_residual["passed"])
     common["env_canary_evidence"] = events["env_canary_evidence"]
     common["isolation_gate"].update(env_canary_pass=events["env_canary_evidence"]["passed"])
@@ -1348,6 +1397,9 @@ def _run(args):
         remaining = deadline - time.time() if deadline is not None else 60
         validation = validate(task, accepted, max(1, min(VALIDATION_TIMEOUT_SECONDS, remaining - 5)), c6_state_before, c6_readonly, version, args.fingerprint)
         validation["derived_from_model_profile_sha256"] = spec["binding"]["profile_sha256"]
+        if execution_incomplete(validation["exit_code"]):
+            isolation_pass = False
+            raise BoundaryError("validator実行完了が確認できません。accepted treeを採用しません")
         # 非scratch manifestは例外pathを削除せず完全一致を要求する。
         if tree_manifest(accepted, exclude_bookkeeping=False) != after_manifest or tree_manifest(root) != after_manifest:
             raise BoundaryError("validator中にaccepted/model treeが変更されました")
@@ -1362,7 +1414,12 @@ def _run(args):
     except (OSError, RuntimeError, ValueError, KeyError, TypeError) as error:
         snapshot = {"matched": False, "error_type": type(error).__name__, "error_sha256": digest_bytes(str(error).encode())}
         scope.append("unsafe_or_unstable_snapshot")
-        validation = {"exit_code": "not_run", "reason": "snapshot_boundary_failure"}
+        if execution_incomplete(cli_exit):
+            reason = "model_timeout_no_automatic_termination" if cli_exit == "timeout" else "model_signal_no_automatic_termination"
+            validation = {"exit_code": "not_run", "reason": reason}
+            snapshot = {"matched": False, "reason": reason}
+        elif not execution_incomplete(validation.get("exit_code")):
+            validation = {"exit_code": "not_run", "reason": "snapshot_boundary_failure"}
     finally:
         validation_residual = scan_residual_processes(spec["env"]["P5_RUN_TOKEN"])
     residual_count = model_residual["detected_count"] + validation_residual["detected_count"]
@@ -1395,6 +1452,9 @@ def _run(args):
         result[key] = events["usage"].get(key, UNKNOWN)
     save(root / ".benchmark-result.json", result)
     print(json.dumps(result, ensure_ascii=False, indent=2))
+    interrupted = cli_exit if isinstance(cli_exit, str) and cli_exit.startswith("signal:") else validation.get("exit_code")
+    if isinstance(interrupted, str) and interrupted.startswith("signal:"):
+        raise SystemExit(128 + int(interrupted.split(":", 1)[1]))
 
 
 def run(args):

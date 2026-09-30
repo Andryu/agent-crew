@@ -12,6 +12,7 @@ import tempfile
 import time
 
 from harness_fingerprint import compute_harness_fingerprint
+import run as harness_run
 
 HERE = Path(__file__).resolve().parent
 WORK = Path("/private/tmp/agent-crew-p5-benchmark/formal")
@@ -178,27 +179,90 @@ def load_clock(path, fingerprint, now=None):
     return clock
 
 
-def require_preflight(campaign_dir):
-    """不合格ならモデルrunを開始させない。"""
-    preflight_file = campaign_dir / "sandbox-preflight.json"
-    preflight = subprocess.run([sys.executable, "-B", str(HERE / "sandbox_preflight.py")],
-                               cwd=HERE, text=True, capture_output=True)
+class BatchSignal(SystemExit):
+    def __init__(self, signum):
+        self.signum = signum
+        super().__init__(128 + signum)
+
+
+class PreflightFailure(RuntimeError):
+    pass
+
+
+def interrupt_handler(signum, _frame):
+    raise BatchSignal(signum)
+
+
+def wait_private_process(command, cwd, campaign_dir, label, timeout):
+    """private fileへ出力しleaderのwaitだけを行う。timeout/例外でkillしない。"""
+    evidence = campaign_dir / ".evidence" / ".batch"
+    directory = harness_run._open_directory(evidence, create=True)
+    token = label + "-" + os.urandom(8).hex()
+    paths = {name: evidence / f"{token}.{name}" for name in ("stdout", "stderr")}
+    handles = []
+    process = None
+    code, error = "not_started", None
     try:
-        preflight_data = json.loads(preflight.stdout)
-    except json.JSONDecodeError:
+        for name in ("stdout", "stderr"):
+            fd = os.open(paths[name].name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                         0o600, dir_fd=directory)
+            os.fchmod(fd, 0o600)
+            handles.append(os.fdopen(fd, "wb"))
+        process = subprocess.Popen(command, cwd=cwd, stdout=handles[0], stderr=handles[1],
+                                   stdin=None, start_new_session=True)
+        try:
+            code = process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            code, error = "timeout", "実行完了未確認。自動終了せずcampaignを停止"
+        except BatchSignal as interruption:
+            code, error = f"signal:{interruption.signum}", "signal受信。自動終了せずcampaignを停止"
+        except Exception:
+            code, error = "wait_error", "process待機失敗。自動終了せずcampaignを停止"
+    except OSError:
+        code, error = "spawn_error", "process起動失敗。campaignを停止"
+    finally:
+        for handle in handles:
+            handle.close()
+        os.close(directory)
+    complete = type(code) is int
+    diagnostic_path = evidence / f"{token}.process.json"
+    atomic_json(diagnostic_path, {"schema": 1, "label": label, "exit_code": code,
+        "completion_confirmed": complete, "automatic_termination": False,
+        "process_may_still_be_running": process is not None and not complete,
+        "leader_pid_at_launch": process.pid if process is not None else None,
+        "pid_current_ownership_unverified": True})
+    return {"exit_code": code, "completion_confirmed": complete, "error": error,
+            "stdout_relative_path": str(paths["stdout"].relative_to(campaign_dir)),
+            "stderr_relative_path": str(paths["stderr"].relative_to(campaign_dir)),
+            "diagnostic_relative_path": str(diagnostic_path.relative_to(campaign_dir)),
+            "automatic_termination": False}
+
+
+def require_preflight(campaign_dir):
+    """正常終了したpreflightだけを読み、不合格・timeoutならmodelを開始させない。"""
+    preflight_file = campaign_dir / "sandbox-preflight.json"
+    execution = wait_private_process([sys.executable, "-B", str(HERE / "sandbox_preflight.py")],
+                                     HERE, campaign_dir, "preflight", 315)
+    if execution["exit_code"] != 0:
+        atomic_json(preflight_file, {"passed": False, "infrastructure_error": "preflight_execution_failed",
+                                     "process_execution": execution})
+        raise PreflightFailure("sandbox preflightの正常終了未確認。モデルrunを開始しません")
+    try:
+        preflight_data = json.loads(harness_run.safe_read(campaign_dir / execution["stdout_relative_path"]))
+        if not isinstance(preflight_data, dict):
+            raise ValueError("preflight object required")
+    except (OSError, RuntimeError, ValueError):
         preflight_data = {"passed": False, "raw_output_invalid": True}
     atomic_json(preflight_file, preflight_data)
-    if preflight.returncode != 0:
-        raise SystemExit(f"sandbox preflight失敗。モデルrunを開始しません: {preflight_file}")
-    try:
-        if not preflight_data.get("passed"):
-            raise SystemExit(f"sandbox preflight不合格。モデルrunを開始しません: {preflight_file}")
-    except json.JSONDecodeError:
-        raise SystemExit(f"sandbox preflight証跡が不正。モデルrunを開始しません: {preflight_file}")
+    if preflight_data.get("passed") is not True:
+        raise PreflightFailure("sandbox preflight不合格。モデルrunを開始しません")
+    return preflight_data
 
 
 def main():
     os.umask(0o077)
+    signal.signal(signal.SIGTERM, interrupt_handler)
+    signal.signal(signal.SIGINT, interrupt_handler)
     contracts = [HERE / f"b-contract/{repo}/AGENTS.md" for repo in ("agent_crew", "wealth_advisor")]
     skill = HERE / "b-contract/agent_crew/.agents/skills/fable-class/SKILL.md"
     b_index = HERE / "b-contract-index.json"
@@ -226,17 +290,22 @@ def main():
         atomic_json(policy_file, private_artifact_policy(campaign, fingerprint, campaign_dir))
     elif policy_file.is_symlink():
         raise SystemExit(f"private artifact policyがsymlinkです: {policy_file}")
-    require_preflight(campaign_dir)
     clock_file = campaign_dir / "campaign-clock.json"
     clock = load_clock(clock_file, fingerprint)
     summary_file = campaign_dir / "batch-summary.json"
     previous = json.loads(summary_file.read_text(encoding="utf-8")) if summary_file.exists() else None
     if previous and previous.get("fingerprint") != fingerprint:
         raise SystemExit("campaign fingerprint不一致。別campaignとして実行してください")
+    if previous and previous.get("stopped_reason"):
+        raise SystemExit("停止済みcampaignは自動再開しません。子run rootを読み直さず監査待ちです")
     schedule = load_or_create_mapping(campaign_dir / "run-slot-mapping.json", campaign, fingerprint)
     results = []
     stopped_reason = None
-    for slot in schedule:
+    try:
+        require_preflight(campaign_dir)
+    except PreflightFailure:
+        stopped_reason = "preflight_failure"
+    for slot in schedule if stopped_reason is None else []:
         task, condition, repeat, run_id = (slot["task_id"], slot["condition"],
                                             slot["repeat"], slot["run_id"])
         remaining = clock["deadline_epoch"] - time.time()
@@ -265,39 +334,32 @@ def main():
         atomic_json(active, {"task": task, "condition": condition, "repeat": repeat, "run_id": run_id,
                              "started_epoch": time.time(), "campaign": campaign,
                              "fingerprint": fingerprint})
-        process = subprocess.Popen([sys.executable, "-B", str(HERE / "run.py"), task, condition,
-                                    str(repeat), "--run-id", run_id, "--campaign", str(campaign_dir),
-                                    "--fingerprint", fingerprint,
-                                    "--deadline-epoch", str(clock["deadline_epoch"])],
-                                   cwd=HERE.parents[2], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                   text=True, start_new_session=True)
-        try:
-            _, err = process.communicate(timeout=min(315, max(1, remaining)))
-            error = err[-500:]
-            code = process.returncode
-        except subprocess.TimeoutExpired:
-            process.terminate()
-            try:
-                process.communicate(timeout=5)
-            except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
-                process.communicate()
-            child_file = run_dir / ".benchmark-active-pgid"
-            if child_file.exists():
-                try:
-                    os.killpg(int(child_file.read_text(encoding="ascii")), signal.SIGKILL)
-                except (ProcessLookupError, ValueError):
-                    pass
-            error, code = "outer 315秒 timeout", "timeout"
-        if active.exists() and not active.is_symlink():
-            active.unlink()
-        if run_file.exists():
-            record = json.loads(run_file.read_text(encoding="utf-8"))
-            if not record_matches_slot(record, campaign, fingerprint, slot):
-                raise SystemExit(f"run resultがslot/campaignと不一致: {run_file}")
+        execution = wait_private_process(
+            [sys.executable, "-B", str(HERE / "run.py"), task, condition, str(repeat), "--run-id", run_id,
+             "--campaign", str(campaign_dir), "--fingerprint", fingerprint,
+             "--deadline-epoch", str(clock["deadline_epoch"])],
+            HERE.parents[2], campaign_dir, run_id, min(315, max(1, remaining)))
+        code = execution["exit_code"]
+        if code == 0:
+            if active.exists() and not active.is_symlink():
+                active.unlink()
+            if run_file.exists():
+                record = json.loads(harness_run.safe_read(run_file))
+                if not record_matches_slot(record, campaign, fingerprint, slot):
+                    raise SystemExit(f"run resultがslot/campaignと不一致: {run_file}")
+            else:
+                record = infrastructure_record(task, condition, repeat, campaign, fingerprint,
+                                               "正常終了後にrun resultがありません", code)
+                record["run_id"] = run_id
         else:
-            record = infrastructure_record(task, condition, repeat, campaign, fingerprint, error, code)
+            # timeout/非zero終了後はrun rootのexists/read/hash/PGID確認を一切しない。
+            record = infrastructure_record(task, condition, repeat, campaign, fingerprint,
+                                           execution["error"] or "子runが正常終了しませんでした", code)
             record["run_id"] = run_id
+            record["process_execution"] = execution
+            atomic_json(active, {"task": task, "condition": condition, "repeat": repeat, "run_id": run_id,
+                                 "campaign": campaign, "fingerprint": fingerprint, "status": "unaccepted_execution",
+                                 "process_execution": execution})
         results.append(record)
         print(f"{task} {condition}{repeat}: {results[-1].get('pass_preliminary', 'infra_error')}", flush=True)
         stopped_reason = stop_reason(record)

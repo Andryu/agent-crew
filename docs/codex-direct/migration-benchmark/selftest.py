@@ -35,9 +35,6 @@ if "sandbox" in sys.argv:
         raise SystemExit(0)
     raise SystemExit(subprocess.run(command).returncode)
 mode=pathlib.Path(__file__).with_name("mode").read_text()
-if mode == "sleep":
-    time.sleep(3)
-    raise SystemExit(0)
 if mode == "fail":
     raise SystemExit(1)
 assert "DATABASE_URL" not in os.environ and "SSH_AUTH_SOCK" not in os.environ
@@ -403,6 +400,50 @@ def preflight_test(root):
     print("preflight: exact binding/tool env/canary cleanup/fail closed OK (sandbox outcomes mocked)", flush=True)
 
 
+def preflight_timeout_test(root):
+    root.mkdir()
+    runner._write_private(root / "AGENTS.md", "fixture")
+    spec = runner.execution_spec(root, runner.c6_task(), runner.CLI_VERSION, "fixture-fingerprint")
+    originals = preflight.subprocess.Popen, runner.os.kill, runner.os.killpg
+    processes, signals = [], []
+    class MockCanary:
+        pid = 987654321
+        returncode = None
+        def __init__(self):
+            self.stdin, self.stdout, self.stderr = None, io.StringIO(), io.StringIO()
+        def communicate(self, **_kwargs):
+            raise subprocess.TimeoutExpired("synthetic canary", 20, output=b"partial", stderr=b"diagnostic")
+        def kill(self):
+            raise AssertionError("preflight Popen.kill禁止")
+        def terminate(self):
+            raise AssertionError("preflight Popen.terminate禁止")
+        def send_signal(self, _signal):
+            raise AssertionError("preflight Popen.send_signal禁止")
+    def popen(*_args, **_kwargs):
+        process = MockCanary()
+        processes.append(process)
+        return process
+    def forbidden_signal(*args):
+        signals.append(args)
+        raise AssertionError("preflightで自動killしました")
+    preflight.subprocess.Popen, runner.os.kill, runner.os.killpg = popen, forbidden_signal, forbidden_signal
+    try:
+        report = preflight.check(spec)
+        assert not report["passed"] and report["process_may_still_be_running"]
+        assert len(processes) == 1 and not signals
+        assert report["cases"][0]["exit_code"] == "timeout"
+        assert all(case["outcome"] == "not_run_preflight_error" for case in report["cases"][1:])
+        assert "987654321" not in json.dumps(report)
+        diagnostics = root.parent / ".evidence" / root.name / "preflight.raw.json"
+        assert diagnostics.stat().st_mode & 0o777 == 0o600
+        detail = runner.load(diagnostics)[0]
+        assert detail["process_may_still_be_running"] and detail["leader_pid_at_launch"] == MockCanary.pid
+        assert not detail["automatic_termination"]
+    finally:
+        preflight.subprocess.Popen, runner.os.kill, runner.os.killpg = originals
+    print("preflight timeout: no kill/next case blocked/private diagnostic/no model (mock) OK", flush=True)
+
+
 def fake_preflight_report(spec):
     return {"schema": 3, "passed": True, "binding": spec["binding"], "cli_version": runner.CLI_VERSION,
             "binding_comparison": "entire_canonical_binding_equal_before_model",
@@ -438,13 +479,18 @@ def integration_test(root):
     summary_path = campaign / "batch-summary.json"
     runner.save(summary_path, {"schema": 2, "campaign": campaign.name, "fingerprint": fingerprint})
     serial = 0
-    def invoke(task="C1", mode="normal"):
+    def invoke(task="C1", mode="normal", expected_exit=None):
         nonlocal serial
         serial += 1
         (root / "mode").write_text(mode)
         args = SimpleNamespace(task=task, condition="A", repeat=1, run_id=f"run-{serial:02}", campaign=str(campaign), fingerprint=fingerprint)
         with contextlib.redirect_stdout(io.StringIO()):
-            runner.run(args)
+            try:
+                runner.run(args)
+            except SystemExit as error:
+                assert expected_exit is not None and error.code == expected_exit
+            else:
+                assert expected_exit is None
         path = campaign / args.run_id / ".benchmark-result.json"
         return args, runner.load(path), path
     try:
@@ -529,16 +575,16 @@ def integration_test(root):
         assert c6["validation"]["manifest_before_sha256"] == c6["validation"]["manifest_after_sha256"]
         assert c6["snapshot_evidence"]["accepted_sha256"] == c6["validation"]["manifest_after_sha256"]
         # 非scratchのbookkeeping名もvalidatorの書換えとして必ず拒否する。
-        original_execute = runner.execute_group
+        original_execute = runner.execute_command
         def mutate_snapshot(_command, validation_root, *_args, **_kwargs):
             runner._write_private(validation_root / ".benchmark-answer.txt", "unexpected")
             return 0, "OK", ""
-        runner.execute_group = mutate_snapshot
+        runner.execute_command = mutate_snapshot
         try:
             invalid = runner.validate(c1_task(), campaign / ".accepted/run-01", harness_fingerprint="fixture-fingerprint")
             assert invalid["exit_code"] == "validator_changed_snapshot" and not invalid["manifest_unchanged"]
         finally:
-            runner.execute_group = original_execute
+            runner.execute_command = original_execute
         for mode in ("env_missing", "env_leak"):
             _, invalid_environment, _ = invoke(mode=mode)
             assert not invalid_environment["isolation_gate"]["passed"] and not invalid_environment["isolation_gate"]["env_canary_pass"]
@@ -552,17 +598,33 @@ def integration_test(root):
         runner.scan_residual_processes = clean_process_evidence
         _, failed, _ = invoke(mode="fail")
         assert failed["cli_exit"] == 1 and not failed["pass_preliminary"]
-        runner.CLI_TIMEOUT_SECONDS = 0.1
-        _, timed, _ = invoke(mode="sleep")
-        assert timed["cli_exit"] == "timeout" and not timed["pass_preliminary"]
-        runner.CLI_TIMEOUT_SECONDS = originals[2]
-        runner.execute_group = lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("preflight失敗後にmodelを起動"))
+        original_snapshot, original_validate = runner.accepted_snapshot, runner.validate
+        def forbidden_snapshot(*_args, **_kwargs):
+            raise AssertionError("timeout/signal後にsnapshot/validatorを実行しました")
+        runner.accepted_snapshot = runner.validate = forbidden_snapshot
+        try:
+            for incomplete_code in ("timeout", "signal:15"):
+                def interrupted_execute(_command, _root, env, *_args, **_kwargs):
+                    # 完全な成功eventがあっても、実行完了未確認なら受入禁止。
+                    events = event_stream(runner.ENV_CANARY_COMMAND)
+                    events[3]["item"]["aggregated_output"] = json.dumps({key: value for key, value in env.items() if key != "CODEX_HOME"})
+                    return incomplete_code, "\n".join(json.dumps(event) for event in events), ""
+                runner.execute_command = interrupted_execute
+                _, timed, timed_path = invoke(expected_exit=143 if incomplete_code == "signal:15" else None)
+                assert timed["cli_exit"] == incomplete_code and not timed["pass_preliminary"]
+                assert not timed["isolation_gate"]["passed"] and not timed["acceptance_gate"]["passed"]
+                assert timed["validation"]["exit_code"] == "not_run" and not timed["snapshot_evidence"]["matched"]
+                assert timed["residual_process_evidence"]["model"]["kill_count"] == 0
+                assert not (campaign / ".accepted" / timed_path.parent.name).exists()
+        finally:
+            runner.execute_command, runner.accepted_snapshot, runner.validate = original_execute, original_snapshot, original_validate
+        runner.execute_command = lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("preflight失敗後にmodelを起動"))
         runner.per_run_preflight = lambda spec: {"passed": True, "binding": {**spec["binding"], "harness_fingerprint": "wrong"}}
         try:
             _, blocked, _ = invoke()
             assert blocked["cli_exit"] == "not_run" and not blocked["isolation_gate"]["preflight_bound"]
         finally:
-            runner.execute_group = original_execute
+            runner.execute_command = original_execute
     finally:
         runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS, runner.scan_residual_processes = originals
     print("integration: 4 gates/exact replay path/fingerprint+hash tamper/non-mutating result/C6 scratch validator/full manifest/timeout/binding block OK", flush=True)
@@ -646,15 +708,142 @@ def residual_process_test():
 
 def process_test(root):
     root.mkdir()
-    for timeout in (True, False):
-        marker = root / f"child-{timeout}"
-        child = f'import pathlib,time; time.sleep(0.4); pathlib.Path({str(marker)!r}).write_text("alive")'
-        parent = (f'import subprocess,sys,time; subprocess.Popen([sys.executable,"-c",{child!r}],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); ' + ('time.sleep(3)' if timeout else 'pass'))
-        code, _, _ = runner.execute_group([sys.executable, "-B", "-c", parent], root, runner.limited_env(root), 0.1 if timeout else 3)
-        assert code == ("timeout" if timeout else 0)
-        time.sleep(0.6)
-        assert not marker.exists()
-    print("process: normal+timeout group cleanup OK", flush=True)
+    originals = runner.subprocess.Popen, runner.os.kill, runner.os.killpg
+    created, signals = [], []
+    mode = "normal"
+    class MockProcess:
+        pid = 123456789
+        returncode = 0
+        def __init__(self):
+            self.stdin, self.stdout, self.stderr = io.StringIO(), io.StringIO(), io.StringIO()
+            self.calls = 0
+        def communicate(self, **_kwargs):
+            self.calls += 1
+            if mode == "timeout":
+                raise subprocess.TimeoutExpired("mock", 1, output=b"partial raw", stderr=b"partial diagnostic")
+            if mode == "signal":
+                runner.terminate_handler(signal.SIGTERM, None)
+            return "complete raw", ""
+        def kill(self):
+            raise AssertionError("Popen.kill禁止")
+        def terminate(self):
+            raise AssertionError("Popen.terminate禁止")
+        def send_signal(self, _signal):
+            raise AssertionError("Popen.send_signal禁止")
+        def wait(self, **_kwargs):
+            raise AssertionError("timeout後のwait禁止")
+    def popen(*_args, **_kwargs):
+        process = MockProcess()
+        created.append(process)
+        return process
+    def forbidden_signal(*args):
+        signals.append(args)
+        raise AssertionError("PID/PGID自動signal禁止")
+    runner.subprocess.Popen, runner.os.kill, runner.os.killpg = popen, forbidden_signal, forbidden_signal
+    try:
+        for mode, expected in (("normal", 0), ("timeout", "timeout"), ("signal", "signal:15")):
+            target = root / mode / "run-01"
+            target.mkdir(parents=True)
+            code, stdout, _stderr = runner.execute_command(["mock"], target, {}, 1)
+            assert code == expected and created[-1].calls == 1 and not signals
+            assert all(getattr(created[-1], name).closed for name in ("stdin", "stdout", "stderr"))
+            if mode != "normal":
+                evidence = target.parent / ".evidence/run-01/process-model-interruption.json"
+                diagnostic = runner.load(evidence)
+                assert evidence.stat().st_mode & 0o777 == 0o600
+                assert diagnostic["process_may_still_be_running"] and not diagnostic["automatic_termination"]
+            else:
+                assert stdout == "complete raw"
+        mode = "signal"
+        try:
+            runner.run_trusted_command(["mock helper"], capture_output=True, text=True, check=True)
+        except runner.RunSignal as error:
+            assert error.code == 143 and not signals
+        else:
+            raise AssertionError("補助commandのsignalを握り潰した")
+        # validator timeoutでは、実行後manifestを読まず不合格を返す。
+        validation_root = root / "validation"
+        validation_root.mkdir()
+        original_manifest = runner.tree_manifest
+        manifests = []
+        def once_manifest(*_args, **_kwargs):
+            manifests.append(True)
+            assert len(manifests) == 1, "timeout後にvalidator snapshotを読んだ"
+            return {}
+        runner.tree_manifest = once_manifest
+        mode = "timeout"
+        try:
+            result = runner.validate(c1_task(), validation_root, timeout=1)
+            assert result["exit_code"] == "timeout" and not result["manifest_unchanged"] and not signals
+        finally:
+            runner.tree_manifest = original_manifest
+        try:
+            runner.terminate_handler(signal.SIGTERM, None)
+        except runner.RunSignal as error:
+            assert error.code == 143 and not signals
+        else:
+            raise AssertionError("signalをfail-closed exitへ変換しなかった")
+    finally:
+        runner.subprocess.Popen, runner.os.kill, runner.os.killpg = originals
+    print("process: normal/timeout/signal no kill+killpg/no wait/private diagnostic/no post-timeout validation (mock) OK", flush=True)
+
+
+def c6_process_test(root):
+    root.mkdir()
+    spec = importlib.util.spec_from_file_location("p5_c6_validator", HERE / "validate_c6.py")
+    validator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(validator)
+    originals = validator.subprocess.Popen, runner.os.kill, runner.os.killpg
+    mode, signals, created = "normal", [], []
+    class MockReload:
+        pid = 192837465
+        returncode = 0
+        def __init__(self):
+            self.stdin, self.stdout, self.stderr = None, io.StringIO(), io.StringIO()
+        def communicate(self, **_kwargs):
+            if mode == "timeout":
+                raise subprocess.TimeoutExpired("C6 synthetic reload", 10)
+            if mode == "exception":
+                raise OSError("synthetic observation failure")
+            if mode == "interrupt":
+                raise KeyboardInterrupt()
+            return "P0 [検証中]", ""
+        def kill(self):
+            raise AssertionError("C6 Popen.kill禁止")
+        def terminate(self):
+            raise AssertionError("C6 Popen.terminate禁止")
+        def send_signal(self, _signal):
+            raise AssertionError("C6 Popen.send_signal禁止")
+    def popen(*_args, **_kwargs):
+        process = MockReload()
+        created.append(process)
+        return process
+    def forbidden_signal(*args):
+        signals.append(args)
+        raise AssertionError("C6でPID/PGIDを自動killしました")
+    validator.subprocess.Popen, runner.os.kill, runner.os.killpg = popen, forbidden_signal, forbidden_signal
+    try:
+        for mode in ("normal", "timeout", "exception", "interrupt"):
+            target = root / mode
+            (target / ".benchmark-tmp").mkdir(parents=True)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                try:
+                    completed = validator.run_reload_no_kill(target / "progress.py", target)
+                except SystemExit as error:
+                    assert mode != "normal" and error.code == 1
+                else:
+                    assert mode == "normal" and completed.returncode == 0 and "P0" in completed.stdout
+            assert not signals and created[-1].stdout.closed and created[-1].stderr.closed
+            if mode != "normal":
+                diagnostic = target / ".benchmark-tmp/c6-reload-interruption.json"
+                assert diagnostic.stat().st_mode & 0o777 == 0o600
+                detail = runner.load(diagnostic)
+                assert not detail["automatic_termination"] and detail["process_may_still_be_running"]
+                assert "192837465" not in output.getvalue()
+    finally:
+        validator.subprocess.Popen, runner.os.kill, runner.os.killpg = originals
+    print("C6 reload: normal/timeout/exception/interrupt no kill/private scratch evidence/validation fail (mock) OK", flush=True)
 
 
 def main():
@@ -669,8 +858,10 @@ def main():
     snapshot_test(root / "snapshots")
     prepare_copy_test(root / "prepare-copy")
     preflight_test(root / "preflight")
+    preflight_timeout_test(root / "preflight-timeout")
     integration_test(root / "integration")
     process_test(root / "process")
+    c6_process_test(root / "c6-process")
     print("P5 security selftest: all passed; 実sandbox/実model呼出しなし; private root:", root)
 
 

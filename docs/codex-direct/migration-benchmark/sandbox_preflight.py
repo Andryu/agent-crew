@@ -42,15 +42,36 @@ def write_command(path):
 
 def run_case(name, spec, command, expected):
     invocation = runner.sandbox_command(spec["root"], spec["task"], command, spec)
+    process, completion_confirmed, interrupted = None, False, None
+    def decoded(value):
+        return value.decode(errors="replace") if isinstance(value, bytes) else value or ""
     try:
-        completed = subprocess.run(invocation, text=True, capture_output=True, env=runner.process_env(spec),
-                                   cwd=spec["root"], timeout=20, check=False)
-        code, stdout, stderr = completed.returncode, completed.stdout, completed.stderr
+        process = subprocess.Popen(invocation, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   env=runner.process_env(spec), cwd=spec["root"])
+        stdout, stderr = process.communicate(timeout=20)
+        code = process.returncode
+        completion_confirmed = True
         outcome = ("allowed" if code == 0 else "preflight_error") if expected == "allow" else classify_denial(code, stdout, stderr)
-    except (OSError, subprocess.TimeoutExpired) as error:
-        outcome, code, stdout, stderr = "preflight_error", "spawn_or_timeout", "", str(error)
+    except subprocess.TimeoutExpired as error:
+        outcome, code = "preflight_error", "timeout"
+        stdout, stderr = decoded(error.stdout), decoded(error.stderr)
+        spec["preflight_execution_incomplete"] = True
+    except runner.RunSignal as error:
+        outcome, code, stdout, stderr = "preflight_error", f"signal:{error.signum}", "", ""
+        spec["preflight_execution_incomplete"] = True
+        interrupted = error
+    except OSError as error:
+        outcome, code, stdout, stderr = "preflight_error", "spawn_error", "", str(error)
+    finally:
+        if process is not None:
+            runner.close_process_streams(process)
     spec.setdefault("private_preflight_diagnostics", []).append({"name": name, "command": command, "exit_code": code,
-                                                               "stdout": stdout, "stderr": stderr})
+        "stdout": stdout, "stderr": stderr, "automatic_termination": False,
+        "leader_pid_at_launch": process.pid if process is not None else None,
+        "pid_current_ownership_unverified": True,
+        "process_may_still_be_running": process is not None and not completion_confirmed})
+    if interrupted is not None:
+        raise interrupted
     return {"name": name, "expected": expected, "outcome": outcome, "exit_code": code,
             "command_sha256": runner.canonical_digest(command), "binding_sha256": runner.canonical_digest(spec["binding"]),
             "stdout_sha256": runner.digest_bytes(stdout.encode()), "stderr_sha256": runner.digest_bytes(stderr.encode())}
@@ -71,6 +92,7 @@ def check(spec):
     link.symlink_to(sentinel)
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     spec["private_preflight_diagnostics"] = []
+    spec["preflight_execution_incomplete"] = False
     report = {"schema": 3, "started_at": runner.stamp(), "cli_version": spec["binding"]["cli_version"],
               "tool_environment_scope": "auxiliary_env_i_probe_not_actual_exec_tool",
               "binding": spec["binding"], "binding_comparison": "entire_canonical_binding_equal_before_model", "passed": False, "cases": []}
@@ -98,10 +120,11 @@ def check(spec):
             if path.is_file():
                 file_hashes[path] = runner.sha(path)
                 cases.append((f"task_file_write_{index}", ["python3.12", "-B", "-c", "import sys; f=open(sys.argv[1],'r+b'); b=f.read(); f.seek(0); f.write(b); f.close()", str(path)], "allow"))
-        if report["sandbox_initialized"]:
-            report["cases"].extend(run_case(name, spec, command, expected) for name, command, expected in cases)
-        else:
-            report["cases"].extend({"name": name, "expected": expected, "outcome": "not_run_preflight_error"} for name, _, expected in cases)
+        for name, command, expected in cases:
+            if report["sandbox_initialized"] and not spec["preflight_execution_incomplete"]:
+                report["cases"].append(run_case(name, spec, command, expected))
+            else:
+                report["cases"].append({"name": name, "expected": expected, "outcome": "not_run_preflight_error"})
         rebound = runner.canonical_execution_spec(root, spec["task"], spec["binding"]["cli_version"], spec["binding"]["harness_fingerprint"], spec["binding"]["phase"])
         conditions = {"canary_writes_observed": scratch.is_file() and task_write.is_file(),
                       "outside_writes_absent": not os.path.lexists(outside) and not os.path.lexists(repository_target),
@@ -115,7 +138,8 @@ def check(spec):
         for path in (link, scratch, task_write, sentinel, outside, repository_target):
             path.unlink(missing_ok=True)
         report["canaries_removed"] = all(not os.path.lexists(path) for path in (link, scratch, task_write, sentinel, outside, repository_target))
-        report["passed"] = report["passed"] and report["canaries_removed"]
+        report["process_may_still_be_running"] = spec.pop("preflight_execution_incomplete")
+        report["passed"] = report["passed"] and report["canaries_removed"] and not report["process_may_still_be_running"]
         report["ended_at"] = runner.stamp()
         diagnostics = root.parent / ".evidence" / root.name / "preflight.raw.json"
         runner.save(diagnostics, spec.pop("private_preflight_diagnostics", []))
@@ -132,14 +156,14 @@ def main():
         fixture = directory / "fixture"
         fixture.mkdir(mode=0o700)
         runner._write_private(fixture / "AGENTS.md", "P5 synthetic fixture\n")
-        version = subprocess.run([runner.CODEX_EXECUTABLE, "--version"], capture_output=True, text=True, check=True,
+        version = runner.run_trusted_command([runner.CODEX_EXECUTABLE, "--version"], capture_output=True, text=True, check=True,
                                  env={"PATH": runner.FIXED_PATH}).stdout.strip()
         if version != runner.CLI_VERSION:
             raise SystemExit("CLI版不一致")
         harness = runner.canonical_digest({name: runner.sha(runner.HERE / name) for name in ("run.py", "sandbox_preflight.py")})
         report = check(runner.execution_spec(fixture, runner.c6_task(), version, harness))
         print(json.dumps(report, ensure_ascii=False, indent=2))
-        if args.cleanup:
+        if args.cleanup and not report.get("process_may_still_be_running"):
             shutil.rmtree(directory)
         if not report["passed"]:
             raise SystemExit(1)

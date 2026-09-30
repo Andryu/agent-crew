@@ -42,6 +42,40 @@ def checked(root, relative):
     return path
 
 
+def run_reload_no_kill(program, root):
+    """固定表示CLIを観測し、timeout/例外でもleader PIDへsignalを送らない。"""
+    command = [sys.executable, "-B", str(program), "--once"]
+    process = None
+    try:
+        process = subprocess.Popen(command, cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate(timeout=10)
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+    except (Exception, KeyboardInterrupt, SystemExit) as error:
+        diagnostic = {"schema": 1, "reason_type": type(error).__name__, "automatic_termination": False,
+                      "process_may_still_be_running": process is not None,
+                      "leader_pid_at_launch": process.pid if process is not None else None,
+                      "pid_current_ownership_unverified": True}
+        # acceptedの非scratchへは書かず、PIDは0600のprivate診断だけに残す。
+        destination = root / ".benchmark-tmp/c6-reload-interruption.json"
+        try:
+            fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "w") as handle:
+                os.fchmod(handle.fileno(), 0o600)
+                json.dump(diagnostic, handle, ensure_ascii=False)
+        except OSError:
+            pass
+        fail("C6表示CLIの実行完了を確認できません。自動終了せずcampaignを停止します")
+    finally:
+        if process is not None:
+            for name in ("stdin", "stdout", "stderr"):
+                stream = getattr(process, name, None)
+                if stream is not None:
+                    try:
+                        stream.close()
+                    except (OSError, ValueError):
+                        pass
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--state-before-sha256", required=True)
@@ -70,8 +104,7 @@ def main():
         fail("P0が検証中ではありません")
     if data.get("schema") != 1 or set(data.get("tasks", {})) != {f"P{number}" for number in range(8)}:
         fail("合成state.jsonのschemaまたはタスク構造が変わりました")
-    shown = subprocess.run([sys.executable, "-B", str(program), "--once"], cwd=root,
-                           capture_output=True, text=True)
+    shown = run_reload_no_kill(program, root)
     if shown.returncode != 0 or "P0 [検証中]" not in shown.stdout:
         fail("合成state.jsonをCLIで再読込できません")
     print(json.dumps({"ok": True, "state_changed": True, "p0_status": p0["status"],
