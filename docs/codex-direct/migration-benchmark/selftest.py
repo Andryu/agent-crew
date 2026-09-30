@@ -1,468 +1,361 @@
 #!/usr/bin/env python3
-"""有料CLIを呼ばずに隔離、成功、失敗、timeoutを確認する。"""
+"""実モデルなしでpermission binding、監査、snapshot、再分類の境界を検証する。"""
 
+import contextlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
-import signal
-import shutil
 import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 from types import SimpleNamespace
 
-SCRIPT = Path(__file__).resolve().with_name("run.py")
-SPEC = importlib.util.spec_from_file_location("p5_run", SCRIPT)
+HERE = Path(__file__).resolve().parent
+SPEC = importlib.util.spec_from_file_location("p5_run", HERE / "run.py")
 runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
-BATCH_SPEC = importlib.util.spec_from_file_location("p5_batch", SCRIPT.with_name("batch.py"))
-batch = importlib.util.module_from_spec(BATCH_SPEC)
-BATCH_SPEC.loader.exec_module(batch)
+import sandbox_preflight as preflight
 
 FAKE = '''#!/usr/bin/env python3
-import json,os,subprocess,sys,time
+import json,os,pathlib,subprocess,sys,time
 if "--version" in sys.argv:
     print("codex-cli 0.155.1")
     raise SystemExit(0)
 if "sandbox" in sys.argv:
-    command = sys.argv[sys.argv.index("--")+1:]
-    if "unittest" in command:
+    command=sys.argv[sys.argv.index("--")+1:]
+    if "unittest" in command or "pytest" in command:
         raise SystemExit(0)
     raise SystemExit(subprocess.run(command).returncode)
-if os.getenv("FAKE_CLI_MODE") == "sleep":
-    time.sleep(2)
+mode=pathlib.Path(__file__).with_name("mode").read_text()
+if mode == "sleep":
+    time.sleep(3)
     raise SystemExit(0)
-if os.getenv("FAKE_CLI_MODE") == "fail":
+if mode == "fail":
     raise SystemExit(1)
-recorded_command = "python3.12 -B -m unittest discover -s tests -p test_crew_launcher.py -v"
-if os.getenv("FAKE_CLI_MODE") == "c6":
-    root = sys.argv[sys.argv.index("-C") + 1]
-    update = [sys.executable, "-B", "migration-progress/progress.py", "set",
-              "--task", "P0", "--status", "検証中", "--current", "fake更新",
-              "--next", "fake再読込", "--blocker", "なし"]
-    subprocess.run(update, cwd=root, check=True,
-                   capture_output=True, text=True)
-    recorded_command = "python3.12 -B migration-progress/progress.py set --task P0 --status 検証中 --current fake更新 --next fake再読込 --blocker なし"
-answer = sys.argv[sys.argv.index("-o")+1]
-open(answer,"w").write("目的 検証 次の一手\\n")
+assert "DATABASE_URL" not in os.environ and "SSH_AUTH_SOCK" not in os.environ
+assert "CODEX_HOME" in os.environ
+prompt=sys.stdin.read()
+if "課題ID: C6" in prompt:
+    subprocess.run([sys.executable,"-B","migration-progress/progress.py","set","--task","P0",
+                    "--status","検証中","--current","fake更新","--next","fake再読込","--blocker","なし"],
+                   capture_output=True,check=True)
+if mode == "symlink":
+    pathlib.Path("docs/plans/unsafe.md").symlink_to("../../AGENTS.md")
+if mode == "extra":
+    pathlib.Path("benchmark-tmp").mkdir()
+    pathlib.Path("benchmark-tmp/unexpected").write_text("unexpected")
+if mode == "scratch":
+    pathlib.Path(".benchmark-tmp/expected").write_text("expected")
+pathlib.Path(sys.argv[sys.argv.index("-o")+1]).write_text("目的 検証 次の一手\\n")
+command="python3.12 .benchmark-tmp/network.py" if mode == "unknown" else "pwd; true"
 print(json.dumps({"type":"thread.started","thread_id":"fixture"}))
 print(json.dumps({"type":"turn.started"}))
-print(json.dumps({"type":"item.started","item":{"id":"cmd-1","type":"command_execution","command":recorded_command,"cwd":".","status":"in_progress"}}))
-print(json.dumps({"type":"item.completed","item":{"id":"cmd-1","type":"command_execution","command":recorded_command,"cwd":".","status":"completed","exit_code":0,"aggregated_output":"OK"}}))
-print(json.dumps({"type":"item.completed","item":{"type":"agent_message","text":"目的 検証 次"}}))
-print(json.dumps({"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":3}}))
+print(json.dumps({"type":"item.started","item":{"id":"cmd-1","type":"command_execution","command":command,"status":"in_progress"}}))
+print(json.dumps({"type":"item.completed","item":{"id":"cmd-1","type":"command_execution","command":command,"status":"completed","exit_code":0,"aggregated_output":"OK"}}))
+print(json.dumps({"type":"item.completed","item":{"id":"answer","type":"agent_message","text":"目的 検証 次"}}))
+print(json.dumps({"type":"turn.completed","usage":{"input_tokens":12,"cached_input_tokens":6,"cache_write_input_tokens":0,"output_tokens":3,"total_tokens":15}}))
 '''
 
 
-def event_audit_selftest():
-    """未知・伏字・失敗eventを安全合格へ混ぜない。"""
-    with tempfile.TemporaryDirectory(prefix="p5-event-audit-", dir="/private/tmp",
-                                     ignore_cleanup_errors=True) as directory:
-        root = Path(directory)
+def expect_rejected(call):
+    try:
+        call()
+    except (OSError, RuntimeError, ValueError):
+        return
+    raise AssertionError("境界違反を受け入れました")
 
-        def audit(name, events):
-            destination = root / f"{name}.json"
-            result = runner.safe_events("\n".join(
-                event if isinstance(event, str) else json.dumps(event) for event in events
-            ), destination, expected_cwd=root)
-            assert destination.stat().st_mode & 0o777 == 0o600
-            return result
 
-        normal = audit("normal", [
-            {"type": "thread.started", "thread_id": "fixture"},
-            {"type": "turn.started"},
-            {"type": "item.completed", "item": {"type": "reasoning", "text": "hidden"}},
-            {"type": "item.started", "item": {"id": "cmd-1", "type": "command_execution",
-             "command": "python3.12 -B -m unittest -q", "cwd": ".", "status": "in_progress"}},
-            {"type": "item.completed", "item": {"id": "cmd-1", "type": "command_execution",
-             "command": "python3.12 -B -m unittest -q", "cwd": ".", "status": "completed", "exit_code": 0,
-             "aggregated_output": "OK"}},
-            {"type": "item.completed", "item": {"type": "agent_message", "text": "done"}},
-            {"type": "turn.completed", "usage": {"input_tokens": 1, "output_tokens": 1}},
-        ])
-        assert normal["event_audit"]["status"] == "pass"
-        assert normal["safety_gate"]["passed"] is True
-        c6_command = ("python3.12 -B migration-progress/progress.py set --task P0 --status 検証中 "
-                      "--current 確認 --next 再読込 --blocker なし")
-        assert runner._command_safety(c6_command) == (True, None)
-        for unsafe_command in (
-            "git -C . fetch || true",
-            "node -p 'require(\"net\").connect(1234,\"127.0.0.1\")'",
-            "/usr/bin/python3 -c 'print(1)'",
-            "cat README.md;node -p 'require(\"net\").connect(1234,\"127.0.0.1\")'",
-            "find . -maxdepth 0 -exec node -p 'require(\"net\").connect(1234,\"127.0.0.1\")' +",
-            "cat ../outside.txt",
-            "rg --pre node pattern .",
-            "git diff --ext-diff",
-        ):
-            assert runner._command_safety(unsafe_command)[0] is False, unsafe_command
+def c1_task():
+    return next(task for task in runner.load(runner.BASE / "comparison.json")["tasks"] if task["id"] == "C1")
 
-        cases = {
-            "malformed": ["not-json", {"type": "turn.completed", "usage": {}}],
-            "unknown-event": [{"type": "mystery.event"}, {"type": "turn.completed", "usage": {}}],
-            "unknown-item": [{"type": "item.completed", "item": {"type": "mystery_tool"}},
-                             {"type": "turn.completed", "usage": {}}],
-            "mcp": [{"type": "item.completed", "item": {"type": "mcp_tool_call"}},
-                    {"type": "turn.completed", "usage": {}}],
-            "network": [{"type": "item.started", "item": {"id": "cmd-2", "type": "command_execution",
-                         "command": "curl https://example.invalid", "status": "in_progress"}},
-                        {"type": "item.completed", "item": {"id": "cmd-2", "type": "command_execution",
-                         "command": "curl https://example.invalid", "status": "failed", "exit_code": 1,
-                         "aggregated_output": "blocked"}},
-                        {"type": "turn.completed", "usage": {}}],
-            "secret": [{"type": "item.started", "item": {"id": "cmd-3", "type": "command_execution",
-                        "command": "echo token=fixture", "status": "in_progress"}},
-                       {"type": "item.completed", "item": {"id": "cmd-3", "type": "command_execution",
-                        "command": "echo token=fixture", "status": "completed", "exit_code": 0,
-                        "aggregated_output": ""}},
-                       {"type": "turn.completed", "usage": {}}],
-            "user-path": [{"type": "item.started", "item": {"id": "cmd-4", "type": "command_execution",
-                           "command": "cat " + "/Users" + "/example/private", "status": "in_progress"}},
-                          {"type": "item.completed", "item": {"id": "cmd-4", "type": "command_execution",
-                           "command": "cat " + "/Users" + "/example/private", "status": "completed", "exit_code": 0,
-                           "aggregated_output": ""}},
-                          {"type": "turn.completed", "usage": {}}],
-            "missing-exit": [{"type": "item.started", "item": {"id": "cmd-5", "type": "command_execution",
-                              "command": "python3.12 -B check.py", "status": "in_progress"}},
-                             {"type": "item.completed", "item": {"id": "cmd-5", "type": "command_execution",
-                              "command": "python3.12 -B check.py", "status": "completed", "aggregated_output": ""}},
-                             {"type": "turn.completed", "usage": {}}],
-            "missing-output": [{"type": "item.started", "item": {"id": "cmd-6", "type": "command_execution",
-                                "command": "python3.12 -B check.py", "status": "in_progress"}},
-                               {"type": "item.completed", "item": {"id": "cmd-6", "type": "command_execution",
-                                "command": "python3.12 -B check.py", "status": "completed", "exit_code": 0}},
-                               {"type": "turn.completed", "usage": {}}],
-            "failed-command": [{"type": "item.started", "item": {"id": "cmd-9", "type": "command_execution",
-                                "command": "python3.12 -B check.py", "status": "in_progress"}},
-                               {"type": "item.completed", "item": {"id": "cmd-9", "type": "command_execution",
-                                "command": "python3.12 -B check.py", "status": "failed", "exit_code": 1,
-                                "aggregated_output": "failed"}},
-                               {"type": "turn.completed", "usage": {}}],
-            "started-only": [{"type": "item.started", "item": {"id": "cmd-7", "type": "command_execution",
-                              "command": "pwd", "cwd": ".", "status": "in_progress"}},
-                             {"type": "turn.completed", "usage": {}}],
-            "updated-only": [{"type": "item.updated", "item": {"id": "cmd-u", "type": "command_execution",
-                              "command": "pwd", "cwd": ".", "status": "failed", "exit_code": 1,
-                              "aggregated_output": "failed"}}, {"type": "turn.completed", "usage": {}}],
-            "type-mismatch": [{"type": "item.started", "item": {"id": "mixed-1", "type": "command_execution",
-                               "command": "pwd", "cwd": ".", "status": "in_progress"}},
-                              {"type": "item.completed", "item": {"id": "mixed-1", "type": "file_change",
-                               "status": "completed"}}, {"type": "turn.completed", "usage": {}}],
-            "missing-cwd": [{"type": "item.started", "item": {"id": "cmd-cwd", "type": "command_execution",
-                             "command": "pwd", "status": "in_progress"}},
-                            {"type": "item.completed", "item": {"id": "cmd-cwd", "type": "command_execution",
-                             "command": "pwd", "status": "completed", "exit_code": 0,
-                             "aggregated_output": ""}}, {"type": "turn.completed", "usage": {}}],
-            "file-change-failed": [{"type": "item.started", "item": {"id": "file-1", "type": "file_change"}},
-                                   {"type": "item.completed", "item": {"id": "file-1", "type": "file_change",
-                                    "status": "failed"}}, {"type": "turn.completed", "usage": {}}],
-            "python-network": [{"type": "item.started", "item": {"id": "cmd-8", "type": "command_execution",
-                                "command": "python3.12 -c 'import socket; socket.create_connection((\"127.0.0.1\", 1234))'",
-                                "status": "in_progress"}},
-                               {"type": "item.completed", "item": {"id": "cmd-8", "type": "command_execution",
-                                "command": "python3.12 -c 'import socket; socket.create_connection((\"127.0.0.1\", 1234))'",
-                                "status": "failed", "exit_code": 1, "aggregated_output": "Permission denied"}},
-                               {"type": "turn.completed", "usage": {}}],
-            "error": [{"type": "error", "message": "fixture"},
-                      {"type": "turn.failed", "message": "fixture"}],
-            "empty": [],
-        }
-        for name, events in cases.items():
-            result = audit(name, events)
-            assert result["event_audit"]["status"] != "pass", name
-            assert result["safety_gate"]["passed"] is False, name
 
-        symlink = root / "symlink.json"
-        symlink.symlink_to(root / "target.json")
-        try:
-            runner.save(symlink, {"unsafe": True})
-        except OSError:
-            pass
+def permission_test(root):
+    root.mkdir()
+    spec = runner.execution_spec(root, c1_task(), runner.CLI_VERSION, "fixed-harness")
+    config = tomllib.loads("\n".join(spec["config"]))["permissions"]["p5_fixture"]
+    assert "extends" not in config and config["filesystem"][":root"] == "deny"
+    assert config["filesystem"][":minimal"] == "read" and config["filesystem"][str(root)] == "read"
+    assert config["filesystem"][str(root / ".benchmark-tmp")] == "write" and config["network"]["enabled"] is False
+    binding = spec["binding"]
+    assert binding["harness_fingerprint"] == "fixed-harness"
+    assert binding["codex_executable"]["sha256"] == runner.sha(Path(runner.CODEX_EXECUTABLE).resolve())
+    assert binding["tool_environment"]["sha256"] == runner.canonical_digest(spec["env"])
+    assert binding["codex_process_environment"]["sha256"] == runner.canonical_digest(runner.process_env(spec))
+    assert "CODEX_HOME" not in binding["tool_environment"]["keys"]
+    assert "CODEX_HOME" in binding["codex_process_environment"]["keys"]
+    assert runner.AUTH_HOME not in json.dumps(binding)
+    previous = os.environ.get("DATABASE_URL")
+    os.environ["DATABASE_URL"] = "synthetic-secret"
+    try:
+        assert "DATABASE_URL" not in runner.limited_env(root)
+        assert "synthetic-secret" not in json.dumps(binding)
+    finally:
+        if previous is None:
+            os.environ.pop("DATABASE_URL", None)
         else:
-            raise AssertionError("private artifact symlinkを上書きした")
-        assert root.stat().st_mode & 0o777 == 0o700
-        print("P5 event audit selftest: pass/unknown/fail/redaction/mode/symlink OK", flush=True)
+            os.environ["DATABASE_URL"] = previous
+    tools = tomllib.loads("\n".join(runner.tool_environment_config(spec)))["shell_environment_policy"]
+    assert tools["inherit"] == "none" and tools["set"] == spec["env"]
+    invocation = runner.sandbox_command(root, c1_task(), ["pwd"], spec)
+    assert invocation[invocation.index("--") + 1:invocation.index("--") + 3] == ["/usr/bin/env", "-i"]
+    assert not any(token.startswith("CODEX_HOME=") for token in invocation)
+    validation = runner.execution_spec(root, c1_task(), runner.CLI_VERSION, "fixed-harness", "validation")
+    policy = tomllib.loads("\n".join(validation["config"]))["permissions"]["p5_fixture"]["filesystem"]
+    assert [key for key, value in policy.items() if value == "write"] == [str(root / ".benchmark-tmp")]
+    other = root.parent / "rebound"
+    other.mkdir()
+    rebound = runner.execution_spec(other, c1_task(), runner.CLI_VERSION, "fixed-harness")
+    assert rebound["binding"]["policy_template_sha256"] == binding["policy_template_sha256"]
+    assert rebound["binding"]["profile_sha256"] != binding["profile_sha256"]
+    assert rebound["binding"]["root_inode"] != binding["root_inode"]
+    shared_parent = root / "existing-shared-parent"
+    shared_parent.mkdir(mode=0o755)
+    shared_parent.chmod(0o755)
+    runner.save(shared_parent / "private.json", {"ok": True})
+    assert shared_parent.stat().st_mode & 0o777 == 0o755
+    assert (shared_parent / "private.json").stat().st_mode & 0o777 == 0o600
+    print("permission: canonical/phase/root/tool+process env/auth hash/executable/harness/parent mode OK", flush=True)
 
 
-def c6_safety_selftest():
-    """C1の既知cleanup障害より前に、C6境界の異常系を単独で確認する。"""
-    # managed sandboxが作るmountは削除拒否になり得る。/private/tmpの生成rootだけを対象にし、
-    # cleanup失敗を検証失敗にしない（ここで手動rmはしない）。
-    with tempfile.TemporaryDirectory(prefix="p5-c6-safety-", dir="/private/tmp",
-                                     ignore_cleanup_errors=True) as directory:
-        root = Path(directory)
-        progress = root / "migration-progress"
-        progress.mkdir()
-        source = runner.BASE / "snapshot/agent_crew/migration-progress"
-        for name in ("progress.py", "README.md"):
-            shutil.copy2(source / name, progress / name)
-        shutil.copy2(runner.BASE / "fixtures/board-state.json", progress / "state.json")
-        before = runner.sha(progress / "state.json")
-        validator = SCRIPT.with_name("validate_c6.py")
-        base = [sys.executable, "-B", str(validator), "--state-before-sha256", before,
-                "--progress-sha256", runner.sha(progress / "progress.py"),
-                "--readme-sha256", runner.sha(progress / "README.md")]
-        # 未更新・progress改変・不完全stateは、それぞれ独立に不合格になる。
-        assert subprocess.run(base, cwd=root, capture_output=True, text=True).returncode == 1
-        with (progress / "progress.py").open("a", encoding="utf-8") as handle:
-            handle.write("\n# changed\n")
-        assert subprocess.run(base, cwd=root, capture_output=True, text=True).returncode == 1
-        shutil.copy2(source / "progress.py", progress / "progress.py")
-        (progress / "state.json").write_text(json.dumps({"schema": 1, "tasks": {"P0": {}}}), encoding="utf-8")
-        assert subprocess.run(base, cwd=root, capture_output=True, text=True).returncode == 1
-        (progress / "state.json").unlink()
-        (progress / "state.json").symlink_to("missing-state.json")
-        assert subprocess.run(base, cwd=root, capture_output=True, text=True).returncode == 1
-        (progress / "state.json").unlink()
-        symlink_root = root / "intermediate-symlink"
-        symlink_root.mkdir()
-        (symlink_root / "migration-progress").symlink_to(progress, target_is_directory=True)
-        assert subprocess.run(base, cwd=symlink_root, capture_output=True, text=True).returncode == 1
-        assert runner.preliminary_pass(0, 0, [], True, False) is False
-        c6_allowed = {"migration-progress/state.json"}
-        c6_modified = ["docs/plans/unexpected.md"]
-        c6_scope = [name for name in c6_modified if name not in c6_allowed]
-        assert c6_scope == ["docs/plans/unexpected.md"]
-        # 壊れsymlink validatorは上書きしない。sandbox実行はfakeで置換する。
-        target = root / "validate_c6.py"
-        target.symlink_to("missing-validator.py")
-        task = runner.c6_task()
-        original = runner.execute_group
-        runner.execute_group = lambda *_args, **_kwargs: (0, "", "")
+def event_stream(command="pwd", code=0, extras=()):
+    active = {"id": "cmd", "type": "command_execution", "command": command, "status": "in_progress"}
+    completed = {**active, "status": "failed" if code else "completed", "exit_code": code, "aggregated_output": "private synthetic stdout"}
+    return [{"type": "thread.started", "thread_id": "fixture"}, {"type": "turn.started"},
+            {"type": "item.started", "item": active}, {"type": "item.completed", "item": completed}, *extras,
+            {"type": "turn.completed", "usage": {"input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1}}]
+
+
+def event_test(root):
+    root.mkdir()
+    def audit(command="pwd", code=0, extras=()):
+        raw = "\n".join(json.dumps(event) for event in event_stream(command, code, extras))
+        return runner.safe_events(raw, root / "events.json", root)
+    normal = audit("false; true", 1, [{"type": "item.completed", "item": {"id": "patch", "type": "file_change", "status": "failed", "changes": []}}])
+    assert normal["event_audit"]["passed"] and normal["attempt_policy"]["passed"]
+    assert normal["commands"][0]["cwd_source"] == "not_reported"
+    assert normal["commands"][0]["initial_cwd_source"] == "trusted_invocation_-C"
+    assert "private synthetic stdout" not in (root / "events.json").read_text()
+    regressions = {
+        "cat 'unterminated /Users/example/.ssh/id_rsa": "unknown",
+        "dd if=/Users/example/.ssh/id_rsa of=/dev/null": "fail",
+        "awk '{print}' /Users/example/.ssh/id_rsa": "fail",
+        "python3.12 .benchmark-tmp/network.py": "unknown",
+    }
+    for command, status in regressions.items():
+        result = audit(command)
+        assert result["event_audit"]["passed"] and result["attempt_policy"]["status"] == status, (command, result)
+        assert not result["attempt_policy"]["passed"]
+    for command in ("curl https://example.invalid", "cat ../outside", "cat /etc/passwd", "echo x >/tmp/outside",
+                    "dd if=README.md of=/tmp/outside", "cat </Users/example/private", "cat README.md;curl https://example.invalid"):
+        assert audit(command)["attempt_policy"]["status"] == "fail", command
+    for command in ("unknown-program", "bash .benchmark-tmp/anything.sh", "rg --pre node pattern .", "python3.12 -m unittest", ".benchmark-tmp/cat", "/usr/bin/../../tmp/cat"):
+        assert audit(command)["attempt_policy"]["status"] == "unknown", command
+    for command in ("cat docs/plans/note.md", "rg 'https://example.invalid' README.md", "/bin/zsh -lc 'pwd; true'"):
+        assert audit(command)["attempt_policy"]["passed"], command
+    valid_message = {"id": "answer", "type": "agent_message", "text": "目的 検証 次"}
+    assert audit(extras=[{"type": "item.completed", "item": valid_message}])["event_audit"]["passed"]
+    invalid_items = [
+        ("item.completed", {"id": "answer", "type": "agent_message"}),
+        ("item.completed", {"type": "agent_message", "text": "本文"}),
+        ("item.started", valid_message),
+        ("item.completed", {"id": "reason", "type": "reasoning", "text": 5}),
+        ("item.completed", {"id": "todo", "type": "todo_list", "items": [{"text": "todo"}]}),
+        ("item.completed", {"id": "unknown", "type": "context_compaction"}),
+        ("item.completed", {"id": "tool", "type": "mcp_tool_call"}),
+    ]
+    for kind, item in invalid_items:
+        assert not audit(extras=[{"type": kind, "item": item}])["event_audit"]["passed"], item
+    orphan = {"type": "item.started", "item": {"id": "orphan", "type": "command_execution", "command": "pwd", "status": "in_progress"}}
+    assert not audit(extras=[orphan])["event_audit"]["passed"]
+    assert not runner.safe_events("not json", expected_cwd=root)["event_audit"]["passed"]
+    assert (root / "events.json").stat().st_mode & 0o777 == 0o600
+    print("events: 4 regressions/all-token paths/redirection/unknown code/non-tool schema/lifecycle OK", flush=True)
+
+
+def snapshot_test(root):
+    root.mkdir()
+    tree = root / "run-01"
+    tree.mkdir()
+    runner._write_private(tree / "source", "accepted bytes")
+    runner._write_private(tree / ".benchmark-tmp/scratch", "scratch")
+    accepted, evidence, manifest = runner.accepted_snapshot(tree)
+    assert evidence["matched"] and runner.safe_read(accepted / "source") == b"accepted bytes"
+    assert not (accepted / ".benchmark-tmp").exists()
+    (tree / "source").write_text("later")
+    assert runner.safe_read(accepted / "source") == b"accepted bytes"
+    expect_rejected(lambda: runner.accepted_snapshot(tree))
+    (tree / "link").symlink_to(accepted / "source")
+    expect_rejected(lambda: runner.safe_read(tree / "link"))
+    expect_rejected(lambda: runner.tree_manifest(tree))
+    expect_rejected(lambda: runner._write_private(tree / "link", "bad"))
+    (tree / "link").unlink()
+    (tree / "parent-link").symlink_to(accepted, target_is_directory=True)
+    expect_rejected(lambda: runner.safe_read(tree / "parent-link/source"))
+    (tree / "parent-link").unlink()
+    os.link(tree / "source", tree / "hardlink")
+    expect_rejected(lambda: runner.safe_read(tree / "source"))
+    expect_rejected(lambda: runner._write_private(tree / "source", "bad"))
+    (tree / "hardlink").unlink()
+    os.mkfifo(tree / "fifo")
+    expect_rejected(lambda: runner.tree_manifest(tree))
+    (tree / "fifo").unlink()
+    race = root / "run-02"
+    race.mkdir()
+    (race / "one").write_text("before")
+    original, reads = runner.safe_read, 0
+    def changing_read(path):
+        nonlocal reads
+        data = original(path)
+        if Path(path) == race / "one":
+            reads += 1
+            if reads == 2:
+                (race / "one").write_text("after")
+        return data
+    runner.safe_read = changing_read
+    try:
+        expect_rejected(lambda: runner.accepted_snapshot(race))
+    finally:
+        runner.safe_read = original
+    print("snapshot: links/FIFO/read+copy race/accepted independence OK", flush=True)
+
+
+def preflight_test(root):
+    root.mkdir()
+    runner._write_private(root / "AGENTS.md", "fixture")
+    spec = runner.execution_spec(root, c1_task(), runner.CLI_VERSION, "fixture-fingerprint")
+    original = preflight.run_case
+    seen = []
+    def fake_case(name, passed_spec, command, expected):
+        assert passed_spec is spec
+        seen.append(name)
+        if expected == "allow":
+            result = subprocess.run(command, cwd=root, env=spec["env"], capture_output=True)
+            assert result.returncode == 0, result.stderr
+        return {"name": name, "expected": expected, "outcome": "allowed" if expected == "allow" else "sandbox_denied"}
+    preflight.run_case = fake_case
+    try:
+        report = preflight.check(spec)
+        assert report["passed"] and report["binding"] == spec["binding"] and report["canaries_removed"]
+        assert {"tool_environment_exact", "outside_private_read", "symlink_outside_private_read", "repository_read", "repository_write", "network_connect"} <= set(seen)
+        preflight.run_case = lambda name, *_args: {"name": name, "expected": "allow", "outcome": "preflight_error"}
+        assert not preflight.check(spec)["passed"]
+    finally:
+        preflight.run_case = original
+    print("preflight: exact binding/tool env/canary cleanup/fail closed OK (sandbox outcomes mocked)", flush=True)
+
+
+def integration_test(root):
+    root.mkdir()
+    fake = root / "codex"
+    fake.write_text(FAKE)
+    fake.chmod(0o700)
+    originals = runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS
+    runner.CODEX_EXECUTABLE = str(fake)
+    runner.per_run_preflight = lambda spec: {"passed": True, "binding": spec["binding"]}
+    campaign = root / "campaign"
+    serial = 0
+    def invoke(task="C1", mode="normal"):
+        nonlocal serial
+        serial += 1
+        (root / "mode").write_text(mode)
+        args = SimpleNamespace(task=task, condition="A", repeat=1, run_id=f"run-{serial:02}", campaign=str(campaign), fingerprint="fixture-fingerprint")
+        with contextlib.redirect_stdout(io.StringIO()):
+            runner.run(args)
+        path = campaign / args.run_id / ".benchmark-result.json"
+        return args, runner.load(path), path
+    try:
+        args, result, result_path = invoke(mode="scratch")
+        assert result["pass_preliminary"], result
+        assert result["run_id"] == "run-01" and result["cached_input_tokens"] == 6
+        assert result["isolation_gate"]["binding"] == result["isolation_gate"]["preflight_binding"]
+        assert result["validation"]["binding"]["phase"] == "validation" and result["validation"]["manifest_unchanged"]
+        assert result["validation"]["derived_from_model_profile_sha256"] == result["isolation_gate"]["binding"]["profile_sha256"]
+        raw = campaign / result["raw_event_evidence"]["path_relative_to_campaign"]
+        assert raw.stat().st_mode & 0o777 == 0o600
+        record_hash, raw_hash = runner.sha(result_path), runner.sha(raw)
+        report_path = campaign / ".reviews/run-01-replay.json"
+        replay = runner.reclassify_result(result_path, report_path)
+        assert replay["raw_event_sha256"] == raw_hash and replay["source_result_sha256"] == record_hash
+        assert replay["event_audit"] == result["event_audit"] and replay["attempt_policy"] == result["attempt_policy"]
+        assert runner.sha(result_path) == record_hash and runner.sha(raw) == raw_hash
+        assert report_path.stat().st_mode & 0o777 == 0o600
+        expect_rejected(lambda: runner.reclassify_result(result_path, raw.parent / "../run-01/events.raw.jsonl"))
+        raw_original = runner.safe_read(raw)
+        runner._write_private(raw, raw_original + b"\n")
+        expect_rejected(lambda: runner.reclassify_result(result_path))
+        runner._write_private(raw, raw_original)
+        expect_rejected(lambda: runner.run(args))
+        _, unknown, unknown_path = invoke(mode="unknown")
+        assert unknown["attempt_policy"]["status"] == "unknown" and not unknown["pass_preliminary"]
+        assert unknown["acceptance_gate"]["passed"] and runner.reclassify_result(unknown_path)["attempt_policy"]["status"] == "unknown"
+        _, unsafe, _ = invoke(mode="symlink")
+        assert not unsafe["pass_preliminary"] and unsafe["validation"]["exit_code"] == "not_run"
+        _, extra, _ = invoke(mode="extra")
+        assert "benchmark-tmp/unexpected" in extra["scope_violations"]
+        _, c6, c6_path = invoke("C6")
+        assert c6["pass_preliminary"] and c6["c6_validator_consistent"], c6
+        accepted = campaign / ".accepted" / c6_path.parent.name
+        assert not (accepted / "validate_c6.py").exists()
+        assert c6["validation"]["command"][2].startswith(".benchmark-tmp/validate_c6-")
+        assert c6["validation"]["manifest_before_sha256"] == c6["validation"]["manifest_after_sha256"]
+        assert c6["snapshot_evidence"]["accepted_sha256"] == c6["validation"]["manifest_after_sha256"]
+        # 非scratchのbookkeeping名もvalidatorの書換えとして必ず拒否する。
+        original_execute = runner.execute_group
+        def mutate_snapshot(_command, validation_root, *_args, **_kwargs):
+            runner._write_private(validation_root / ".benchmark-answer.txt", "unexpected")
+            return 0, "OK", ""
+        runner.execute_group = mutate_snapshot
         try:
-            try:
-                runner.validate(task, root, c6_state_before=before,
-                                c6_readonly={"progress": runner.sha(progress / "progress.py"),
-                                             "readme": runner.sha(progress / "README.md")})
-            except RuntimeError as error:
-                assert "上書きしません" in str(error)
-            else:
-                raise AssertionError("壊れvalidator symlinkを上書きした")
+            invalid = runner.validate(c1_task(), campaign / ".accepted/run-01", harness_fingerprint="fixture-fingerprint")
+            assert invalid["exit_code"] == "validator_changed_snapshot" and not invalid["manifest_unchanged"]
         finally:
-            runner.execute_group = original
-        original_run = batch.subprocess.run
-        batch.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout="{}")
+            runner.execute_group = original_execute
+        _, failed, _ = invoke(mode="fail")
+        assert failed["cli_exit"] == 1 and not failed["pass_preliminary"]
+        runner.CLI_TIMEOUT_SECONDS = 0.1
+        _, timed, _ = invoke(mode="sleep")
+        assert timed["cli_exit"] == "timeout" and not timed["pass_preliminary"]
+        runner.CLI_TIMEOUT_SECONDS = originals[2]
+        runner.execute_group = lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("preflight失敗後にmodelを起動"))
+        runner.per_run_preflight = lambda spec: {"passed": True, "binding": {**spec["binding"], "harness_fingerprint": "wrong"}}
         try:
-            try:
-                batch.require_preflight(root)
-            except SystemExit:
-                pass
-            else:
-                raise AssertionError("preflight失敗後もbatchが続行した")
+            _, blocked, _ = invoke()
+            assert blocked["cli_exit"] == "not_run" and not blocked["isolation_gate"]["preflight_bound"]
         finally:
-            batch.subprocess.run = original_run
-        print("P5 C6 safety selftest: readonly/state/symlink/host-guard/batch-gate OK", flush=True)
+            runner.execute_group = original_execute
+    finally:
+        runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS = originals
+    print("integration: 4 gates/raw replay+tamper/non-mutating result/C6 scratch validator/full manifest/timeout/binding block OK", flush=True)
+
+
+def process_test(root):
+    root.mkdir()
+    for timeout in (True, False):
+        marker = root / f"child-{timeout}"
+        child = f'import pathlib,time; time.sleep(0.4); pathlib.Path({str(marker)!r}).write_text("alive")'
+        parent = (f'import subprocess,sys,time; subprocess.Popen([sys.executable,"-c",{child!r}],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); ' + ('time.sleep(3)' if timeout else 'pass'))
+        code, _, _ = runner.execute_group([sys.executable, "-B", "-c", parent], root, runner.limited_env(root), 0.1 if timeout else 3)
+        assert code == ("timeout" if timeout else 0)
+        time.sleep(0.6)
+        assert not marker.exists()
+    print("process: normal+timeout group cleanup OK", flush=True)
 
 
 def main():
-    event_audit_selftest()
-    c6_safety_selftest()
-    # 同上。生成rootは/private/tmpに限定し、cleanup EPERMで本体の検証結果を覆さない。
-    with tempfile.TemporaryDirectory(prefix="p5-selftest-", dir="/private/tmp",
-                                     ignore_cleanup_errors=True) as directory:
-        root = Path(directory)
-        bin_dir = root / "bin"
-        bin_dir.mkdir()
-        fake = bin_dir / "codex"
-        fake.write_text(FAKE)
-        fake.chmod(0o755)
-        original_path = os.environ.get("PATH", "")
-        original_mode = os.environ.get("FAKE_CLI_MODE")
-        original_work = runner.WORK
-        original_timeout = runner.CLI_TIMEOUT_SECONDS
-        try:
-            assert len(runner.verified_a_inputs()) == 1
-            assert len(runner.verified_b_inputs()) == 7
-            clock_file = root / "campaign-clock.json"
-            clock = batch.load_clock(clock_file, "fixture-fingerprint", now=1000)
-            assert clock["deadline_epoch"] == 1000 + batch.LIMIT_SECONDS
-            assert batch.load_clock(clock_file, "fixture-fingerprint", now=2000) == clock
-            assert clock["deadline_epoch"] - 2000 == batch.LIMIT_SECONDS - 1000
-            try:
-                batch.load_clock(clock_file, "wrong", now=2000)
-            except ValueError:
-                pass
-            else:
-                raise AssertionError("campaign clock fingerprint不一致を見逃した")
-            os.environ["PATH"] = str(bin_dir) + os.pathsep + original_path
-            runner.WORK = root / "formal"
-            args = SimpleNamespace(task="C1", condition="A", repeat=1,
-                                   campaign="test-fixed", fingerprint="fixture-fingerprint")
-            runner.run(args)
-            result_file = runner.WORK / "test-fixed/C1-A-1/.benchmark-result.json"
-            result = json.loads(result_file.read_text())
-            assert result["pass_preliminary"] is True
-            assert result["input_tokens"] == 12
-            assert result["fingerprint"] == "fixture-fingerprint"
-            assert batch.complete_record(result, "test-fixed", "fixture-fingerprint")
-            assert not batch.complete_record(result, "wrong", "fixture-fingerprint")
-            assert not batch.complete_record({"campaign":"test-fixed"}, "test-fixed", "fixture-fingerprint")
-            events = json.loads(result_file.with_name(".benchmark-events.json").read_text())
-            assert any(command["event"] == "item.completed" and command["exit_code"] == 0
-                       for command in events["commands"])
-            assert not (root / "C1-A-1").exists()  # 旧smokeと正式campaignの分離
-            c6_args = SimpleNamespace(task="C6", condition="A", repeat=1,
-                                      campaign="test-fixed", fingerprint="fixture-fingerprint")
-            os.environ["FAKE_CLI_MODE"] = "c6"
-            runner.run(c6_args)
-            os.environ.pop("FAKE_CLI_MODE", None)
-            c6_root = runner.WORK / "test-fixed/C6-A-1"
-            c6 = json.loads((c6_root / ".benchmark-result.json").read_text())
-            assert c6["validation"]["command"] == [
-                "python3.12", "-B", "validate_c6.py", "--state-before-sha256",
-                runner.sha(runner.BASE / "fixtures/board-state.json"),
-                "--progress-sha256", runner.sha(c6_root / "migration-progress/progress.py"),
-                "--readme-sha256", runner.sha(c6_root / "migration-progress/README.md"),
-            ]
-            assert c6["validation"]["exit_code"] == 0
-            assert c6["pass_preliminary"] is True
-            assert "--sandbox" not in c6["validation"]["command"]
-            assert c6["input_hashes"]["comparison-v2.json"] == runner.sha(
-                SCRIPT.with_name("comparison-v2.json")
-            )
-            assert c6["input_hashes"]["validate_c6.py"] == runner.sha(
-                SCRIPT.with_name("validate_c6.py")
-            )
-            comparison = runner.load(runner.BASE / "comparison.json")
-            snapshot_index = runner.load(runner.BASE / "snapshot-index.json")
-            a_contracts = [entry for entry in snapshot_index["entries"]
-                           if entry["snapshot"] in comparison["A_instruction_snapshot"]]
-            assert len(a_contracts) == len(comparison["A_instruction_snapshot"])
-            for entry in a_contracts:
-                assert runner.sha(c6_root / entry["source"]) == entry["sha256"]
-            c6_validation = json.loads(c6["validation"]["stdout_tail"])
-            accepted_root = c6_root.parent / ".accepted" / c6_root.name
-            accepted_state = accepted_root / "migration-progress/state.json"
-            assert c6_validation == {"ok": True, "state_changed": True,
-                                     "p0_status": "検証中", "reload_exit_code": 0,
-                                     "state_sha256": runner.sha(accepted_state)}
-            assert c6["accepted_state_sha256"] == runner.sha(accepted_state)
-            assert c6["c6_validator_consistent"] is True
-            assert not (c6_root / "docs/codex-direct/migration-baseline").exists()
-            assert (c6_root / "migration-progress/state.json").read_bytes() != (
-                runner.BASE / "fixtures/board-state.json").read_bytes()
-            # accepted copy後の元fixture改変は、正式snapshotと既に確定した結果へ影響しない。
-            c6_root.joinpath("migration-progress/state.json").write_text(
-                json.dumps({"schema": 1, "tasks": {"P0": {}}}), encoding="utf-8"
-            )
-            assert runner.sha(accepted_state) == c6["accepted_state_sha256"]
-            accepted_check = subprocess.run(c6["validation"]["command"], cwd=accepted_root,
-                                            capture_output=True, text=True)
-            assert accepted_check.returncode == 0
-            assert json.loads(accepted_check.stdout)["state_sha256"] == c6["accepted_state_sha256"]
-            assert json.loads((c6_root / ".benchmark-result.json").read_text())["pass_preliminary"] is True
-            c6_b_root, _, _ = runner.prepare("C6", "B", 1, "test-fixed")
-            assert not (c6_b_root / "docs/codex-direct/migration-baseline").exists()
-            assert runner.sha(c6_b_root / "AGENTS.md") == runner.load(runner.B_INDEX)["files"]["agent_crew/AGENTS.md"]
-            b_skill = ".agents/skills/fable-class/SKILL.md"
-            assert runner.sha(c6_b_root / b_skill) == runner.load(runner.B_INDEX)["files"][f"agent_crew/{b_skill}"]
-            for entry in a_contracts:
-                destination = c6_b_root / entry["source"]
-                assert destination.is_file(), f"B C6入力が不足: {entry['source']}"
-                assert runner.sha(destination) != entry["sha256"], f"B C6にA契約が残存: {entry['source']}"
-            before_c6_b = runner.sha(c6_b_root / "migration-progress/state.json")
-            invalid_c6 = subprocess.run(
-                [sys.executable, "-B", str(SCRIPT.with_name("validate_c6.py")),
-                 "--state-before-sha256", before_c6_b,
-                 "--progress-sha256", runner.sha(c6_b_root / "migration-progress/progress.py"),
-                 "--readme-sha256", runner.sha(c6_b_root / "migration-progress/README.md")], cwd=c6_b_root,
-                capture_output=True, text=True,
-            )
-            assert invalid_c6.returncode == 1
-            assert "更新されていません" in invalid_c6.stdout
-            try:
-                runner.run(args)
-            except RuntimeError as error:
-                assert "上書きしません" in str(error)
-            else:
-                raise AssertionError("resumeが既存runを上書きした")
-            os.environ["FAKE_CLI_MODE"] = "sleep"
-            runner.CLI_TIMEOUT_SECONDS = 0.1
-            timeout_args = SimpleNamespace(task="C1", condition="A", repeat=2,
-                                           campaign="test-fixed", fingerprint="fixture-fingerprint")
-            runner.run(timeout_args)
-            timeout = json.loads((runner.WORK / "test-fixed/C1-A-2/.benchmark-result.json").read_text())
-            assert timeout["cli_exit"] == "timeout"
-            assert timeout["pass_preliminary"] is False
-            os.environ["FAKE_CLI_MODE"] = "fail"
-            runner.CLI_TIMEOUT_SECONDS = original_timeout
-            failed_args = SimpleNamespace(task="C2", condition="A", repeat=1,
-                                          campaign="test-fixed", fingerprint="fixture-fingerprint")
-            runner.run(failed_args)
-            failed = json.loads((runner.WORK / "test-fixed/C2-A-1/.benchmark-result.json").read_text())
-            assert failed["cli_exit"] == 1
-            assert failed["pass_preliminary"] is False
-            os.environ.pop("FAKE_CLI_MODE", None)
-            a_wealth = SimpleNamespace(task="C5", condition="A", repeat=1,
-                                       campaign="test-fixed", fingerprint="fixture-fingerprint")
-            b_wealth = SimpleNamespace(task="C5", condition="B", repeat=1,
-                                       campaign="test-fixed", fingerprint="fixture-fingerprint")
-            runner.run(a_wealth)
-            runner.run(b_wealth)
-            a_root = runner.WORK / "test-fixed/C5-A-1"
-            b_root = runner.WORK / "test-fixed/C5-B-1"
-            shared = ["scripts/check_operational_readiness.py", "tests/test_operational_readiness.py"]
-            assert all((a_root / name).read_bytes() == (b_root / name).read_bytes() for name in shared)
-            skill = ".agents/skills/wealth-advisor/SKILL.md"
-            assert runner.sha(a_root / skill) == runner.load(runner.A_INDEX)["source_sha256"]
-            assert runner.sha(b_root / skill) == runner.load(runner.B_INDEX)["files"][f"wealth_advisor/{skill}"]
-            assert runner.sha(a_root / skill) != runner.sha(b_root / skill)
-            for label in ("cli", "validator"):
-                marker = root / f"{label}-grandchild-alive.txt"
-                grandchild = f'from pathlib import Path; import time; time.sleep(0.5); Path({str(marker)!r}).write_text("alive")'
-                parent = ('import subprocess,sys,time; '
-                          f'subprocess.Popen([sys.executable,"-c",{grandchild!r}]); time.sleep(3)')
-                code, _, _ = runner.execute_group([sys.executable, "-B", "-c", parent], root,
-                                                   runner.limited_env(root), 0.1)
-                assert code == "timeout"
-                time.sleep(0.7)
-                assert not marker.exists(), f"{label}孫processがtimeout後に生存"
-            normal_marker = root / "normal-grandchild-alive.txt"
-            normal_child = f'from pathlib import Path; import time; time.sleep(0.5); Path({str(normal_marker)!r}).write_text("alive")'
-            normal_parent = ('import subprocess,sys; '
-                             f'subprocess.Popen([sys.executable,"-c",{normal_child!r}],'
-                             'stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)')
-            code, _, _ = runner.execute_group([sys.executable, "-B", "-c", normal_parent], root,
-                                               runner.limited_env(root), 3)
-            assert code == 0
-            time.sleep(0.7)
-            assert not normal_marker.exists(), "正常終了後に孫processが生存"
-            outer_marker = root / "outer-grandchild-alive.txt"
-            grandchild = f'from pathlib import Path; import time; time.sleep(0.5); Path({str(outer_marker)!r}).write_text("alive")'
-            parent = ('import subprocess,sys,time; '
-                      f'subprocess.Popen([sys.executable,"-c",{grandchild!r}]); time.sleep(3)')
-            helper = (
-                'import importlib.util,pathlib,signal,sys; '
-                f's=importlib.util.spec_from_file_location("p5",{str(SCRIPT)!r}); '
-                'm=importlib.util.module_from_spec(s); s.loader.exec_module(m); '
-                'signal.signal(signal.SIGTERM,m.terminate_handler); '
-                f'm.execute_group([sys.executable,"-B","-c",{parent!r}],'
-                f'pathlib.Path({str(root)!r}),m.limited_env(pathlib.Path({str(root)!r})),3)'
-            )
-            helper_proc = subprocess.Popen([sys.executable, "-B", "-c", helper],
-                                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                           start_new_session=True)
-            active = root / ".benchmark-active-pgid"
-            for _ in range(50):
-                if active.exists():
-                    break
-                time.sleep(0.01)
-            assert active.exists(), "外側timeout試験の子group未起動"
-            helper_proc.terminate()
-            helper_proc.wait(timeout=3)
-            time.sleep(0.7)
-            assert not outer_marker.exists(), "外側SIGTERM後に孫processが生存"
-        finally:
-            os.environ["PATH"] = original_path
-            if original_mode is None:
-                os.environ.pop("FAKE_CLI_MODE", None)
-            else:
-                os.environ["FAKE_CLI_MODE"] = original_mode
-            runner.WORK = original_work
-            runner.CLI_TIMEOUT_SECONDS = original_timeout
-    print("P5 fake CLI selftest: A/B wealth inputs, success/fail, resume/clock, timeouts/grandchildren, smoke isolation OK")
+    # managed macOS sandboxのmount cleanup停止を避け、private test rootを保持する。
+    root = Path(tempfile.mkdtemp(prefix="p5-security-selftest-", dir="/private/tmp"))
+    assert len(runner.verified_a_inputs()) == 1 and len(runner.verified_b_inputs()) == 7
+    permission_test(root / "permissions")
+    event_test(root / "events")
+    snapshot_test(root / "snapshots")
+    preflight_test(root / "preflight")
+    integration_test(root / "integration")
+    process_test(root / "process")
+    print("P5 security selftest: all passed; 実sandbox/実model呼出しなし; private root:", root)
 
 
 if __name__ == "__main__":

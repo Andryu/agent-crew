@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""P5最終集計器をモデル呼出しなしの合成24runで検証する。"""
+"""P5集計を合成24runとprivate raw証跡で検証する。モデルは呼ばない。"""
 
+import hashlib
 import importlib.util
-import json
 from pathlib import Path
 import tempfile
 
@@ -18,176 +18,184 @@ def load_module(name):
 
 batch = load_module("batch")
 analyze = load_module("analyze")
+HASH = "a" * 64
 
 
-def fixtures(a_seconds=100.0, b_seconds=70.0):
+def binding(root, fingerprint, phase):
+    return {"schema": 3, "phase": phase, "cli_version": "codex-cli 0.155.1",
+            "harness_fingerprint": fingerprint, "root_realpath": str(root.resolve()),
+            "root_device": root.stat().st_dev, "root_inode": root.stat().st_ino, "policy_template_sha256": HASH,
+            "profile_sha256": HASH if phase == "model" else "b" * 64,
+            "tool_environment": {"keys": ["PATH", "TMPDIR"], "sha256": HASH},
+            "codex_process_environment": {"keys": ["CODEX_HOME", "PATH"],
+                                          "sha256": HASH, "auth_home_location_sha256": HASH},
+            "codex_executable": {"realpath": "/usr/bin/true", "sha256": HASH},
+            "read_boundary": "pinned_cli_minimal_runtime_plus_fixture"}
+
+
+def fixtures(campaign_dir, a_seconds=100.0, b_seconds=70.0):
     fingerprint = "f" * 64
     campaign = f"p5-{fingerprint[:16]}"
-    runs = []
-    reviews = []
-    for task in analyze.TASKS:
-        for condition in analyze.CONDITIONS:
-            for repeat in analyze.REPEATS:
-                runs.append({
-                    "campaign": campaign, "fingerprint": fingerprint,
-                    "task_id": task, "condition": condition, "repeat": repeat,
-                    "cli_exit": 0, "validation": {"exit_code": 0},
-                    "scope_violations": [], "event_audit": {"status": "pass", "passed": True},
-                    "safety_gate": {"status": "pass", "passed": True},
-                    "host_guard": {"unchanged": True} if task == "C6" else None,
-                    "c6_validator_consistent": True if task == "C6" else None,
-                    "wall_seconds": a_seconds if condition == "A" else b_seconds,
-                    "cost_usd": "unknown", "approval_wait_seconds": "unknown",
-                })
-                reviews.append({
-                    "task_id": task, "condition": condition, "repeat": repeat,
-                    "acceptance_pass": True, "handoff_pass": True, "scope_pass": True,
-                    "review_findings": [], "reviewed_by": "independent-reviewer",
-                    "reviewed_at": "2026-09-23T00:00:00Z",
-                })
-    summary = {"campaign": campaign, "fingerprint": fingerprint, "results": runs}
-    review_file = {"schema": 1, "campaign": campaign, "fingerprint": fingerprint,
+    assert campaign_dir.name == campaign
+    runs, reviews = [], []
+    for slot in batch.scheduled_runs():
+        task, condition, repeat, run_id = (slot["task_id"], slot["condition"],
+                                            slot["repeat"], slot["run_id"])
+        root = campaign_dir / run_id
+        accepted = campaign_dir / ".accepted" / run_id
+        root.mkdir(parents=True, exist_ok=True)
+        accepted.mkdir(parents=True, exist_ok=True)
+        raw = campaign_dir / ".evidence" / run_id / "events.raw.jsonl"
+        raw.parent.mkdir(parents=True, exist_ok=True)
+        raw.write_bytes((run_id + "\n").encode())
+        raw.chmod(0o600)
+        digest = hashlib.sha256(raw.read_bytes()).hexdigest()
+        model = binding(root, fingerprint, "model")
+        validator = binding(accepted, fingerprint, "validation")
+        runs.append({
+            "schema": 3, "campaign": campaign, "fingerprint": fingerprint,
+            "run_id": run_id, "task_id": task, "condition": condition, "repeat": repeat,
+            "cli_version": "codex-cli 0.155.1", "cli_exit": 0,
+            "validation": {"exit_code": 0, "manifest_unchanged": True, "binding": validator,
+                           "derived_from_model_profile_sha256": model["profile_sha256"]},
+            "isolation_gate": {"status": "pass", "passed": True, "preflight_bound": True,
+                               "binding": model, "preflight_binding": model},
+            "event_audit": {"status": "pass", "passed": True},
+            "attempt_policy": {"status": "pass", "passed": True},
+            "acceptance_gate": {"status": "pass", "passed": True},
+            "safety_gate": {"status": "pass", "passed": True},
+            "raw_event_evidence": {"path_relative_to_campaign": f".evidence/{run_id}/events.raw.jsonl",
+                                   "sha256": digest, "mode": "0600"},
+            "scope_violations": [], "host_guard": {"unchanged": True},
+            "c6_validator_consistent": True if task == "C6" else None,
+            "wall_seconds": a_seconds if condition == "A" else b_seconds,
+            "input_tokens": 1000, "cached_input_tokens": 500,
+            "cache_write_input_tokens": 100, "output_tokens": 100, "total_tokens": 1100,
+            "cost_usd": "unknown", "approval_wait_seconds": "unknown",
+            "ended_at": "2026-09-30T00:00:00Z",
+        })
+        reviews.append({
+            "run_id": run_id, "task_id": task, "condition": condition, "repeat": repeat,
+            "raw_event_sha256": digest, "event_audit_reproduced": True,
+            "event_audit_pass": True, "attempt_policy_pass": True,
+            "acceptance_pass": True, "handoff_pass": True, "scope_pass": True,
+            "review_findings": [], "reviewed_by": "independent-reviewer",
+            "reviewed_at": "2026-09-30T00:00:00Z",
+        })
+    summary = {"schema": 2, "campaign": campaign, "fingerprint": fingerprint,
+               "schedule": batch.scheduled_runs(), "results": runs}
+    review_file = {"schema": 2, "campaign": campaign, "fingerprint": fingerprint,
                    "reviews": reviews}
     return summary, {"passed": True}, review_file
 
 
-def expect_error(summary, preflight, reviews, fragment):
-    try:
-        analyze.analyze(summary, preflight, reviews)
-    except analyze.AnalysisError as error:
-        assert fragment in str(error), error
-    else:
-        raise AssertionError(f"AnalysisErrorにならない: {fragment}")
+def decide(summary, preflight, reviews, campaign_dir):
+    return analyze.analyze(summary, preflight, reviews, campaign_dir)
 
 
 def main():
-    summary, preflight, reviews = fixtures()
-    positive = analyze.analyze(summary, preflight, reviews)
-    assert positive["campaign_complete"] is True
-    assert positive["all_runs_final_pass"] is True
-    assert positive["speed_target"]["status"] == "achieved"
-    assert positive["speed_target"]["ratio_median"] == 0.7
-    assert positive["decision"] == "adopt"
-    assert positive["measurements"]["cost_usd_total"] == "unknown"
-    assert batch.stop_reason(positive_summary_record := summary["results"][0]) is None
-    audit_stop = dict(positive_summary_record)
-    audit_stop["event_audit"] = {"status": "unknown", "passed": False}
-    assert batch.stop_reason(audit_stop) == "event_audit_not_pass"
-    cli_stop = dict(positive_summary_record)
-    cli_stop["cli_exit"] = 1
-    assert batch.stop_reason(cli_stop) == "cli_not_successful"
-
-    slow_summary, slow_preflight, slow_reviews = fixtures(b_seconds=90.0)
-    slow = analyze.analyze(slow_summary, slow_preflight, slow_reviews)
-    assert slow["campaign_complete"] is True
-    assert slow["speed_target"]["status"] == "not_achieved"
-    assert slow["decision"] == "do_not_adopt"
-
-    failed_summary, failed_preflight, failed_reviews = fixtures()
-    failed_reviews["reviews"][0]["acceptance_pass"] = False
-    failed = analyze.analyze(failed_summary, failed_preflight, failed_reviews)
-    assert failed["campaign_complete"] is True
-    assert failed["all_runs_final_pass"] is False
-    assert failed["speed_target"]["status"] == "not_evaluable"
-
-    unknown_summary, unknown_preflight, unknown_reviews = fixtures()
-    unknown_summary["results"][0]["event_audit"] = {"status": "unknown", "passed": False}
-    unknown = analyze.analyze(unknown_summary, unknown_preflight, unknown_reviews)
-    assert unknown["all_runs_final_pass"] is False
-
-    incomplete_summary, incomplete_preflight, incomplete_reviews = fixtures()
-    incomplete_summary["results"].pop()
-    incomplete = analyze.analyze(incomplete_summary, incomplete_preflight, incomplete_reviews)
-    assert incomplete["campaign_complete"] is False
-    assert incomplete["decision"] == "incomplete"
-
-    duplicate_summary, duplicate_preflight, duplicate_reviews = fixtures()
-    duplicate_summary["results"].append(dict(duplicate_summary["results"][0]))
-    expect_error(duplicate_summary, duplicate_preflight, duplicate_reviews, "重複")
-
-    mismatch_summary, mismatch_preflight, mismatch_reviews = fixtures()
-    mismatch_summary["results"][0]["fingerprint"] = "wrong"
-    expect_error(mismatch_summary, mismatch_preflight, mismatch_reviews, "fingerprint")
-
-    zero_summary, zero_preflight, zero_reviews = fixtures(a_seconds=0.0, b_seconds=0.0)
-    zero = analyze.analyze(zero_summary, zero_preflight, zero_reviews)
-    assert zero["speed_target"]["status"] == "not_evaluable"
-    assert "invalid_wall_seconds" in zero["speed_target"]["reason"]
-
-    overflow_summary, overflow_preflight, overflow_reviews = fixtures(a_seconds=1e308, b_seconds=9e307)
-    overflow = analyze.analyze(overflow_summary, overflow_preflight, overflow_reviews)
-    assert overflow["speed_target"]["status"] == "not_evaluable"
-    assert "non_finite_median" in overflow["speed_target"]["reason"]
-
-    bad_review_summary, bad_review_preflight, bad_review_reviews = fixtures()
-    del bad_review_reviews["reviews"][0]["reviewed_at"]
-    bad_review = analyze.analyze(bad_review_summary, bad_review_preflight, bad_review_reviews)
-    assert bad_review["campaign_complete"] is False
-
-    for field, value in (("reviewed_by", "unknown"), ("reviewed_at", "unknown"),
-                         ("reviewed_by", 1), ("reviewed_at", True)):
-        review_summary, review_preflight, review_reviews = fixtures()
-        review_reviews["reviews"][0][field] = value
-        rejected = analyze.analyze(review_summary, review_preflight, review_reviews)
-        assert rejected["campaign_complete"] is False, (field, value)
-
-    strict_summary, strict_preflight, strict_reviews = fixtures()
-    strict_summary["results"][0]["cli_exit"] = False
-    strict = analyze.analyze(strict_summary, strict_preflight, strict_reviews)
-    assert strict["all_runs_final_pass"] is False
-
-    repeat_summary, repeat_preflight, repeat_reviews = fixtures()
-    repeat_summary["results"][0]["repeat"] = True
-    expect_error(repeat_summary, repeat_preflight, repeat_reviews, "範囲外")
-
-    infra_summary, infra_preflight, infra_reviews = fixtures()
-    first = infra_summary["results"][0]
-    infra_summary["results"][0] = batch.infrastructure_record(
-        first["task_id"], first["condition"], first["repeat"],
-        first["campaign"], first["fingerprint"], "timeout", "timeout")
-    infra = analyze.analyze(infra_summary, infra_preflight, infra_reviews)
-    assert infra["campaign_complete"] is True
-    assert infra["all_runs_final_pass"] is False
-    assert infra["speed_target"]["status"] == "not_evaluable"
-    assert batch.stop_reason(infra_summary["results"][0]) == "infrastructure_error"
-
-    unsafe_summary, unsafe_preflight, unsafe_reviews = fixtures()
-    unsafe_summary["campaign"] = "/private/tmp/secret\nline"
-    unsafe_reviews["campaign"] = unsafe_summary["campaign"]
-    for record in unsafe_summary["results"]:
-        record["campaign"] = unsafe_summary["campaign"]
-    expect_error(unsafe_summary, unsafe_preflight, unsafe_reviews, "形式が不正")
-
-    unknown_fp_summary, unknown_fp_preflight, unknown_fp_reviews = fixtures()
-    unknown_fp_summary["fingerprint"] = "unknown"
-    unknown_fp_reviews["fingerprint"] = "unknown"
-    expect_error(unknown_fp_summary, unknown_fp_preflight, unknown_fp_reviews, "形式が不正")
-
     with tempfile.TemporaryDirectory(prefix="p5-analysis-", dir="/private/tmp",
-                                     ignore_cleanup_errors=True) as directory:
-        root = Path(directory)
-        private = root / "campaign/aggregate.json"
-        batch.atomic_json(private, positive)
-        assert private.stat().st_mode & 0o777 == 0o600
-        assert private.parent.stat().st_mode & 0o777 == 0o700
-        public = root / "public.md"
-        markdown = analyze.public_markdown(positive)
-        assert "/private/" not in markdown and "/Users/" not in markdown
-        analyze.write_public(public, markdown)
-        assert public.stat().st_mode & 0o777 == 0o644
-        policy = batch.private_artifact_policy("p5-ffffffffffffffff", "f" * 64, root / "campaign", now=1000)
-        assert policy["retention_days"] == 14
-        assert policy["expires_epoch"] == 1000 + 14 * 24 * 60 * 60
-        symlink = root / "link.json"
-        symlink.symlink_to(root / "target.json")
+                                     ignore_cleanup_errors=True) as temporary:
+        campaign_dir = Path(temporary) / "p5-ffffffffffffffff"
+        summary, preflight, reviews = fixtures(campaign_dir)
+        positive = decide(summary, preflight, reviews, campaign_dir)
+        assert positive["campaign_complete"] and positive["all_runs_final_pass"]
+        assert positive["quality_gate"]["status"] == "pass"
+        assert positive["safety_gate"]["status"] == "pass"
+        assert positive["cache_comparability"]["status"] == "comparable"
+        assert positive["speed_target"]["status"] == "achieved"
+        assert positive["speed_target"]["ratio_median"] == 0.7
+        assert positive["decision"] == "adopt"
+        assert positive["usage"]["totals"]["cached_input_tokens"] == 12000
+        assert batch.stop_reason(summary["results"][0]) is None
+
+        original = summary["results"][0]["attempt_policy"]
+        summary["results"][0]["attempt_policy"] = {"status": "unknown", "passed": False}
+        summary["results"][0]["safety_gate"] = {"status": "fail", "passed": False}
+        resolved = decide(summary, preflight, reviews, campaign_dir)
+        assert resolved["decision"] == "adopt"
+        assert resolved["run_results"][0]["independently_resolved_unknown"] is True
+        assert batch.stop_reason(summary["results"][0]) is None
+        summary["results"][0]["attempt_policy"] = {"status": "fail", "passed": False}
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        summary["results"][0]["attempt_policy"] = original
+        summary["results"][0]["safety_gate"] = {"status": "pass", "passed": True}
+
+        raw = campaign_dir / ".evidence" / summary["results"][0]["run_id"] / "events.raw.jsonl"
+        raw_bytes = raw.read_bytes()
+        raw.unlink()
+        missing_raw = decide(summary, preflight, reviews, campaign_dir)
+        assert missing_raw["safety_gate"]["status"] == "fail"
+        assert missing_raw["decision"] != "adopt"
+        raw.write_bytes(raw_bytes)
+        raw.chmod(0o600)
+        reviews["reviews"][0]["raw_event_sha256"] = "0" * 64
+        mismatch = decide(summary, preflight, reviews, campaign_dir)
+        assert mismatch["decision"] != "adopt"
+        reviews["reviews"][0]["raw_event_sha256"] = hashlib.sha256(raw_bytes).hexdigest()
+        reviews["reviews"][0]["event_audit_reproduced"] = False
+        no_replay = decide(summary, preflight, reviews, campaign_dir)
+        assert no_replay["decision"] != "adopt"
+        reviews["reviews"][0]["event_audit_reproduced"] = True
+        reviews["reviews"][0]["attempt_policy_pass"] = False
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        reviews["reviews"][0]["attempt_policy_pass"] = True
+
+        model = summary["results"][0]["isolation_gate"]["binding"]
+        old_tool = model.pop("tool_environment")
+        assert decide(summary, preflight, reviews, campaign_dir)["safety_gate"]["status"] == "fail"
+        model["tool_environment"] = old_tool
+        summary["results"][0]["isolation_gate"]["preflight_bound"] = False
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        summary["results"][0]["isolation_gate"]["preflight_bound"] = True
+        validation = summary["results"][0]["validation"]
+        derived = validation.pop("derived_from_model_profile_sha256")
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        validation["derived_from_model_profile_sha256"] = derived
+
+        for record in summary["results"]:
+            if record["task_id"] == "C1" and record["condition"] == "B":
+                record["cached_input_tokens"] = 900
+        cache_diff = decide(summary, preflight, reviews, campaign_dir)
+        assert cache_diff["cache_comparability"]["status"] == "unknown"
+        assert cache_diff["speed_target"]["status"] == "unknown"
+        for record in summary["results"]:
+            record["cached_input_tokens"] = 500
+        del summary["results"][0]["cached_input_tokens"]
+        assert decide(summary, preflight, reviews, campaign_dir)["speed_target"]["status"] == "unknown"
+        summary["results"][0]["cached_input_tokens"] = 500
+
+        slots = [slot["run_id"] for slot in batch.scheduled_runs()]
+        assert len(slots) == len(set(slots)) == 24 and all(len(slot) == 6 for slot in slots)
+        mapping_path = campaign_dir / "run-slot-mapping.json"
+        mapping = batch.load_or_create_mapping(mapping_path, summary["campaign"], summary["fingerprint"])
+        assert mapping == batch.scheduled_runs()
+        assert mapping_path.stat().st_mode & 0o777 == 0o600
+        assert batch.record_matches_slot(summary["results"][0], summary["campaign"],
+                                         summary["fingerprint"], mapping[0])
+        assert not batch.record_matches_slot(summary["results"][0], summary["campaign"],
+                                             summary["fingerprint"], mapping[1])
+        assert campaign_dir / slots[0] / ".benchmark-result.json" != campaign_dir / "C1-A-1" / ".benchmark-result.json"
         try:
-            batch.atomic_json(symlink, {})
-        except RuntimeError:
+            batch.load_or_create_mapping(mapping_path, summary["campaign"], "e" * 64)
+        except ValueError:
             pass
         else:
-            raise AssertionError("symlink JSONを上書きした")
-
-    print("P5 analysis selftest: 24run/gates/speed/unknown/duplicate/fingerprint/mode OK")
+            raise AssertionError("resumeのfingerprint不一致を拒否しなかった")
+        summary["results"][0]["run_id"] = "run-24"
+        try:
+            decide(summary, preflight, reviews, campaign_dir)
+        except analyze.AnalysisError:
+            pass
+        else:
+            raise AssertionError("opaque slot mapping不一致を拒否しなかった")
+        summary["results"][0]["run_id"] = "run-01"
+        private = campaign_dir / "aggregate.json"
+        batch.atomic_json(private, positive)
+        assert private.stat().st_mode & 0o777 == 0o600
+        markdown = analyze.public_markdown(positive)
+        assert "/private/" not in markdown and "/Users/" not in markdown
+    print("P5 analysis selftest: raw/review/binding/opaque/cache/4gate OK")
 
 
 if __name__ == "__main__":

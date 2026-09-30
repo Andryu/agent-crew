@@ -18,6 +18,30 @@ LIMIT_SECONDS = 120 * 60
 RETENTION_DAYS = 14
 
 
+def scheduled_runs():
+    schedule = []
+    for index, task in enumerate(TASKS):
+        order = "ABBA" if index % 2 == 0 else "BAAB"
+        used = {"A": 0, "B": 0}
+        for condition in order:
+            used[condition] += 1
+            schedule.append({"run_id": f"run-{len(schedule) + 1:02d}",
+                             "task_id": task, "condition": condition, "repeat": used[condition]})
+    return schedule
+
+
+def load_or_create_mapping(path, campaign, fingerprint):
+    mapping = {"schema": 1, "campaign": campaign, "fingerprint": fingerprint,
+               "runs": scheduled_runs()}
+    if path.exists():
+        _reject_symlink(path)
+        if json.loads(path.read_text(encoding="utf-8")) != mapping:
+            raise ValueError("run slot mappingが現行schedule/fingerprintと不一致")
+    else:
+        atomic_json(path, mapping)
+    return mapping["runs"]
+
+
 def _reject_symlink(path):
     """既存の対象・親directoryがsymlinkなら保存を止める。"""
     current = Path(path)
@@ -102,8 +126,13 @@ def complete_record(record, campaign, fingerprint):
             and all(key in record for key in ("ended_at", "validation", "cli_exit")))
 
 
+def record_matches_slot(record, campaign, fingerprint, slot):
+    return (complete_record(record, campaign, fingerprint) and
+            all(record.get(key) == slot[key] for key in ("run_id", "task_id", "condition", "repeat")))
+
+
 def infrastructure_record(task, condition, repeat, campaign, fingerprint, error, exit_code=None):
-    return {"campaign": campaign, "fingerprint": fingerprint, "task_id": task,
+    return {"schema": 3, "campaign": campaign, "fingerprint": fingerprint, "task_id": task,
             "condition": condition, "repeat": repeat, "infrastructure_error": error,
             "exit_code": exit_code if exit_code is not None else "unknown",
             "pass_preliminary": False}
@@ -119,8 +148,19 @@ def stop_reason(record):
     safety = record.get("safety_gate") if isinstance(record.get("safety_gate"), dict) else {}
     if audit.get("status") != "pass" or audit.get("passed") is not True:
         return "event_audit_not_pass"
-    if safety.get("status") != "pass" or safety.get("passed") is not True:
+    isolation = record.get("isolation_gate") if isinstance(record.get("isolation_gate"), dict) else {}
+    if isolation.get("status") != "pass" or isolation.get("passed") is not True or isolation.get("preflight_bound") is not True:
+        return "isolation_gate_not_pass"
+    attempt = record.get("attempt_policy") if isinstance(record.get("attempt_policy"), dict) else {}
+    unresolved_script = attempt.get("status") == "unknown" and attempt.get("passed") is False
+    if not unresolved_script and (attempt.get("status") != "pass" or attempt.get("passed") is not True):
+        return "attempt_policy_not_pass"
+    # 原resultのunknownは独立reviewでのみ解消する。ここで停止すると24runを測定できない。
+    if not unresolved_script and (safety.get("status") != "pass" or safety.get("passed") is not True):
         return "safety_gate_not_pass"
+    acceptance = record.get("acceptance_gate") if isinstance(record.get("acceptance_gate"), dict) else {}
+    if acceptance.get("status") != "pass" or acceptance.get("passed") is not True:
+        return "acceptance_gate_not_pass"
     return None
 
 
@@ -177,7 +217,7 @@ def main():
                 for path in a_tree.rglob("*") if path.is_file()}
     if a_fixed != a_actual or any(path.is_symlink() for path in a_tree.rglob("*")):
         raise SystemExit("A補足指示treeが固定indexと不一致")
-    inputs = [HERE / "run.py", HERE / "batch.py", HERE / "sandbox_preflight.py", HERE / "comparison-v2.json", HERE / "validate_c6.py",
+    inputs = [HERE / "run.py", HERE / "batch.py", HERE / "sandbox_preflight.py", HERE / "analyze.py", HERE / "analysis_selftest.py", HERE / "comparison-v2.json", HERE / "validate_c6.py",
               HERE.parent / "migration-baseline/comparison.json", HERE.parent / "migration-baseline/snapshot-index.json",
               b_index, a_index]
     fingerprint = hashlib.sha256("".join(str(path.relative_to(HERE.parent.parent.parent)) + ":" +
@@ -197,24 +237,20 @@ def main():
     previous = json.loads(summary_file.read_text(encoding="utf-8")) if summary_file.exists() else None
     if previous and previous.get("fingerprint") != fingerprint:
         raise SystemExit("campaign fingerprint不一致。別campaignとして実行してください")
-    schedule = []
-    for index, task in enumerate(TASKS):
-        order = "ABBA" if index % 2 == 0 else "BAAB"
-        used = {"A": 0, "B": 0}
-        for condition in order:
-            used[condition] += 1
-            schedule.append((task, condition, used[condition]))
+    schedule = load_or_create_mapping(campaign_dir / "run-slot-mapping.json", campaign, fingerprint)
     results = []
     stopped_reason = None
-    for task, condition, repeat in schedule:
+    for slot in schedule:
+        task, condition, repeat, run_id = (slot["task_id"], slot["condition"],
+                                            slot["repeat"], slot["run_id"])
         remaining = clock["deadline_epoch"] - time.time()
         if remaining < 70:
             stopped_reason = "campaign_deadline"
             break
-        run_file = campaign_dir / f"{task}-{condition}-{repeat}/.benchmark-result.json"
+        run_file = campaign_dir / run_id / ".benchmark-result.json"
         if run_file.exists():
             recorded = json.loads(run_file.read_text(encoding="utf-8"))
-            if not complete_record(recorded, campaign, fingerprint):
+            if not record_matches_slot(recorded, campaign, fingerprint, slot):
                 raise SystemExit(f"resume不一致: {run_file}")
             results.append(recorded)
             stopped_reason = stop_reason(recorded)
@@ -224,16 +260,18 @@ def main():
         if run_file.parent.exists():
             record = infrastructure_record(task, condition, repeat, campaign, fingerprint,
                                            "部分runが存在。自動再実行せず監査待ち")
+            record["run_id"] = run_id
             results.append(record)
             stopped_reason = stop_reason(record)
             break
         run_dir = run_file.parent
         active = campaign_dir / "active-run.json"
-        atomic_json(active, {"task": task, "condition": condition, "repeat": repeat,
+        atomic_json(active, {"task": task, "condition": condition, "repeat": repeat, "run_id": run_id,
                              "started_epoch": time.time(), "campaign": campaign,
                              "fingerprint": fingerprint})
         process = subprocess.Popen([sys.executable, "-B", str(HERE / "run.py"), task, condition,
-                                    str(repeat), "--campaign", campaign, "--fingerprint", fingerprint,
+                                    str(repeat), "--run-id", run_id, "--campaign", str(campaign_dir),
+                                    "--fingerprint", fingerprint,
                                     "--deadline-epoch", str(clock["deadline_epoch"])],
                                    cwd=HERE.parents[2], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                    text=True, start_new_session=True)
@@ -259,15 +297,19 @@ def main():
             active.unlink()
         if run_file.exists():
             record = json.loads(run_file.read_text(encoding="utf-8"))
+            if not record_matches_slot(record, campaign, fingerprint, slot):
+                raise SystemExit(f"run resultがslot/campaignと不一致: {run_file}")
         else:
             record = infrastructure_record(task, condition, repeat, campaign, fingerprint, error, code)
+            record["run_id"] = run_id
         results.append(record)
         print(f"{task} {condition}{repeat}: {results[-1].get('pass_preliminary', 'infra_error')}", flush=True)
         stopped_reason = stop_reason(record)
-        summary = {"schema": 1, "campaign": campaign, "fingerprint": fingerprint,
+        summary = {"schema": 2, "campaign": campaign, "fingerprint": fingerprint,
                    "planned_runs": len(schedule), "completed_records": len(results),
                    "elapsed_seconds": round(time.time() - clock["started_epoch"], 3),
-                   "schedule": schedule, "results": results, "stopped_reason": stopped_reason}
+                   "schedule": schedule, "run_slot_mapping_file": str(campaign_dir / "run-slot-mapping.json"),
+                   "results": results, "stopped_reason": stopped_reason}
         summary["preflight_file"] = str(campaign_dir / "sandbox-preflight.json")
         summary["clock_file"] = str(clock_file)
         summary["active_file"] = str(active)
@@ -276,13 +318,14 @@ def main():
         atomic_json(summary_file, summary)
         if stopped_reason:
             break
-    summary = {"schema": 1, "planned_runs": len(schedule), "completed_records": len(results),
+    summary = {"schema": 2, "planned_runs": len(schedule), "completed_records": len(results),
                "campaign": campaign, "fingerprint": fingerprint,
                "elapsed_seconds": round(time.time() - clock["started_epoch"], 3),
                "B_contract_sha256": {contract.parent.name: hashlib.sha256(contract.read_bytes()).hexdigest()
                                      for contract in contracts},
                "B_skill_sha256": hashlib.sha256(skill.read_bytes()).hexdigest(),
-               "schedule": schedule, "results": results, "stopped_reason": stopped_reason}
+               "schedule": schedule, "run_slot_mapping_file": str(campaign_dir / "run-slot-mapping.json"),
+               "results": results, "stopped_reason": stopped_reason}
     summary["preflight_file"] = str(campaign_dir / "sandbox-preflight.json")
     summary["clock_file"] = str(clock_file)
     summary["active_file"] = str(campaign_dir / "active-run.json")
