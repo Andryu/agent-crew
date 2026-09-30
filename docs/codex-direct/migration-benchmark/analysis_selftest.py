@@ -185,7 +185,7 @@ def decide(summary, preflight, reviews, campaign_dir):
 
 def batch_process_control_tests(parent):
     """実processを起動せず、timeout後の子root非接触とcampaign停止を検証する。"""
-    originals = (batch.WORK, batch.require_preflight, batch.subprocess, batch.scheduled_runs,
+    originals = (batch.WORK, batch.require_preflight, batch.subprocess, batch.scheduled_runs, batch.atomic_json, batch.wait_private_process,
                  os.kill, os.killpg, Path.exists, Path.read_text, harness_run.safe_read)
     all_slots = batch.scheduled_runs()
     signals = []
@@ -196,26 +196,44 @@ def batch_process_control_tests(parent):
             raise AssertionError("未完了/非正常終了後に子run rootへ触れた: " + str(path))
     def guarded_exists(path):
         guard(path)
-        return originals[6](path)
+        return originals[8](path)
     def guarded_text(path, *args, **kwargs):
         guard(path)
-        return originals[7](path, *args, **kwargs)
+        return originals[9](path, *args, **kwargs)
     def guarded_safe_read(path):
         guard(path)
-        return originals[8](path)
+        return originals[10](path)
     def forbidden_signal(*args):
         signals.append(args)
         raise AssertionError("batchがPID/PGIDへ自動signalを送った")
     os.kill, os.killpg = forbidden_signal, forbidden_signal
     Path.exists, Path.read_text, harness_run.safe_read = guarded_exists, guarded_text, guarded_safe_read
     try:
-        for mode in ("preflight_timeout", "preflight_success_run_timeout", "run_timeout", "run_nonzero", "run_signal", "normal"):
+        for mode in ("preflight_timeout", "preflight_signal", "preflight_before_launch_signal", "preflight_success_run_timeout", "run_timeout", "run_nonzero", "run_signal", "run_before_popen_signal", "run_popen_signal", "run_after_wait_signal", "summary_signal", "normal"):
             work = parent / mode
             launches = []
-            state.update(forbidden_root=None, locked=False)
+            state.update(forbidden_root=None, locked=False, run_waited=False, summary_interrupted=False)
             batch.WORK = work
             batch.scheduled_runs = lambda: all_slots[:1 if mode == "normal" else 2]
-            batch.require_preflight = originals[1] if mode.startswith("preflight") else lambda _campaign: None
+            preflight_calls = []
+            def synthetic_preflight_call(_campaign):
+                preflight_calls.append(True)
+                if mode == "preflight_before_launch_signal":
+                    raise batch.BatchSignal(15)
+            batch.require_preflight = originals[1] if mode in {"preflight_timeout", "preflight_signal"} else synthetic_preflight_call
+            def guarded_wait_private_process(command, cwd, campaign_dir, label, timeout):
+                if mode == "run_before_popen_signal" and label == "run-01":
+                    state["locked"] = True
+                    raise batch.BatchSignal(15)
+                return originals[5](command, cwd, campaign_dir, label, timeout)
+            batch.wait_private_process = guarded_wait_private_process
+            def guarded_atomic_json(path, value):
+                if mode == "summary_signal" and Path(path).name == "batch-summary.json" and state.get("run_waited") and not state.get("summary_interrupted"):
+                    state["summary_interrupted"] = True
+                    state["locked"] = True
+                    raise batch.BatchSignal(15)
+                return originals[4](path, value)
+            batch.atomic_json = guarded_atomic_json
             class MockProcess:
                 pid = 246813579
                 def __init__(self, command, **kwargs):
@@ -224,6 +242,9 @@ def batch_process_control_tests(parent):
                     self.wait_calls = 0
                     self.returncode = None
                     launches.append(self)
+                    if mode == "run_popen_signal" and not self.is_preflight:
+                        state["locked"] = True
+                        raise batch.BatchSignal(15)
                     assert kwargs["stdout"] is not subprocess.PIPE and kwargs["stderr"] is not subprocess.PIPE
                     for handle in (kwargs["stdout"], kwargs["stderr"]):
                         assert os.fstat(handle.fileno()).st_mode & 0o777 == 0o600
@@ -249,6 +270,8 @@ def batch_process_control_tests(parent):
                     if self.is_preflight:
                         if mode == "preflight_timeout":
                             raise subprocess.TimeoutExpired(self.command, timeout)
+                        if mode == "preflight_signal":
+                            raise batch.BatchSignal(15)
                         self.returncode = 0
                         return 0
                     if mode in {"run_timeout", "preflight_success_run_timeout"}:
@@ -262,6 +285,9 @@ def batch_process_control_tests(parent):
                         self.returncode = 1
                         return 1
                     self.returncode = 0
+                    state["run_waited"] = True
+                    if mode == "run_after_wait_signal":
+                        state["locked"] = True
                     return 0
                 def communicate(self, **_kwargs):
                     raise AssertionError("batchはpipe communicateを使わない")
@@ -272,8 +298,22 @@ def batch_process_control_tests(parent):
                 def send_signal(self, _signal):
                     raise AssertionError("batch Popen.send_signal禁止")
             batch.subprocess = SimpleNamespace(Popen=MockProcess, TimeoutExpired=subprocess.TimeoutExpired)
-            with redirect_stdout(io.StringIO()):
-                batch.main()
+            if mode == "run_after_wait_signal":
+                # 正常wait後にresultを読もうとした瞬間の割込みを作る。
+                original_safe_read = harness_run.safe_read
+                def interrupt_result_read(path):
+                    if Path(path).name == ".benchmark-result.json" and state["run_waited"]:
+                        raise batch.BatchSignal(15)
+                    return original_safe_read(path)
+                harness_run.safe_read = interrupt_result_read
+            try:
+                with redirect_stdout(io.StringIO()):
+                    batch.main()
+            except batch.BatchSignal:
+                assert mode in {"run_after_wait_signal", "summary_signal"}
+            finally:
+                if mode == "run_after_wait_signal":
+                    harness_run.safe_read = originals[10]
             campaign = work / ("p5-" + compute_harness_fingerprint(HERE)[:16])
             summary_path = campaign / "batch-summary.json"
             summary = json.loads(summary_path.read_text())
@@ -281,19 +321,29 @@ def batch_process_control_tests(parent):
             if mode == "normal":
                 assert summary["stopped_reason"] is None and summary["completed_records"] == 1
                 assert summary["results"][0]["pass_preliminary"]
-            elif mode == "preflight_timeout":
-                assert summary["stopped_reason"] == "preflight_failure" and summary["completed_records"] == 0
-                assert len(launches) == 1 and launches[0].is_preflight
+            elif mode in {"preflight_timeout", "preflight_signal", "preflight_before_launch_signal"}:
+                assert summary["stopped_reason"] == ("infrastructure_error" if mode == "preflight_before_launch_signal" else "preflight_failure") and summary["completed_records"] == 0
+                if mode == "preflight_before_launch_signal":
+                    assert not launches and len(preflight_calls) == 1
+                else:
+                    assert len(launches) == 1 and launches[0].is_preflight
+                    assert json.loads((campaign / "sandbox-preflight.json").read_text())["passed"] is False
                 assert not (campaign / "run-01").exists()
-                assert json.loads((campaign / "sandbox-preflight.json").read_text())["passed"] is False
             else:
-                assert summary["stopped_reason"] == "infrastructure_error" and summary["completed_records"] == 1
-                record = summary["results"][0]
-                assert record["run_id"] == "run-01" and not record["pass_preliminary"]
-                assert record["process_execution"]["exit_code"] != 0
-                assert len([item for item in launches if not item.is_preflight]) == 1
+                assert summary["stopped_reason"] == "infrastructure_error"
+                if mode not in {"run_after_wait_signal", "summary_signal"}:
+                    assert summary["completed_records"] == 1
+                    record = summary["results"][0]
+                    assert record["run_id"] == "run-01" and not record["pass_preliminary"]
+                    if mode not in {"run_popen_signal", "run_before_popen_signal"}:
+                        assert record["process_execution"]["exit_code"] != 0
+                assert len([item for item in launches if not item.is_preflight]) == (0 if mode == "run_before_popen_signal" else 1)
+            marker = campaign / "active-run.json"
+            assert marker.exists() == (mode != "normal")
+            if marker.exists():
+                assert marker.stat().st_mode & 0o777 == 0o600
             assert not (campaign / "run-02").exists()
-            for path in (campaign / ".evidence/.batch").iterdir():
+            for path in (campaign / ".evidence/.batch").iterdir() if (campaign / ".evidence/.batch").exists() else []:
                 assert path.stat().st_mode & 0o777 == 0o600
                 if path.suffix == ".json":
                     assert json.loads(path.read_text())["automatic_termination"] is False
@@ -308,9 +358,10 @@ def batch_process_control_tests(parent):
                 else:
                     raise AssertionError("停止済みcampaignを再開した")
                 assert len(launches) == count and summary_path.read_bytes() == original_summary
+                assert len(preflight_calls) == (1 if mode not in {"preflight_timeout", "preflight_signal"} else 0)
     finally:
         (batch.WORK, batch.require_preflight, batch.subprocess, batch.scheduled_runs,
-         os.kill, os.killpg, Path.exists, Path.read_text, harness_run.safe_read) = originals
+         batch.atomic_json, batch.wait_private_process, os.kill, os.killpg, Path.exists, Path.read_text, harness_run.safe_read) = originals
     print("batch process control: no kill/killpg/private files+wait/timeout root untouched/no run-02/summary stop/no resume/normal OK")
 
 

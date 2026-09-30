@@ -70,8 +70,10 @@ def run_case(name, spec, command, expected):
         "leader_pid_at_launch": process.pid if process is not None else None,
         "pid_current_ownership_unverified": True,
         "process_may_still_be_running": process is not None and not completion_confirmed})
-    if interrupted is not None:
-        raise interrupted
+    if (outcome in {"preflight_error", "unexpected_failure"} or interrupted is not None or not completion_confirmed
+            or type(code) is not int or code < 0):
+        runner.abort_run(spec, "preflight", "case_execution_unconfirmed", code,
+                         {"case": name, "private_cases": spec["private_preflight_diagnostics"]})
     return {"name": name, "expected": expected, "outcome": outcome, "exit_code": code,
             "command_sha256": runner.canonical_digest(command), "binding_sha256": runner.canonical_digest(spec["binding"]),
             "stdout_sha256": runner.digest_bytes(stdout.encode()), "stderr_sha256": runner.digest_bytes(stderr.encode())}
@@ -135,15 +137,15 @@ def check(spec):
         report["passed"] = all(conditions.values()) and all(case_matches_expected(case) for case in report["cases"])
     finally:
         listener.close()
-        for path in (link, scratch, task_write, sentinel, outside, repository_target):
-            path.unlink(missing_ok=True)
-        report["canaries_removed"] = all(not os.path.lexists(path) for path in (link, scratch, task_write, sentinel, outside, repository_target))
-        report["process_may_still_be_running"] = spec.pop("preflight_execution_incomplete")
-        report["passed"] = report["passed"] and report["canaries_removed"] and not report["process_may_still_be_running"]
-        report["ended_at"] = runner.stamp()
-        diagnostics = root.parent / ".evidence" / root.name / "preflight.raw.json"
-        runner.save(diagnostics, spec.pop("private_preflight_diagnostics", []))
-        report["private_diagnostics_sha256"] = runner.sha(diagnostics)
+    for path in (link, scratch, task_write, sentinel, outside, repository_target):
+        path.unlink(missing_ok=True)
+    report["canaries_removed"] = all(not os.path.lexists(path) for path in (link, scratch, task_write, sentinel, outside, repository_target))
+    report["process_may_still_be_running"] = spec.pop("preflight_execution_incomplete")
+    report["passed"] = report["passed"] and report["canaries_removed"] and not report["process_may_still_be_running"]
+    report["ended_at"] = runner.stamp()
+    diagnostics = root.parent / ".evidence" / root.name / "preflight.raw.json"
+    runner.save(diagnostics, spec.pop("private_preflight_diagnostics", []))
+    report["private_diagnostics_sha256"] = runner.sha(diagnostics)
     return report
 
 

@@ -259,7 +259,7 @@ def require_preflight(campaign_dir):
     return preflight_data
 
 
-def main():
+def _main():
     os.umask(0o077)
     signal.signal(signal.SIGTERM, interrupt_handler)
     signal.signal(signal.SIGINT, interrupt_handler)
@@ -285,6 +285,9 @@ def main():
     campaign = f"p5-{fingerprint[:16]}"
     secure_mkdir(WORK)
     campaign_dir = secure_mkdir(WORK / campaign)
+    active = campaign_dir / "active-run.json"
+    if os.path.lexists(active):
+        raise SystemExit("active operation markerが残存。子run rootを読まず自動再開を拒否します")
     policy_file = campaign_dir / "private-artifact-policy.json"
     if not policy_file.exists():
         atomic_json(policy_file, private_artifact_policy(campaign, fingerprint, campaign_dir))
@@ -301,10 +304,17 @@ def main():
     schedule = load_or_create_mapping(campaign_dir / "run-slot-mapping.json", campaign, fingerprint)
     results = []
     stopped_reason = None
+    atomic_json(active, {"phase": "preflight", "campaign": campaign,
+                         "fingerprint": fingerprint, "started_epoch": time.time()})
     try:
         require_preflight(campaign_dir)
-    except PreflightFailure:
-        stopped_reason = "preflight_failure"
+        preliminary = {"schema": 2, "campaign": campaign, "fingerprint": fingerprint,
+                       "planned_runs": len(schedule), "completed_records": 0,
+                       "schedule": schedule, "results": [], "stopped_reason": None}
+        atomic_json(summary_file, preliminary)
+        active.unlink()
+    except (PreflightFailure, BatchSignal, Exception) as exc:
+        stopped_reason = "preflight_failure" if isinstance(exc, PreflightFailure) else "infrastructure_error"
     for slot in schedule if stopped_reason is None else []:
         task, condition, repeat, run_id = (slot["task_id"], slot["condition"],
                                             slot["repeat"], slot["run_id"])
@@ -329,37 +339,36 @@ def main():
             results.append(record)
             stopped_reason = stop_reason(record)
             break
-        run_dir = run_file.parent
-        active = campaign_dir / "active-run.json"
-        atomic_json(active, {"task": task, "condition": condition, "repeat": repeat, "run_id": run_id,
-                             "started_epoch": time.time(), "campaign": campaign,
-                             "fingerprint": fingerprint})
-        execution = wait_private_process(
-            [sys.executable, "-B", str(HERE / "run.py"), task, condition, str(repeat), "--run-id", run_id,
-             "--campaign", str(campaign_dir), "--fingerprint", fingerprint,
-             "--deadline-epoch", str(clock["deadline_epoch"])],
-            HERE.parents[2], campaign_dir, run_id, min(315, max(1, remaining)))
-        code = execution["exit_code"]
-        if code == 0:
-            if active.exists() and not active.is_symlink():
-                active.unlink()
-            if run_file.exists():
-                record = json.loads(harness_run.safe_read(run_file))
-                if not record_matches_slot(record, campaign, fingerprint, slot):
-                    raise SystemExit(f"run resultがslot/campaignと不一致: {run_file}")
+        atomic_json(active, {"phase": "run", "task": task, "condition": condition,
+                             "repeat": repeat, "run_id": run_id, "started_epoch": time.time(),
+                             "campaign": campaign, "fingerprint": fingerprint})
+        try:
+            execution = wait_private_process(
+                [sys.executable, "-B", str(HERE / "run.py"), task, condition, str(repeat), "--run-id", run_id,
+                 "--campaign", str(campaign_dir), "--fingerprint", fingerprint,
+                 "--deadline-epoch", str(clock["deadline_epoch"])],
+                HERE.parents[2], campaign_dir, run_id, min(315, max(1, remaining)))
+            code = execution["exit_code"]
+            if code == 0:
+                if run_file.exists():
+                    record = json.loads(harness_run.safe_read(run_file))
+                    if not record_matches_slot(record, campaign, fingerprint, slot):
+                        raise ValueError("run resultがslot/campaignと不一致")
+                else:
+                    record = infrastructure_record(task, condition, repeat, campaign, fingerprint,
+                                                   "正常終了後にrun resultがありません", code)
+                    record["run_id"] = run_id
             else:
+                # 非zero/timeout時は子run rootを読まない。
                 record = infrastructure_record(task, condition, repeat, campaign, fingerprint,
-                                               "正常終了後にrun resultがありません", code)
+                                               execution["error"] or "子runが正常終了しませんでした", code)
                 record["run_id"] = run_id
-        else:
-            # timeout/非zero終了後はrun rootのexists/read/hash/PGID確認を一切しない。
+                record["process_execution"] = execution
+        except (BatchSignal, Exception) as exc:
+            # Popen前後や正常wait後のsignalでもmarkerを維持し、子rootは読まない。
             record = infrastructure_record(task, condition, repeat, campaign, fingerprint,
-                                           execution["error"] or "子runが正常終了しませんでした", code)
+                                           "batch operation interrupted", "signal" if isinstance(exc, BatchSignal) else "exception")
             record["run_id"] = run_id
-            record["process_execution"] = execution
-            atomic_json(active, {"task": task, "condition": condition, "repeat": repeat, "run_id": run_id,
-                                 "campaign": campaign, "fingerprint": fingerprint, "status": "unaccepted_execution",
-                                 "process_execution": execution})
         results.append(record)
         print(f"{task} {condition}{repeat}: {results[-1].get('pass_preliminary', 'infra_error')}", flush=True)
         stopped_reason = stop_reason(record)
@@ -374,6 +383,8 @@ def main():
         summary["private_artifact_policy_file"] = str(policy_file)
         summary["aggregate_policy"] = json.loads(policy_file.read_text(encoding="utf-8"))["aggregate"]
         atomic_json(summary_file, summary)
+        if stopped_reason is None:
+            active.unlink()
         if stopped_reason:
             break
     summary = {"schema": 2, "planned_runs": len(schedule), "completed_records": len(results),
@@ -391,6 +402,29 @@ def main():
     summary["aggregate_policy"] = json.loads(policy_file.read_text(encoding="utf-8"))["aggregate"]
     atomic_json(summary_file, summary)
     print(f"summary: {summary_file}", flush=True)
+
+
+def main():
+    try:
+        return _main()
+    except BatchSignal:
+        # signalがwait後からsummary確定までに届いても、active markerを残して再開を拒否する。
+        try:
+            fingerprint = compute_harness_fingerprint(HERE)
+            campaign_dir = WORK / f"p5-{fingerprint[:16]}"
+            marker = campaign_dir / "active-run.json"
+            if os.path.lexists(marker):
+                summary_file = campaign_dir / "batch-summary.json"
+                summary = json.loads(harness_run.safe_read(summary_file)) if summary_file.exists() else {
+                    "schema": 2, "campaign": campaign_dir.name, "fingerprint": fingerprint,
+                    "results": [], "completed_records": 0}
+                summary["stopped_reason"] = "infrastructure_error"
+                summary["interruption"] = "signal_during_active_operation"
+                atomic_json(summary_file, summary)
+        except Exception:
+            # markerが永続化済みなら次回起動時の安全停止は維持される。
+            pass
+        raise
 
 
 if __name__ == "__main__":

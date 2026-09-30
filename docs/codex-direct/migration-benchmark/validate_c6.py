@@ -51,20 +51,9 @@ def run_reload_no_kill(program, root):
         stdout, stderr = process.communicate(timeout=10)
         return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
     except (Exception, KeyboardInterrupt, SystemExit) as error:
-        diagnostic = {"schema": 1, "reason_type": type(error).__name__, "automatic_termination": False,
-                      "process_may_still_be_running": process is not None,
-                      "leader_pid_at_launch": process.pid if process is not None else None,
-                      "pid_current_ownership_unverified": True}
-        # acceptedの非scratchへは書かず、PIDは0600のprivate診断だけに残す。
-        destination = root / ".benchmark-tmp/c6-reload-interruption.json"
-        try:
-            fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-            with os.fdopen(fd, "w") as handle:
-                os.fchmod(handle.fileno(), 0o600)
-                json.dump(diagnostic, handle, ensure_ascii=False)
-        except OSError:
-            pass
-        fail("C6表示CLIの実行完了を確認できません。自動終了せずcampaignを停止します")
+        # 子の完了未確認後はaccepted rootの診断fileにも触れない。
+        # 親runnerが非zeroを観測し、root外private診断へ記録する。
+        fail("C6表示CLIの実行完了を確認できません。rootへ触れずcampaignを停止します")
     finally:
         if process is not None:
             for name in ("stdin", "stdout", "stderr"):

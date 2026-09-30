@@ -1212,6 +1212,28 @@ def record_process_interruption(root, process, reason):
     })
 
 
+def abort_run(spec, phase, reason, exit_status=None, details=None):
+    """失敗判定後はrootを一切再参照せず、外側のprivate診断だけを書いて終了する。"""
+    root = spec["root"]
+    campaign = root.parent.parent if root.parent.name == ".accepted" else root.parent
+    diagnostic = {"schema": 1, "observed_at": stamp(), "run_id": root.name, "phase": phase,
+                  "reason": reason, "exit_status": exit_status, "automatic_termination": False,
+                  "process_may_still_be_running": True, "root_access_after_failure": False,
+                  "harness_fingerprint": spec["binding"]["harness_fingerprint"], "details": details or {}}
+    save(campaign / ".evidence" / root.name / f"{phase}-interruption.json", diagnostic)
+    raise SystemExit(1)
+
+
+def require_clean_residual(spec, phase):
+    try:
+        residual = scan_residual_processes(spec["env"]["P5_RUN_TOKEN"])
+    except (OSError, RuntimeError, subprocess.SubprocessError, RunSignal) as error:
+        abort_run(spec, phase, "residual_scan_error", details={"error_type": type(error).__name__})
+    if not isinstance(residual, dict) or residual.get("passed") is not True:
+        abort_run(spec, phase, "residual_detected_or_scan_unconfirmed", details={"residual_process_evidence": residual})
+    return residual
+
+
 def execute_command(command, root, env, timeout, input_text=None):
     process = subprocess.Popen(command, text=True, stdin=subprocess.PIPE if input_text is not None else None,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=root, env=env, start_new_session=True)
@@ -1247,18 +1269,20 @@ def validate(task, root, timeout=VALIDATION_TIMEOUT_SECONDS, c6_state_before=Non
         cmd = ["python3.12", "-B", str(destination.relative_to(root)), "--state-before-sha256", c6_state_before,
                "--progress-sha256", c6_readonly["progress"], "--readme-sha256", c6_readonly["readme"]]
     before = tree_manifest(root, exclude_bookkeeping=False)
-    code, stdout, stderr = execute_command(sandbox_command(root, task, cmd, spec), root, process_env(spec), timeout)
-    if execution_incomplete(code):
-        return {"command": cmd, "sandbox": "canonical_validation_readonly_accepted_plus_scratch_write", "binding": spec["binding"],
-                "exit_code": code, "reason": "validator_incomplete_no_automatic_termination", "stdout_tail": "", "stderr_tail": "",
-                "manifest_unchanged": False, "manifest_before_sha256": canonical_digest(before),
-                "manifest_after_sha256": None, "validator_source_sha256": validator_hash}
+    try:
+        code, stdout, stderr = execute_command(sandbox_command(root, task, cmd, spec), root, process_env(spec), timeout)
+    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+        abort_run(spec, "validation", "execution_error", details={"error_type": type(error).__name__})
+    if code != 0:
+        abort_run(spec, "validation", "execution_not_successful", code, {"stdout": stdout, "stderr": stderr})
+    residual = require_clean_residual(spec, "validation")
     after = tree_manifest(root, exclude_bookkeeping=False)
     unchanged = before == after and (destination is None or sha(destination) == validator_hash)
     return {"command": cmd, "sandbox": "canonical_validation_readonly_accepted_plus_scratch_write", "binding": spec["binding"],
             "exit_code": code if unchanged else "validator_changed_snapshot", "stdout_tail": stdout[-2500:], "stderr_tail": stderr[-2500:],
             "manifest_unchanged": unchanged, "manifest_before_sha256": canonical_digest(before),
-            "manifest_after_sha256": canonical_digest(after), "validator_source_sha256": validator_hash}
+            "manifest_after_sha256": canonical_digest(after), "validator_source_sha256": validator_hash,
+            "residual_process_evidence": residual}
 
 
 def required_preflight_cases(spec):
@@ -1363,8 +1387,11 @@ def _run(args):
         raise BoundaryError("campaign残時間不足。runを開始しません")
     try:
         cli_exit, stdout, stderr = execute_command(command, root, process_env(spec), min(CLI_TIMEOUT_SECONDS, remaining - 60), prompt)
-    finally:
-        model_residual = scan_residual_processes(spec["env"]["P5_RUN_TOKEN"])
+    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+        abort_run(spec, "model", "execution_error", details={"error_type": type(error).__name__})
+    if cli_exit != 0:
+        abort_run(spec, "model", "execution_not_successful", cli_exit, {"stdout": stdout, "stderr": stderr})
+    model_residual = require_clean_residual(spec, "model")
     raw_path = root.parent / ".evidence" / root.name / "events.raw.jsonl"
     _write_private(raw_path, stdout)
     events = safe_events(stdout, root / ".benchmark-events.json", root, expected_env=spec["env"])
@@ -1383,6 +1410,7 @@ def _run(args):
     snapshot = {"matched": False}
     validation = {"exit_code": "not_run", "reason": "snapshot_not_accepted"}
     accepted_state, c6_consistent = None, True
+    validation_residual = {**model_residual, "status": "not_run", "passed": False, "scan_pass": False, "scan_count": 0}
     try:
         if not isolation_pass:
             raise BoundaryError("モデル実行の隔離証拠が不合格です")
@@ -1397,9 +1425,7 @@ def _run(args):
         remaining = deadline - time.time() if deadline is not None else 60
         validation = validate(task, accepted, max(1, min(VALIDATION_TIMEOUT_SECONDS, remaining - 5)), c6_state_before, c6_readonly, version, args.fingerprint)
         validation["derived_from_model_profile_sha256"] = spec["binding"]["profile_sha256"]
-        if execution_incomplete(validation["exit_code"]):
-            isolation_pass = False
-            raise BoundaryError("validator実行完了が確認できません。accepted treeを採用しません")
+        validation_residual = validation["residual_process_evidence"]
         # 非scratch manifestは例外pathを削除せず完全一致を要求する。
         if tree_manifest(accepted, exclude_bookkeeping=False) != after_manifest or tree_manifest(root) != after_manifest:
             raise BoundaryError("validator中にaccepted/model treeが変更されました")
@@ -1414,14 +1440,7 @@ def _run(args):
     except (OSError, RuntimeError, ValueError, KeyError, TypeError) as error:
         snapshot = {"matched": False, "error_type": type(error).__name__, "error_sha256": digest_bytes(str(error).encode())}
         scope.append("unsafe_or_unstable_snapshot")
-        if execution_incomplete(cli_exit):
-            reason = "model_timeout_no_automatic_termination" if cli_exit == "timeout" else "model_signal_no_automatic_termination"
-            validation = {"exit_code": "not_run", "reason": reason}
-            snapshot = {"matched": False, "reason": reason}
-        elif not execution_incomplete(validation.get("exit_code")):
-            validation = {"exit_code": "not_run", "reason": "snapshot_boundary_failure"}
-    finally:
-        validation_residual = scan_residual_processes(spec["env"]["P5_RUN_TOKEN"])
+        validation = {"exit_code": "not_run", "reason": "snapshot_boundary_failure"}
     residual_count = model_residual["detected_count"] + validation_residual["detected_count"]
     residual_scan_pass = model_residual["scan_pass"] and validation_residual["scan_pass"]
     isolation_pass = isolation_pass and validation_residual["passed"]
@@ -1452,9 +1471,6 @@ def _run(args):
         result[key] = events["usage"].get(key, UNKNOWN)
     save(root / ".benchmark-result.json", result)
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    interrupted = cli_exit if isinstance(cli_exit, str) and cli_exit.startswith("signal:") else validation.get("exit_code")
-    if isinstance(interrupted, str) and interrupted.startswith("signal:"):
-        raise SystemExit(128 + int(interrupted.split(":", 1)[1]))
 
 
 def run(args):

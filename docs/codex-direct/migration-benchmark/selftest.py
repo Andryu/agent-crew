@@ -400,48 +400,110 @@ def preflight_test(root):
     print("preflight: exact binding/tool env/canary cleanup/fail closed OK (sandbox outcomes mocked)", flush=True)
 
 
+@contextlib.contextmanager
+def forbid_after_outcome(roots, modules=(runner,)):
+    """outcome観測後はroot操作と監査・再bindingを禁止し、root外診断だけ許す。"""
+    locked, originals = [False], []
+    def activate():
+        locked[0] = True
+    def root_path(path):
+        candidate = Path(path)
+        return any(candidate == root or root in candidate.parents for root in roots)
+    def replace(owner, name, value):
+        originals.append((owner, name, getattr(owner, name)))
+        setattr(owner, name, value)
+    def forbidden(name, original, path_only=False):
+        def call(*args, **kwargs):
+            if locked[0] and (not path_only or root_path(args[0])):
+                raise AssertionError("失敗outcome後に禁止helperを呼んだ: " + name)
+            return original(*args, **kwargs)
+        return call
+    for module in modules:
+        for name in ("safe_events", "safe_read", "sha", "tree_manifest", "accepted_snapshot", "host_guard",
+                     "execution_spec", "canonical_execution_spec", "derive_canonical_binding", "permission_policy"):
+            replace(module, name, forbidden(name, getattr(module, name)))
+        for name in ("_open_directory", "_write_private", "save"):
+            replace(module, name, forbidden(name, getattr(module, name), path_only=True))
+    for name in ("exists", "is_file", "is_dir", "stat", "lstat", "read_text", "read_bytes", "unlink", "open", "resolve"):
+        replace(Path, name, forbidden("Path." + name, getattr(Path, name), path_only=name != "unlink"))
+    try:
+        yield activate
+    finally:
+        for owner, name, original in reversed(originals):
+            setattr(owner, name, original)
+
+
 def preflight_timeout_test(root):
     root.mkdir()
-    runner._write_private(root / "AGENTS.md", "fixture")
-    spec = runner.execution_spec(root, runner.c6_task(), runner.CLI_VERSION, "fixture-fingerprint")
     originals = preflight.subprocess.Popen, runner.os.kill, runner.os.killpg
-    processes, signals = [], []
-    class MockCanary:
-        pid = 987654321
-        returncode = None
-        def __init__(self):
-            self.stdin, self.stdout, self.stderr = None, io.StringIO(), io.StringIO()
-        def communicate(self, **_kwargs):
-            raise subprocess.TimeoutExpired("synthetic canary", 20, output=b"partial", stderr=b"diagnostic")
-        def kill(self):
-            raise AssertionError("preflight Popen.kill禁止")
-        def terminate(self):
-            raise AssertionError("preflight Popen.terminate禁止")
-        def send_signal(self, _signal):
-            raise AssertionError("preflight Popen.send_signal禁止")
-    def popen(*_args, **_kwargs):
-        process = MockCanary()
-        processes.append(process)
-        return process
+    signals = []
     def forbidden_signal(*args):
         signals.append(args)
         raise AssertionError("preflightで自動killしました")
-    preflight.subprocess.Popen, runner.os.kill, runner.os.killpg = popen, forbidden_signal, forbidden_signal
+    runner.os.kill, runner.os.killpg = forbidden_signal, forbidden_signal
     try:
-        report = preflight.check(spec)
-        assert not report["passed"] and report["process_may_still_be_running"]
-        assert len(processes) == 1 and not signals
-        assert report["cases"][0]["exit_code"] == "timeout"
-        assert all(case["outcome"] == "not_run_preflight_error" for case in report["cases"][1:])
-        assert "987654321" not in json.dumps(report)
-        diagnostics = root.parent / ".evidence" / root.name / "preflight.raw.json"
-        assert diagnostics.stat().st_mode & 0o777 == 0o600
-        detail = runner.load(diagnostics)[0]
-        assert detail["process_may_still_be_running"] and detail["leader_pid_at_launch"] == MockCanary.pid
-        assert not detail["automatic_termination"]
+        for mode in ("timeout", "signal", "nonzero", "spawn_error"):
+            target = root / mode / "run-01"
+            target.mkdir(parents=True)
+            runner._write_private(target / "AGENTS.md", "fixture")
+            spec = runner.execution_spec(target, runner.c6_task(), runner.CLI_VERSION, "fixture-fingerprint")
+            processes = []
+            with forbid_after_outcome([target], modules=(runner, preflight.runner)) as activate:
+                class MockCanary:
+                    pid = 987654321
+                    returncode = 1
+                    def __init__(self, *_args, **_kwargs):
+                        processes.append(self)
+                        self.stdin, self.stdout, self.stderr = None, io.StringIO(), io.StringIO()
+                        if mode == "spawn_error":
+                            activate()
+                            raise OSError("synthetic spawn failure")
+                    def communicate(self, **_kwargs):
+                        activate()
+                        if mode == "timeout":
+                            raise subprocess.TimeoutExpired("canary", 20, output=b"partial", stderr=b"diagnostic")
+                        if mode == "signal":
+                            raise preflight.runner.RunSignal(15)
+                        return "", "sandbox initialization failed"
+                    def kill(self):
+                        raise AssertionError("preflight Popen.kill禁止")
+                    def terminate(self):
+                        raise AssertionError("preflight Popen.terminate禁止")
+                preflight.subprocess.Popen = MockCanary
+                try:
+                    preflight.check(spec)
+                except SystemExit as error:
+                    assert error.code == 1
+                else:
+                    raise AssertionError("preflight失敗後にreport/cleanupへ進んだ")
+            assert len(processes) == 1 and not signals
+            assert list((target / ".benchmark-tmp").glob("outside-link-*")), "canaryをunlinkした"
+            assert list(target.parent.glob(".p5-private-*")), "private sentinelをunlinkした"
+            assert not (target / ".benchmark-isolation.json").exists()
+            diagnostic = target.parent / ".evidence" / target.name / "preflight-interruption.json"
+            assert diagnostic.stat().st_mode & 0o777 == 0o600
+            detail = runner.load(diagnostic)
+            assert not detail["root_access_after_failure"] and detail["phase"] == "preflight"
+        # 正常なdenyのnonzeroはinfra失敗と区別する。
+        class Denied:
+            pid = 123456789
+            returncode = 1
+            stdin = stdout = stderr = None
+            def communicate(self, **_kwargs):
+                return "", "Operation not permitted"
+        preflight.subprocess.Popen = lambda *_args, **_kwargs: Denied()
+        case = preflight.run_case("normal-denial", spec, ["true"], "deny")
+        assert case["outcome"] == "sandbox_denied" and case["exit_code"] == 1
+        Denied.returncode = -15
+        try:
+            preflight.run_case("signalled-denial", spec, ["true"], "deny")
+        except SystemExit as error:
+            assert error.code == 1
+        else:
+            raise AssertionError("signal終了を正常denyと誤認した")
     finally:
         preflight.subprocess.Popen, runner.os.kill, runner.os.killpg = originals
-    print("preflight timeout: no kill/next case blocked/private diagnostic/no model (mock) OK", flush=True)
+    print("preflight: timeout/signal/nonzero/spawn immediate root-free abort/no cleanup/normal denial OK (mock)", flush=True)
 
 
 def fake_preflight_report(spec):
@@ -492,6 +554,9 @@ def integration_test(root):
             else:
                 assert expected_exit is None
         path = campaign / args.run_id / ".benchmark-result.json"
+        if expected_exit is not None:
+            assert not path.exists()
+            return args, None, path
         return args, runner.load(path), path
     try:
         args, result, result_path = invoke(mode="scratch")
@@ -592,12 +657,11 @@ def integration_test(root):
         def residual_found(token):
             return {**clean_process_evidence(token), "status": "fail", "passed": False, "detected_count": 1, "kill_count": 0}
         runner.scan_residual_processes = residual_found
-        _, detached, _ = invoke()
-        assert not detached["isolation_gate"]["passed"] and detached["isolation_gate"]["residual_process_count"] > 0
-        assert detached["validation"]["exit_code"] == "not_run"
+        _, _, detached_path = invoke(expected_exit=1)
+        assert runner.load(campaign / ".evidence" / detached_path.parent.name / "model-interruption.json")["reason"] == "residual_detected_or_scan_unconfirmed"
         runner.scan_residual_processes = clean_process_evidence
-        _, failed, _ = invoke(mode="fail")
-        assert failed["cli_exit"] == 1 and not failed["pass_preliminary"]
+        _, _, failed_path = invoke(mode="fail", expected_exit=1)
+        assert runner.load(campaign / ".evidence" / failed_path.parent.name / "model-interruption.json")["exit_status"] == 1
         original_snapshot, original_validate = runner.accepted_snapshot, runner.validate
         def forbidden_snapshot(*_args, **_kwargs):
             raise AssertionError("timeout/signal後にsnapshot/validatorを実行しました")
@@ -610,11 +674,9 @@ def integration_test(root):
                     events[3]["item"]["aggregated_output"] = json.dumps({key: value for key, value in env.items() if key != "CODEX_HOME"})
                     return incomplete_code, "\n".join(json.dumps(event) for event in events), ""
                 runner.execute_command = interrupted_execute
-                _, timed, timed_path = invoke(expected_exit=143 if incomplete_code == "signal:15" else None)
-                assert timed["cli_exit"] == incomplete_code and not timed["pass_preliminary"]
-                assert not timed["isolation_gate"]["passed"] and not timed["acceptance_gate"]["passed"]
-                assert timed["validation"]["exit_code"] == "not_run" and not timed["snapshot_evidence"]["matched"]
-                assert timed["residual_process_evidence"]["model"]["kill_count"] == 0
+                _, _, timed_path = invoke(expected_exit=1)
+                evidence = runner.load(campaign / ".evidence" / timed_path.parent.name / "model-interruption.json")
+                assert evidence["exit_status"] == incomplete_code and not evidence["root_access_after_failure"]
                 assert not (campaign / ".accepted" / timed_path.parent.name).exists()
         finally:
             runner.execute_command, runner.accepted_snapshot, runner.validate = original_execute, original_snapshot, original_validate
@@ -628,6 +690,69 @@ def integration_test(root):
     finally:
         runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS, runner.scan_residual_processes = originals
     print("integration: 4 gates/exact replay path/fingerprint+hash tamper/non-mutating result/C6 scratch validator/full manifest/timeout/binding block OK", flush=True)
+
+
+def immediate_abort_test(root):
+    root.mkdir()
+    fake = root / "codex"
+    fake.write_text(FAKE)
+    fake.chmod(0o700)
+    (root / "mode").write_text("normal")
+    originals = runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.execute_command, runner.scan_residual_processes
+    runner.CODEX_EXECUTABLE, runner.per_run_preflight = str(fake), fake_preflight_report
+    try:
+        for phase in ("model", "validation"):
+            for outcome in ("timeout", "signal:15", 1, "residual", "scan_error", "scan_exception"):
+                campaign = root / (phase + "-" + str(outcome).replace(":", "-"))
+                model_root, accepted_root = campaign / "run-01", campaign / ".accepted/run-01"
+                args = SimpleNamespace(task="C1", condition="A", repeat=1, run_id="run-01",
+                                       campaign=str(campaign), fingerprint="fixture-fingerprint")
+                scan_count = [0]
+                with forbid_after_outcome([model_root, accepted_root]) as activate:
+                    def execute(command, execution_root, env, *_args, **_kwargs):
+                        current_phase = "validation" if execution_root.parent.name == ".accepted" else "model"
+                        if current_phase == phase and outcome not in {"residual", "scan_error", "scan_exception"}:
+                            activate()
+                            return outcome, "untrusted partial raw", "partial stderr"
+                        if current_phase == "model":
+                            runner._write_private(execution_root / ".benchmark-answer.txt", "目的 検証 次")
+                            events = event_stream(runner.ENV_CANARY_COMMAND)
+                            events[3]["item"]["aggregated_output"] = json.dumps({key: value for key, value in env.items() if key != "CODEX_HOME"})
+                            return 0, "\n".join(json.dumps(event) for event in events), ""
+                        return 0, "OK", ""
+                    def scan(token):
+                        scan_count[0] += 1
+                        current_phase = "model" if scan_count[0] == 1 else "validation"
+                        evidence = clean_process_evidence(token)
+                        if current_phase == phase and outcome in {"residual", "scan_error", "scan_exception"}:
+                            activate()
+                            if outcome == "scan_exception":
+                                raise OSError("synthetic scan failure")
+                            evidence.update(status="fail", passed=False)
+                            if outcome == "residual":
+                                evidence.update(detected_count=1, remaining_count=1, clean_after_scan=False)
+                            else:
+                                evidence.update(scan_pass=False, clean_after_scan=False)
+                        return evidence
+                    runner.execute_command, runner.scan_residual_processes = execute, scan
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        try:
+                            runner.run(args)
+                        except SystemExit as error:
+                            assert error.code == 1
+                        else:
+                            raise AssertionError("root停止条件から正常returnした")
+                assert not (model_root / ".benchmark-result.json").exists()
+                if phase == "model":
+                    assert not accepted_root.exists() and not (model_root / ".benchmark-events.json").exists()
+                diagnostic = campaign / ".evidence/run-01" / (phase + "-interruption.json")
+                assert diagnostic.stat().st_mode & 0o777 == 0o600
+                data = runner.load(diagnostic)
+                assert data["phase"] == phase and not data["root_access_after_failure"]
+                assert not data["automatic_termination"]
+    finally:
+        runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.execute_command, runner.scan_residual_processes = originals
+    print("run abort: model+validator timeout/signal/nonzero/residual/scan-error; no root helper/audit/result after outcome OK (mock)", flush=True)
 
 
 def environment_canary_test(root):
@@ -773,8 +898,12 @@ def process_test(root):
         runner.tree_manifest = once_manifest
         mode = "timeout"
         try:
-            result = runner.validate(c1_task(), validation_root, timeout=1)
-            assert result["exit_code"] == "timeout" and not result["manifest_unchanged"] and not signals
+            try:
+                runner.validate(c1_task(), validation_root, timeout=1)
+            except SystemExit as error:
+                assert error.code == 1 and not signals
+            else:
+                raise AssertionError("validator timeout後に処理を続けた")
         finally:
             runner.tree_manifest = original_manifest
         try:
@@ -801,6 +930,8 @@ def c6_process_test(root):
         def __init__(self):
             self.stdin, self.stdout, self.stderr = None, io.StringIO(), io.StringIO()
         def communicate(self, **_kwargs):
+            if mode != "normal":
+                activate()
             if mode == "timeout":
                 raise subprocess.TimeoutExpired("C6 synthetic reload", 10)
             if mode == "exception":
@@ -827,7 +958,7 @@ def c6_process_test(root):
             target = root / mode
             (target / ".benchmark-tmp").mkdir(parents=True)
             output = io.StringIO()
-            with contextlib.redirect_stdout(output):
+            with forbid_after_outcome([target]) as activate, contextlib.redirect_stdout(output):
                 try:
                     completed = validator.run_reload_no_kill(target / "progress.py", target)
                 except SystemExit as error:
@@ -836,14 +967,11 @@ def c6_process_test(root):
                     assert mode == "normal" and completed.returncode == 0 and "P0" in completed.stdout
             assert not signals and created[-1].stdout.closed and created[-1].stderr.closed
             if mode != "normal":
-                diagnostic = target / ".benchmark-tmp/c6-reload-interruption.json"
-                assert diagnostic.stat().st_mode & 0o777 == 0o600
-                detail = runner.load(diagnostic)
-                assert not detail["automatic_termination"] and detail["process_may_still_be_running"]
+                assert not (target / ".benchmark-tmp/c6-reload-interruption.json").exists()
                 assert "192837465" not in output.getvalue()
     finally:
         validator.subprocess.Popen, runner.os.kill, runner.os.killpg = originals
-    print("C6 reload: normal/timeout/exception/interrupt no kill/private scratch evidence/validation fail (mock) OK", flush=True)
+    print("C6 reload: normal/timeout/exception/interrupt no kill/no root diagnostic/validation fail (mock) OK", flush=True)
 
 
 def main():
@@ -860,6 +988,7 @@ def main():
     preflight_test(root / "preflight")
     preflight_timeout_test(root / "preflight-timeout")
     integration_test(root / "integration")
+    immediate_abort_test(root / "immediate-abort")
     process_test(root / "process")
     c6_process_test(root / "c6-process")
     print("P5 security selftest: all passed; 実sandbox/実model呼出しなし; private root:", root)
