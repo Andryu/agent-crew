@@ -124,39 +124,25 @@ def _hex(value):
     return isinstance(value, str) and FINGERPRINT_RE.fullmatch(value) is not None
 
 
-def _environment_complete(value, process=False):
-    if not isinstance(value, dict) or not _hex(value.get("sha256")):
-        return False
-    keys = value.get("keys")
-    if not isinstance(keys, list) or not keys or not all(isinstance(key, str) and key for key in keys):
-        return False
-    if len(keys) != len(set(keys)) or keys != sorted(keys):
-        return False
-    return not process or _hex(value.get("auth_home_location_sha256"))
+def _task_for_record(record):
+    if record.get("task_id") == "C6":
+        return harness_run.c6_task()
+    comparison = harness_run.load(harness_run.BASE / "comparison.json")
+    return next(task for task in comparison["tasks"] if task["id"] == record.get("task_id"))
 
 
-def _binding_complete(value, record, phase, expected_root):
-    if not isinstance(value, dict) or value.get("schema") != 3 or value.get("phase") != phase:
-        return False
-    if value.get("harness_fingerprint") != record.get("fingerprint") or value.get("cli_version") != record.get("cli_version"):
+def preflight_evidence_pass(record, campaign_dir, model_spec):
+    run_id = record.get("run_id")
+    relative = record.get("preflight_evidence_relative_path")
+    if relative != f"{run_id}/.benchmark-isolation.json" or not _hex(record.get("preflight_evidence_sha256")):
         return False
     try:
-        root_info = expected_root.lstat()
-        if not stat.S_ISDIR(root_info.st_mode) or expected_root.is_symlink():
+        data = harness_run.safe_read(campaign_dir / relative)
+        if hashlib.sha256(data).hexdigest() != record["preflight_evidence_sha256"]:
             return False
-    except OSError:
+        return harness_run.validate_preflight_evidence(json.loads(data), model_spec)
+    except (OSError, RuntimeError, ValueError, TypeError, json.JSONDecodeError):
         return False
-    if (value.get("root_realpath") != str(expected_root.resolve()) or
-            value.get("root_device") != root_info.st_dev or value.get("root_inode") != root_info.st_ino):
-        return False
-    if not _hex(value.get("policy_template_sha256")) or not _hex(value.get("profile_sha256")):
-        return False
-    if not _environment_complete(value.get("tool_environment")) or not _environment_complete(value.get("codex_process_environment"), True):
-        return False
-    executable = value.get("codex_executable")
-    return (isinstance(executable, dict) and isinstance(executable.get("realpath"), str) and
-            executable["realpath"].startswith("/") and _hex(executable.get("sha256")) and
-            value.get("read_boundary") == "pinned_cli_minimal_runtime_plus_fixture")
 
 
 def binding_pass(record, campaign_dir):
@@ -164,16 +150,39 @@ def binding_pass(record, campaign_dir):
         return False
     isolation = record.get("isolation_gate") if isinstance(record.get("isolation_gate"), dict) else {}
     validation = record.get("validation") if isinstance(record.get("validation"), dict) else {}
-    model = isolation.get("binding")
-    validator = validation.get("binding")
     model_root = campaign_dir / record["run_id"]
     accepted_root = campaign_dir / ".accepted" / record["run_id"]
-    return (isolation.get("status") == "pass" and isolation.get("passed") is True and
-            isolation.get("preflight_bound") is True and isolation.get("preflight_binding") == model and
-            _binding_complete(model, record, "model", model_root) and
-            _binding_complete(validator, record, "validation", accepted_root) and
-            validation.get("derived_from_model_profile_sha256") == model["profile_sha256"] and
-            validator["codex_executable"] == model["codex_executable"])
+    try:
+        if record.get("cli_version") != harness_run.CLI_VERSION:
+            return False
+        task = _task_for_record(record)
+        model_spec = harness_run.canonical_execution_spec(model_root, task, harness_run.CLI_VERSION,
+                                                         record["fingerprint"], phase="model")
+        model = model_spec["binding"]
+        validator = harness_run.derive_canonical_binding(accepted_root, task, harness_run.CLI_VERSION,
+                                                         record["fingerprint"], phase="validation")
+        residual = record.get("residual_process_evidence")
+        if not isinstance(residual, dict) or set(residual) != {"model", "validation"}:
+            return False
+        for evidence in residual.values():
+            if (not isinstance(evidence, dict) or evidence.get("status") != "pass" or
+                    evidence.get("passed") is not True or evidence.get("scan_pass") is not True or
+                    evidence.get("clean_after_scan") is not True or
+                    type(evidence.get("detected_count")) is not int or evidence["detected_count"] != 0 or
+                    type(evidence.get("remaining_count")) is not int or evidence["remaining_count"] != 0 or
+                    type(evidence.get("scan_count")) is not int or evidence["scan_count"] < 2):
+                return False
+        return (isolation.get("status") == "pass" and isolation.get("passed") is True and
+                isolation.get("preflight_bound") is True and isolation.get("preflight_evidence_valid") is True and
+                isolation.get("env_canary_pass") is True and
+                type(isolation.get("residual_process_count")) is int and isolation["residual_process_count"] == 0 and
+                isolation.get("residual_scan_pass") is True and
+                isolation.get("binding") == model and isolation.get("preflight_binding") == model and
+                validation.get("binding") == validator and
+                validation.get("derived_from_model_profile_sha256") == model["profile_sha256"] and
+                preflight_evidence_pass(record, campaign_dir, model_spec))
+    except (OSError, RuntimeError, ValueError, TypeError, KeyError, StopIteration, AttributeError):
+        return False
 
 
 def raw_evidence_pass(record, review, campaign_dir):
@@ -231,6 +240,22 @@ def replay_evidence_pass(record, review, campaign_dir):
         classifier_sha = harness_run.sha(harness_run.HERE / "run.py")
         if review.get("classifier_sha256") != classifier_sha:
             return False
+        raw_path = campaign_dir / ".evidence" / run_id / "events.raw.jsonl"
+        task = _task_for_record(record)
+        spec = harness_run.canonical_execution_spec(campaign_dir / run_id, task,
+                                                    harness_run.CLI_VERSION, record["fingerprint"], phase="model")
+        classified = harness_run.safe_events(harness_run.safe_read(raw_path).decode("utf-8"),
+                                             expected_cwd=campaign_dir / run_id,
+                                             expected_env=spec["env"])
+        if any(replay.get(key) != classified[key] for key in ("event_audit", "attempt_policy", "commands",
+                                                             "diagnostics", "usage", "raw_event_sha256",
+                                                             "env_canary_evidence")):
+            return False
+        if (record.get("event_audit") != classified["event_audit"] or
+                record.get("attempt_policy") != classified["attempt_policy"] or
+                record.get("env_canary_evidence") != classified["env_canary_evidence"] or
+                classified["env_canary_evidence"].get("passed") is not True):
+            return False
         event = replay.get("event_audit") if isinstance(replay.get("event_audit"), dict) else {}
         attempt = replay.get("attempt_policy") if isinstance(replay.get("attempt_policy"), dict) else {}
         return (replay.get("schema") == 1 and replay.get("purpose") == "independent_raw_reclassification" and
@@ -241,7 +266,7 @@ def replay_evidence_pass(record, review, campaign_dir):
                 replay.get("classifier_sha256") == classifier_sha and
                 event.get("status") == "pass" and event.get("passed") is True and
                 attempt.get("status") != "fail")
-    except (OSError, RuntimeError, ValueError, TypeError, json.JSONDecodeError):
+    except (OSError, RuntimeError, ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError):
         return False
 
 
@@ -253,7 +278,7 @@ def accepted_manifest_pass(record, campaign_dir):
     if snapshot.get("matched") is not True:
         return False
     try:
-        manifest = harness_run.tree_manifest(campaign_dir / ".accepted" / record["run_id"])
+        manifest = harness_run.tree_manifest(campaign_dir / ".accepted" / record["run_id"], exclude_bookkeeping=False)
         digest = harness_run.canonical_digest(manifest)
         return all(value == digest for value in (
             snapshot.get("before_sha256"), snapshot.get("after_sha256"), snapshot.get("accepted_sha256"),

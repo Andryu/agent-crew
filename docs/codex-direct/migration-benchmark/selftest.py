@@ -6,6 +6,9 @@ import importlib.util
 import io
 import json
 import os
+import shlex
+import signal
+import struct
 from pathlib import Path
 import subprocess
 import sys
@@ -21,8 +24,8 @@ SPEC.loader.exec_module(runner)
 import sandbox_preflight as preflight
 from harness_fingerprint import HARNESS_INPUTS, compute_harness_fingerprint
 
-FAKE = '''#!/usr/bin/env python3
-import json,os,pathlib,subprocess,sys,time
+FAKE = '''#!/usr/bin/env python3.12
+import json,os,pathlib,shlex,subprocess,sys,time,tomllib
 if "--version" in sys.argv:
     print("codex-cli 0.155.1")
     raise SystemExit(0)
@@ -53,13 +56,22 @@ if mode == "scratch":
     pathlib.Path(".benchmark-tmp/expected").write_text("expected")
 pathlib.Path(sys.argv[sys.argv.index("-o")+1]).write_text("目的 検証 次の一手\\n")
 command="python3.12 .benchmark-tmp/network.py" if mode == "unknown" else "pwd; true"
+canary_command=@CANARY_COMMAND@
+env_config=next(value for value in sys.argv if value.startswith("shell_environment_policy.set="))
+tool_env=tomllib.loads(env_config)["shell_environment_policy"]["set"]
+if mode == "env_leak":
+    tool_env["CODEX_HOME"]=os.environ["CODEX_HOME"]
+canary_output=subprocess.run(shlex.split(canary_command),env=tool_env,text=True,capture_output=True,check=True).stdout
 print(json.dumps({"type":"thread.started","thread_id":"fixture"}))
 print(json.dumps({"type":"turn.started"}))
+if mode != "env_missing":
+    print(json.dumps({"type":"item.started","item":{"id":"canary","type":"command_execution","command":canary_command,"status":"in_progress"}}))
+    print(json.dumps({"type":"item.completed","item":{"id":"canary","type":"command_execution","command":canary_command,"status":"completed","exit_code":0,"aggregated_output":canary_output}}))
 print(json.dumps({"type":"item.started","item":{"id":"cmd-1","type":"command_execution","command":command,"status":"in_progress"}}))
 print(json.dumps({"type":"item.completed","item":{"id":"cmd-1","type":"command_execution","command":command,"status":"completed","exit_code":0,"aggregated_output":"OK"}}))
 print(json.dumps({"type":"item.completed","item":{"id":"answer","type":"agent_message","text":"目的 検証 次"}}))
 print(json.dumps({"type":"turn.completed","usage":{"input_tokens":12,"cached_input_tokens":6,"cache_write_input_tokens":0,"output_tokens":3,"total_tokens":15}}))
-'''
+'''.replace('@CANARY_COMMAND@', repr(runner.ENV_CANARY_COMMAND))
 
 
 def expect_rejected(call):
@@ -101,7 +113,14 @@ def fingerprint_test(root):
 
 def permission_test(root):
     root.mkdir()
+    untouched = (root.stat().st_mode, root.stat().st_mtime_ns, list(root.iterdir()))
+    pure = runner.canonical_execution_spec(root, c1_task(), runner.CLI_VERSION, "fixed-harness")
+    assert untouched == (root.stat().st_mode, root.stat().st_mtime_ns, list(root.iterdir()))
+    assert not (root / ".benchmark-tmp").exists()
     spec = runner.execution_spec(root, c1_task(), runner.CLI_VERSION, "fixed-harness")
+    assert spec == pure
+    assert runner.derive_canonical_binding(root, c1_task(), runner.CLI_VERSION, "fixed-harness") == spec["binding"]
+    assert "P5_RUN_TOKEN" in spec["env"]
     config = tomllib.loads("\n".join(spec["config"]))["permissions"]["p5_fixture"]
     assert "extends" not in config and config["filesystem"][":root"] == "deny"
     assert config["filesystem"][":minimal"] == "read" and config["filesystem"][str(root)] == "read"
@@ -144,7 +163,24 @@ def permission_test(root):
     runner.save(shared_parent / "private.json", {"ok": True})
     assert shared_parent.stat().st_mode & 0o777 == 0o755
     assert (shared_parent / "private.json").stat().st_mode & 0o777 == 0o600
-    print("permission: canonical/phase/root/tool+process env/auth hash/executable/harness/parent mode OK", flush=True)
+    executable = root / "fake-executable"
+    runner._write_private(executable, b"executable before", 0o700)
+    original_read, reads = runner.safe_read, []
+    def counted_read(path):
+        if Path(path) == executable:
+            reads.append(path)
+        return original_read(path)
+    runner.safe_read = counted_read
+    try:
+        before_hash = runner.executable_sha256(executable)
+        assert runner.executable_sha256(executable) == before_hash and len(reads) == 1
+        runner._write_private(executable, b"executable after", 0o700)
+        assert runner.executable_sha256(executable) != before_hash and len(reads) == 2
+        os.link(executable, root / "executable-hardlink")
+        expect_rejected(lambda: runner.executable_sha256(executable))
+    finally:
+        runner.safe_read = original_read
+    print("permission: canonical/phase/root/tool+process env/auth hash/executable cache invalidation/harness/parent mode OK", flush=True)
 
 
 def event_stream(command="pwd", code=0, extras=()):
@@ -246,12 +282,75 @@ def snapshot_test(root):
         expect_rejected(lambda: runner.accepted_snapshot(race))
     finally:
         runner.safe_read = original
-    print("snapshot: links/FIFO/read+copy race/accepted independence OK", flush=True)
+    source, destination = root / "fixed-source", root / "fixed-destination"
+    runner._write_private(source, b"fixed verified bytes")
+    expected_hash = runner.sha(source)
+    reads = 0
+    def source_swapped(path):
+        nonlocal reads
+        data = original(path)
+        if Path(path) == source:
+            reads += 1
+            runner._write_private(source, b"untrusted swapped bytes")
+        return data
+    runner.safe_read = source_swapped
+    try:
+        runner.copy_verified_bytes(source, destination, expected_hash)
+        assert reads == 1 and original(destination) == b"fixed verified bytes"
+        expect_rejected(lambda: runner.copy_verified_bytes(source, destination, expected_hash))
+    finally:
+        runner.safe_read = original
+    print("snapshot: links/FIFO/read+copy race/accepted independence/verified-same-bytes TOCTOU OK", flush=True)
+
+
+def prepare_copy_test(root):
+    root.mkdir()
+    original_base, original_here, original_b_index = runner.BASE, runner.HERE, runner.B_INDEX
+    original_read = runner.safe_read
+    def copy_tree(source, destination):
+        for name, entry in runner.tree_manifest(source, exclude_internal=False, exclude_bookkeeping=False).items():
+            if entry["type"] == "file":
+                runner._write_private(destination / name, original_read(source / name), 0o700 if entry["executable"] else 0o600)
+    # 原repoではなく複製した固定fixtureだけを差し替える。
+    cloned_base, cloned_here = root / "migration-baseline", root / "migration-benchmark"
+    copy_tree(original_base, cloned_base)
+    copy_tree(original_here / "b-contract", cloned_here / "b-contract")
+    runner._write_private(cloned_here / "b-contract-index.json", original_read(original_b_index))
+    runner.BASE, runner.HERE, runner.B_INDEX = cloned_base, cloned_here, cloned_here / "b-contract-index.json"
+    try:
+        index = runner.load(cloned_base / "snapshot-index.json")
+        snapshot = next(entry for entry in index["entries"] if entry["repo"] == "agent_crew" and entry["source"] == "scripts/crew")
+        fixed = cloned_base / snapshot["snapshot"]
+        data = original_read(fixed)
+        for serial, (condition, target, destination_name, expected) in enumerate([
+            ("A", fixed, "scripts/crew", snapshot["sha256"]),
+            ("B", cloned_here / "b-contract/agent_crew/AGENTS.md", "AGENTS.md",
+             runner.load(runner.B_INDEX)["files"]["agent_crew/AGENTS.md"]),
+        ], 1):
+            # 前caseのsourceを戻してから、read直後に異なるbytesへatomic置換する。
+            runner._write_private(fixed, data)
+            reads = []
+            def swapped_source(path):
+                value = original_read(path)
+                if Path(path) == target:
+                    reads.append(path)
+                    runner._write_private(target, b"changed after verified read")
+                return value
+            runner.safe_read = swapped_source
+            prepared, _, _ = runner.prepare("C1", condition, 1, str(root / "campaign"), f"run-{serial:02}")
+            runner.safe_read = original_read
+            assert len(reads) == 1 and runner.sha(prepared / destination_name) == expected
+            assert runner.sha(target) != expected
+    finally:
+        runner.BASE, runner.HERE, runner.B_INDEX, runner.safe_read = original_base, original_here, original_b_index, original_read
+    print("prepare: real A fixture/B contract source swapped after read; copied verified bytes only OK", flush=True)
 
 
 def preflight_test(root):
     root.mkdir()
     runner._write_private(root / "AGENTS.md", "fixture")
+    for name in c1_task()["input"] + c1_task()["fixture"]:
+        runner._write_private(root / name, "fixed fixture")
     spec = runner.execution_spec(root, c1_task(), runner.CLI_VERSION, "fixture-fingerprint")
     original = preflight.run_case
     seen = []
@@ -261,11 +360,20 @@ def preflight_test(root):
         if expected == "allow":
             result = subprocess.run(command, cwd=root, env=spec["env"], capture_output=True)
             assert result.returncode == 0, result.stderr
-        return {"name": name, "expected": expected, "outcome": "allowed" if expected == "allow" else "sandbox_denied"}
+        return {"name": name, "expected": expected, "outcome": "allowed" if expected == "allow" else "sandbox_denied",
+                "exit_code": 0 if expected == "allow" else 1, "binding_sha256": runner.canonical_digest(spec["binding"]),
+                "command_sha256": runner.canonical_digest(command), "stdout_sha256": "0" * 64, "stderr_sha256": "0" * 64}
     preflight.run_case = fake_case
     try:
         report = preflight.check(spec)
         assert report["passed"] and report["binding"] == spec["binding"] and report["canaries_removed"]
+        assert runner.validate_preflight_evidence(report, spec)
+        for mutation in ({"cases": report["cases"][:-1]}, {"cases": report["cases"] + report["cases"][:1]},
+                         {"canaries_removed": False}, {"postconditions": {}}, {"tool_environment_scope": "exec_verified"}):
+            assert not runner.validate_preflight_evidence({**report, **mutation}, spec)
+        changed_cases = json.loads(json.dumps(report["cases"]))
+        changed_cases[-1]["binding_sha256"] = "0" * 64
+        assert not runner.validate_preflight_evidence({**report, "cases": changed_cases}, spec)
         assert {"tool_environment_exact", "outside_private_read", "symlink_outside_private_read", "repository_read", "repository_write", "network_connect"} <= set(seen)
         preflight.run_case = lambda name, *_args: {"name": name, "expected": "allow", "outcome": "preflight_error"}
         assert not preflight.check(spec)["passed"]
@@ -274,14 +382,36 @@ def preflight_test(root):
     print("preflight: exact binding/tool env/canary cleanup/fail closed OK (sandbox outcomes mocked)", flush=True)
 
 
+def fake_preflight_report(spec):
+    return {"schema": 3, "passed": True, "binding": spec["binding"], "cli_version": runner.CLI_VERSION,
+            "binding_comparison": "entire_canonical_binding_equal_before_model",
+            "tool_environment_scope": "auxiliary_env_i_probe_not_actual_exec_tool",
+            "sandbox_initialized": True, "canaries_removed": True,
+            "postconditions": {name: True for name in ("canary_writes_observed", "outside_writes_absent",
+                "private_sentinel_unchanged", "task_file_contents_unchanged", "binding_unchanged")},
+            "cases": [{"name": name, "expected": expected,
+                "outcome": "allowed" if expected == "allow" else "sandbox_denied", "exit_code": 0 if expected == "allow" else 1,
+                "binding_sha256": runner.canonical_digest(spec["binding"]), "command_sha256": "0" * 64,
+                "stdout_sha256": "0" * 64, "stderr_sha256": "0" * 64}
+                for name, expected in runner.required_preflight_cases(spec).items()]}
+
+
+def clean_process_evidence(_token):
+    return {"status": "pass", "passed": True, "scan_pass": True, "detected_count": 0, "kill_count": 0,
+            "remaining_count": 0, "scan_count": 3, "clean_after_scan": True,
+            "detection_scope": "exact_inherited_environment_token_including_detached_sessions",
+            "complete_descendant_detection_claimed": False}
+
+
 def integration_test(root):
     root.mkdir()
     fake = root / "codex"
     fake.write_text(FAKE)
     fake.chmod(0o700)
-    originals = runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS
+    originals = runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS, runner.cleanup_residual_processes
     runner.CODEX_EXECUTABLE = str(fake)
-    runner.per_run_preflight = lambda spec: {"passed": True, "binding": spec["binding"]}
+    runner.per_run_preflight = fake_preflight_report
+    runner.cleanup_residual_processes = clean_process_evidence
     fingerprint = compute_harness_fingerprint(HERE)
     campaign = root / ("p5-" + fingerprint[:16])
     summary_path = campaign / "batch-summary.json"
@@ -301,6 +431,11 @@ def integration_test(root):
         assert result["pass_preliminary"], result
         assert result["run_id"] == "run-01" and result["cached_input_tokens"] == 6
         assert result["isolation_gate"]["binding"] == result["isolation_gate"]["preflight_binding"]
+        assert result["isolation_gate"]["env_canary_pass"] and result["env_canary_evidence"]["passed"]
+        assert result["isolation_gate"]["residual_process_count"] == 0 and result["isolation_gate"]["residual_scan_pass"]
+        assert runner.sha(campaign / result["preflight_evidence_relative_path"]) == result["preflight_evidence_sha256"]
+        assert runner.validate_preflight_evidence(runner.load(campaign / result["preflight_evidence_relative_path"]),
+                runner.canonical_execution_spec(result_path.parent, c1_task(), runner.CLI_VERSION, fingerprint))
         assert result["validation"]["binding"]["phase"] == "validation" and result["validation"]["manifest_unchanged"]
         assert result["validation"]["derived_from_model_profile_sha256"] == result["isolation_gate"]["binding"]["profile_sha256"]
         raw = campaign / result["raw_event_evidence"]["path_relative_to_campaign"]
@@ -310,6 +445,7 @@ def integration_test(root):
         replay = runner.reclassify_result(result_path, report_path)
         assert replay["raw_event_sha256"] == raw_hash and replay["source_result_sha256"] == record_hash
         assert replay["event_audit"] == result["event_audit"] and replay["attempt_policy"] == result["attempt_policy"]
+        assert replay["env_canary_evidence"] == result["env_canary_evidence"]
         assert runner.sha(result_path) == record_hash and runner.sha(raw) == raw_hash
         assert replay["classifier_sha256"] == runner.sha(HERE / "run.py")
         assert replay["harness_fingerprint"] == fingerprint and replay["run_id"] == args.run_id
@@ -382,6 +518,17 @@ def integration_test(root):
             assert invalid["exit_code"] == "validator_changed_snapshot" and not invalid["manifest_unchanged"]
         finally:
             runner.execute_group = original_execute
+        for mode in ("env_missing", "env_leak"):
+            _, invalid_environment, _ = invoke(mode=mode)
+            assert not invalid_environment["isolation_gate"]["passed"] and not invalid_environment["isolation_gate"]["env_canary_pass"]
+            assert invalid_environment["validation"]["exit_code"] == "not_run"
+        def residual_found(token):
+            return {**clean_process_evidence(token), "status": "fail", "passed": False, "detected_count": 1, "kill_count": 1}
+        runner.cleanup_residual_processes = residual_found
+        _, detached, _ = invoke()
+        assert not detached["isolation_gate"]["passed"] and detached["isolation_gate"]["residual_process_count"] > 0
+        assert detached["validation"]["exit_code"] == "not_run"
+        runner.cleanup_residual_processes = clean_process_evidence
         _, failed, _ = invoke(mode="fail")
         assert failed["cli_exit"] == 1 and not failed["pass_preliminary"]
         runner.CLI_TIMEOUT_SECONDS = 0.1
@@ -396,8 +543,83 @@ def integration_test(root):
         finally:
             runner.execute_group = original_execute
     finally:
-        runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS = originals
+        runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS, runner.cleanup_residual_processes = originals
     print("integration: 4 gates/exact replay path/fingerprint+hash tamper/non-mutating result/C6 scratch validator/full manifest/timeout/binding block OK", flush=True)
+
+
+def environment_canary_test(root):
+    root.mkdir()
+    expected = runner.limited_env(root, "fixture-fingerprint")
+    command = runner.ENV_CANARY_COMMAND
+    def audit(canary_command=command, output=None, prefix=()):
+        events = event_stream(canary_command)
+        events[3]["item"]["aggregated_output"] = json.dumps(expected) if output is None else output
+        if prefix:
+            events[2:2] = prefix
+        return runner.safe_events("\n".join(json.dumps(event) for event in events), expected_cwd=root, expected_env=expected)
+    assert audit()["env_canary_evidence"]["passed"]
+    assert audit("/bin/zsh -lc " + shlex.quote(command))["env_canary_evidence"]["passed"]
+    assert not audit(command + "; true")["env_canary_evidence"]["passed"]
+    assert not audit("pwd")["env_canary_evidence"]["passed"]
+    assert not audit(output="{}")["env_canary_evidence"]["passed"]
+    assert not audit(output=json.dumps({**expected, "CODEX_HOME": "/synthetic/auth"}))["env_canary_evidence"]["passed"]
+    assert not audit(output=json.dumps({key: value for key, value in expected.items() if key != "P5_RUN_TOKEN"}))["env_canary_evidence"]["passed"]
+    assert not audit(output=json.dumps({**expected, "P5_RUN_TOKEN": "different"}))["env_canary_evidence"]["passed"]
+    patch = {"type": "item.completed", "item": {"id": "patch", "type": "file_change", "status": "completed", "changes": []}}
+    assert not audit(prefix=[patch])["env_canary_evidence"]["passed"]
+    prior = event_stream("pwd")[2:4]
+    for event in prior:
+        event["item"]["id"] = "prior"
+    assert not audit(prefix=prior)["env_canary_evidence"]["passed"]
+    evidence = json.dumps(audit())
+    assert expected["P5_RUN_TOKEN"] not in evidence and expected["HOME"] not in evidence
+    print("env canary: actual command/order/strict env/missing/leak/token tamper/no public values OK", flush=True)
+
+
+def residual_process_test():
+    token = "a" * 64
+    marker = ("P5_RUN_TOKEN=" + token).encode()
+    # argvに同じ文字列があっても環境には存在しない。
+    payload = struct.pack("=i", 2) + b"/usr/bin/python\0\0" + b"python\0" + marker + b"\0PATH=/usr/bin\0"
+    assert marker not in runner.parse_macos_procargs_environment(payload)
+    with_env = payload + marker + b"\0"
+    assert marker in runner.parse_macos_procargs_environment(with_env)
+    originals = runner.candidate_process_ids, runner.process_environment_entries, runner.os.kill, runner.time.sleep
+    processes = {901: (marker,), 902: (marker + b"-suffix",), 903: (b"OTHER=" + marker,), 904: (b"PATH=/usr/bin",)}
+    calls = []
+    runner.candidate_process_ids = lambda: list(processes)
+    runner.process_environment_entries = lambda pid: processes[pid]
+    runner.time.sleep = lambda _seconds: None
+    def kill(pid, signum):
+        assert signum == signal.SIGKILL
+        calls.append(pid)
+        del processes[pid]
+    runner.os.kill = kill
+    try:
+        result = runner.cleanup_residual_processes(token)
+        # 901は元group外/setsid済みを表す。process group IDへ依存せず検出する。
+        assert calls == [901] and result["detected_count"] == 1 and result["kill_count"] == 1
+        assert result["clean_after_scan"] and not result["passed"] and result["scan_count"] == 3
+        assert set(processes) == {902, 903, 904}
+        assert runner.cleanup_residual_processes(token)["passed"]
+        processes[905] = (marker,)
+        reads = 0
+        def reused_pid(pid):
+            nonlocal reads
+            if pid == 905:
+                reads += 1
+                return (marker,) if reads == 1 else (b"PATH=/usr/bin",)
+            return processes[pid]
+        runner.process_environment_entries = reused_pid
+        result = runner.cleanup_residual_processes(token)
+        assert calls == [901] and result["detected_count"] == 1 and not result["passed"]
+        runner.process_environment_entries = lambda _pid: (_ for _ in ()).throw(PermissionError("mock denied"))
+        result = runner.cleanup_residual_processes(token)
+        assert not result["scan_pass"] and not result["passed"]
+        assert "901" not in json.dumps(result) and token not in json.dumps(result)
+    finally:
+        runner.candidate_process_ids, runner.process_environment_entries, runner.os.kill, runner.time.sleep = originals
+    print("residual: detached exact-env scan/argv false positive/PID reuse/kill/unrelated preservation/fail closed OK (mock)", flush=True)
 
 
 def process_test(root):
@@ -420,7 +642,10 @@ def main():
     fingerprint_test(root / "fingerprint")
     permission_test(root / "permissions")
     event_test(root / "events")
+    environment_canary_test(root / "env-canary")
+    residual_process_test()
     snapshot_test(root / "snapshots")
+    prepare_copy_test(root / "prepare-copy")
     preflight_test(root / "preflight")
     integration_test(root / "integration")
     process_test(root / "process")

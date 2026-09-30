@@ -72,6 +72,7 @@ def check(spec):
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     spec["private_preflight_diagnostics"] = []
     report = {"schema": 3, "started_at": runner.stamp(), "cli_version": spec["binding"]["cli_version"],
+              "tool_environment_scope": "auxiliary_env_i_probe_not_actual_exec_tool",
               "binding": spec["binding"], "binding_comparison": "entire_canonical_binding_equal_before_model", "passed": False, "cases": []}
     try:
         listener.bind(("127.0.0.1", 0))
@@ -101,7 +102,7 @@ def check(spec):
             report["cases"].extend(run_case(name, spec, command, expected) for name, command, expected in cases)
         else:
             report["cases"].extend({"name": name, "expected": expected, "outcome": "not_run_preflight_error"} for name, _, expected in cases)
-        rebound = runner.execution_spec(root, spec["task"], spec["binding"]["cli_version"], spec["binding"]["harness_fingerprint"], spec["binding"]["phase"])
+        rebound = runner.canonical_execution_spec(root, spec["task"], spec["binding"]["cli_version"], spec["binding"]["harness_fingerprint"], spec["binding"]["phase"])
         conditions = {"canary_writes_observed": scratch.is_file() and task_write.is_file(),
                       "outside_writes_absent": not os.path.lexists(outside) and not os.path.lexists(repository_target),
                       "private_sentinel_unchanged": runner.sha(sentinel) == sentinel_hash,

@@ -2,6 +2,9 @@
 """固定fixtureを隔離実行し、再監査できるprivate証跡と4種類の判定を残す。"""
 
 import argparse
+import ctypes
+import errno
+import struct
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
@@ -31,12 +34,15 @@ CLI_VERSION = "codex-cli 0.155.1"
 CLI_TIMEOUT_SECONDS = 240
 VALIDATION_TIMEOUT_SECONDS = 45
 ACTIVE_GROUP = None
+_EXECUTABLE_HASH_CACHE = {}
 CODEX_EXECUTABLE = str(Path(shutil.which("codex") or "/opt/homebrew/bin/codex").resolve())
 AUTH_HOME = os.environ.get("CODEX_HOME") or str(Path.home() / ".codex")
 FIXED_PATH = os.pathsep.join(dict.fromkeys([
     str(Path(sys.executable).parent), str(Path.home() / ".local/bin"),
     "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin",
 ]))
+ENV_CANARY_COMMAND = shlex.join(["python3.12", "-I", "-B", "-c",
+    "import json,os; print(json.dumps(dict(os.environ),sort_keys=True,separators=(',',':')))"])
 INTERNAL_FILES = {".benchmark-prompt.txt", ".benchmark-answer.txt", ".benchmark-active-pgid",
                   ".benchmark-events.json", ".benchmark-result.json", ".benchmark-isolation.json"}
 
@@ -123,6 +129,31 @@ def safe_read(path):
 
 def sha(path):
     return digest_bytes(safe_read(path))
+
+
+def executable_sha256(path):
+    """大型CLIを同一identityの間だけ再利用。毎回component/type/metadataを検査する。"""
+    path = Path(path)
+    def identity():
+        parent = _open_directory(path.parent)
+        try:
+            info = os.stat(path.name, dir_fd=parent, follow_symlinks=False)
+            if not _regular(info):
+                raise BoundaryError("実行fileのlink/nonregularを拒否")
+            return (str(path), info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns,
+                    info.st_ctime_ns, info.st_nlink, info.st_mode)
+        finally:
+            os.close(parent)
+    before = identity()
+    if before in _EXECUTABLE_HASH_CACHE:
+        return _EXECUTABLE_HASH_CACHE[before]
+    digest = sha(path)
+    if identity() != before:
+        raise BoundaryError("実行fileのhash計算中にidentityが変わりました")
+    if len(_EXECUTABLE_HASH_CACHE) >= 16:
+        _EXECUTABLE_HASH_CACHE.clear()
+    _EXECUTABLE_HASH_CACHE[before] = digest
+    return digest
 
 
 def _private_parent(path):
@@ -263,19 +294,34 @@ def permission_config(root, task, profile="p5_fixture", phase="model"):
             f'permissions.{profile}.network.enabled=false', f'permissions.{profile}.filesystem={{' + entries + "}"]
 
 
-def limited_env(root):
-    scratch = root / ".benchmark-tmp"
-    home = scratch / "home"
-    fd = _open_directory(home, create=True)
+def _prepare_environment_home(root):
+    fd = _open_directory(root / ".benchmark-tmp/home", create=True)
     try:
         os.fchmod(fd, 0o700)
     finally:
         os.close(fd)
+
+
+def run_token(root, harness_fingerprint="unbound", phase="model"):
+    model_root = root.parent.parent / root.name if phase == "validation" and root.parent.name == ".accepted" else root
+    directory_fd = _open_directory(model_root)
+    try:
+        info = os.fstat(directory_fd)
+    finally:
+        os.close(directory_fd)
+    return canonical_digest({"root": str(model_root.resolve()), "device": info.st_dev,
+                             "inode": info.st_ino, "harness": harness_fingerprint})
+
+
+def limited_env(root, harness_fingerprint="unbound", phase="model"):
+    """environmentを再導出するだけでdirectoryの作成・chmodを行わない。"""
+    scratch = root / ".benchmark-tmp"
+    home = scratch / "home"
     env = {"PATH": FIXED_PATH, "LANG": "en_US.UTF-8", "LC_ALL": "en_US.UTF-8", "HOME": str(home),
-            "TMPDIR": str(scratch), "TMP": str(scratch), "TEMP": str(scratch), "PYTHONDONTWRITEBYTECODE": "1",
-            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_OPTIONAL_LOCKS": "0"}
+           "TMPDIR": str(scratch), "TMP": str(scratch), "TEMP": str(scratch), "PYTHONDONTWRITEBYTECODE": "1",
+           "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_OPTIONAL_LOCKS": "0",
+           "P5_RUN_TOKEN": run_token(root, harness_fingerprint, phase)}
     if sys.platform == "darwin":
-        # macOSが暗黙追加する非機密のencoding値もallowlistで固定する。
         env["__CF_USER_TEXT_ENCODING"] = f"0x{os.getuid():X}:0x0:0x0"
     return env
 
@@ -290,10 +336,15 @@ def tool_environment_config(spec):
     return ['shell_environment_policy.inherit="none"', 'shell_environment_policy.set={' + entries + '}']
 
 
-def execution_spec(root, task, cli_version, harness_fingerprint="unbound", phase="model"):
-    prepare_permission_directories(root, task)
-    env = limited_env(root)
-    info = root.lstat()
+def canonical_execution_spec(root, task, cli_version, harness_fingerprint="unbound", phase="model"):
+    """read-only: callerが用意したrootから正規spec/bindingを再導出する。"""
+    root = Path(root)
+    env = limited_env(root, harness_fingerprint, phase)
+    directory_fd = _open_directory(root)
+    try:
+        info = os.fstat(directory_fd)
+    finally:
+        os.close(directory_fd)
     executable = Path(CODEX_EXECUTABLE).resolve(strict=True)
     spec = {"root": root, "task": task, "env": env, "config": permission_config(root, task, phase=phase)}
     spec["binding"] = {
@@ -304,10 +355,20 @@ def execution_spec(root, task, cli_version, harness_fingerprint="unbound", phase
         "tool_environment": {"keys": sorted(env), "sha256": canonical_digest(env)},
         "codex_process_environment": {"keys": sorted(process_env(spec)), "sha256": canonical_digest(process_env(spec)),
                                       "auth_home_location_sha256": digest_bytes(AUTH_HOME.encode())},
-        "codex_executable": {"realpath": str(executable), "sha256": sha(executable)},
+        "codex_executable": {"realpath": str(executable), "sha256": executable_sha256(executable)},
         "read_boundary": "pinned_cli_minimal_runtime_plus_fixture",
     }
     return spec
+
+
+def derive_canonical_binding(root, task, cli_version, harness_fingerprint, phase="model"):
+    return canonical_execution_spec(root, task, cli_version, harness_fingerprint, phase)["binding"]
+
+
+def execution_spec(root, task, cli_version, harness_fingerprint="unbound", phase="model"):
+    prepare_permission_directories(root, task)
+    _prepare_environment_home(root)
+    return canonical_execution_spec(root, task, cli_version, harness_fingerprint, phase)
 
 
 def sandbox_command(root, task, command, spec=None):
@@ -352,71 +413,88 @@ def accepted_snapshot(root):
     return accepted, {"before_sha256": canonical_digest(before), "after_sha256": canonical_digest(after),
                       "accepted_sha256": canonical_digest(copied), "matched": True}, after
 
+
+def verified_bytes(source, expected_hash):
+    data = safe_read(source)
+    if digest_bytes(data) != expected_hash:
+        raise BoundaryError("固定inputのhash不一致: " + source.name)
+    return data
+
+
+def copy_verified_bytes(source, destination, expected_hash, mode=0o600):
+    """検査した同一bytesをcopyし、sourceを再読しない。"""
+    data = verified_bytes(source, expected_hash)
+    _write_private(destination, data, mode)
+    if sha(destination) != expected_hash:
+        raise BoundaryError("copy後のdestination hash不一致")
+
+
+def indexed_files(index_path, tree):
+    expected = load(index_path)["files"]
+    found = set()
+    def visit(directory, relative=""):
+        fd = _open_directory(directory)
+        try:
+            for name in sorted(os.listdir(fd)):
+                key = relative + name
+                info = os.stat(name, dir_fd=fd, follow_symlinks=False)
+                if stat.S_ISDIR(info.st_mode):
+                    visit(directory / name, key + "/")
+                elif _regular(info):
+                    found.add(key)
+                else:
+                    raise BoundaryError("指示treeにlink/nonregularがあります")
+        finally:
+            os.close(fd)
+    visit(tree)
+    if found != set(expected):
+        raise BoundaryError("指示treeのfile集合がindexと不一致")
+    return {name: verified_bytes(tree / name, expected[name]) for name in sorted(expected)}
+
+
 def prepare(task_id, condition, repeat, campaign, run_id):
     comparison = load(BASE / "comparison.json")
     index = load(BASE / "snapshot-index.json")
-    task = c6_task() if task_id == "C6" else next(t for t in comparison["tasks"] if t["id"] == task_id)
+    task = c6_task() if task_id == "C6" else next(task for task in comparison["tasks"] if task["id"] == task_id)
     if not re.fullmatch(r"run-[0-9]{2,}", run_id):
         raise ValueError("run_idはrun-NN形式が必要です")
     root = WORK / campaign / run_id
     if os.path.lexists(root):
-        raise RuntimeError(f"既存runは上書きしません: {root}")
+        raise BoundaryError("既存runは上書きしません")
     _private_parent(root / ".target")
     hashes = {}
+    def place(relative, data, expected):
+        path = Path(relative)
+        if path.is_absolute() or ".." in path.parts:
+            raise BoundaryError("fixtureの相対pathが不正です")
+        mode = 0o700 if path.name == "crew" or path.suffix == ".sh" else 0o600
+        _write_private(root / path, data, mode)
+        if sha(root / path) != expected:
+            raise BoundaryError("fixture destination hash不一致")
+        hashes[relative] = expected
     for entry in index["entries"]:
-        source = BASE / entry["snapshot"]
-        if sha(source) != entry["sha256"]:
-            raise RuntimeError(f"P0 hash不一致: {entry['snapshot']}")
-        c6_visible = set(task["input"] + task["fixture"])
+        data = verified_bytes(BASE / entry["snapshot"], entry["sha256"])
+        visible = set(task["input"] + task["fixture"])
         if task_id == "C6" and condition == "A" and entry["snapshot"] in comparison["A_instruction_snapshot"]:
-            c6_visible.add(entry["source"])
-        if entry["repo"] == task["repo"] and (task_id != "C6" or entry["source"] in c6_visible):
-            destination = root / entry["source"]
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination)
-            if destination.name == "crew":
-                destination.chmod(0o755)
-            hashes[entry["source"]] = entry["sha256"]
+            visible.add(entry["source"])
+        replaced_by_b = (condition == "B" and task["repo"] == "agent_crew" and
+                         entry["source"].startswith(".agents/skills/fable-class/"))
+        if entry["repo"] == task["repo"] and (task_id != "C6" or entry["source"] in visible) and not replaced_by_b:
+            place(entry["source"], data, entry["sha256"])
     if task_id == "C6":
         fixture = index["synthetic_fixture"]
-        source = BASE / fixture["path"]
-        if sha(source) != fixture["sha256"]:
-            raise RuntimeError("合成fixture hash不一致")
-        destination = root / "migration-progress/state.json"
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, destination)
-        hashes["migration-progress/state.json"] = fixture["sha256"]
+        place("migration-progress/state.json", verified_bytes(BASE / fixture["path"], fixture["sha256"]), fixture["sha256"])
     if condition == "A" and task["repo"] == "wealth_advisor":
-        verified_a_inputs()
-        source = HERE / "a-contract/wealth_advisor/.agents/skills/wealth-advisor/SKILL.md"
-        destination = root / ".agents/skills/wealth-advisor/SKILL.md"
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, destination)
-        hashes[str(destination.relative_to(root))] = sha(destination)
+        entries = indexed_files(A_INDEX, HERE / "a-contract")
+        name = "wealth_advisor/.agents/skills/wealth-advisor/SKILL.md"
+        place(".agents/skills/wealth-advisor/SKILL.md", entries[name], digest_bytes(entries[name]))
     if condition == "B":
-        verified_b_inputs()
-        contract = HERE / "b-contract" / task["repo"] / "AGENTS.md"
-        if not contract.is_file():
-            raise RuntimeError("B契約未固定。親によるP2確定待ち")
-        shutil.copy2(contract, root / "AGENTS.md")
-        hashes["AGENTS.md"] = sha(contract)
-        if task["repo"] == "agent_crew":
-            skill_dir = root / ".agents/skills/fable-class"
-            if skill_dir.exists():
-                shutil.rmtree(skill_dir)
-            fixed_skill = HERE / "b-contract/agent_crew/.agents/skills/fable-class"
-            if not (fixed_skill / "SKILL.md").is_file():
-                raise RuntimeError("B skill未固定。親によるP2確定待ち")
-            shutil.copytree(fixed_skill, skill_dir)
-            for file in skill_dir.rglob("*"):
-                if file.is_file():
-                    hashes[str(file.relative_to(root))] = sha(file)
-        elif task["repo"] == "wealth_advisor":
-            source = HERE / "b-contract/wealth_advisor/.agents/skills/wealth-advisor/SKILL.md"
-            destination = root / ".agents/skills/wealth-advisor/SKILL.md"
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination)
-            hashes[str(destination.relative_to(root))] = sha(destination)
+        entries = indexed_files(B_INDEX, HERE / "b-contract")
+        prefix = task["repo"] + "/"
+        for name, data in entries.items():
+            if name.startswith(prefix):
+                place(name[len(prefix):], data, digest_bytes(data))
+    _prepare_environment_home(root)
     git_env = limited_env(root)
     subprocess.run(["git", "init", "-q", str(root)], check=True, env=git_env)
     subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True, env=git_env)
@@ -433,6 +511,9 @@ def prompt_for(task):
         f"受入条件: {task['accept']}",
         "fixture以外の実環境、外部サービス、認証、金融データへアクセスしないでください。",
         "既存のテスト・契約を用い、指定された対象だけ編集してください。",
+        "最初のtool操作では、次の固定commandだけをそのまま実行してください。他のcommandや編集を先に行わず、環境変数を追加・削除・変更しないでください。",
+        ENV_CANARY_COMMAND,
+        "この環境観測commandが成功してから課題を進め、観測した環境の値は最終回答に掲載しないでください。",
         "一時ファイルは.benchmark-tmp/以下だけに置き、ほかのscratch directoryは作らないでください。",
         "完了時に目的、実施内容、検証コマンドと結果、未完、次の一手を明記してください。",
     ]
@@ -448,8 +529,21 @@ def _count(mapping, value):
     mapping[key] = mapping.get(key, 0) + 1
 
 
+def is_env_canary_command(command):
+    if command == ENV_CANARY_COMMAND:
+        return True
+    try:
+        words = shlex.split(command)
+    except (ValueError, TypeError):
+        return False
+    return (len(words) == 3 and words[0] in {"/bin/sh", "/bin/bash", "/bin/zsh", "/usr/bin/bash", "/usr/bin/zsh"}
+            and words[1] in {"-c", "-lc"} and words[2] == ENV_CANARY_COMMAND)
+
+
 def command_attempts(command, expected_cwd=None):
     """parse/実行内容が不明なものはunknown。全tokenのpathとredirectionを検査する。"""
+    if is_env_canary_command(command):
+        return []
     findings = []
     def finding(reason, severity="unknown"):
         entry = {"reason": reason, "severity": severity}
@@ -603,11 +697,16 @@ def non_tool_schema_errors(kind, item):
     return errors
 
 
-def safe_events(raw, destination=None, expected_cwd=None):
+def safe_events(raw, destination=None, expected_cwd=None, expected_env=None):
     """private rawから同じ判定を再生成する。本文は返却・集計へ含めない。"""
     usage, event_types, item_types, categories = {}, {}, {}, {}
     violations, attempts, commands, diagnostics = [], [], [], []
     lifecycles = {}
+    first_tool_id = None
+    canary_started = False
+    canary_completed = False
+    canary_issues = []
+    observed_env_sha256 = None
     parsed = malformed = 0
     thread_started = turn_started = turn_ended = False
     def violation(reason, line):
@@ -681,6 +780,12 @@ def safe_events(raw, destination=None, expected_cwd=None):
         if not isinstance(item_id, str) or not item_id:
             violation("missing_tool_item_id", number)
             item_id = f"missing:{number}"
+        if first_tool_id is None:
+            first_tool_id = item_id
+            if item_type != "command_execution" or kind != "item.started" or not is_env_canary_command(item.get("command")):
+                canary_issues.append("first_tool_is_not_exact_canary")
+        elif item_id != first_tool_id and not canary_completed:
+            canary_issues.append("tool_before_canary_completed")
         state = lifecycles.setdefault(item_id, {"type": item_type, "started": 0, "completed": 0})
         if state["type"] != item_type:
             violation("tool_item_type_mismatch", number)
@@ -727,6 +832,31 @@ def safe_events(raw, destination=None, expected_cwd=None):
                     violation("missing_command_output", number)
                 if item.get("exit_code") != 0:
                     diagnostics.append({"line": number, "reason": "command_nonzero"})
+            if item_id == first_tool_id:
+                if not is_env_canary_command(command):
+                    canary_issues.append("canary_command_mismatch")
+                if kind == "item.started":
+                    canary_started = is_env_canary_command(command)
+                elif kind == "item.completed":
+                    canary_completed = True
+                    if item.get("exit_code") != 0 or status != "completed":
+                        canary_issues.append("canary_command_failed")
+                    try:
+                        def unique_object(pairs):
+                            result = {}
+                            for key, value in pairs:
+                                if key in result:
+                                    raise ValueError("duplicate key")
+                                result[key] = value
+                            return result
+                        observed = json.loads(output, object_pairs_hook=unique_object)
+                        if not isinstance(observed, dict) or any(not isinstance(key, str) or not isinstance(value, str) for key, value in observed.items()):
+                            raise ValueError("invalid environment")
+                        observed_env_sha256 = canonical_digest(observed)
+                        if expected_env is None or observed != expected_env:
+                            canary_issues.append("tool_environment_mismatch")
+                    except (ValueError, TypeError):
+                        canary_issues.append("canary_output_invalid")
             commands.append({"line": number, "event": kind, "item_id_sha256": canonical_digest(item_id),
                              "command_sha256": digest_bytes(command.encode()), "command_bytes": len(command.encode()),
                              "output_sha256": digest_bytes(output.encode()) if isinstance(output, str) else UNKNOWN,
@@ -756,7 +886,18 @@ def safe_events(raw, destination=None, expected_cwd=None):
         violation("incomplete_run_lifecycle", 0)
     event_pass = not violations
     attempt_status = "fail" if any(entry["severity"] == "fail" for entry in attempts) else "unknown" if attempts else "pass"
+    if expected_env is None:
+        canary_issues.append("expected_environment_unbound")
+    if not canary_started or not canary_completed:
+        canary_issues.append("canary_missing_or_incomplete")
+    canary_pass = not canary_issues and event_pass
     cleaned = {
+        "env_canary_evidence": {"status": "pass" if canary_pass else "fail", "passed": canary_pass,
+            "expected_environment_sha256": canonical_digest(expected_env) if expected_env is not None else None,
+            "observed_environment_sha256": observed_env_sha256,
+            "command_sha256": digest_bytes(ENV_CANARY_COMMAND.encode()),
+            "first_tool_exact_command": canary_started, "completed": canary_completed,
+            "issues": sorted(set(canary_issues)), "scope": "actual_codex_exec_first_tool_environment_observation"},
         "event_audit": {"status": "pass" if event_pass else "unknown", "passed": event_pass,
                         "schema_cli_version": CLI_VERSION, "total_lines": len(raw.splitlines()), "parsed_lines": parsed,
                         "malformed_lines": malformed, "event_types": event_types, "item_types": item_types,
@@ -805,7 +946,11 @@ def reclassify_result(result_path, destination=None):
     raw = safe_read(raw_path)
     if digest_bytes(raw) != record["raw_event_evidence"]["sha256"]:
         raise BoundaryError("raw event hash不一致")
-    report = safe_events(raw.decode("utf-8"), expected_cwd=run_root)
+    task = c6_task() if record["task_id"] == "C6" else next(task for task in load(BASE / "comparison.json")["tasks"] if task["id"] == record["task_id"])
+    spec = canonical_execution_spec(run_root, task, record["cli_version"], fingerprint)
+    if record.get("isolation_gate", {}).get("binding") != spec["binding"]:
+        raise BoundaryError("再分類時のcanonical binding不一致")
+    report = safe_events(raw.decode("utf-8"), expected_cwd=run_root, expected_env=spec["env"])
     report.update({"schema": 1, "purpose": "independent_raw_reclassification", "source_result_sha256": digest_bytes(record_bytes),
                    "run_id": run_id, "harness_fingerprint": fingerprint,
                    "classifier_sha256": sha(HERE / "run.py"), "raw_event_sha256": digest_bytes(raw),
@@ -826,6 +971,109 @@ def stop_group(pgid):
             os.killpg(pgid, signal.SIGKILL)
         except ProcessLookupError:
             pass
+
+
+def parse_macos_procargs_environment(payload):
+    """argv文字列を環境変数と誤認せずKERN_PROCARGS2を構造解析する。"""
+    if len(payload) < 5:
+        raise BoundaryError("process environmentを解釈できません")
+    argc = struct.unpack_from("=i", payload)[0]
+    if not 0 <= argc <= 100000:
+        raise BoundaryError("process argcが不正です")
+    offset = payload.find(b"\0", 4)
+    if offset < 0:
+        raise BoundaryError("process executable境界がありません")
+    offset += 1
+    while offset < len(payload) and payload[offset] == 0:
+        offset += 1
+    for _ in range(argc):
+        end = payload.find(b"\0", offset)
+        if end < 0:
+            raise BoundaryError("process argv境界がありません")
+        offset = end + 1
+    return tuple(entry for entry in payload[offset:].split(b"\0") if entry)
+
+
+def process_environment_entries(pid):
+    # 値をログ・artifactへ出さず、呼出元はexact token membershipだけを判定する。
+    if sys.platform == "darwin":
+        mib = (ctypes.c_int * 3)(1, 49, pid)  # CTL_KERN / KERN_PROCARGS2
+        buffer = ctypes.create_string_buffer(1024 * 1024)
+        size = ctypes.c_size_t(len(buffer))
+        libc = ctypes.CDLL(None, use_errno=True)
+        if libc.sysctl(mib, 3, buffer, ctypes.byref(size), None, 0) != 0:
+            error = ctypes.get_errno()
+            if error == errno.ESRCH:
+                raise ProcessLookupError(error, "process disappeared")
+            raise OSError(error, "process environment scan failed")
+        return parse_macos_procargs_environment(buffer.raw[:size.value])
+    if sys.platform.startswith("linux"):
+        try:
+            with open(f"/proc/{pid}/environ", "rb") as handle:
+                return tuple(entry for entry in handle.read(1024 * 1024).split(b"\0") if entry)
+        except FileNotFoundError as error:
+            raise ProcessLookupError("process disappeared") from error
+    raise BoundaryError("process environment scan未対応platform")
+
+
+def candidate_process_ids():
+    completed = subprocess.run(["/bin/ps", "-A", "-o", "pid=,uid="], text=True, capture_output=True,
+                               env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"}, timeout=5, check=True)
+    result = []
+    for line in completed.stdout.splitlines():
+        fields = line.split()
+        if len(fields) != 2 or not all(field.isdigit() for field in fields):
+            raise BoundaryError("process inventoryが不正です")
+        pid, uid = map(int, fields)
+        if uid == os.getuid() and pid != os.getpid():
+            result.append(pid)
+    return result
+
+
+def cleanup_residual_processes(token, scan_rounds=3, interval=0.05):
+    """group外でもexact token継承processを停止。token除去後の完全検出は主張しない。"""
+    if not isinstance(token, str) or not re.fullmatch(r"[a-f0-9]{64}", token) or scan_rounds < 2:
+        raise BoundaryError("残留process scanのtoken/回数が不正です")
+    marker = ("P5_RUN_TOKEN=" + token).encode()
+    detected, killed = set(), set()
+    scan_pass = True
+    last_matches = set()
+    for index in range(scan_rounds):
+        matches = set()
+        try:
+            candidates = candidate_process_ids()
+        except (OSError, RuntimeError, subprocess.SubprocessError):
+            candidates = []
+            scan_pass = False
+        for pid in candidates:
+            try:
+                if marker in process_environment_entries(pid):
+                    matches.add(pid)
+            except ProcessLookupError:
+                pass
+            except (OSError, RuntimeError):
+                scan_pass = False
+        detected.update(matches)
+        for pid in matches:
+            try:
+                # scanとkillの間のPID再利用にも、環境entryのexact一致を再確認する。
+                if marker in process_environment_entries(pid):
+                    os.kill(pid, signal.SIGKILL)
+                    killed.add(pid)
+            except ProcessLookupError:
+                pass
+            except (OSError, RuntimeError):
+                scan_pass = False
+        last_matches = matches
+        if index + 1 < scan_rounds:
+            time.sleep(interval)
+    clean = scan_pass and not last_matches
+    passed = clean and not detected
+    return {"status": "pass" if passed else "fail", "passed": passed, "scan_pass": scan_pass,
+            "detected_count": len(detected), "kill_count": len(killed), "remaining_count": len(last_matches),
+            "scan_count": scan_rounds, "clean_after_scan": clean,
+            "detection_scope": "exact_inherited_environment_token_including_detached_sessions",
+            "complete_descendant_detection_claimed": False}
 
 
 def terminate_handler(_signum, _frame):
@@ -879,6 +1127,53 @@ def validate(task, root, timeout=VALIDATION_TIMEOUT_SECONDS, c6_state_before=Non
             "manifest_after_sha256": canonical_digest(after), "validator_source_sha256": validator_hash}
 
 
+def required_preflight_cases(spec):
+    cases = {"sandbox_initialized": "allow", "tool_environment_exact": "allow", "fixture_read": "allow",
+             "scratch_write": "allow", "task_directory_write": "allow", "outside_private_read": "deny",
+             "symlink_outside_private_read": "deny", "outside_write": "deny", "repository_read": "deny",
+             "repository_write": "deny", "network_connect": "deny"}
+    if spec["task"]["id"] != "C6":
+        for index, _name in enumerate(spec["task"]["input"] + spec["task"]["fixture"], 2):
+            cases[f"task_file_write_{index}"] = "allow"
+    return cases
+
+
+def validate_preflight_evidence(report, spec):
+    """reportの自己申告だけでなく、固定case集合・binding・個別outcomeを照合する。"""
+    if not isinstance(report, dict):
+        return False
+    cases = report.get("cases")
+    required = required_preflight_cases(spec)
+    if not isinstance(cases, list) or len(cases) != len(required):
+        return False
+    seen = set()
+    for case in cases:
+        if not isinstance(case, dict) or not isinstance(case.get("name"), str) or case["name"] in seen:
+            return False
+        name = case.get("name")
+        if name not in required or case.get("expected") != required[name]:
+            return False
+        seen.add(name)
+        if case.get("outcome") != ("allowed" if required[name] == "allow" else "sandbox_denied"):
+            return False
+        if type(case.get("exit_code")) is not int or (case["exit_code"] == 0) != (required[name] == "allow"):
+            return False
+        if case.get("binding_sha256") != canonical_digest(spec["binding"]):
+            return False
+        if any(not isinstance(case.get(key), str) or not re.fullmatch(r"[a-f0-9]{64}", case[key])
+               for key in ("command_sha256", "stdout_sha256", "stderr_sha256")):
+            return False
+    conditions = report.get("postconditions")
+    expected_conditions = {"canary_writes_observed", "outside_writes_absent", "private_sentinel_unchanged",
+                           "task_file_contents_unchanged", "binding_unchanged"}
+    return (report.get("schema") == 3 and report.get("passed") is True and report.get("sandbox_initialized") is True
+            and report.get("binding") == spec["binding"] and report.get("cli_version") == spec["binding"]["cli_version"]
+            and report.get("binding_comparison") == "entire_canonical_binding_equal_before_model"
+            and report.get("tool_environment_scope") == "auxiliary_env_i_probe_not_actual_exec_tool"
+            and report.get("canaries_removed") is True and isinstance(conditions, dict)
+            and set(conditions) == expected_conditions and all(value is True for value in conditions.values()))
+
+
 def per_run_preflight(spec):
     import sandbox_preflight
     return sandbox_preflight.check(spec)
@@ -895,11 +1190,17 @@ def _run(args):
     preflight = per_run_preflight(spec)
     save(root / ".benchmark-isolation.json", preflight)
     bound = preflight.get("binding") == spec["binding"]
-    isolation_pass = preflight.get("passed") is True and bound
+    preflight_valid = validate_preflight_evidence(preflight, spec)
+    isolation_pass = preflight_valid and bound
     common = {"schema": 3, "campaign": Path(args.campaign).name, "fingerprint": args.fingerprint,
               "run_id": args.run_id, "task_id": args.task, "condition": args.condition, "repeat": args.repeat,
-              "cli_version": version, "isolation_gate": {"status": "pass" if isolation_pass else "fail", "passed": isolation_pass,
-                  "binding": spec["binding"], "preflight_binding": preflight.get("binding"), "preflight_bound": bound}}
+              "cli_version": version,
+              "preflight_evidence_relative_path": str((root / ".benchmark-isolation.json").relative_to(root.parent)),
+              "preflight_evidence_sha256": sha(root / ".benchmark-isolation.json"),
+              "isolation_gate": {"status": "pass" if isolation_pass else "fail", "passed": isolation_pass,
+                  "binding": spec["binding"], "preflight_binding": preflight.get("binding"), "preflight_bound": bound,
+                  "preflight_evidence_valid": preflight_valid, "env_canary_pass": False,
+                  "residual_process_count": 0, "residual_scan_pass": False}}
     if not isolation_pass:
         failure = {**common, "cli_exit": "not_run", "validation": {"exit_code": "not_run"}, "started_at": stamp(), "ended_at": stamp(),
                    "event_audit": {"status": "not_run", "passed": False}, "attempt_policy": {"status": "not_run", "passed": False},
@@ -925,18 +1226,30 @@ def _run(args):
     remaining = deadline - time.time() if deadline is not None else 360
     if remaining < 70:
         raise BoundaryError("campaign残時間不足。runを開始しません")
-    cli_exit, stdout, stderr = execute_group(command, root, process_env(spec), min(CLI_TIMEOUT_SECONDS, remaining - 60), prompt)
+    try:
+        cli_exit, stdout, stderr = execute_group(command, root, process_env(spec), min(CLI_TIMEOUT_SECONDS, remaining - 60), prompt)
+    finally:
+        model_residual = cleanup_residual_processes(spec["env"]["P5_RUN_TOKEN"])
     raw_path = root.parent / ".evidence" / root.name / "events.raw.jsonl"
     _write_private(raw_path, stdout)
-    events = safe_events(stdout, root / ".benchmark-events.json", root)
+    events = safe_events(stdout, root / ".benchmark-events.json", root, expected_env=spec["env"])
     guard_after = host_guard()
-    isolation_pass = isolation_pass and guard_before == guard_after and spec["binding"] == execution_spec(root, task, version, args.fingerprint)["binding"]
-    common["isolation_gate"].update(status="pass" if isolation_pass else "fail", passed=isolation_pass)
+    try:
+        current_binding_matches = spec["binding"] == derive_canonical_binding(root, task, version, args.fingerprint)
+        preflight_unchanged = sha(root / ".benchmark-isolation.json") == common["preflight_evidence_sha256"]
+    except (OSError, RuntimeError, ValueError):
+        current_binding_matches, preflight_unchanged = False, False
+    isolation_pass = (isolation_pass and guard_before == guard_after and current_binding_matches and preflight_unchanged
+                      and events["env_canary_evidence"]["passed"] and model_residual["passed"])
+    common["env_canary_evidence"] = events["env_canary_evidence"]
+    common["isolation_gate"].update(env_canary_pass=events["env_canary_evidence"]["passed"])
     modified, scope, answer = [], [], ""
     snapshot = {"matched": False}
     validation = {"exit_code": "not_run", "reason": "snapshot_not_accepted"}
     accepted_state, c6_consistent = None, True
     try:
+        if not isolation_pass:
+            raise BoundaryError("モデル実行の隔離証拠が不合格です")
         accepted, snapshot, after_manifest = accepted_snapshot(root)
         after = source_inventory(after_manifest)
         modified = sorted(key for key in set(before) | set(after) if before.get(key) != after.get(key))
@@ -963,6 +1276,14 @@ def _run(args):
         snapshot = {"matched": False, "error_type": type(error).__name__, "error_sha256": digest_bytes(str(error).encode())}
         scope.append("unsafe_or_unstable_snapshot")
         validation = {"exit_code": "not_run", "reason": "snapshot_boundary_failure"}
+    finally:
+        validation_residual = cleanup_residual_processes(spec["env"]["P5_RUN_TOKEN"])
+    residual_count = model_residual["detected_count"] + validation_residual["detected_count"]
+    residual_scan_pass = model_residual["scan_pass"] and validation_residual["scan_pass"]
+    isolation_pass = isolation_pass and validation_residual["passed"]
+    common["residual_process_evidence"] = {"model": model_residual, "validation": validation_residual}
+    common["isolation_gate"].update(status="pass" if isolation_pass else "fail", passed=isolation_pass,
+                                    residual_process_count=residual_count, residual_scan_pass=residual_scan_pass)
     if args.task == "C6":
         hashes.update({"comparison-v2.json": sha(HERE / "comparison-v2.json"), "validate_c6.py": sha(HERE / "validate_c6.py")})
     handoff = all(word in answer for word in ("目的", "検証", "次"))

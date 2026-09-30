@@ -24,16 +24,27 @@ import run as harness_run
 HASH = "a" * 64
 
 
-def binding(root, fingerprint, phase):
-    return {"schema": 3, "phase": phase, "cli_version": "codex-cli 0.155.1",
-            "harness_fingerprint": fingerprint, "root_realpath": str(root.resolve()),
-            "root_device": root.stat().st_dev, "root_inode": root.stat().st_ino, "policy_template_sha256": HASH,
-            "profile_sha256": HASH if phase == "model" else "b" * 64,
-            "tool_environment": {"keys": ["PATH", "TMPDIR"], "sha256": HASH},
-            "codex_process_environment": {"keys": ["CODEX_HOME", "PATH"],
-                                          "sha256": HASH, "auth_home_location_sha256": HASH},
-            "codex_executable": {"realpath": "/usr/bin/true", "sha256": HASH},
-            "read_boundary": "pinned_cli_minimal_runtime_plus_fixture"}
+def binding(root, fingerprint, phase, task):
+    return harness_run.derive_canonical_binding(root, task, harness_run.CLI_VERSION,
+                                                fingerprint, phase=phase)
+
+
+def synthetic_preflight(spec):
+    model = spec["binding"]
+    required = harness_run.required_preflight_cases(spec)
+    cases = [{"name": name, "expected": expected,
+              "outcome": "allowed" if expected == "allow" else "sandbox_denied",
+              "exit_code": 0 if expected == "allow" else 1,
+              "command_sha256": HASH, "stdout_sha256": HASH, "stderr_sha256": HASH,
+              "binding_sha256": harness_run.canonical_digest(model)}
+             for name, expected in required.items()]
+    return {"schema": 3, "cli_version": harness_run.CLI_VERSION, "binding": model,
+            "binding_comparison": "entire_canonical_binding_equal_before_model",
+            "tool_environment_scope": "auxiliary_env_i_probe_not_actual_exec_tool",
+            "passed": True, "canaries_removed": True, "sandbox_initialized": True,
+            "postconditions": {"canary_writes_observed": True, "outside_writes_absent": True,
+                               "private_sentinel_unchanged": True, "task_file_contents_unchanged": True,
+                               "binding_unchanged": True}, "cases": cases}
 
 
 def fixtures(campaign_dir, a_seconds=100.0, b_seconds=70.0):
@@ -48,27 +59,62 @@ def fixtures(campaign_dir, a_seconds=100.0, b_seconds=70.0):
         accepted = campaign_dir / ".accepted" / run_id
         root.mkdir(parents=True, exist_ok=True)
         accepted.mkdir(parents=True, exist_ok=True)
+        task_definition = harness_run.c6_task() if task == "C6" else next(
+            item for item in harness_run.load(harness_run.BASE / "comparison.json")["tasks"]
+            if item["id"] == task)
+        model_spec = harness_run.canonical_execution_spec(root, task_definition,
+                                                          harness_run.CLI_VERSION, fingerprint, phase="model")
+        model = model_spec["binding"]
+        validator = binding(accepted, fingerprint, "validation", task_definition)
         raw = campaign_dir / ".evidence" / run_id / "events.raw.jsonl"
         raw.parent.mkdir(parents=True, exist_ok=True)
-        raw.write_bytes((run_id + "\n").encode())
+        canary = harness_run.ENV_CANARY_COMMAND
+        env_output = json.dumps(model_spec["env"], sort_keys=True)
+        events = [
+            {"type": "thread.started", "thread_id": "synthetic"},
+            {"type": "turn.started"},
+            {"type": "item.started", "item": {"type": "command_execution", "id": "env-canary",
+                                               "command": canary, "status": "in_progress"}},
+            {"type": "item.completed", "item": {"type": "command_execution", "id": "env-canary",
+                                                 "command": canary, "status": "completed", "exit_code": 0,
+                                                 "aggregated_output": env_output}},
+            {"type": "turn.completed", "usage": {"input_tokens": 1000,
+                                                 "cached_input_tokens": 500, "output_tokens": 100,
+                                                 "cache_write_input_tokens": 100, "total_tokens": 1100}},
+        ]
+        raw.write_text("".join(json.dumps(event) + "\n" for event in events), encoding="utf-8")
         raw.chmod(0o600)
         digest = hashlib.sha256(raw.read_bytes()).hexdigest()
-        model = binding(root, fingerprint, "model")
-        validator = binding(accepted, fingerprint, "validation")
+        classified = harness_run.safe_events(raw.read_text(encoding="utf-8"), expected_cwd=root,
+                                             expected_env=model_spec["env"])
+        assert classified["event_audit"]["passed"] is True
+        assert classified["env_canary_evidence"]["passed"] is True
+        preflight_path = root / ".benchmark-isolation.json"
+        batch.atomic_json(preflight_path, synthetic_preflight(model_spec))
+        preflight_sha = hashlib.sha256(harness_run.safe_read(preflight_path)).hexdigest()
         empty_digest = harness_run.canonical_digest(harness_run.tree_manifest(accepted))
         runs.append({
             "schema": 3, "campaign": campaign, "fingerprint": fingerprint,
             "run_id": run_id, "task_id": task, "condition": condition, "repeat": repeat,
-            "cli_version": "codex-cli 0.155.1", "cli_exit": 0,
+            "cli_version": harness_run.CLI_VERSION, "cli_exit": 0,
+            "preflight_evidence_relative_path": f"{run_id}/.benchmark-isolation.json",
+            "preflight_evidence_sha256": preflight_sha,
             "validation": {"exit_code": 0, "manifest_unchanged": True, "binding": validator,
                            "derived_from_model_profile_sha256": model["profile_sha256"],
                            "manifest_before_sha256": empty_digest, "manifest_after_sha256": empty_digest},
             "snapshot_evidence": {"matched": True, "before_sha256": empty_digest,
                                   "after_sha256": empty_digest, "accepted_sha256": empty_digest},
             "isolation_gate": {"status": "pass", "passed": True, "preflight_bound": True,
+                               "env_canary_pass": True, "residual_process_count": 0,
+                               "residual_scan_pass": True, "preflight_evidence_valid": True,
                                "binding": model, "preflight_binding": model},
-            "event_audit": {"status": "pass", "passed": True},
-            "attempt_policy": {"status": "pass", "passed": True},
+            "env_canary_evidence": classified["env_canary_evidence"],
+            "residual_process_evidence": {phase: {"status": "pass", "passed": True,
+                "scan_pass": True, "detected_count": 0, "kill_count": 0, "remaining_count": 0,
+                "scan_count": 2, "clean_after_scan": True, "detection_scope": "process_group_and_descendant_scan",
+                "complete_descendant_detection_claimed": False} for phase in ("model", "validation")},
+            "event_audit": classified["event_audit"],
+            "attempt_policy": classified["attempt_policy"],
             "acceptance_gate": {"status": "pass", "passed": True},
             "safety_gate": {"status": "pass", "passed": True},
             "raw_event_evidence": {"path_relative_to_campaign": f".evidence/{run_id}/events.raw.jsonl",
@@ -110,13 +156,19 @@ def refresh_evidence(summary, reviews, campaign_dir):
         review = review_by_id[run_id]
         review["source_result_sha256"] = source_sha
         review["classifier_sha256"] = classifier
-        replay = {"schema": 1, "purpose": "independent_raw_reclassification",
-                  "source_result_sha256": source_sha, "run_id": run_id,
-                  "harness_fingerprint": summary["fingerprint"], "classifier_sha256": classifier,
-                  "raw_event_sha256": record["raw_event_evidence"]["sha256"],
-                  "automatic_only": True, "independent_reviewer_judgement": "pending",
-                  "event_audit": {"status": "pass", "passed": True},
-                  "attempt_policy": record["attempt_policy"]}
+        raw_path = campaign_dir / ".evidence" / run_id / "events.raw.jsonl"
+        task = harness_run.c6_task() if record["task_id"] == "C6" else next(
+            item for item in harness_run.load(harness_run.BASE / "comparison.json")["tasks"]
+            if item["id"] == record["task_id"])
+        spec = harness_run.canonical_execution_spec(campaign_dir / run_id, task,
+                                                    harness_run.CLI_VERSION, summary["fingerprint"], phase="model")
+        replay = harness_run.safe_events(raw_path.read_text(encoding="utf-8"),
+                                         expected_cwd=campaign_dir / run_id,
+                                         expected_env=spec["env"])
+        replay.update({"schema": 1, "purpose": "independent_raw_reclassification",
+                       "source_result_sha256": source_sha, "run_id": run_id,
+                       "harness_fingerprint": summary["fingerprint"], "classifier_sha256": classifier,
+                       "automatic_only": True, "independent_reviewer_judgement": "pending"})
         replay_path = campaign_dir / ".reviews" / f"{run_id}-replay.json"
         batch.atomic_json(replay_path, replay)
         review["replay_report_sha256"] = hashlib.sha256(harness_run.safe_read(replay_path)).hexdigest()
@@ -173,6 +225,10 @@ def main():
         accepted_change.write_text("tampered", encoding="utf-8")
         assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
         accepted_change.unlink()
+        late_answer = campaign_dir / ".accepted" / first["run_id"] / ".benchmark-answer.txt"
+        late_answer.write_text("late change", encoding="utf-8")
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        late_answer.unlink()
         old_fingerprint = summary["fingerprint"]
         summary["fingerprint"] = reviews["fingerprint"] = old_fingerprint[:16] + "0" * 48
         try:
@@ -183,19 +239,46 @@ def main():
             raise AssertionError("旧fingerprintの採用を拒否しなかった")
         summary["fingerprint"] = reviews["fingerprint"] = old_fingerprint
 
-        original = summary["results"][0]["attempt_policy"]
-        summary["results"][0]["attempt_policy"] = {"status": "unknown", "passed": False}
-        summary["results"][0]["safety_gate"] = {"status": "fail", "passed": False}
+        first = summary["results"][0]
+        first_raw = campaign_dir / ".evidence" / first["run_id"] / "events.raw.jsonl"
+        original_raw = first_raw.read_bytes()
+        original_event, original_attempt = first["event_audit"], first["attempt_policy"]
+        unknown_events = [json.loads(line) for line in original_raw.splitlines()]
+        unknown_events[-1:-1] = [
+            {"type": "item.started", "item": {"type": "command_execution", "id": "cmd1",
+                                               "command": "python3 -c 'print(1)'", "status": "in_progress"}},
+            {"type": "item.completed", "item": {"type": "command_execution", "id": "cmd1",
+                                                 "command": "python3 -c 'print(1)'", "status": "completed",
+                                                 "exit_code": 0, "aggregated_output": "1"}},
+        ]
+        first_raw.write_text("".join(json.dumps(event) + "\n" for event in unknown_events), encoding="utf-8")
+        first_raw.chmod(0o600)
+        spec = harness_run.canonical_execution_spec(campaign_dir / first["run_id"],
+                                                    analyze._task_for_record(first), harness_run.CLI_VERSION,
+                                                    summary["fingerprint"], phase="model")
+        classified = harness_run.safe_events(first_raw.read_text(encoding="utf-8"),
+                                             expected_cwd=campaign_dir / first["run_id"],
+                                             expected_env=spec["env"])
+        assert classified["event_audit"]["passed"] is True
+        assert classified["attempt_policy"]["status"] == "unknown"
+        first["event_audit"] = classified["event_audit"]
+        first["attempt_policy"] = classified["attempt_policy"]
+        first["env_canary_evidence"] = classified["env_canary_evidence"]
+        first["safety_gate"] = {"status": "fail", "passed": False}
+        first["raw_event_evidence"]["sha256"] = reviews["reviews"][0]["raw_event_sha256"] = hashlib.sha256(first_raw.read_bytes()).hexdigest()
         refresh_evidence(summary, reviews, campaign_dir)
         resolved = decide(summary, preflight, reviews, campaign_dir)
         assert resolved["decision"] == "adopt"
         assert resolved["run_results"][0]["independently_resolved_unknown"] is True
-        assert batch.stop_reason(summary["results"][0]) is None
-        summary["results"][0]["attempt_policy"] = {"status": "fail", "passed": False}
+        assert batch.stop_reason(first) is None
+        first["attempt_policy"] = {"status": "fail", "passed": False}
         refresh_evidence(summary, reviews, campaign_dir)
         assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
-        summary["results"][0]["attempt_policy"] = original
-        summary["results"][0]["safety_gate"] = {"status": "pass", "passed": True}
+        first_raw.write_bytes(original_raw)
+        first_raw.chmod(0o600)
+        first["event_audit"], first["attempt_policy"] = original_event, original_attempt
+        first["safety_gate"] = {"status": "pass", "passed": True}
+        first["raw_event_evidence"]["sha256"] = reviews["reviews"][0]["raw_event_sha256"] = hashlib.sha256(original_raw).hexdigest()
         refresh_evidence(summary, reviews, campaign_dir)
 
         raw = campaign_dir / ".evidence" / summary["results"][0]["run_id"] / "events.raw.jsonl"
@@ -217,6 +300,24 @@ def main():
         reviews["reviews"][0]["attempt_policy_pass"] = False
         assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
         reviews["reviews"][0]["attempt_policy_pass"] = True
+        invalid_raw = raw.read_bytes()
+        raw.write_bytes(b"not-json\n")
+        raw.chmod(0o600)
+        first = summary["results"][0]
+        first["raw_event_evidence"]["sha256"] = reviews["reviews"][0]["raw_event_sha256"] = hashlib.sha256(raw.read_bytes()).hexdigest()
+        refresh_evidence(summary, reviews, campaign_dir)
+        replay_path = campaign_dir / ".reviews" / f"{first['run_id']}-replay.json"
+        forged = json.loads(harness_run.safe_read(replay_path))
+        forged["event_audit"] = first["event_audit"]
+        forged["attempt_policy"] = first["attempt_policy"]
+        forged["env_canary_evidence"] = first["env_canary_evidence"]
+        batch.atomic_json(replay_path, forged)
+        reviews["reviews"][0]["replay_report_sha256"] = hashlib.sha256(harness_run.safe_read(replay_path)).hexdigest()
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        raw.write_bytes(invalid_raw)
+        raw.chmod(0o600)
+        first["raw_event_evidence"]["sha256"] = reviews["reviews"][0]["raw_event_sha256"] = hashlib.sha256(raw.read_bytes()).hexdigest()
+        refresh_evidence(summary, reviews, campaign_dir)
 
         model = summary["results"][0]["isolation_gate"]["binding"]
         old_tool = model.pop("tool_environment")
@@ -231,6 +332,55 @@ def main():
         derived = validation.pop("derived_from_model_profile_sha256")
         assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
         validation["derived_from_model_profile_sha256"] = derived
+        refresh_evidence(summary, reviews, campaign_dir)
+
+        first = summary["results"][0]
+        isolation = first["isolation_gate"]
+        canonical_model = isolation["binding"]
+        preflight_path = campaign_dir / first["run_id"] / ".benchmark-isolation.json"
+        original_preflight = harness_run.safe_read(preflight_path)
+        forged_model = dict(canonical_model)
+        forged_model["codex_executable"] = {"realpath": "/usr/bin/true", "sha256": HASH}
+        isolation["binding"] = isolation["preflight_binding"] = forged_model
+        forged_preflight = json.loads(original_preflight)
+        forged_preflight["binding"] = forged_model
+        for case in forged_preflight["cases"]:
+            case["binding_sha256"] = harness_run.canonical_digest(forged_model)
+        batch.atomic_json(preflight_path, forged_preflight)
+        first["preflight_evidence_sha256"] = hashlib.sha256(harness_run.safe_read(preflight_path)).hexdigest()
+        refresh_evidence(summary, reviews, campaign_dir)
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        forged_model["codex_executable"] = canonical_model["codex_executable"]
+        forged_model["tool_environment"] = {"keys": ["PATH"], "sha256": HASH}
+        batch.atomic_json(preflight_path, forged_preflight)
+        first["preflight_evidence_sha256"] = hashlib.sha256(harness_run.safe_read(preflight_path)).hexdigest()
+        refresh_evidence(summary, reviews, campaign_dir)
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        isolation["binding"] = isolation["preflight_binding"] = canonical_model
+        preflight_path.write_bytes(original_preflight)
+        preflight_path.chmod(0o600)
+        first["preflight_evidence_sha256"] = hashlib.sha256(original_preflight).hexdigest()
+        refresh_evidence(summary, reviews, campaign_dir)
+
+        damaged_preflight = json.loads(original_preflight)
+        damaged_preflight["cases"] = [case for case in damaged_preflight["cases"]
+                                       if case["name"] != "network_connect"]
+        batch.atomic_json(preflight_path, damaged_preflight)
+        first["preflight_evidence_sha256"] = hashlib.sha256(harness_run.safe_read(preflight_path)).hexdigest()
+        refresh_evidence(summary, reviews, campaign_dir)
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        preflight_path.write_bytes(original_preflight)
+        preflight_path.chmod(0o600)
+        first["preflight_evidence_sha256"] = hashlib.sha256(original_preflight).hexdigest()
+        refresh_evidence(summary, reviews, campaign_dir)
+        isolation["env_canary_pass"] = False
+        refresh_evidence(summary, reviews, campaign_dir)
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        isolation["env_canary_pass"] = True
+        first["residual_process_evidence"]["model"]["remaining_count"] = 1
+        refresh_evidence(summary, reviews, campaign_dir)
+        assert decide(summary, preflight, reviews, campaign_dir)["decision"] != "adopt"
+        first["residual_process_evidence"]["model"]["remaining_count"] = 0
         refresh_evidence(summary, reviews, campaign_dir)
 
         for record in summary["results"]:
