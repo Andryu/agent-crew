@@ -6,16 +6,17 @@ import json
 import os
 from pathlib import Path
 import signal
+import stat
 import subprocess
 import sys
-import tempfile
 import time
 
-from harness_fingerprint import compute_harness_fingerprint
+from harness_fingerprint import (compute_harness_fingerprint, compute_python_runtime_binding,
+                                 compute_codex_executable_binding, formal_base)
 import run as harness_run
 
 HERE = Path(__file__).resolve().parent
-WORK = Path("/private/tmp/agent-crew-p5-benchmark/formal")
+WORK = formal_base() / "formal"
 TASKS = ["C1", "C2", "C3", "C4", "C5", "C6"]
 LIMIT_SECONDS = 120 * 60
 RETENTION_DAYS = 14
@@ -36,62 +37,85 @@ def scheduled_runs():
 def load_or_create_mapping(path, campaign, fingerprint):
     mapping = {"schema": 1, "campaign": campaign, "fingerprint": fingerprint,
                "runs": scheduled_runs()}
-    if path.exists():
-        _reject_symlink(path)
-        if json.loads(path.read_text(encoding="utf-8")) != mapping:
+    if os.path.lexists(path):
+        if json.loads(harness_run.safe_read(path)) != mapping:
             raise ValueError("run slot mappingが現行schedule/fingerprintと不一致")
     else:
         atomic_json(path, mapping)
     return mapping["runs"]
 
 
-def _reject_symlink(path):
-    """既存の対象・親directoryがsymlinkなら保存を止める。"""
-    current = Path(path)
-    for parent in (current, *current.parents):
-        if os.path.lexists(parent) and parent.is_symlink():
-            raise RuntimeError(f"symlink pathへの書込みを拒否: {parent}")
-
-
 def secure_mkdir(path):
-    """campaign階層を0700で作成し、既存symlinkを拒否する。"""
+    """fdを介して0700のprivate directoryを作成・確認する。"""
     path = Path(path)
-    _reject_symlink(path)
-    path.mkdir(parents=True, exist_ok=True)
-    if path.is_symlink():
-        raise RuntimeError(f"symlink campaign directory: {path}")
-    path.chmod(0o700)
+    fd = harness_run._open_directory(path, create=True)
+    try:
+        info = os.fstat(fd)
+        if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+            raise RuntimeError(f"private directoryのowner/modeが不正です: {path}")
+    finally:
+        os.close(fd)
     return path
 
 
 def atomic_json(path, value):
-    """0600 JSONを同一directory内の一時fileから原子的に保存する。"""
+    """検証したdirectory fdとO_NOFOLLOWを用いて0600 JSONを保存する。"""
     path = Path(path)
-    _reject_symlink(path)
     secure_mkdir(path.parent)
-    if os.path.lexists(path) and path.is_symlink():
-        raise RuntimeError(f"symlink JSONを上書きしません: {path}")
     payload = (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode()
-    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
-    temporary_path = Path(temporary)
+    harness_run._write_private(path, payload)
+    directory_fd = harness_run._open_directory(path.parent)
     try:
-        os.fchmod(fd, 0o600)
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        if os.path.lexists(path) and path.is_symlink():
-            raise RuntimeError(f"symlink JSONを上書きしません: {path}")
-        os.replace(temporary_path, path)
-        path.chmod(0o600)
-        directory_fd = os.open(path.parent, os.O_RDONLY)
+        file_fd = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd)
         try:
-            os.fsync(directory_fd)
+            info = os.fstat(file_fd)
+            if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or
+                    info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600):
+                raise RuntimeError("保存したJSONのtype/owner/modeが不正です")
+            os.fsync(file_fd)
         finally:
-            os.close(directory_fd)
-    except BaseException:
-        temporary_path.unlink(missing_ok=True)
-        raise
+            os.close(file_fd)
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def remove_private_file(path):
+    """検証したprivate directory fdから通常fileだけを消す。"""
+    path = Path(path)
+    directory_fd = harness_run._open_directory(path.parent)
+    try:
+        info = os.stat(path.name, dir_fd=directory_fd, follow_symlinks=False)
+        if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or
+                info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600):
+            raise RuntimeError("削除対象のtype/owner/modeが不正です")
+        os.unlink(path.name, dir_fd=directory_fd)
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def campaign_binding(campaign_dir, fingerprint, python_runtime, codex_executable):
+    """開始時のCLI/runtimeとprivate directory identityを固定する。"""
+    value = {"schema": 1, "fingerprint": fingerprint,
+             "codex_executable": codex_executable, "python_runtime": python_runtime,
+             "private_directories": harness_run.private_directory_identity(campaign_dir)}
+    value["binding_sha256"] = harness_run.canonical_digest(value)
+    return value
+
+
+def require_campaign_binding(campaign_dir, expected):
+    """preflight/run起動境界で固定値と保存file・現物を再照合する。"""
+    harness_run.require_formal_locations(WORK, campaign_dir)
+    binding_file = campaign_dir / "campaign-binding.json"
+    saved = harness_run.load_campaign_binding(binding_file, campaign_dir, expected["fingerprint"])["record"]
+    if saved != expected:
+        raise RuntimeError("campaign binding fileが開始時期待値と不一致")
+    current = campaign_binding(campaign_dir, expected["fingerprint"],
+                               compute_python_runtime_binding(), compute_codex_executable_binding())
+    if current != expected:
+        raise RuntimeError("campaign runtime/CLI/private directory identityが変更されました")
+    return binding_file
 
 
 def private_artifact_policy(campaign, fingerprint, campaign_dir, now=None):
@@ -101,7 +125,7 @@ def private_artifact_policy(campaign, fingerprint, campaign_dir, now=None):
         "campaign": campaign,
         "fingerprint": fingerprint,
         "classification": "private",
-        "storage": "private_tmp_only",
+        "storage": "account_home_cache_only",
         "campaign_dir": str(campaign_dir),
         "raw_artifacts": {
             "prompt": "private_only",
@@ -167,9 +191,8 @@ def stop_reason(record):
 
 def load_clock(path, fingerprint, now=None):
     now = time.time() if now is None else now
-    if path.exists():
-        _reject_symlink(path)
-        clock = json.loads(path.read_text(encoding="utf-8"))
+    if os.path.lexists(path):
+        clock = json.loads(harness_run.safe_read(path))
         if clock.get("fingerprint") != fingerprint:
             raise ValueError("campaign clock fingerprint不一致")
         return clock
@@ -238,11 +261,15 @@ def wait_private_process(command, cwd, campaign_dir, label, timeout):
             "automatic_termination": False}
 
 
-def require_preflight(campaign_dir):
+def require_preflight(campaign_dir, expected_binding):
     """正常終了したpreflightだけを読み、不合格・timeoutならmodelを開始させない。"""
     preflight_file = campaign_dir / "sandbox-preflight.json"
-    execution = wait_private_process([sys.executable, "-B", str(HERE / "sandbox_preflight.py")],
+    binding_file = require_campaign_binding(campaign_dir, expected_binding)
+    execution = wait_private_process([sys.executable, "-B", str(HERE / "sandbox_preflight.py"),
+                                      "--expected-binding-file", str(binding_file),
+                                      "--fingerprint", expected_binding["fingerprint"]],
                                      HERE, campaign_dir, "preflight", 315)
+    require_campaign_binding(campaign_dir, expected_binding)
     if execution["exit_code"] != 0:
         atomic_json(preflight_file, {"passed": False, "infrastructure_error": "preflight_execution_failed",
                                      "process_execution": execution})
@@ -263,6 +290,11 @@ def _main():
     os.umask(0o077)
     signal.signal(signal.SIGTERM, interrupt_handler)
     signal.signal(signal.SIGINT, interrupt_handler)
+    if WORK != formal_base() / "formal":
+        raise SystemExit("formal campaignの固定保存先が変更されました")
+    harness_run.require_formal_locations(WORK)
+    harness_run.prepare_formal_base()
+    secure_mkdir(WORK)
     contracts = [HERE / f"b-contract/{repo}/AGENTS.md" for repo in ("agent_crew", "wealth_advisor")]
     skill = HERE / "b-contract/agent_crew/.agents/skills/fable-class/SKILL.md"
     b_index = HERE / "b-contract-index.json"
@@ -281,22 +313,36 @@ def _main():
                 for path in a_tree.rglob("*") if path.is_file()}
     if a_fixed != a_actual or any(path.is_symlink() for path in a_tree.rglob("*")):
         raise SystemExit("A補足指示treeが固定indexと不一致")
-    fingerprint = compute_harness_fingerprint(HERE)
+    python_runtime = compute_python_runtime_binding()
+    codex_executable = compute_codex_executable_binding()
+    fingerprint = compute_harness_fingerprint(HERE, python_runtime_binding=python_runtime,
+                                              codex_executable_binding=codex_executable)
     campaign = f"p5-{fingerprint[:16]}"
-    secure_mkdir(WORK)
     campaign_dir = secure_mkdir(WORK / campaign)
+    expected_binding = campaign_binding(campaign_dir, fingerprint, python_runtime, codex_executable)
+    binding_file = campaign_dir / "campaign-binding.json"
+    if os.path.lexists(binding_file):
+        if json.loads(harness_run.safe_read(binding_file)) != expected_binding:
+            raise SystemExit("既存campaign bindingが開始時期待値と不一致")
+    else:
+        atomic_json(binding_file, expected_binding)
+    require_campaign_binding(campaign_dir, expected_binding)
     active = campaign_dir / "active-run.json"
     if os.path.lexists(active):
         raise SystemExit("active operation markerが残存。子run rootを読まず自動再開を拒否します")
     policy_file = campaign_dir / "private-artifact-policy.json"
-    if not policy_file.exists():
+    if not os.path.lexists(policy_file):
         atomic_json(policy_file, private_artifact_policy(campaign, fingerprint, campaign_dir))
-    elif policy_file.is_symlink():
-        raise SystemExit(f"private artifact policyがsymlinkです: {policy_file}")
+    else:
+        policy = json.loads(harness_run.safe_read(policy_file))
+        if (policy.get("campaign") != campaign or policy.get("fingerprint") != fingerprint
+                or policy.get("campaign_dir") != str(campaign_dir)
+                or policy.get("storage") != "account_home_cache_only"):
+            raise SystemExit("既存private artifact policyがcampaignと不一致")
     clock_file = campaign_dir / "campaign-clock.json"
     clock = load_clock(clock_file, fingerprint)
     summary_file = campaign_dir / "batch-summary.json"
-    previous = json.loads(summary_file.read_text(encoding="utf-8")) if summary_file.exists() else None
+    previous = json.loads(harness_run.safe_read(summary_file)) if os.path.lexists(summary_file) else None
     if previous and previous.get("fingerprint") != fingerprint:
         raise SystemExit("campaign fingerprint不一致。別campaignとして実行してください")
     if previous and previous.get("stopped_reason"):
@@ -305,14 +351,19 @@ def _main():
     results = []
     stopped_reason = None
     atomic_json(active, {"phase": "preflight", "campaign": campaign,
-                         "fingerprint": fingerprint, "started_epoch": time.time()})
+                         "fingerprint": fingerprint, "campaign_binding_file": str(binding_file),
+                         "campaign_binding_sha256": expected_binding["binding_sha256"],
+                         "codex_executable": codex_executable, "started_epoch": time.time()})
     try:
-        require_preflight(campaign_dir)
+        require_preflight(campaign_dir, expected_binding)
         preliminary = {"schema": 2, "campaign": campaign, "fingerprint": fingerprint,
+                       "campaign_binding_file": str(binding_file),
+                       "campaign_binding_sha256": expected_binding["binding_sha256"],
+                       "codex_executable": codex_executable,
                        "planned_runs": len(schedule), "completed_records": 0,
                        "schedule": schedule, "results": [], "stopped_reason": None}
         atomic_json(summary_file, preliminary)
-        active.unlink()
+        remove_private_file(active)
     except (PreflightFailure, BatchSignal, Exception) as exc:
         stopped_reason = "preflight_failure" if isinstance(exc, PreflightFailure) else "infrastructure_error"
     for slot in schedule if stopped_reason is None else []:
@@ -322,9 +373,10 @@ def _main():
         if remaining < 70:
             stopped_reason = "campaign_deadline"
             break
+        require_campaign_binding(campaign_dir, expected_binding)
         run_file = campaign_dir / run_id / ".benchmark-result.json"
         if run_file.exists():
-            recorded = json.loads(run_file.read_text(encoding="utf-8"))
+            recorded = json.loads(harness_run.safe_read(run_file))
             if not record_matches_slot(recorded, campaign, fingerprint, slot):
                 raise SystemExit(f"resume不一致: {run_file}")
             results.append(recorded)
@@ -341,13 +393,19 @@ def _main():
             break
         atomic_json(active, {"phase": "run", "task": task, "condition": condition,
                              "repeat": repeat, "run_id": run_id, "started_epoch": time.time(),
-                             "campaign": campaign, "fingerprint": fingerprint})
+                             "campaign": campaign, "fingerprint": fingerprint,
+                             "campaign_binding_file": str(binding_file),
+                             "campaign_binding_sha256": expected_binding["binding_sha256"],
+                             "codex_executable": codex_executable})
         try:
+            require_campaign_binding(campaign_dir, expected_binding)
             execution = wait_private_process(
                 [sys.executable, "-B", str(HERE / "run.py"), task, condition, str(repeat), "--run-id", run_id,
                  "--campaign", str(campaign_dir), "--fingerprint", fingerprint,
+                 "--expected-binding-file", str(binding_file),
                  "--deadline-epoch", str(clock["deadline_epoch"])],
                 HERE.parents[2], campaign_dir, run_id, min(315, max(1, remaining)))
+            require_campaign_binding(campaign_dir, expected_binding)
             code = execution["exit_code"]
             if code == 0:
                 if run_file.exists():
@@ -373,6 +431,9 @@ def _main():
         print(f"{task} {condition}{repeat}: {results[-1].get('pass_preliminary', 'infra_error')}", flush=True)
         stopped_reason = stop_reason(record)
         summary = {"schema": 2, "campaign": campaign, "fingerprint": fingerprint,
+                   "campaign_binding_file": str(binding_file),
+                   "campaign_binding_sha256": expected_binding["binding_sha256"],
+                   "codex_executable": codex_executable,
                    "planned_runs": len(schedule), "completed_records": len(results),
                    "elapsed_seconds": round(time.time() - clock["started_epoch"], 3),
                    "schedule": schedule, "run_slot_mapping_file": str(campaign_dir / "run-slot-mapping.json"),
@@ -381,14 +442,17 @@ def _main():
         summary["clock_file"] = str(clock_file)
         summary["active_file"] = str(active)
         summary["private_artifact_policy_file"] = str(policy_file)
-        summary["aggregate_policy"] = json.loads(policy_file.read_text(encoding="utf-8"))["aggregate"]
+        summary["aggregate_policy"] = json.loads(harness_run.safe_read(policy_file))["aggregate"]
         atomic_json(summary_file, summary)
         if stopped_reason is None:
-            active.unlink()
+            remove_private_file(active)
         if stopped_reason:
             break
     summary = {"schema": 2, "planned_runs": len(schedule), "completed_records": len(results),
                "campaign": campaign, "fingerprint": fingerprint,
+               "campaign_binding_file": str(binding_file),
+               "campaign_binding_sha256": expected_binding["binding_sha256"],
+               "codex_executable": codex_executable,
                "elapsed_seconds": round(time.time() - clock["started_epoch"], 3),
                "B_contract_sha256": {contract.parent.name: hashlib.sha256(contract.read_bytes()).hexdigest()
                                      for contract in contracts},
@@ -399,7 +463,7 @@ def _main():
     summary["clock_file"] = str(clock_file)
     summary["active_file"] = str(campaign_dir / "active-run.json")
     summary["private_artifact_policy_file"] = str(policy_file)
-    summary["aggregate_policy"] = json.loads(policy_file.read_text(encoding="utf-8"))["aggregate"]
+    summary["aggregate_policy"] = json.loads(harness_run.safe_read(policy_file))["aggregate"]
     atomic_json(summary_file, summary)
     print(f"summary: {summary_file}", flush=True)
 

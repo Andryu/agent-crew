@@ -211,13 +211,14 @@ def batch_process_control_tests(parent):
     Path.exists, Path.read_text, harness_run.safe_read = guarded_exists, guarded_text, guarded_safe_read
     try:
         for mode in ("preflight_timeout", "preflight_signal", "preflight_before_launch_signal", "preflight_success_run_timeout", "run_timeout", "run_nonzero", "run_signal", "run_before_popen_signal", "run_popen_signal", "run_after_wait_signal", "summary_signal", "normal"):
-            work = parent / mode
+            work = parent / mode / "formal"
+            work.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             launches = []
             state.update(forbidden_root=None, locked=False, run_waited=False, summary_interrupted=False)
             batch.WORK = work
             batch.scheduled_runs = lambda: all_slots[:1 if mode == "normal" else 2]
             preflight_calls = []
-            def synthetic_preflight_call(_campaign):
+            def synthetic_preflight_call(_campaign, _expected_binding):
                 preflight_calls.append(True)
                 if mode == "preflight_before_launch_signal":
                     raise batch.BatchSignal(15)
@@ -462,13 +463,13 @@ def _synthetic_main():
         incomplete_reviews = {**reviews, "reviews": [reviews["reviews"][0]]}
         assert decide(incomplete_summary, preflight, incomplete_reviews, campaign_dir)["decision"] == "incomplete"
         assert batch.stop_reason(first) == "attempt_policy_not_pass"
-        batch_work = Path(temporary) / "batch-stop"
+        batch_work = Path(temporary) / "batch-stop/formal"
         first_file = batch_work / summary["campaign"] / first["run_id"] / ".benchmark-result.json"
         batch.atomic_json(first_file, first)
         original_work, original_preflight, original_subprocess = batch.WORK, batch.require_preflight, batch.subprocess
         try:
             batch.WORK = batch_work
-            batch.require_preflight = lambda _campaign_dir: None
+            batch.require_preflight = lambda _campaign_dir, _expected_binding: None
             def unexpected_model_start(*_args, **_kwargs):
                 raise AssertionError("unknown後に次runを起動した")
             batch.subprocess = SimpleNamespace(Popen=unexpected_model_start)
@@ -643,6 +644,7 @@ def _synthetic_main():
 
 
 def main():
+    os.umask(0o077)
     # 実runtimeの型・bytes・改変検知はsecurity selftestが担当する。
     # ここでは開始時の実bindingを一度確認し、合成24runの集計契約だけを検証する。
     # productionの毎phase再hashを変更せず、test内の差替えは終了時に戻す。
@@ -650,15 +652,31 @@ def main():
     frozen_json = json.dumps(actual_runtime, sort_keys=True)
     original_shared = fingerprint_module.compute_python_runtime_binding
     original_runner = harness_run.compute_python_runtime_binding
+    original_locations = harness_run.require_formal_locations
+    original_source = harness_run.require_source_directory
+    original_base = harness_run.prepare_formal_base
+    original_batch_base = batch.formal_base
+    original_batch_runtime = batch.compute_python_runtime_binding
     def frozen_runtime():
         return json.loads(frozen_json)
     try:
         fingerprint_module.compute_python_runtime_binding = frozen_runtime
         harness_run.compute_python_runtime_binding = frozen_runtime
+        # 集計の合成caseはprivate tmpに置く。正式配置guardはsecurity selftestで検証する。
+        harness_run.require_formal_locations = lambda *_args: None
+        harness_run.require_source_directory = lambda: None
+        harness_run.prepare_formal_base = lambda: batch.WORK.parent
+        batch.formal_base = lambda: batch.WORK.parent
+        batch.compute_python_runtime_binding = frozen_runtime
         _synthetic_main()
     finally:
         fingerprint_module.compute_python_runtime_binding = original_shared
         harness_run.compute_python_runtime_binding = original_runner
+        harness_run.require_formal_locations = original_locations
+        harness_run.require_source_directory = original_source
+        harness_run.prepare_formal_base = original_base
+        batch.formal_base = original_batch_base
+        batch.compute_python_runtime_binding = original_batch_runtime
 
 
 if __name__ == "__main__":

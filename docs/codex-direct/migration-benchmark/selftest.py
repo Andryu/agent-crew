@@ -15,6 +15,8 @@ import sys
 import tempfile
 import time
 import tomllib
+import fnmatch
+from unittest.mock import patch
 from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
@@ -22,8 +24,14 @@ SPEC = importlib.util.spec_from_file_location("p5_run", HERE / "run.py")
 runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
 import sandbox_preflight as preflight
-from harness_fingerprint import HARNESS_INPUTS, compute_harness_fingerprint
+from harness_fingerprint import HARNESS_INPUTS
 import harness_fingerprint as fingerprint_module
+
+
+def compute_harness_fingerprint(here, **kwargs):
+    # 合成CLIを使う統合caseでは、campaignも同じ合成実体へbindingする。
+    kwargs.setdefault("codex_executable_binding", runner.compute_codex_executable_binding(runner.CODEX_EXECUTABLE))
+    return fingerprint_module.compute_harness_fingerprint(here, **kwargs)
 
 FAKE = '''#!/usr/bin/env python3.12
 import json,os,pathlib,shlex,subprocess,sys,time,tomllib
@@ -609,6 +617,22 @@ def clean_process_evidence(_token):
             "complete_descendant_detection_claimed": False}
 
 
+def run_synthetic(args):
+    """正式path契約を保ち、合成caseごとのprivate WORKにだけ差し替える。"""
+    campaign = Path(args.campaign)
+    path = campaign / "campaign-binding.json"
+    if not path.exists():
+        value = {"schema": 1, "fingerprint": args.fingerprint,
+                 "codex_executable": runner.compute_codex_executable_binding(runner.CODEX_EXECUTABLE),
+                 "python_runtime": fingerprint_module.compute_python_runtime_binding(),
+                 "private_directories": runner.private_directory_identity(campaign)}
+        value["binding_sha256"] = runner.canonical_digest(value)
+        runner.save(path, value)
+    args.expected_binding_file = path
+    with patch.object(runner, "WORK", campaign.parent):
+        return runner.run(args)
+
+
 def integration_test(root):
     root.mkdir()
     fake = root / "codex"
@@ -630,7 +654,7 @@ def integration_test(root):
         args = SimpleNamespace(task=task, condition="A", repeat=1, run_id=f"run-{serial:02}", campaign=str(campaign), fingerprint=fingerprint)
         with contextlib.redirect_stdout(io.StringIO()):
             try:
-                runner.run(args)
+                run_synthetic(args)
             except SystemExit as error:
                 assert expected_exit is not None and error.code == expected_exit
             else:
@@ -706,7 +730,7 @@ def integration_test(root):
         runner._write_private(raw, raw_original + b"\n")
         expect_rejected(lambda: runner.reclassify_result(result_path))
         runner._write_private(raw, raw_original)
-        expect_rejected(lambda: runner.run(args))
+        expect_rejected(lambda: run_synthetic(args))
         _, unknown, unknown_path = invoke(mode="unknown")
         assert unknown["attempt_policy"]["status"] == "unknown" and not unknown["pass_preliminary"]
         assert unknown["acceptance_gate"]["passed"] and runner.reclassify_result(unknown_path)["attempt_policy"]["status"] == "unknown"
@@ -788,7 +812,8 @@ def immediate_abort_test(root):
     try:
         for phase in ("model", "validation"):
             for outcome in ("timeout", "signal:15", 1, "residual", "scan_error", "scan_exception"):
-                campaign = root / (phase + "-" + str(outcome).replace(":", "-"))
+                campaign = root / (phase + "-" + str(outcome).replace(":", "-")) / ("p5-" + fingerprint[:16])
+                runner.private_directory_identity(campaign, create=True)
                 model_root, accepted_root = campaign / "run-01", campaign / ".accepted/run-01"
                 args = SimpleNamespace(task="C1", condition="A", repeat=1, run_id="run-01",
                                        campaign=str(campaign), fingerprint=fingerprint)
@@ -822,7 +847,7 @@ def immediate_abort_test(root):
                     runner.execute_command, runner.scan_residual_processes = execute, scan
                     with contextlib.redirect_stdout(io.StringIO()):
                         try:
-                            runner.run(args)
+                            run_synthetic(args)
                         except SystemExit as error:
                             assert error.code == 1
                         else:
@@ -838,6 +863,152 @@ def immediate_abort_test(root):
     finally:
         runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.execute_command, runner.scan_residual_processes = originals
     print("run abort: model+validator timeout/signal/nonzero/residual/scan-error; no root helper/audit/result after outcome OK (mock)", flush=True)
+
+
+def campaign_destination_test(root):
+    root.mkdir()
+    fingerprint = "a" * 64
+    work = root / "formal"
+    campaign = work / ("p5-" + fingerprint[:16])
+    runner.private_directory_identity(campaign, create=True)
+    alt = root / "alternate" / campaign.name
+    directories = runner.private_directory_identity(alt, create=True)
+    value = {"schema": 1, "fingerprint": fingerprint, "codex_executable": {},
+             "python_runtime": {}, "private_directories": directories}
+    value["binding_sha256"] = runner.canonical_digest(value)
+    runner.save(alt / "campaign-binding.json", value)
+    assert runner.load_campaign_binding(alt / "campaign-binding.json", alt, fingerprint)["record"] == value
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("不正campaignからCLI/fixture/modelを開始した")
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch.object(runner, "WORK", work))
+        stack.enter_context(patch.object(runner, "compute_harness_fingerprint", lambda *_args, **_kwargs: fingerprint))
+        stack.enter_context(patch.object(runner, "compute_python_runtime_binding", lambda: {}))
+        stack.enter_context(patch.object(runner, "compute_codex_executable_binding", lambda *_args: {}))
+        for name in ("prepare", "run_trusted_command", "execute_command"):
+            stack.enter_context(patch.object(runner, name, forbidden))
+        for destination, binding in (
+            (runner.account_home() / "Library/Caches/alternate" / campaign.name, alt / "campaign-binding.json"),
+            (campaign.name, Path(campaign.name) / "campaign-binding.json"),
+            (alt, alt / "campaign-binding.json"),
+            (campaign, alt / "campaign-binding.json"),
+            (str(work) + "/../formal/" + campaign.name, campaign / "campaign-binding.json"),
+            (campaign, None),
+        ):
+            args = SimpleNamespace(campaign=destination, fingerprint=fingerprint, run_id="run-01", expected_binding_file=binding)
+            expect_rejected(lambda: runner._run(args))
+        # 正しい文字列でも、正式directory componentのsymlinkを許可しない。
+        alias_work = root / "formal-alias"
+        alias_work.symlink_to(work)
+        with patch.object(runner, "WORK", alias_work):
+            args = SimpleNamespace(campaign=alias_work / campaign.name, fingerprint=fingerprint, run_id="run-01",
+                                   expected_binding_file=alias_work / campaign.name / "campaign-binding.json")
+            expect_rejected(lambda: runner._run(args))
+    assert not (campaign / "run-01").exists() and not (alt / "run-01").exists()
+    print("campaign destination: non-temp alternate/relative/self-signed binding/alias/binding path reject before CLI+fixture OK", flush=True)
+
+
+def directory_completion_abort_test(root):
+    root.mkdir()
+    fake = root / "codex"
+    runner._write_private(fake, FAKE, 0o700)
+    original_identity = runner.private_directory_identity
+    with patch.object(runner, "CODEX_EXECUTABLE", str(fake)), patch.object(runner, "per_run_preflight", fake_preflight_report), \
+            patch.object(runner, "scan_residual_processes", clean_process_evidence):
+        fingerprint = compute_harness_fingerprint(HERE)
+        for phase in ("model", "validation"):
+            for replaced in ("root", "parent", "campaign"):
+                campaign = root / (phase + "-" + replaced) / ("p5-" + fingerprint[:16])
+                original_identity(campaign, create=True)
+                model, accepted = campaign / "run-01", campaign / ".accepted/run-01"
+                args = SimpleNamespace(task="C1", condition="A", repeat=1, run_id="run-01", campaign=str(campaign), fingerprint=fingerprint)
+                state, identities, visited = {"done": False}, {}, []
+                target = model if phase == "model" else accepted
+                with forbid_after_outcome([model, accepted]) as activate:
+                    def identity(path, *positional, **kwargs):
+                        path = Path(path)
+                        if not state["done"]:
+                            result = original_identity(path, *positional, **kwargs)
+                            identities[path] = json.loads(json.dumps(result))
+                            return result
+                        visited.append(path)
+                        result = json.loads(json.dumps(identities[path]))
+                        if (replaced == "campaign" and path == campaign) or (replaced != "campaign" and path == target):
+                            result["root" if replaced == "campaign" else replaced]["inode"] += 1
+                        return result
+                    def execute(_command, execution_root, env, *_args, **_kwargs):
+                        current_phase = "validation" if execution_root.parent.name == ".accepted" else "model"
+                        if current_phase == phase:
+                            state["done"] = True
+                            activate()
+                            return 0, "unadopted normal process output", ""
+                        runner._write_private(execution_root / ".benchmark-answer.txt", "目的 検証 次")
+                        events = event_stream(runner.ENV_CANARY_COMMAND)
+                        events[3]["item"]["aggregated_output"] = json.dumps({key: value for key, value in env.items() if key != "CODEX_HOME"})
+                        return 0, "\n".join(json.dumps(event) for event in events), ""
+                    with patch.object(runner, "private_directory_identity", identity), patch.object(runner, "execute_command", execute):
+                        try:
+                            with contextlib.redirect_stdout(io.StringIO()):
+                                run_synthetic(args)
+                        except SystemExit as error:
+                            assert error.code == 1
+                        else:
+                            raise AssertionError("正常終了後のdirectory差替えを採用した")
+                assert target in visited and (replaced != "campaign" or campaign in visited)
+                assert not (model / ".benchmark-result.json").exists()
+                if phase == "model":
+                    assert not accepted.exists()
+                    assert not (campaign / ".evidence/run-01/events.raw.jsonl").exists()
+                    assert not (model / ".benchmark-events.json").exists()
+                diagnostic = campaign / ".evidence/run-01" / (phase + "-interruption.json")
+                data = runner.load(diagnostic)
+                assert data["reason"] in {"private_directory_changed", "private_directory_recalculation_error"}
+                assert not data["root_access_after_failure"] and diagnostic.stat().st_mode & 0o777 == 0o600
+    print("directory completion: model+validation root/parent/campaign inode swap abort before root/raw/event/result OK (mock)", flush=True)
+
+
+def model_rebound_abort_test(root):
+    root.mkdir()
+    fake = root / "codex"
+    runner._write_private(fake, FAKE, 0o700)
+    original_derive = runner.derive_canonical_binding
+    with patch.object(runner, "CODEX_EXECUTABLE", str(fake)), patch.object(runner, "per_run_preflight", fake_preflight_report), \
+            patch.object(runner, "scan_residual_processes", clean_process_evidence):
+        fingerprint = compute_harness_fingerprint(HERE)
+        for field in ("root_inode", "profile_sha256", "tool_environment"):
+            campaign = root / field / ("p5-" + fingerprint[:16])
+            runner.private_directory_identity(campaign, create=True)
+            model = campaign / "run-01"
+            args = SimpleNamespace(task="C1", condition="A", repeat=1, run_id="run-01", campaign=str(campaign), fingerprint=fingerprint)
+            with forbid_after_outcome([model]) as activate:
+                def changed_binding(*positional, **kwargs):
+                    observed = original_derive(*positional, **kwargs)
+                    if field == "root_inode":
+                        observed[field] += 1
+                    elif field == "profile_sha256":
+                        observed[field] = "0" * 64
+                    else:
+                        observed[field] = {**observed[field], "sha256": "0" * 64}
+                    activate()
+                    return observed
+                with patch.object(runner, "derive_canonical_binding", changed_binding), \
+                        patch.object(runner, "execute_command", lambda *_args, **_kwargs: (0, "must not save raw", "")):
+                    try:
+                        with contextlib.redirect_stdout(io.StringIO()):
+                            run_synthetic(args)
+                    except SystemExit as error:
+                        assert error.code == 1
+                    else:
+                        raise AssertionError("再導出binding不一致から正常returnした")
+            assert not (campaign / ".evidence/run-01/events.raw.jsonl").exists()
+            assert not (model / ".benchmark-events.json").exists()
+            assert not (model / ".benchmark-result.json").exists()
+            assert not (campaign / ".accepted/run-01").exists()
+            diagnostic = campaign / ".evidence/run-01/model-interruption.json"
+            record = runner.load(diagnostic)
+            assert record["reason"] == "model_binding_changed" and not record["root_access_after_failure"]
+            assert diagnostic.stat().st_mode & 0o777 == 0o600
+    print("model rebound: identity/profile/tool env mismatch abort before raw/event/result/root helper OK (mock)", flush=True)
 
 
 def campaign_fingerprint_guard_test():
@@ -868,7 +1039,7 @@ def runtime_abort_test(root):
     fake = root / "codex"
     runner._write_private(fake, FAKE, 0o700)
     runtime = runner.compute_python_runtime_binding()
-    fingerprint = compute_harness_fingerprint(HERE)
+    fingerprint = compute_harness_fingerprint(HERE, codex_executable_binding=runner.compute_codex_executable_binding(fake))
     names = ("CODEX_EXECUTABLE", "per_run_preflight", "execute_command", "scan_residual_processes",
              "compute_python_runtime_binding", "execution_spec")
     originals = {name: getattr(runner, name) for name in names}
@@ -877,7 +1048,8 @@ def runtime_abort_test(root):
     try:
         for stage in ("initial_spec", "model_before", "model_after", "validation_before", "validation_launch", "validation_after"):
             for outcome in ("mismatch", "exception"):
-                campaign = root / (stage + "-" + outcome)
+                campaign = root / (stage + "-" + outcome) / ("p5-" + fingerprint[:16])
+                runner.private_directory_identity(campaign, create=True)
                 model, accepted = campaign / "run-01", campaign / ".accepted/run-01"
                 args = SimpleNamespace(task="C1", condition="A", repeat=1, run_id="run-01",
                                        campaign=str(campaign), fingerprint=fingerprint)
@@ -918,7 +1090,7 @@ def runtime_abort_test(root):
                     runner.compute_python_runtime_binding, runner.execute_command = changing_runtime, execute
                     with contextlib.redirect_stdout(io.StringIO()):
                         try:
-                            runner.run(args)
+                            run_synthetic(args)
                         except SystemExit as error:
                             assert error.code == 1
                         else:
@@ -1207,7 +1379,7 @@ def c6_process_test(root):
     print("C6 reload: normal/timeout/exception/interrupt no kill/no root diagnostic/validation fail (mock) OK", flush=True)
 
 
-def main():
+def _synthetic_main():
     # managed macOS sandboxのmount cleanup停止を避け、private test rootを保持する。
     root = Path(tempfile.mkdtemp(prefix="p5-security-selftest-", dir="/private/tmp"))
     assert len(runner.verified_a_inputs()) == 1 and len(runner.verified_b_inputs()) == 7
@@ -1224,11 +1396,132 @@ def main():
     integration_test(root / "integration")
     immediate_abort_test(root / "immediate-abort")
     campaign_fingerprint_guard_test()
+    campaign_destination_test(root / "campaign-destination")
+    directory_completion_abort_test(root / "directory-completion")
+    model_rebound_abort_test(root / "model-rebound")
     runtime_abort_test(root / "runtime-abort")
     preflight_runtime_abort_test(root / "preflight-runtime-abort")
     process_test(root / "process")
     c6_process_test(root / "c6-process")
     print("P5 security selftest: all passed; 実sandbox/実model呼出しなし; private root:", root)
+
+
+def temp_boundary_test(root):
+    root.mkdir(mode=0o700)
+    patterns = fingerprint_module.PLATFORM_TEMP_DENY_GLOBS
+    assert len(patterns) == 8
+    # exactとdescendantを独立に確認し、root-only globで済ませる回帰を防ぐ。
+    for target in ("/tmp", "/private/tmp", "/var/tmp", "/private/var/tmp"):
+        exact, deep = target.replace("tmp", "t[m]p"), target.replace("tmp", "t[m]p") + "/**"
+        assert exact in patterns and deep in patterns
+        for name in (target, target + "/canary", target + "/deep/nested/canary"):
+            assert any(fnmatch.fnmatchcase(name, pattern) for pattern in patterns)
+        expect_rejected(lambda target=target: fingerprint_module.reject_platform_temp(Path(target) / "formal/run-01"))
+    alias = root / "temp-alias"
+    alias.symlink_to("/private/tmp")
+    expect_rejected(lambda: fingerprint_module.reject_platform_temp(alias / "formal"))
+    with patch.dict(os.environ, {"HOME": "/private/tmp/fake-home"}):
+        assert fingerprint_module.formal_base() == fingerprint_module.account_home() / "Library/Caches/agent-crew-p5-benchmark"
+    private = root / "private"
+    before = runner.private_directory_identity(private, create=True)
+    private.chmod(0o755)
+    expect_rejected(lambda: runner.private_directory_identity(private))
+    assert private.stat().st_mode & 0o777 == 0o755
+    private.chmod(0o700)
+    original_fstat = os.fstat
+    def replaced_identity(fd):
+        value = original_fstat(fd)
+        return SimpleNamespace(st_dev=value.st_dev, st_ino=value.st_ino + 1, st_uid=value.st_uid, st_mode=value.st_mode)
+    with patch.object(os, "fstat", replaced_identity):
+        assert runner.private_directory_identity(private) != before
+    alias_private = root / "private-alias"
+    alias_private.symlink_to(private)
+    expect_rejected(lambda: runner.private_directory_identity(alias_private))
+    # production入口guardはprepare/model/sandboxの前にtemp sourceを拒否する。
+    expect_rejected(lambda: runner.require_formal_locations(root))
+    print("temp boundary: eight exact+descendant globs/account HOME/realpath alias/private identity+mode OK", flush=True)
+
+
+def codex_binding_test(root):
+    root.mkdir(mode=0o700)
+    executable = root / "codex"
+    runner._write_private(executable, b"same-version-before", 0o700)
+    original = fingerprint_module.compute_codex_executable_binding(executable)
+    runtime = fingerprint_module.compute_python_runtime_binding()
+    old_fp = fingerprint_module.compute_harness_fingerprint(HERE, python_runtime_binding=runtime, codex_executable_binding=original)
+    runner._write_private(executable, b"same-version-after!", 0o700)
+    changed = fingerprint_module.compute_codex_executable_binding(executable)
+    assert changed != original and changed["sha256"] != original["sha256"]
+    assert fingerprint_module.compute_harness_fingerprint(HERE, python_runtime_binding=runtime, codex_executable_binding=changed) != old_fp
+    executable.unlink()
+    executable.symlink_to(runner.CODEX_EXECUTABLE)
+    expect_rejected(lambda: fingerprint_module.compute_codex_executable_binding(executable))
+    campaign = root / "campaign"
+    directories = runner.private_directory_identity(campaign, create=True)
+    record = {"schema": 1, "fingerprint": old_fp, "codex_executable": original,
+              "python_runtime": runtime, "private_directories": directories}
+    record["binding_sha256"] = runner.canonical_digest(record)
+    path = campaign / "campaign-binding.json"
+    runner.save(path, record)
+    assert runner.load_campaign_binding(path, campaign, old_fp)["record"] == record
+    path.chmod(0o644)
+    expect_rejected(lambda: runner.load_campaign_binding(path, campaign, old_fp))
+    path.chmod(0o600)
+    runner.save(path, {**record, "codex_executable": changed})
+    expect_rejected(lambda: runner.load_campaign_binding(path, campaign, old_fp))
+    runner.save(path, record)
+    spec = {"root": campaign / "run-01", "binding": {"harness_fingerprint": old_fp}}
+    for mode in ("mismatch", "exception"):
+        def observed(*_args):
+            if mode == "exception":
+                raise OSError("synthetic CLI swap")
+            return changed
+        with patch.object(runner, "compute_codex_executable_binding", observed), forbid_after_outcome([spec["root"]]) as activate:
+            activate()
+            try:
+                runner.require_codex_binding(spec, "model", original)
+            except SystemExit as error:
+                assert error.code == 1
+            else:
+                raise AssertionError("CLI差替えから停止しませんでした")
+    assert (campaign / ".evidence/run-01/model-interruption.json").stat().st_mode & 0o777 == 0o600
+    print("CLI binding: same-version bytes/stat/symlink/fingerprint/private campaign file/root-free abort OK", flush=True)
+
+
+def main():
+    os.umask(0o077)
+    guard_root = Path(tempfile.mkdtemp(prefix="p5-boundary-selftest-", dir="/private/tmp"))
+    temp_boundary_test(guard_root / "boundaries")
+    codex_binding_test(guard_root / "cli")
+    # 実sandboxを起動しない合成caseだけtempへ配置する。production guardは上で実検証。
+    # 実repo/旧campaignにはcanaryを作らず、同じ作成/照合/cleanupを専用合成親で試す。
+    with contextlib.ExitStack() as stack:
+        removed_directories = set()
+        actual_rmdir, actual_lexists = os.rmdir, os.path.lexists
+        def mock_canary_rmdir(path, *, dir_fd=None):
+            if dir_fd is not None and str(path).startswith(".p5-boundary-"):
+                # managed outer sandboxは空directoryのrmdirも拒否するため、ここだけ模擬する。
+                child = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dir_fd)
+                try:
+                    assert not os.listdir(child), "cleanupでcanary内容が残りました"
+                finally:
+                    os.close(child)
+                removed_directories.add(str(path))
+                return
+            return actual_rmdir(path, dir_fd=dir_fd)
+        def mock_removed_lexists(path):
+            return False if Path(path).name in removed_directories else actual_lexists(path)
+        stack.enter_context(patch.object(os, "rmdir", mock_canary_rmdir))
+        stack.enter_context(patch.object(os.path, "lexists", mock_removed_lexists))
+        for module in {runner, preflight.runner}:
+            stack.enter_context(patch.object(module, "require_formal_locations", lambda *_args: None))
+            stack.enter_context(patch.object(module, "require_source_directory", lambda: None))
+        stack.enter_context(patch.object(runner, "compute_harness_fingerprint", compute_harness_fingerprint))
+        stack.enter_context(patch.object(preflight, "boundary_parents", lambda root: {
+            label: root.parent / "synthetic-boundaries" / label for label in preflight.BOUNDARY_LABELS}))
+        stack.enter_context(patch.object(preflight, "platform_temp_parents", lambda: {
+            label: guard_root for label in preflight.TEMP_LABELS}))
+        _synthetic_main()
 
 
 if __name__ == "__main__":

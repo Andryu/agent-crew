@@ -21,11 +21,13 @@ import sys
 import time
 
 from harness_fingerprint import (compute_harness_fingerprint, compute_python_runtime_binding,
+                                 compute_codex_executable_binding, CODEX_REAL_PATH,
+                                 account_home, formal_base, reject_platform_temp, PLATFORM_TEMP_DENY_GLOBS,
                                  PYTHON_EXECUTABLE, PYTHON_RUNTIME_ROOT)
 
 HERE = Path(__file__).resolve().parent
 BASE = HERE.parent / "migration-baseline"
-WORK = Path("/private/tmp/agent-crew-p5-benchmark/formal")
+WORK = formal_base() / "formal"
 REPOSITORY = HERE.parents[2]
 B_INDEX = HERE / "b-contract-index.json"
 A_INDEX = HERE / "a-contract-index.json"
@@ -35,8 +37,8 @@ CLI_VERSION = "codex-cli 0.155.1"
 CLI_TIMEOUT_SECONDS = 240
 VALIDATION_TIMEOUT_SECONDS = 45
 _EXECUTABLE_HASH_CACHE = {}
-CODEX_EXECUTABLE = str(Path(shutil.which("codex") or "/opt/homebrew/bin/codex").resolve())
-AUTH_HOME = os.environ.get("CODEX_HOME") or str(Path.home() / ".codex")
+CODEX_EXECUTABLE = str(CODEX_REAL_PATH)
+AUTH_HOME = os.environ.get("CODEX_HOME") or str(account_home() / ".codex")
 PYTHON_RUNTIME = PYTHON_RUNTIME_ROOT
 FIXED_PATH = os.pathsep.join(dict.fromkeys([
     str(Path(PYTHON_EXECUTABLE).parent),
@@ -95,6 +97,72 @@ def _open_directory(path, create=False):
 
 def _regular(info):
     return stat.S_ISREG(info.st_mode) and info.st_nlink == 1
+
+
+def private_directory_identity(path, create=False, include_parent=True):
+    """fd/nofollowでrootと直接親を固定。既存directoryをchmodで修復しない。"""
+    path = Path(path)
+    result = {}
+    for label, target in (("root", path), ("parent", path.parent)) if include_parent else (("root", path),):
+        fd = _open_directory(target, create=create)
+        try:
+            info = os.fstat(fd)
+            if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+                raise BoundaryError("private root/直接親にはaccount owner・0700が必要です")
+            result[label] = {"realpath": str(target.resolve()), "device": info.st_dev, "inode": info.st_ino,
+                             "owner": info.st_uid, "mode": stat.S_IMODE(info.st_mode)}
+        finally:
+            os.close(fd)
+    return result
+
+
+def require_formal_locations(*paths):
+    reject_platform_temp(REPOSITORY)
+    for path in paths:
+        reject_platform_temp(path)
+
+
+def require_source_directory():
+    return private_directory_identity(REPOSITORY)
+
+
+def load_campaign_binding(path, campaign, fingerprint):
+    path, campaign = Path(path), Path(campaign)
+    if path != campaign / "campaign-binding.json":
+        raise BoundaryError("campaign binding fileの位置が不正です")
+    fd = _open_directory(path.parent)
+    try:
+        info = os.stat(path.name, dir_fd=fd, follow_symlinks=False)
+        if not _regular(info) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
+            raise BoundaryError("campaign bindingはaccount ownerの0600 regular single-link fileが必要です")
+        record = load(path)
+        after = os.stat(path.name, dir_fd=fd, follow_symlinks=False)
+        if (info.st_dev, info.st_ino, info.st_mtime_ns, info.st_ctime_ns) != (after.st_dev, after.st_ino, after.st_mtime_ns, after.st_ctime_ns):
+            raise BoundaryError("campaign bindingが読取中に変更されました")
+    finally:
+        os.close(fd)
+    fields = {"schema", "fingerprint", "codex_executable", "python_runtime", "private_directories", "binding_sha256"}
+    if (set(record) != fields or record["schema"] != 1 or record["fingerprint"] != fingerprint
+            or record["binding_sha256"] != canonical_digest({key: value for key, value in record.items() if key != "binding_sha256"})
+            or record["private_directories"] != private_directory_identity(campaign)):
+        raise BoundaryError("campaign bindingのschema/hash/directoryが不一致です")
+    return {"path": campaign, "record": record}
+
+
+def prepare_formal_base():
+    # OS account homeと既存祖先に別owner/group/world-write/symlinkを許可しない。
+    base = formal_base()
+    reject_platform_temp(base)
+    for path in (account_home(), account_home() / "Library", account_home() / "Library/Caches"):
+        fd = _open_directory(path)
+        try:
+            info = os.fstat(fd)
+            if info.st_uid != os.getuid() or info.st_mode & 0o022:
+                raise BoundaryError("formal root祖先のowner/modeが不正です")
+        finally:
+            os.close(fd)
+    private_directory_identity(base, create=True, include_parent=False)
+    return base
 
 
 def safe_read(path):
@@ -284,11 +352,13 @@ def prepare_permission_directories(root, task):
 def policy_template(task, phase="model"):
     return {"schema": 3, "phase": phase, "network": False,
             "read": [":minimal", "$PYTHON_RUNTIME", "$RUN"], "default": "deny",
+            "deny_globs": list(PLATFORM_TEMP_DENY_GLOBS),
             "write": [str(path.relative_to(Path("/RUN"))) for path in permission_policy(Path("/RUN"), task, phase)]}
 
 
 def permission_config(root, task, profile="p5_fixture", phase="model"):
     filesystem = {":root": "deny", ":minimal": "read", str(PYTHON_RUNTIME): "read", str(root): "read"}
+    filesystem.update({pattern: "deny" for pattern in PLATFORM_TEMP_DENY_GLOBS})
     filesystem.update({str(path): "write" for path in permission_policy(root, task, phase)})
     entries = ",".join(f"{json.dumps(key)}={json.dumps(value)}" for key, value in filesystem.items())
     return [f'permissions.{profile}.description="P5 pinned minimal runtime and fixture"',
@@ -346,7 +416,6 @@ def canonical_execution_spec(root, task, cli_version, harness_fingerprint="unbou
         info = os.fstat(directory_fd)
     finally:
         os.close(directory_fd)
-    executable = Path(CODEX_EXECUTABLE).resolve(strict=True)
     spec = {"root": root, "task": task, "env": env, "config": permission_config(root, task, phase=phase)}
     spec["binding"] = {
         "schema": 3, "phase": phase, "cli_version": cli_version, "harness_fingerprint": harness_fingerprint,
@@ -356,9 +425,10 @@ def canonical_execution_spec(root, task, cli_version, harness_fingerprint="unbou
         "tool_environment": {"keys": sorted(env), "sha256": canonical_digest(env)},
         "codex_process_environment": {"keys": sorted(process_env(spec)), "sha256": canonical_digest(process_env(spec)),
                                       "auth_home_location_sha256": digest_bytes(AUTH_HOME.encode())},
-        "codex_executable": {"realpath": str(executable), "sha256": executable_sha256(executable)},
+        "codex_executable": compute_codex_executable_binding(CODEX_EXECUTABLE),
+        "private_directories": private_directory_identity(root),
         "python_runtime": compute_python_runtime_binding(),
-        "read_boundary": "pinned_cli_minimal_and_python_runtime_plus_fixture",
+        "read_boundary": "pinned_cli_minimal_without_platform_temp_and_python_runtime_plus_fixture",
     }
     return spec
 
@@ -374,6 +444,7 @@ def execution_spec(root, task, cli_version, harness_fingerprint="unbound", phase
 
 
 def sandbox_command(root, task, command, spec=None):
+    require_formal_locations(root)
     spec = spec or execution_spec(root, task, CLI_VERSION)
     # sandbox CLI自身はmodelと同じprocess env。実コマンドはtool envだけに固定する。
     environment = [f"{key}={value}" for key, value in sorted(spec["env"].items())]
@@ -1267,8 +1338,31 @@ def require_runtime_binding(spec, phase, expected, observed=None):
     return current
 
 
+def require_codex_binding(spec, phase, expected, observed=None):
+    try:
+        current = compute_codex_executable_binding(CODEX_EXECUTABLE) if observed is None else observed
+    except (Exception, RunSignal) as error:
+        abort_run(spec, phase, "codex_binding_recalculation_error", details={"error_type": type(error).__name__})
+    if not isinstance(expected, dict) or current != expected:
+        abort_run(spec, phase, "codex_executable_changed")
+    return current
+
+
+def require_directory_binding(spec, phase):
+    try:
+        current = private_directory_identity(spec["root"])
+        campaign = spec.get("campaign_binding")
+        if campaign and private_directory_identity(campaign["path"]) != campaign["record"]["private_directories"]:
+            raise BoundaryError("campaign/直接親directoryが変わりました")
+    except (Exception, RunSignal) as error:
+        abort_run(spec, phase, "private_directory_recalculation_error", details={"error_type": type(error).__name__})
+    if current != spec["binding"]["private_directories"]:
+        abort_run(spec, phase, "private_directory_changed")
+
+
 def validate(task, root, timeout=VALIDATION_TIMEOUT_SECONDS, c6_state_before=None, c6_readonly=None,
-             cli_version=CLI_VERSION, harness_fingerprint="unbound", *, expected_runtime_binding):
+             cli_version=CLI_VERSION, harness_fingerprint="unbound", *, expected_runtime_binding,
+             expected_codex_binding=None, campaign_binding=None):
     # spec生成中のruntime再計算失敗にも、既知のroot文字列だけで外側診断を残す。
     spec = {"root": root, "binding": {"harness_fingerprint": harness_fingerprint}}
     try:
@@ -1276,6 +1370,9 @@ def validate(task, root, timeout=VALIDATION_TIMEOUT_SECONDS, c6_state_before=Non
     except (Exception, RunSignal) as error:
         abort_run(spec, "validation", "validation_binding_recalculation_error", details={"error_type": type(error).__name__})
     require_runtime_binding(spec, "validation", expected_runtime_binding, spec["binding"]["python_runtime"])
+    spec["campaign_binding"] = campaign_binding
+    expected_codex_binding = expected_codex_binding or spec["binding"]["codex_executable"]
+    require_codex_binding(spec, "validation", expected_codex_binding, spec["binding"]["codex_executable"])
     cmd = ["git", "diff", "--check"] if task["id"] == "C4" else shlex.split(task["validate"])
     if cmd[0] == "python3.12":
         cmd[0] = PYTHON_EXECUTABLE
@@ -1292,13 +1389,17 @@ def validate(task, root, timeout=VALIDATION_TIMEOUT_SECONDS, c6_state_before=Non
                "--progress-sha256", c6_readonly["progress"], "--readme-sha256", c6_readonly["readme"]]
     before = tree_manifest(root, exclude_bookkeeping=False)
     require_runtime_binding(spec, "validation", expected_runtime_binding)
+    require_codex_binding(spec, "validation", expected_codex_binding)
+    require_directory_binding(spec, "validation")
     try:
         code, stdout, stderr = execute_command(sandbox_command(root, task, cmd, spec), root, process_env(spec), timeout)
     except (OSError, RuntimeError, subprocess.SubprocessError) as error:
         abort_run(spec, "validation", "execution_error", details={"error_type": type(error).__name__})
     if code != 0:
         abort_run(spec, "validation", "execution_not_successful", code, {"stdout": stdout, "stderr": stderr})
+    require_directory_binding(spec, "validation")
     residual = require_clean_residual(spec, "validation")
+    require_codex_binding(spec, "validation", expected_codex_binding)
     require_runtime_binding(spec, "validation", expected_runtime_binding)
     after = tree_manifest(root, exclude_bookkeeping=False)
     unchanged = before == after and (destination is None or sha(destination) == validator_hash)
@@ -1310,12 +1411,16 @@ def validate(task, root, timeout=VALIDATION_TIMEOUT_SECONDS, c6_state_before=Non
 
 
 def required_preflight_cases(spec):
+    from sandbox_preflight import BOUNDARY_LABELS, TEMP_LABELS
     cases = {"sandbox_initialized": "allow", "tool_environment_exact": "allow", "fixture_read": "allow",
              "scratch_write": "allow", "task_directory_write": "allow", "outside_private_read": "deny",
              "symlink_outside_private_read": "deny", "outside_write": "deny", "repository_read": "deny",
              "repository_write": "deny", "network_connect": "deny", "python_runtime_import": "allow",
              "python_runtime_parent_listing": "deny", "python_sibling_read": "deny",
              "uv_executable_read": "deny", "python_runtime_write": "deny"}
+    for label in BOUNDARY_LABELS + TEMP_LABELS:
+        cases.update({label + suffix: "deny" for suffix in ("_read", "_write", "_symlink_read", "_symlink_write")})
+    cases.update({label + "_listing": "deny" for label in TEMP_LABELS})
     if spec["task"]["id"] != "C6":
         for index, _name in enumerate(spec["task"]["input"] + spec["task"]["fixture"], 2):
             cases[f"task_file_write_{index}"] = "allow"
@@ -1367,30 +1472,48 @@ def _run(args):
     # run間でcode/runtimeが変わった場合は、fixture作成前に旧campaignを拒否する。
     try:
         expected_runtime = compute_python_runtime_binding()
-        current_fingerprint = compute_harness_fingerprint(HERE, python_runtime_binding=expected_runtime)
+        expected_codex = compute_codex_executable_binding(CODEX_EXECUTABLE)
+        current_fingerprint = compute_harness_fingerprint(HERE, python_runtime_binding=expected_runtime,
+                                                          codex_executable_binding=expected_codex)
     except (Exception, RunSignal):
         raise SystemExit("campaign fingerprintを再検証できません") from None
     if current_fingerprint != args.fingerprint:
         raise SystemExit("campaign fingerprintが現行code/runtimeと一致しません")
+    campaign_path = Path(args.campaign)
+    expected_campaign = WORK / ("p5-" + args.fingerprint[:16])
+    expected_file = getattr(args, "expected_binding_file", None)
+    if (not campaign_path.is_absolute() or campaign_path != expected_campaign
+            or str(args.campaign) != str(expected_campaign)
+            or expected_file is None or str(expected_file) != str(expected_campaign / "campaign-binding.json")):
+        raise BoundaryError("runのcampaign/binding fileは固定正式保存先との完全一致が必要です")
+    require_formal_locations(campaign_path, campaign_path / args.run_id)
+    require_source_directory()
+    private_directory_identity(campaign_path)
+    campaign_binding = load_campaign_binding(expected_file, campaign_path, args.fingerprint)
+    if campaign_binding and (campaign_binding["record"]["codex_executable"] != expected_codex
+                             or campaign_binding["record"]["python_runtime"] != expected_runtime):
+        raise BoundaryError("campaign開始時のCLI/runtimeと一致しません")
     signal.signal(signal.SIGTERM, terminate_handler)
     signal.signal(signal.SIGINT, terminate_handler)
     version = run_trusted_command([CODEX_EXECUTABLE, "--version"], capture_output=True, text=True, check=True,
                              env={"PATH": FIXED_PATH, "LANG": "en_US.UTF-8"}).stdout.strip()
     if version != CLI_VERSION:
         raise BoundaryError("CLI版が固定版と異なります")
-    root, task, hashes = prepare(args.task, args.condition, args.repeat, args.campaign, args.run_id)
+    root, task, hashes = prepare(args.task, args.condition, args.repeat, campaign_path, args.run_id)
     spec = {"root": root, "binding": {"harness_fingerprint": args.fingerprint}}
     try:
         spec = execution_spec(root, task, version, args.fingerprint)
     except (Exception, RunSignal) as error:
         abort_run(spec, "model", "initial_binding_recalculation_error", details={"error_type": type(error).__name__})
     require_runtime_binding(spec, "model", expected_runtime, spec["binding"]["python_runtime"])
+    spec["campaign_binding"] = campaign_binding
+    require_codex_binding(spec, "model", expected_codex, spec["binding"]["codex_executable"])
     preflight = per_run_preflight(spec)
     save(root / ".benchmark-isolation.json", preflight)
     bound = preflight.get("binding") == spec["binding"]
     preflight_valid = validate_preflight_evidence(preflight, spec)
     isolation_pass = preflight_valid and bound
-    common = {"schema": 3, "campaign": Path(args.campaign).name, "fingerprint": args.fingerprint,
+    common = {"schema": 3, "campaign": campaign_path.name, "fingerprint": args.fingerprint,
               "run_id": args.run_id, "task_id": args.task, "condition": args.condition, "repeat": args.repeat,
               "cli_version": version,
               "preflight_evidence_relative_path": str((root / ".benchmark-isolation.json").relative_to(root.parent)),
@@ -1425,19 +1548,25 @@ def _run(args):
     if remaining < 70:
         raise BoundaryError("campaign残時間不足。runを開始しません")
     require_runtime_binding(spec, "model", expected_runtime)
+    require_codex_binding(spec, "model", expected_codex)
+    require_directory_binding(spec, "model")
     try:
         cli_exit, stdout, stderr = execute_command(command, root, process_env(spec), min(CLI_TIMEOUT_SECONDS, remaining - 60), prompt)
     except (OSError, RuntimeError, subprocess.SubprocessError) as error:
         abort_run(spec, "model", "execution_error", details={"error_type": type(error).__name__})
     if cli_exit != 0:
         abort_run(spec, "model", "execution_not_successful", cli_exit, {"stdout": stdout, "stderr": stderr})
+    require_directory_binding(spec, "model")
     model_residual = require_clean_residual(spec, "model")
+    require_codex_binding(spec, "model", expected_codex)
     try:
         current_binding = derive_canonical_binding(root, task, version, args.fingerprint)
     except (Exception, RunSignal) as error:
         abort_run(spec, "model", "model_binding_recalculation_error", details={"error_type": type(error).__name__})
     require_runtime_binding(spec, "model", expected_runtime, current_binding["python_runtime"])
-    current_binding_matches = current_binding == spec["binding"]
+    if current_binding != spec["binding"]:
+        abort_run(spec, "model", "model_binding_changed")
+    current_binding_matches = True
     raw_path = root.parent / ".evidence" / root.name / "events.raw.jsonl"
     _write_private(raw_path, stdout)
     events = safe_events(stdout, root / ".benchmark-events.json", root, expected_env=spec["env"])
@@ -1470,7 +1599,8 @@ def _run(args):
         remaining = deadline - time.time() if deadline is not None else 60
         validation = validate(task, accepted, max(1, min(VALIDATION_TIMEOUT_SECONDS, remaining - 5)),
                               c6_state_before, c6_readonly, version, args.fingerprint,
-                              expected_runtime_binding=expected_runtime)
+                              expected_runtime_binding=expected_runtime, expected_codex_binding=expected_codex,
+                              campaign_binding=campaign_binding)
         validation["derived_from_model_profile_sha256"] = spec["binding"]["profile_sha256"]
         validation_residual = validation["residual_process_evidence"]
         # 非scratch manifestは例外pathを削除せず完全一致を要求する。
@@ -1541,6 +1671,7 @@ def main():
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--campaign", required=True)
     parser.add_argument("--fingerprint", required=True)
+    parser.add_argument("--expected-binding-file", required=True, type=Path)
     parser.add_argument("--deadline-epoch", type=float)
     run(parser.parse_args())
 

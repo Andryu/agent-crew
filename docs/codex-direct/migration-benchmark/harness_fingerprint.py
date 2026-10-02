@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 import platform
 import posixpath
+import pwd
+import shutil
 import stat
 import struct
 import sys
@@ -14,6 +16,73 @@ import sys
 PYTHON_EXECUTABLE = str(Path(sys.executable).resolve(strict=True))
 PYTHON_RUNTIME_ROOT = Path(sys.base_prefix).resolve(strict=True)
 PYTHON_VERSION = (3, 12, 13)
+CODEX_LAUNCH_PATH = Path(os.path.abspath(shutil.which("codex") or "/opt/homebrew/bin/codex"))
+CODEX_REAL_PATH = CODEX_LAUNCH_PATH.resolve(strict=True)
+_CLI_HASH_CACHE = {}
+PLATFORM_TEMP_ROOTS = tuple(Path(value) for value in ("/tmp", "/private/tmp", "/var/tmp", "/private/var/tmp"))
+# character classでroot自身をglob denyにし、/**を別に追加して全子孫も遮断する。
+# 0.155.1はsaw_glob=trueのpatternに子孫suffixを自動追加しない。
+PLATFORM_TEMP_DENY_GLOBS = tuple(pattern for root in
+    ("/t[m]p", "/private/t[m]p", "/var/t[m]p", "/private/var/t[m]p") for pattern in (root, root + "/**"))
+
+
+def account_home():
+    """toolのsynthetic HOMEや呼出元環境には依存しない。"""
+    return Path(pwd.getpwuid(os.getuid()).pw_dir)
+
+
+def formal_base():
+    return account_home() / "Library/Caches/agent-crew-p5-benchmark"
+
+
+def reject_platform_temp(path):
+    """aliasのrealpathを含め、Darwinの固定scratch領域を正式rootに使わせない。"""
+    path = Path(path)
+    resolved = path.resolve(strict=False)
+    if sys.platform == "darwin" and any(resolved == root.resolve() or resolved.is_relative_to(root.resolve())
+                                       for root in PLATFORM_TEMP_ROOTS):
+        raise ValueError("Darwin platform temp配下を正式実行rootには使えません")
+    return resolved
+
+
+def compute_codex_executable_binding(executable=None):
+    """起動alias・固定実体・bytes/statを結合。同版の置換も別campaignにする。"""
+    path = Path(executable) if executable is not None else CODEX_REAL_PATH
+    launcher = CODEX_LAUNCH_PATH if path == CODEX_REAL_PATH else path
+    before_launcher = launcher.lstat()
+    resolved = launcher.resolve(strict=True)
+    if resolved != path or not path.is_absolute():
+        raise ValueError("Codex起動aliasの実体が固定pathから変わりました")
+    before = path.lstat()
+    if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+            or before.st_uid not in {0, os.getuid()} or before.st_mode & 0o022):
+        raise ValueError("Codex実体は信頼ownerのregular single-link実行fileが必要です")
+    signature = _stat_signature(before)
+    key = (str(path), signature)
+    if key not in _CLI_HASH_CACHE:
+        _CLI_HASH_CACHE.clear()
+        _CLI_HASH_CACHE[key] = hashlib.sha256(_read_regular_file(path)).hexdigest()
+    # cache hitでも全componentをnofollowで検証する。
+    parent = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in path.parts[1:-1]:
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+            os.close(parent)
+            parent = child
+        current = os.stat(path.name, dir_fd=parent, follow_symlinks=False)
+    finally:
+        os.close(parent)
+    if (_stat_signature(current) != signature or _stat_signature(launcher.lstat()) != _stat_signature(before_launcher)
+            or launcher.resolve(strict=True) != path):
+        raise ValueError("Codex実体/aliasが検証中に変わりました")
+    return {"realpath": str(path), "sha256": _CLI_HASH_CACHE[key],
+            "device": before.st_dev, "inode": before.st_ino, "size": before.st_size,
+            "mtime_ns": before.st_mtime_ns, "ctime_ns": before.st_ctime_ns,
+            "owner": before.st_uid, "mode": stat.S_IMODE(before.st_mode),
+            "launcher": {"path": str(launcher), "device": before_launcher.st_dev,
+                         "inode": before_launcher.st_ino, "mtime_ns": before_launcher.st_mtime_ns,
+                         "ctime_ns": before_launcher.st_ctime_ns,
+                         "target": os.readlink(launcher) if stat.S_ISLNK(before_launcher.st_mode) else None}}
 
 # 従来batchの順序を維持し、このmodule自身を末尾へ追加する。
 HARNESS_INPUTS = (
@@ -172,9 +241,8 @@ def _runtime_tree_manifest(root):
 def compute_python_runtime_binding():
     """固定した実runtimeのidentity・全bytes・symlink・型を毎回再検証する。"""
     executable, root = Path(PYTHON_EXECUTABLE), PYTHON_RUNTIME_ROOT
-    protected = [Path("/"), Path.home(), Path.home() / ".local", Path(__file__).absolute().parents[3],
-                 Path("/private/tmp/agent-crew-p5-benchmark/formal"),
-                 Path(os.path.abspath(os.environ.get("CODEX_HOME") or str(Path.home() / ".codex")))]
+    protected = [Path("/"), account_home(), account_home() / ".local", Path(__file__).absolute().parents[3],
+                 formal_base(), Path(os.path.abspath(os.environ.get("CODEX_HOME") or str(account_home() / ".codex")))]
     if (sys.version_info[:3] != PYTHON_VERSION or sys.implementation.name != "cpython"
             or sys.implementation.cache_tag != "cpython-312" or platform.machine() != "arm64"
             or executable != root / "bin/python3.12"
@@ -205,7 +273,7 @@ def compute_python_runtime_binding():
             "manifest_sha256": hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()}
 
 
-def compute_harness_fingerprint(here, *, python_runtime_binding=None):
+def compute_harness_fingerprint(here, *, python_runtime_binding=None, codex_executable_binding=None):
     """benchmark directoryの現行固定入力から64桁SHA-256を返す。保存・実行はしない。"""
     here = Path(os.path.abspath(here))
     repository = here.parents[2]
@@ -216,4 +284,6 @@ def compute_harness_fingerprint(here, *, python_runtime_binding=None):
         components.append(label + ":" + hashlib.sha256(_read_regular_file(path)).hexdigest())
     runtime = compute_python_runtime_binding() if python_runtime_binding is None else python_runtime_binding
     components.append("python_runtime:" + json.dumps(runtime, sort_keys=True, separators=(",", ":")))
+    codex = compute_codex_executable_binding() if codex_executable_binding is None else codex_executable_binding
+    components.append("codex_executable:" + json.dumps(codex, sort_keys=True, separators=(",", ":")))
     return hashlib.sha256("".join(components).encode()).hexdigest()
