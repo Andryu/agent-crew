@@ -23,6 +23,7 @@ runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
 import sandbox_preflight as preflight
 from harness_fingerprint import HARNESS_INPUTS, compute_harness_fingerprint
+import harness_fingerprint as fingerprint_module
 
 FAKE = '''#!/usr/bin/env python3.12
 import json,os,pathlib,shlex,subprocess,sys,time,tomllib
@@ -121,10 +122,21 @@ def permission_test(root):
     config = tomllib.loads("\n".join(spec["config"]))["permissions"]["p5_fixture"]
     assert "extends" not in config and config["filesystem"][":root"] == "deny"
     assert config["filesystem"][":minimal"] == "read" and config["filesystem"][str(root)] == "read"
+    assert {key for key, value in config["filesystem"].items() if value == "read"} == {
+        ":minimal", str(root), str(runner.PYTHON_RUNTIME)}
+    assert str(Path.home()) not in config["filesystem"] and str(Path.home() / ".local") not in config["filesystem"]
     assert config["filesystem"][str(root / ".benchmark-tmp")] == "write" and config["network"]["enabled"] is False
     binding = spec["binding"]
     assert binding["harness_fingerprint"] == "fixed-harness"
     assert binding["codex_executable"]["sha256"] == runner.sha(Path(runner.CODEX_EXECUTABLE).resolve())
+    runtime = binding["python_runtime"]
+    assert runtime == fingerprint_module.compute_python_runtime_binding()
+    assert runtime["root_realpath"] == str(runner.PYTHON_RUNTIME)
+    assert runtime["executable_realpath"] == str(Path(sys.executable).resolve())
+    assert runtime["executable_sha256"] == runner.sha(Path(runner.PYTHON_EXECUTABLE))
+    assert runtime["root_device"] == runner.PYTHON_RUNTIME.stat().st_dev
+    assert runtime["root_inode"] == runner.PYTHON_RUNTIME.stat().st_ino
+    assert runtime["python_version"] == [3, 12, 13] and runtime["architecture"] == "arm64"
     assert binding["tool_environment"]["sha256"] == runner.canonical_digest(spec["env"])
     assert binding["codex_process_environment"]["sha256"] == runner.canonical_digest(runner.process_env(spec))
     assert "CODEX_HOME" not in binding["tool_environment"]["keys"]
@@ -148,6 +160,8 @@ def permission_test(root):
     validation = runner.execution_spec(root, c1_task(), runner.CLI_VERSION, "fixed-harness", "validation")
     policy = tomllib.loads("\n".join(validation["config"]))["permissions"]["p5_fixture"]["filesystem"]
     assert [key for key, value in policy.items() if value == "write"] == [str(root / ".benchmark-tmp")]
+    assert {key for key, value in policy.items() if value == "read"} == {":minimal", str(root), str(runner.PYTHON_RUNTIME)}
+    assert validation["binding"]["python_runtime"] == binding["python_runtime"]
     other = root.parent / "rebound"
     other.mkdir()
     rebound = runner.execution_spec(other, c1_task(), runner.CLI_VERSION, "fixed-harness")
@@ -178,6 +192,70 @@ def permission_test(root):
     finally:
         runner.safe_read = original_read
     print("permission: canonical/phase/root/tool+process env/auth hash/executable cache invalidation/harness/parent mode OK", flush=True)
+
+
+def python_runtime_test(root):
+    root.mkdir()
+    spec = runner.execution_spec(root, c1_task(), runner.CLI_VERSION, "runtime-regression")
+    assert spec["env"]["PATH"].split(os.pathsep)[0] == str(Path(runner.PYTHON_EXECUTABLE).parent)
+    assert Path(runner.PYTHON_EXECUTABLE).parent.parent == runner.PYTHON_RUNTIME
+    assert not Path(runner.PYTHON_EXECUTABLE).is_symlink()
+    # 従来profileで読めるsystem PATHだけだと、端末上にもPython 3.12は存在せずexit 127となる。
+    # OS sandboxのdeny再現ではなく、同じenv起動失敗と実runtime解決を確認する回帰試験。
+    failed = runner.run_trusted_command(["/usr/bin/env", "-i", "PATH=/usr/bin:/bin", "python3.12", "-B", "-c", "print('runtime-ok')"],
+        cwd=root, capture_output=True, text=True)
+    assert failed.returncode == 127 and "No such file or directory" in failed.stderr, failed
+    assert preflight.classify_denial(failed.returncode, failed.stdout, failed.stderr) == "preflight_error"
+    for executable in ("python3.12", runner.PYTHON_EXECUTABLE):
+        executed = runner.run_trusted_command([executable, "-I", "-B", "-c",
+            "import json,sys; print(json.dumps({'executable':sys.executable,'version':list(sys.version_info[:2])}))"],
+            cwd=root, env=spec["env"], capture_output=True, text=True, check=True)
+        assert json.loads(executed.stdout) == {"executable": runner.PYTHON_EXECUTABLE, "version": [3, 12]}
+    assert shlex.split(runner.ENV_CANARY_COMMAND)[0] == runner.PYTHON_EXECUTABLE
+    checked = runner.run_trusted_command(preflight.runtime_command(spec["binding"]["python_runtime"]),
+        cwd=root, env=spec["env"], capture_output=True, text=True, check=True)
+    assert checked.returncode == 0
+    mismatched = {**spec["binding"]["python_runtime"], "architecture": "x86_64"}
+    rejected = runner.run_trusted_command(preflight.runtime_command(mismatched),
+        cwd=root, env=spec["env"], capture_output=True, text=True)
+    assert rejected.returncode == 1
+    # 小さい合成runtimeで、stdlibのbytes・link target・型の変化を検出する。
+    synthetic = root / "synthetic-runtime"
+    runner._write_private(synthetic / "lib/stdlib.py", b"before")
+    runner._write_private(synthetic / "lib/alternate.py", b"alternate")
+    link = synthetic / "lib/current.py"
+    link.symlink_to("stdlib.py")
+    before, _ = fingerprint_module._runtime_tree_manifest(synthetic)
+    runner._write_private(synthetic / "lib/stdlib.py", b"after")
+    after, _ = fingerprint_module._runtime_tree_manifest(synthetic)
+    assert before != after
+    link.unlink()
+    link.symlink_to("alternate.py")
+    switched, _ = fingerprint_module._runtime_tree_manifest(synthetic)
+    assert switched != after
+    link.unlink()
+    link.symlink_to("../../outside.py")
+    expect_rejected(lambda: fingerprint_module._runtime_tree_manifest(synthetic))
+    link.unlink()
+    os.link(synthetic / "lib/stdlib.py", link)
+    expect_rejected(lambda: fingerprint_module._runtime_tree_manifest(synthetic))
+    link.unlink()
+    os.mkfifo(link)
+    expect_rejected(lambda: fingerprint_module._runtime_tree_manifest(synthetic))
+    link.unlink()
+    alias = root / "runtime-alias"
+    alias.symlink_to(synthetic)
+    expect_rejected(lambda: fingerprint_module._runtime_tree_manifest(alias))
+    # runtime変更はcampaign identityも変える。旧campaign再開を許さない。
+    original_runtime = fingerprint_module.compute_python_runtime_binding
+    fingerprint = compute_harness_fingerprint(HERE)
+    try:
+        runtime = spec["binding"]["python_runtime"]
+        fingerprint_module.compute_python_runtime_binding = lambda: {**runtime, "manifest_sha256": "0" * 64}
+        assert compute_harness_fingerprint(HERE) != fingerprint
+    finally:
+        fingerprint_module.compute_python_runtime_binding = original_runtime
+    print("python runtime: exit127 regression/absolute runtime/canary identity/tree bytes+links+types/campaign identity OK", flush=True)
 
 
 def event_stream(command="pwd", code=0, extras=()):
@@ -374,6 +452,7 @@ def preflight_test(root):
     seen = []
     def fake_case(name, passed_spec, command, expected):
         assert passed_spec is spec
+        assert command[0] == runner.PYTHON_EXECUTABLE
         seen.append(name)
         if expected == "allow":
             result = subprocess.run(command, cwd=root, env=spec["env"], capture_output=True)
@@ -403,7 +482,7 @@ def preflight_test(root):
 @contextlib.contextmanager
 def forbid_after_outcome(roots, modules=(runner,)):
     """outcome観測後はroot操作と監査・再bindingを禁止し、root外診断だけ許す。"""
-    locked, originals = [False], []
+    locked, originals, violations = [False], [], []
     def activate():
         locked[0] = True
     def root_path(path):
@@ -415,6 +494,7 @@ def forbid_after_outcome(roots, modules=(runner,)):
     def forbidden(name, original, path_only=False):
         def call(*args, **kwargs):
             if locked[0] and (not path_only or root_path(args[0])):
+                violations.append(name)
                 raise AssertionError("失敗outcome後に禁止helperを呼んだ: " + name)
             return original(*args, **kwargs)
         return call
@@ -431,6 +511,8 @@ def forbid_after_outcome(roots, modules=(runner,)):
     finally:
         for owner, name, original in reversed(originals):
             setattr(owner, name, original)
+        # production側が例外を捕捉しても、禁止アクセスの試行自体を見逃さない。
+        assert not violations, "失敗後の禁止helper呼出し: " + repr(violations)
 
 
 def preflight_timeout_test(root):
@@ -512,7 +594,7 @@ def fake_preflight_report(spec):
             "tool_environment_scope": "auxiliary_env_i_probe_not_actual_exec_tool",
             "sandbox_initialized": True, "canaries_removed": True,
             "postconditions": {name: True for name in ("canary_writes_observed", "outside_writes_absent",
-                "private_sentinel_unchanged", "task_file_contents_unchanged", "binding_unchanged")},
+                "private_sentinel_unchanged", "task_file_contents_unchanged", "binding_unchanged", "python_runtime_unchanged")},
             "cases": [{"name": name, "expected": expected,
                 "outcome": "allowed" if expected == "allow" else "sandbox_denied", "exit_code": 0 if expected == "allow" else 1,
                 "binding_sha256": runner.canonical_digest(spec["binding"]), "command_sha256": "0" * 64,
@@ -637,6 +719,7 @@ def integration_test(root):
         accepted = campaign / ".accepted" / c6_path.parent.name
         assert not (accepted / "validate_c6.py").exists()
         assert c6["validation"]["command"][2].startswith(".benchmark-tmp/validate_c6-")
+        assert c6["validation"]["command"][0] == runner.PYTHON_EXECUTABLE
         assert c6["validation"]["manifest_before_sha256"] == c6["validation"]["manifest_after_sha256"]
         assert c6["snapshot_evidence"]["accepted_sha256"] == c6["validation"]["manifest_after_sha256"]
         # 非scratchのbookkeeping名もvalidatorの書換えとして必ず拒否する。
@@ -646,7 +729,8 @@ def integration_test(root):
             return 0, "OK", ""
         runner.execute_command = mutate_snapshot
         try:
-            invalid = runner.validate(c1_task(), campaign / ".accepted/run-01", harness_fingerprint="fixture-fingerprint")
+            invalid = runner.validate(c1_task(), campaign / ".accepted/run-01", harness_fingerprint="fixture-fingerprint",
+                                      expected_runtime_binding=runner.compute_python_runtime_binding())
             assert invalid["exit_code"] == "validator_changed_snapshot" and not invalid["manifest_unchanged"]
         finally:
             runner.execute_command = original_execute
@@ -700,13 +784,14 @@ def immediate_abort_test(root):
     (root / "mode").write_text("normal")
     originals = runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.execute_command, runner.scan_residual_processes
     runner.CODEX_EXECUTABLE, runner.per_run_preflight = str(fake), fake_preflight_report
+    fingerprint = compute_harness_fingerprint(HERE)
     try:
         for phase in ("model", "validation"):
             for outcome in ("timeout", "signal:15", 1, "residual", "scan_error", "scan_exception"):
                 campaign = root / (phase + "-" + str(outcome).replace(":", "-"))
                 model_root, accepted_root = campaign / "run-01", campaign / ".accepted/run-01"
                 args = SimpleNamespace(task="C1", condition="A", repeat=1, run_id="run-01",
-                                       campaign=str(campaign), fingerprint="fixture-fingerprint")
+                                       campaign=str(campaign), fingerprint=fingerprint)
                 scan_count = [0]
                 with forbid_after_outcome([model_root, accepted_root]) as activate:
                     def execute(command, execution_root, env, *_args, **_kwargs):
@@ -753,6 +838,153 @@ def immediate_abort_test(root):
     finally:
         runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.execute_command, runner.scan_residual_processes = originals
     print("run abort: model+validator timeout/signal/nonzero/residual/scan-error; no root helper/audit/result after outcome OK (mock)", flush=True)
+
+
+def campaign_fingerprint_guard_test():
+    originals = runner.compute_harness_fingerprint, runner.prepare, runner.run_trusted_command
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("fingerprint不一致後にprepare/CLIを起動した")
+    runner.prepare = runner.run_trusted_command = forbidden
+    try:
+        for mode in ("mismatch", "exception"):
+            def fingerprint(_here, **_kwargs):
+                if mode == "exception":
+                    raise OSError("synthetic runtime fingerprint failure")
+                return "0" * 64
+            runner.compute_harness_fingerprint = fingerprint
+            try:
+                runner._run(SimpleNamespace(fingerprint="1" * 64))
+            except SystemExit:
+                pass
+            else:
+                raise AssertionError("旧campaign fingerprintを許可した")
+    finally:
+        runner.compute_harness_fingerprint, runner.prepare, runner.run_trusted_command = originals
+    print("campaign fingerprint: mismatch/recalculation exception stop before root/prepare/CLI OK", flush=True)
+
+
+def runtime_abort_test(root):
+    root.mkdir()
+    fake = root / "codex"
+    runner._write_private(fake, FAKE, 0o700)
+    runtime = runner.compute_python_runtime_binding()
+    fingerprint = compute_harness_fingerprint(HERE)
+    names = ("CODEX_EXECUTABLE", "per_run_preflight", "execute_command", "scan_residual_processes",
+             "compute_python_runtime_binding", "execution_spec")
+    originals = {name: getattr(runner, name) for name in names}
+    runner.CODEX_EXECUTABLE, runner.per_run_preflight = str(fake), fake_preflight_report
+    runner.scan_residual_processes = clean_process_evidence
+    try:
+        for stage in ("initial_spec", "model_before", "model_after", "validation_before", "validation_launch", "validation_after"):
+            for outcome in ("mismatch", "exception"):
+                campaign = root / (stage + "-" + outcome)
+                model, accepted = campaign / "run-01", campaign / ".accepted/run-01"
+                args = SimpleNamespace(task="C1", condition="A", repeat=1, run_id="run-01",
+                                       campaign=str(campaign), fingerprint=fingerprint)
+                phase = {"spec_started": False, "model_done": False, "validation_started": False, "validation_done": False,
+                         "runtime_calls": 0, "validation_runtime_calls": 0}
+                def marking_spec(*args, **kwargs):
+                    phase["spec_started"] = True
+                    if kwargs.get("phase") == "validation":
+                        phase["validation_started"] = True
+                    return originals["execution_spec"](*args, **kwargs)
+                runner.execution_spec = marking_spec
+                with forbid_after_outcome([model, accepted]) as activate:
+                    def changing_runtime():
+                        phase["runtime_calls"] += 1
+                        if phase["validation_started"]:
+                            phase["validation_runtime_calls"] += 1
+                        fail = ((stage == "initial_spec" and phase["spec_started"])
+                                or (stage == "model_before" and phase["runtime_calls"] >= 3)
+                                or (stage == "model_after" and phase["model_done"])
+                                or (stage == "validation_before" and phase["validation_started"])
+                                or (stage == "validation_launch" and phase["validation_runtime_calls"] >= 2)
+                                or (stage == "validation_after" and phase["validation_done"]))
+                        if fail:
+                            activate()
+                            if outcome == "exception":
+                                raise OSError("synthetic runtime read failure")
+                            return {**runtime, "manifest_sha256": "0" * 64}
+                        return runtime
+                    def execute(_command, execution_root, env, *_args, **_kwargs):
+                        if execution_root.parent.name == ".accepted":
+                            phase["validation_done"] = True
+                            return 0, "OK", ""
+                        runner._write_private(execution_root / ".benchmark-answer.txt", "目的 検証 次")
+                        events = event_stream(runner.ENV_CANARY_COMMAND)
+                        events[3]["item"]["aggregated_output"] = json.dumps({k: v for k, v in env.items() if k != "CODEX_HOME"})
+                        phase["model_done"] = True
+                        return 0, "\n".join(json.dumps(event) for event in events), ""
+                    runner.compute_python_runtime_binding, runner.execute_command = changing_runtime, execute
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        try:
+                            runner.run(args)
+                        except SystemExit as error:
+                            assert error.code == 1
+                        else:
+                            raise AssertionError("runtime不一致/例外から正常returnした")
+                phase_name = "model" if stage in {"initial_spec", "model_before", "model_after"} else "validation"
+                diagnostic = campaign / ".evidence/run-01" / (phase_name + "-interruption.json")
+                assert diagnostic.stat().st_mode & 0o777 == 0o600
+                assert not runner.load(diagnostic)["root_access_after_failure"]
+                assert not (model / ".benchmark-result.json").exists()
+                if stage in {"initial_spec", "model_before", "model_after"}:
+                    assert not accepted.exists()
+                    assert not (campaign / ".evidence/run-01/events.raw.jsonl").exists()
+                    assert not (model / ".benchmark-events.json").exists()
+                if stage in {"validation_before", "validation_launch"}:
+                    assert not phase["validation_done"]
+                if stage in {"initial_spec", "model_before"}:
+                    assert not phase["model_done"]
+    finally:
+        for name, original in originals.items():
+            setattr(runner, name, original)
+    print("runtime abort: fingerprint-to-spec/model-before+after/validation-spec+before+after mismatch+exception; root/result/raw untouched OK (mock)", flush=True)
+
+
+def preflight_runtime_abort_test(root):
+    root.mkdir()
+    current = preflight.runner
+    runtime = current.compute_python_runtime_binding()
+    originals = current.compute_python_runtime_binding, preflight.run_case
+    try:
+        for stage in ("post_check", "rebound"):
+            for outcome in ("mismatch", "exception"):
+                target = root / (stage + "-" + outcome) / "run-01"
+                current._write_private(target / "AGENTS.md", "fixture")
+                spec = current.execution_spec(target, current.c6_task(), current.CLI_VERSION, "fixture-fingerprint")
+                calls, cases = [0], []
+                with forbid_after_outcome([target], modules=(runner, current)) as activate:
+                    def changing_runtime():
+                        calls[0] += 1
+                        if calls[0] >= (2 if stage == "post_check" else 3):
+                            activate()
+                            if outcome == "exception":
+                                raise OSError("synthetic preflight runtime failure")
+                            return {**runtime, "manifest_sha256": "0" * 64}
+                        return runtime
+                    def fake_case(name, _spec, _command, expected):
+                        cases.append(name)
+                        return {"name": name, "expected": expected,
+                                "outcome": "allowed" if expected == "allow" else "sandbox_denied"}
+                    current.compute_python_runtime_binding, preflight.run_case = changing_runtime, fake_case
+                    try:
+                        preflight.check(spec)
+                    except SystemExit as error:
+                        assert error.code == 1
+                    else:
+                        raise AssertionError("preflight runtime failureからpostcondition/cleanupへ進んだ")
+                current.compute_python_runtime_binding = originals[0]
+                assert cases[-1] == "network_connect"
+                assert list(target.parent.glob(".p5-private-*")), "失敗後にsentinelをcleanupした"
+                assert list((target / ".benchmark-tmp").glob("outside-link-*")), "失敗後にcanaryをcleanupした"
+                diagnostic = target.parent / ".evidence/run-01/preflight-interruption.json"
+                assert diagnostic.stat().st_mode & 0o777 == 0o600
+                assert not current.load(diagnostic)["root_access_after_failure"]
+                assert not (target.parent / ".evidence/run-01/preflight.raw.json").exists()
+    finally:
+        current.compute_python_runtime_binding, preflight.run_case = originals
+    print("preflight runtime abort: post-check/rebound mismatch+exception; no root access/cleanup OK (mock)", flush=True)
 
 
 def environment_canary_test(root):
@@ -899,7 +1131,8 @@ def process_test(root):
         mode = "timeout"
         try:
             try:
-                runner.validate(c1_task(), validation_root, timeout=1)
+                runner.validate(c1_task(), validation_root, timeout=1,
+                                expected_runtime_binding=runner.compute_python_runtime_binding())
             except SystemExit as error:
                 assert error.code == 1 and not signals
             else:
@@ -980,6 +1213,7 @@ def main():
     assert len(runner.verified_a_inputs()) == 1 and len(runner.verified_b_inputs()) == 7
     fingerprint_test(root / "fingerprint")
     permission_test(root / "permissions")
+    python_runtime_test(root / "python-runtime")
     event_test(root / "events")
     environment_canary_test(root / "env-canary")
     residual_process_test()
@@ -989,6 +1223,9 @@ def main():
     preflight_timeout_test(root / "preflight-timeout")
     integration_test(root / "integration")
     immediate_abort_test(root / "immediate-abort")
+    campaign_fingerprint_guard_test()
+    runtime_abort_test(root / "runtime-abort")
+    preflight_runtime_abort_test(root / "preflight-runtime-abort")
     process_test(root / "process")
     c6_process_test(root / "c6-process")
     print("P5 security selftest: all passed; 実sandbox/実model呼出しなし; private root:", root)

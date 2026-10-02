@@ -20,7 +20,8 @@ import subprocess
 import sys
 import time
 
-from harness_fingerprint import compute_harness_fingerprint
+from harness_fingerprint import (compute_harness_fingerprint, compute_python_runtime_binding,
+                                 PYTHON_EXECUTABLE, PYTHON_RUNTIME_ROOT)
 
 HERE = Path(__file__).resolve().parent
 BASE = HERE.parent / "migration-baseline"
@@ -36,11 +37,12 @@ VALIDATION_TIMEOUT_SECONDS = 45
 _EXECUTABLE_HASH_CACHE = {}
 CODEX_EXECUTABLE = str(Path(shutil.which("codex") or "/opt/homebrew/bin/codex").resolve())
 AUTH_HOME = os.environ.get("CODEX_HOME") or str(Path.home() / ".codex")
+PYTHON_RUNTIME = PYTHON_RUNTIME_ROOT
 FIXED_PATH = os.pathsep.join(dict.fromkeys([
-    str(Path(sys.executable).parent), str(Path.home() / ".local/bin"),
+    str(Path(PYTHON_EXECUTABLE).parent),
     "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin",
 ]))
-ENV_CANARY_COMMAND = shlex.join(["python3.12", "-I", "-B", "-c",
+ENV_CANARY_COMMAND = shlex.join([PYTHON_EXECUTABLE, "-I", "-B", "-c",
     "import json,os; print(json.dumps(dict(os.environ),sort_keys=True,separators=(',',':')))"])
 INTERNAL_FILES = {".benchmark-prompt.txt", ".benchmark-answer.txt",
                   ".benchmark-events.json", ".benchmark-result.json", ".benchmark-isolation.json"}
@@ -281,12 +283,12 @@ def prepare_permission_directories(root, task):
 
 def policy_template(task, phase="model"):
     return {"schema": 3, "phase": phase, "network": False,
-            "read": [":minimal", "$RUN"], "default": "deny",
+            "read": [":minimal", "$PYTHON_RUNTIME", "$RUN"], "default": "deny",
             "write": [str(path.relative_to(Path("/RUN"))) for path in permission_policy(Path("/RUN"), task, phase)]}
 
 
 def permission_config(root, task, profile="p5_fixture", phase="model"):
-    filesystem = {":root": "deny", ":minimal": "read", str(root): "read"}
+    filesystem = {":root": "deny", ":minimal": "read", str(PYTHON_RUNTIME): "read", str(root): "read"}
     filesystem.update({str(path): "write" for path in permission_policy(root, task, phase)})
     entries = ",".join(f"{json.dumps(key)}={json.dumps(value)}" for key, value in filesystem.items())
     return [f'permissions.{profile}.description="P5 pinned minimal runtime and fixture"',
@@ -355,7 +357,8 @@ def canonical_execution_spec(root, task, cli_version, harness_fingerprint="unbou
         "codex_process_environment": {"keys": sorted(process_env(spec)), "sha256": canonical_digest(process_env(spec)),
                                       "auth_home_location_sha256": digest_bytes(AUTH_HOME.encode())},
         "codex_executable": {"realpath": str(executable), "sha256": executable_sha256(executable)},
-        "read_boundary": "pinned_cli_minimal_runtime_plus_fixture",
+        "python_runtime": compute_python_runtime_binding(),
+        "read_boundary": "pinned_cli_minimal_and_python_runtime_plus_fixture",
     }
     return spec
 
@@ -1253,10 +1256,29 @@ def execute_command(command, root, env, timeout, input_text=None):
         close_process_streams(process)
 
 
+def require_runtime_binding(spec, phase, expected, observed=None):
+    """runtimeの再検証不能・変更ではroot外診断だけを保存し、SystemExitで停止する。"""
+    try:
+        current = compute_python_runtime_binding() if observed is None else observed
+    except (Exception, RunSignal) as error:
+        abort_run(spec, phase, "python_runtime_recalculation_error", details={"error_type": type(error).__name__})
+    if not isinstance(expected, dict) or current != expected:
+        abort_run(spec, phase, "python_runtime_changed")
+    return current
+
+
 def validate(task, root, timeout=VALIDATION_TIMEOUT_SECONDS, c6_state_before=None, c6_readonly=None,
-             cli_version=CLI_VERSION, harness_fingerprint="unbound"):
-    spec = execution_spec(root, task, cli_version, harness_fingerprint, phase="validation")
+             cli_version=CLI_VERSION, harness_fingerprint="unbound", *, expected_runtime_binding):
+    # spec生成中のruntime再計算失敗にも、既知のroot文字列だけで外側診断を残す。
+    spec = {"root": root, "binding": {"harness_fingerprint": harness_fingerprint}}
+    try:
+        spec = execution_spec(root, task, cli_version, harness_fingerprint, phase="validation")
+    except (Exception, RunSignal) as error:
+        abort_run(spec, "validation", "validation_binding_recalculation_error", details={"error_type": type(error).__name__})
+    require_runtime_binding(spec, "validation", expected_runtime_binding, spec["binding"]["python_runtime"])
     cmd = ["git", "diff", "--check"] if task["id"] == "C4" else shlex.split(task["validate"])
+    if cmd[0] == "python3.12":
+        cmd[0] = PYTHON_EXECUTABLE
     validator_hash = None
     destination = None
     if task["id"] == "C6":
@@ -1266,9 +1288,10 @@ def validate(task, root, timeout=VALIDATION_TIMEOUT_SECONDS, c6_state_before=Non
         if os.path.lexists(destination):
             raise BoundaryError("C6 validatorを既存fileへ上書きしません")
         _write_private(destination, source, 0o400)
-        cmd = ["python3.12", "-B", str(destination.relative_to(root)), "--state-before-sha256", c6_state_before,
+        cmd = [PYTHON_EXECUTABLE, "-B", str(destination.relative_to(root)), "--state-before-sha256", c6_state_before,
                "--progress-sha256", c6_readonly["progress"], "--readme-sha256", c6_readonly["readme"]]
     before = tree_manifest(root, exclude_bookkeeping=False)
+    require_runtime_binding(spec, "validation", expected_runtime_binding)
     try:
         code, stdout, stderr = execute_command(sandbox_command(root, task, cmd, spec), root, process_env(spec), timeout)
     except (OSError, RuntimeError, subprocess.SubprocessError) as error:
@@ -1276,6 +1299,7 @@ def validate(task, root, timeout=VALIDATION_TIMEOUT_SECONDS, c6_state_before=Non
     if code != 0:
         abort_run(spec, "validation", "execution_not_successful", code, {"stdout": stdout, "stderr": stderr})
     residual = require_clean_residual(spec, "validation")
+    require_runtime_binding(spec, "validation", expected_runtime_binding)
     after = tree_manifest(root, exclude_bookkeeping=False)
     unchanged = before == after and (destination is None or sha(destination) == validator_hash)
     return {"command": cmd, "sandbox": "canonical_validation_readonly_accepted_plus_scratch_write", "binding": spec["binding"],
@@ -1289,7 +1313,9 @@ def required_preflight_cases(spec):
     cases = {"sandbox_initialized": "allow", "tool_environment_exact": "allow", "fixture_read": "allow",
              "scratch_write": "allow", "task_directory_write": "allow", "outside_private_read": "deny",
              "symlink_outside_private_read": "deny", "outside_write": "deny", "repository_read": "deny",
-             "repository_write": "deny", "network_connect": "deny"}
+             "repository_write": "deny", "network_connect": "deny", "python_runtime_import": "allow",
+             "python_runtime_parent_listing": "deny", "python_sibling_read": "deny",
+             "uv_executable_read": "deny", "python_runtime_write": "deny"}
     if spec["task"]["id"] != "C6":
         for index, _name in enumerate(spec["task"]["input"] + spec["task"]["fixture"], 2):
             cases[f"task_file_write_{index}"] = "allow"
@@ -1323,7 +1349,7 @@ def validate_preflight_evidence(report, spec):
             return False
     conditions = report.get("postconditions")
     expected_conditions = {"canary_writes_observed", "outside_writes_absent", "private_sentinel_unchanged",
-                           "task_file_contents_unchanged", "binding_unchanged"}
+                           "task_file_contents_unchanged", "binding_unchanged", "python_runtime_unchanged"}
     return (report.get("schema") == 3 and report.get("passed") is True and report.get("sandbox_initialized") is True
             and report.get("binding") == spec["binding"] and report.get("cli_version") == spec["binding"]["cli_version"]
             and report.get("binding_comparison") == "entire_canonical_binding_equal_before_model"
@@ -1338,6 +1364,14 @@ def per_run_preflight(spec):
 
 
 def _run(args):
+    # run間でcode/runtimeが変わった場合は、fixture作成前に旧campaignを拒否する。
+    try:
+        expected_runtime = compute_python_runtime_binding()
+        current_fingerprint = compute_harness_fingerprint(HERE, python_runtime_binding=expected_runtime)
+    except (Exception, RunSignal):
+        raise SystemExit("campaign fingerprintを再検証できません") from None
+    if current_fingerprint != args.fingerprint:
+        raise SystemExit("campaign fingerprintが現行code/runtimeと一致しません")
     signal.signal(signal.SIGTERM, terminate_handler)
     signal.signal(signal.SIGINT, terminate_handler)
     version = run_trusted_command([CODEX_EXECUTABLE, "--version"], capture_output=True, text=True, check=True,
@@ -1345,7 +1379,12 @@ def _run(args):
     if version != CLI_VERSION:
         raise BoundaryError("CLI版が固定版と異なります")
     root, task, hashes = prepare(args.task, args.condition, args.repeat, args.campaign, args.run_id)
-    spec = execution_spec(root, task, version, args.fingerprint)
+    spec = {"root": root, "binding": {"harness_fingerprint": args.fingerprint}}
+    try:
+        spec = execution_spec(root, task, version, args.fingerprint)
+    except (Exception, RunSignal) as error:
+        abort_run(spec, "model", "initial_binding_recalculation_error", details={"error_type": type(error).__name__})
+    require_runtime_binding(spec, "model", expected_runtime, spec["binding"]["python_runtime"])
     preflight = per_run_preflight(spec)
     save(root / ".benchmark-isolation.json", preflight)
     bound = preflight.get("binding") == spec["binding"]
@@ -1385,6 +1424,7 @@ def _run(args):
     remaining = deadline - time.time() if deadline is not None else 360
     if remaining < 70:
         raise BoundaryError("campaign残時間不足。runを開始しません")
+    require_runtime_binding(spec, "model", expected_runtime)
     try:
         cli_exit, stdout, stderr = execute_command(command, root, process_env(spec), min(CLI_TIMEOUT_SECONDS, remaining - 60), prompt)
     except (OSError, RuntimeError, subprocess.SubprocessError) as error:
@@ -1392,12 +1432,17 @@ def _run(args):
     if cli_exit != 0:
         abort_run(spec, "model", "execution_not_successful", cli_exit, {"stdout": stdout, "stderr": stderr})
     model_residual = require_clean_residual(spec, "model")
+    try:
+        current_binding = derive_canonical_binding(root, task, version, args.fingerprint)
+    except (Exception, RunSignal) as error:
+        abort_run(spec, "model", "model_binding_recalculation_error", details={"error_type": type(error).__name__})
+    require_runtime_binding(spec, "model", expected_runtime, current_binding["python_runtime"])
+    current_binding_matches = current_binding == spec["binding"]
     raw_path = root.parent / ".evidence" / root.name / "events.raw.jsonl"
     _write_private(raw_path, stdout)
     events = safe_events(stdout, root / ".benchmark-events.json", root, expected_env=spec["env"])
     guard_after = host_guard()
     try:
-        current_binding_matches = spec["binding"] == derive_canonical_binding(root, task, version, args.fingerprint)
         preflight_unchanged = sha(root / ".benchmark-isolation.json") == common["preflight_evidence_sha256"]
     except (OSError, RuntimeError, ValueError):
         current_binding_matches, preflight_unchanged = False, False
@@ -1423,7 +1468,9 @@ def _run(args):
             scope.append(".git/modified_metadata")
         scope.extend(key + "/" for key, value in after_manifest.items() if value["type"] == "directory" and key not in before_manifest and not key.startswith(".git/"))
         remaining = deadline - time.time() if deadline is not None else 60
-        validation = validate(task, accepted, max(1, min(VALIDATION_TIMEOUT_SECONDS, remaining - 5)), c6_state_before, c6_readonly, version, args.fingerprint)
+        validation = validate(task, accepted, max(1, min(VALIDATION_TIMEOUT_SECONDS, remaining - 5)),
+                              c6_state_before, c6_readonly, version, args.fingerprint,
+                              expected_runtime_binding=expected_runtime)
         validation["derived_from_model_profile_sha256"] = spec["binding"]["profile_sha256"]
         validation_residual = validation["residual_process_evidence"]
         # 非scratch manifestは例外pathを削除せず完全一致を要求する。

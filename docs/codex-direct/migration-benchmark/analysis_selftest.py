@@ -26,6 +26,7 @@ batch = load_module("batch")
 analyze = load_module("analyze")
 from harness_fingerprint import compute_harness_fingerprint
 import run as harness_run
+import harness_fingerprint as fingerprint_module
 HASH = "a" * 64
 
 
@@ -49,7 +50,7 @@ def synthetic_preflight(spec):
             "passed": True, "canaries_removed": True, "sandbox_initialized": True,
             "postconditions": {"canary_writes_observed": True, "outside_writes_absent": True,
                                "private_sentinel_unchanged": True, "task_file_contents_unchanged": True,
-                               "binding_unchanged": True}, "cases": cases}
+                               "binding_unchanged": True, "python_runtime_unchanged": True}, "cases": cases}
 
 
 def fixtures(campaign_dir, a_seconds=100.0, b_seconds=70.0):
@@ -365,7 +366,7 @@ def batch_process_control_tests(parent):
     print("batch process control: no kill/killpg/private files+wait/timeout root untouched/no run-02/summary stop/no resume/normal OK")
 
 
-def main():
+def _synthetic_main():
     with tempfile.TemporaryDirectory(prefix="p5-analysis-", dir="/private/tmp",
                                      ignore_cleanup_errors=True) as temporary:
         fingerprint = compute_harness_fingerprint(HERE)
@@ -639,6 +640,25 @@ def main():
         assert "/private/" not in markdown and "/Users/" not in markdown
         batch_process_control_tests(Path(temporary) / "batch-process-control")
     print("P5 analysis selftest: raw/review/binding/opaque/cache/4gate OK")
+
+
+def main():
+    # 実runtimeの型・bytes・改変検知はsecurity selftestが担当する。
+    # ここでは開始時の実bindingを一度確認し、合成24runの集計契約だけを検証する。
+    # productionの毎phase再hashを変更せず、test内の差替えは終了時に戻す。
+    actual_runtime = fingerprint_module.compute_python_runtime_binding()
+    frozen_json = json.dumps(actual_runtime, sort_keys=True)
+    original_shared = fingerprint_module.compute_python_runtime_binding
+    original_runner = harness_run.compute_python_runtime_binding
+    def frozen_runtime():
+        return json.loads(frozen_json)
+    try:
+        fingerprint_module.compute_python_runtime_binding = frozen_runtime
+        harness_run.compute_python_runtime_binding = frozen_runtime
+        _synthetic_main()
+    finally:
+        fingerprint_module.compute_python_runtime_binding = original_shared
+        harness_run.compute_python_runtime_binding = original_runner
 
 
 if __name__ == "__main__":
