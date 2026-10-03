@@ -2,6 +2,7 @@
 """実モデルなしでpermission binding、監査、snapshot、再分類の境界を検証する。"""
 
 import contextlib
+import hashlib
 import importlib.util
 import io
 import json
@@ -23,6 +24,9 @@ HERE = Path(__file__).resolve().parent
 SPEC = importlib.util.spec_from_file_location("p5_run", HERE / "run.py")
 runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
+DRIVER_SPEC = importlib.util.spec_from_file_location("p5_driver_source", HERE / "driver.py")
+driver_source = importlib.util.module_from_spec(DRIVER_SPEC)
+DRIVER_SPEC.loader.exec_module(driver_source)
 import sandbox_preflight as preflight
 from harness_fingerprint import HARNESS_INPUTS
 import harness_fingerprint as fingerprint_module
@@ -625,6 +629,8 @@ def run_synthetic(args):
         value = {"schema": 1, "fingerprint": args.fingerprint,
                  "codex_executable": runner.compute_codex_executable_binding(runner.CODEX_EXECUTABLE),
                  "python_runtime": fingerprint_module.compute_python_runtime_binding(),
+                 "driver_executable": fingerprint_module.compute_driver_executable_binding(),
+                 "driver_config": fingerprint_module.compute_driver_config_binding(),
                  "private_directories": runner.private_directory_identity(campaign)}
         value["binding_sha256"] = runner.canonical_digest(value)
         runner.save(path, value)
@@ -874,7 +880,9 @@ def campaign_destination_test(root):
     alt = root / "alternate" / campaign.name
     directories = runner.private_directory_identity(alt, create=True)
     value = {"schema": 1, "fingerprint": fingerprint, "codex_executable": {},
-             "python_runtime": {}, "private_directories": directories}
+             "python_runtime": {}, "driver_executable": fingerprint_module.compute_driver_executable_binding(),
+             "driver_config": fingerprint_module.compute_driver_config_binding(),
+             "private_directories": directories}
     value["binding_sha256"] = runner.canonical_digest(value)
     runner.save(alt / "campaign-binding.json", value)
     assert runner.load_campaign_binding(alt / "campaign-binding.json", alt, fingerprint)["record"] == value
@@ -1248,6 +1256,7 @@ def process_test(root):
             self.calls = 0
         def communicate(self, **_kwargs):
             self.calls += 1
+            self.timeout_seen = _kwargs.get("timeout")
             if mode == "timeout":
                 raise subprocess.TimeoutExpired("mock", 1, output=b"partial raw", stderr=b"partial diagnostic")
             if mode == "signal":
@@ -1262,6 +1271,8 @@ def process_test(root):
         def wait(self, **_kwargs):
             raise AssertionError("timeout後のwait禁止")
     def popen(*_args, **_kwargs):
+        if mode == "late_popen":
+            clock[0] += 7
         process = MockProcess()
         created.append(process)
         return process
@@ -1283,6 +1294,26 @@ def process_test(root):
                 assert diagnostic["process_may_still_be_running"] and not diagnostic["automatic_termination"]
             else:
                 assert stdout == "complete raw"
+        original_monotonic = runner.time.monotonic
+        clock = [1000.0]
+        mode = "late_popen"
+        try:
+            runner.time.monotonic = lambda: clock[0]
+            target = root / "late-popen/run-01"
+            target.mkdir(parents=True)
+            code, _, _ = runner.execute_command(["mock"], target, {}, 100,
+                                                 deadline_monotonic=1100.0, reserve_seconds=10)
+            assert code == 0 and created[-1].timeout_seen == 83.0
+            count = len(created)
+            try:
+                runner.execute_command(["mock"], target, {}, 100,
+                                       deadline_monotonic=1009.0, reserve_seconds=10)
+            except RuntimeError:
+                assert len(created) == count
+            else:
+                raise AssertionError("期限切れでprocessを起動した")
+        finally:
+            runner.time.monotonic = original_monotonic
         mode = "signal"
         try:
             runner.run_trusted_command(["mock helper"], capture_output=True, text=True, check=True)
@@ -1319,7 +1350,7 @@ def process_test(root):
             raise AssertionError("signalをfail-closed exitへ変換しなかった")
     finally:
         runner.subprocess.Popen, runner.os.kill, runner.os.killpg = originals
-    print("process: normal/timeout/signal no kill+killpg/no wait/private diagnostic/no post-timeout validation (mock) OK", flush=True)
+    print("process: normal/timeout/signal/late Popen monotonic再計測/no kill+killpg/no wait/private diagnostic (mock) OK", flush=True)
 
 
 def c6_process_test(root):
@@ -1399,6 +1430,9 @@ def _synthetic_main():
     campaign_destination_test(root / "campaign-destination")
     directory_completion_abort_test(root / "directory-completion")
     model_rebound_abort_test(root / "model-rebound")
+    driver_identity_test(root / "driver-identity")
+    driver_summary_test(root / "driver-summary")
+    deadline_phase_test(root / "deadline-phase")
     runtime_abort_test(root / "runtime-abort")
     preflight_runtime_abort_test(root / "preflight-runtime-abort")
     process_test(root / "process")
@@ -1459,7 +1493,10 @@ def codex_binding_test(root):
     campaign = root / "campaign"
     directories = runner.private_directory_identity(campaign, create=True)
     record = {"schema": 1, "fingerprint": old_fp, "codex_executable": original,
-              "python_runtime": runtime, "private_directories": directories}
+              "python_runtime": runtime,
+              "driver_executable": fingerprint_module.compute_driver_executable_binding(),
+              "driver_config": fingerprint_module.compute_driver_config_binding(),
+              "private_directories": directories}
     record["binding_sha256"] = runner.canonical_digest(record)
     path = campaign / "campaign-binding.json"
     runner.save(path, record)
@@ -1486,6 +1523,150 @@ def codex_binding_test(root):
                 raise AssertionError("CLI差替えから停止しませんでした")
     assert (campaign / ".evidence/run-01/model-interruption.json").stat().st_mode & 0o777 == 0o600
     print("CLI binding: same-version bytes/stat/symlink/fingerprint/private campaign file/root-free abort OK", flush=True)
+
+
+def deadline_phase_test(root):
+    root.mkdir(mode=0o700)
+    fake = root / "codex"
+    runner._write_private(fake, FAKE, 0o700)
+    fingerprint = compute_harness_fingerprint(HERE, codex_executable_binding=runner.compute_codex_executable_binding(fake))
+    original_cli, original_preflight, original_manifest, original_execute = (
+        runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.tree_manifest, runner.execute_command)
+    real_monotonic = time.monotonic
+    try:
+        runner.CODEX_EXECUTABLE = str(fake)
+        for stage in ("preflight", "manifest"):
+            campaign = root / stage / ("p5-" + fingerprint[:16])
+            runner.private_directory_identity(campaign, create=True)
+            model = campaign / "run-01"
+            clock = [real_monotonic()]
+            deadline = clock[0] + 200
+            phase = {"preflight_done": False, "expired": False}
+            args = SimpleNamespace(task="C1", condition="A", repeat=1, run_id="run-01",
+                                   campaign=str(campaign), fingerprint=fingerprint,
+                                   deadline_monotonic=deadline)
+            with forbid_after_outcome([model]) as activate, patch.object(runner.time, "monotonic", lambda: clock[0]):
+                def slow_preflight(spec):
+                    report = fake_preflight_report(spec)
+                    phase["preflight_done"] = True
+                    if stage == "preflight":
+                        clock[0] = deadline + 1
+                        phase["expired"] = True
+                        activate()
+                    return report
+                def slow_manifest(path, *a, **kw):
+                    value = original_manifest(path, *a, **kw)
+                    if stage == "manifest" and phase["preflight_done"] and Path(path) == model and not phase["expired"]:
+                        clock[0] = deadline + 1
+                        phase["expired"] = True
+                        activate()
+                    return value
+                runner.per_run_preflight, runner.tree_manifest = slow_preflight, slow_manifest
+                runner.execute_command = lambda *_a, **_kw: (_ for _ in ()).throw(AssertionError("期限後のmodel起動"))
+                with contextlib.redirect_stdout(io.StringIO()):
+                    try:
+                        run_synthetic(args)
+                    except SystemExit as error:
+                        assert error.code == 1
+                    else:
+                        raise AssertionError("期限切れから停止しませんでした")
+            assert phase["expired"]
+            assert not (model / ".benchmark-result.json").exists()
+            diagnostic = campaign / ".evidence/run-01" / (stage + "-interruption.json")
+            assert diagnostic.exists() and runner.load(diagnostic)["root_access_after_failure"] is False
+    finally:
+        runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.tree_manifest, runner.execute_command = (
+            original_cli, original_preflight, original_manifest, original_execute)
+    print("deadline: slow preflight/manifest root-free abort before model OK (mock)", flush=True)
+
+
+def driver_identity_test(root):
+    root.mkdir(mode=0o700)
+    head = "abcdef0" + "0" * 33
+    source = root / "source/agent-crew-p5-abcdef0-sparse"
+    here = source / "docs/codex-direct/migration-benchmark"
+    original = here / "driver.py"
+    copy = root / "drivers/p5_driver_v2.py"
+    config = root / "drivers/p5-driver-v2-config.json"
+    content = (HERE / "driver.py").read_bytes()
+    runner._write_private(original, content, 0o644)
+    runner._write_private(copy, content, 0o700)
+    runner._write_private(config, json.dumps({"schema": 1, "source": str(source),
+                                              "head": head, "fingerprint": "a" * 64}), 0o600)
+    with patch.object(driver_source, "BASE", root), patch.object(driver_source, "DRIVERS", root / "drivers"), \
+            patch.object(driver_source, "CONFIG", config), patch.object(driver_source, "SOURCE", None), \
+            patch.object(driver_source, "HERE", None):
+        driver_source.load_config()
+        assert driver_source.SOURCE == source and driver_source.HERE == here
+        binding = driver_source.external_binding()
+        assert binding["source"]["sha256"] == binding["copy"]["sha256"]
+        runner._write_private(copy, content + b"# changed\n", 0o700)
+        try:
+            driver_source.external_binding()
+        except driver_source.Stop:
+            pass
+        else:
+            raise AssertionError("外部driver差替えを許可した")
+    assert driver_source.CAMPAIGN_SECONDS == 24 * 1200 + 315 + 300
+    assert driver_source.DRIVER_GRACE_SECONDS >= 60
+    print("driver: source/copy/config fixed identity and deadline budget OK (synthetic)", flush=True)
+
+
+def driver_summary_test(root):
+    root.mkdir(mode=0o700)
+    campaign = root / ("p5-" + "a" * 16)
+    campaign.mkdir(mode=0o700)
+    binding = {"fingerprint": "a" * 64, "codex_executable": {"sha256": "b" * 64},
+               "python_runtime": {"sha256": "c" * 64},
+               "driver_executable": {"sha256": "d" * 64},
+               "driver_config": {"sha256": "e" * 64}}
+    campaign_binding = {"schema": 1, **binding,
+                        "private_directories": {"root": driver_source.directory_record(campaign),
+                                                "parent": driver_source.directory_record(root)}}
+    def seal(record):
+        record["binding_sha256"] = hashlib.sha256(json.dumps(
+            {key: value for key, value in record.items() if key != "binding_sha256"},
+            sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        return record
+    seal(campaign_binding)
+    summary = {"campaign": campaign.name, "fingerprint": binding["fingerprint"],
+               "planned_runs": 24, "completed_records": 24, "stopped_reason": None,
+               "codex_executable": binding["codex_executable"],
+               "driver_executable": binding["driver_executable"], "driver_config": binding["driver_config"],
+               "campaign_binding_file": str(campaign / "campaign-binding.json"),
+               "campaign_binding_sha256": campaign_binding["binding_sha256"],
+               "results": [{"run_id": f"run-{index:02d}", "fingerprint": binding["fingerprint"],
+                            "pass_preliminary": True} for index in range(1, 25)]}
+    def write(record, result):
+        runner._write_private(campaign / "campaign-binding.json", json.dumps(record), 0o600)
+        runner._write_private(campaign / "batch-summary.json", json.dumps(result), 0o600)
+    def rejected(record, result):
+        write(record, result)
+        try:
+            driver_source.verify_summary(campaign, binding, io.StringIO())
+        except driver_source.Stop:
+            return
+        raise AssertionError("不正なdriver bindingを含むsummaryを許可した")
+    write(campaign_binding, summary)
+    driver_source.verify_summary(campaign, binding, io.StringIO())
+    for field in ("driver_executable", "driver_config"):
+        for mutation in (None, {"sha256": "f" * 64}):
+            changed_binding = json.loads(json.dumps(campaign_binding))
+            if mutation is None:
+                del changed_binding[field]
+            else:
+                changed_binding[field] = mutation
+            seal(changed_binding)
+            changed_summary = json.loads(json.dumps(summary))
+            changed_summary["campaign_binding_sha256"] = changed_binding["binding_sha256"]
+            rejected(changed_binding, changed_summary)
+            changed_summary = json.loads(json.dumps(summary))
+            if mutation is None:
+                del changed_summary[field]
+            else:
+                changed_summary[field] = mutation
+            rejected(campaign_binding, changed_summary)
+    print("driver: 24-record summary accepts complete binding, rejects driver field loss/tamper OK (synthetic)", flush=True)
 
 
 def main():

@@ -35,6 +35,30 @@ def formal_base():
     return account_home() / "Library/Caches/agent-crew-p5-benchmark"
 
 
+def _private_executable_binding(path, expected_mode):
+    path = Path(path)
+    before = path.lstat()
+    if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or before.st_uid != os.getuid()
+            or stat.S_IMODE(before.st_mode) != expected_mode):
+        raise ValueError("driver fileのowner/type/modeが不正です")
+    content = _read_regular_file(path)
+    after = path.lstat()
+    if _stat_signature(before) != _stat_signature(after):
+        raise ValueError("driver fileが検証中に変更されました")
+    return {"path": str(path), "sha256": hashlib.sha256(content).hexdigest(),
+            "device": before.st_dev, "inode": before.st_ino, "size": before.st_size,
+            "mtime_ns": before.st_mtime_ns, "ctime_ns": before.st_ctime_ns,
+            "owner": before.st_uid, "mode": stat.S_IMODE(before.st_mode)}
+
+
+def compute_driver_executable_binding():
+    return _private_executable_binding(formal_base() / "drivers/p5_driver_v2.py", 0o700)
+
+
+def compute_driver_config_binding():
+    return _private_executable_binding(formal_base() / "drivers/p5-driver-v2-config.json", 0o600)
+
+
 def reject_platform_temp(path):
     """aliasのrealpathを含め、Darwinの固定scratch領域を正式rootに使わせない。"""
     path = Path(path)
@@ -86,7 +110,7 @@ def compute_codex_executable_binding(executable=None):
 
 # 従来batchの順序を維持し、このmodule自身を末尾へ追加する。
 HARNESS_INPUTS = (
-    "run.py", "batch.py", "sandbox_preflight.py", "analyze.py", "analysis_selftest.py",
+    "run.py", "batch.py", "sandbox_preflight.py", "analyze.py", "analysis_selftest.py", "driver.py",
     "comparison-v2.json", "validate_c6.py", "../migration-baseline/comparison.json",
     "../migration-baseline/snapshot-index.json", "b-contract-index.json", "a-contract-index.json",
     "harness_fingerprint.py",
@@ -273,7 +297,8 @@ def compute_python_runtime_binding():
             "manifest_sha256": hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()}
 
 
-def compute_harness_fingerprint(here, *, python_runtime_binding=None, codex_executable_binding=None):
+def compute_harness_fingerprint(here, *, python_runtime_binding=None, codex_executable_binding=None,
+                                driver_executable_binding=None):
     """benchmark directoryの現行固定入力から64桁SHA-256を返す。保存・実行はしない。"""
     here = Path(os.path.abspath(here))
     repository = here.parents[2]
@@ -286,4 +311,6 @@ def compute_harness_fingerprint(here, *, python_runtime_binding=None, codex_exec
     components.append("python_runtime:" + json.dumps(runtime, sort_keys=True, separators=(",", ":")))
     codex = compute_codex_executable_binding() if codex_executable_binding is None else codex_executable_binding
     components.append("codex_executable:" + json.dumps(codex, sort_keys=True, separators=(",", ":")))
+    driver = compute_driver_executable_binding() if driver_executable_binding is None else driver_executable_binding
+    components.append("driver_executable:" + json.dumps(driver, sort_keys=True, separators=(",", ":")))
     return hashlib.sha256("".join(components).encode()).hexdigest()

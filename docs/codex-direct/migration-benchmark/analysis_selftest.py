@@ -186,6 +186,8 @@ def decide(summary, preflight, reviews, campaign_dir):
 
 def batch_process_control_tests(parent):
     """実processを起動せず、timeout後の子root非接触とcampaign停止を検証する。"""
+    assert batch.LIMIT_SECONDS == 24 * batch.RUN_PARENT_SECONDS + batch.GLOBAL_PREFLIGHT_SECONDS + batch.FINALIZATION_GRACE_SECONDS
+    assert batch.RUN_PARENT_SECONDS == 1200 and batch.RUN_CHILD_GRACE_SECONDS >= 60
     originals = (batch.WORK, batch.require_preflight, batch.subprocess, batch.scheduled_runs, batch.atomic_json, batch.wait_private_process,
                  os.kill, os.killpg, Path.exists, Path.read_text, harness_run.safe_read)
     all_slots = batch.scheduled_runs()
@@ -218,16 +220,23 @@ def batch_process_control_tests(parent):
             batch.WORK = work
             batch.scheduled_runs = lambda: all_slots[:1 if mode == "normal" else 2]
             preflight_calls = []
-            def synthetic_preflight_call(_campaign, _expected_binding):
+            def synthetic_preflight_call(_campaign, _expected_binding, _deadline=None):
                 preflight_calls.append(True)
                 if mode == "preflight_before_launch_signal":
                     raise batch.BatchSignal(15)
             batch.require_preflight = originals[1] if mode in {"preflight_timeout", "preflight_signal"} else synthetic_preflight_call
-            def guarded_wait_private_process(command, cwd, campaign_dir, label, timeout):
+            def guarded_wait_private_process(command, cwd, campaign_dir, label, timeout, **kwargs):
+                assert isinstance(kwargs.get("deadline_monotonic"), float)
+                if label == "run-01":
+                    child_deadline = float(command[command.index("--deadline-monotonic") + 1])
+                    assert timeout == batch.RUN_PARENT_SECONDS
+                    assert child_deadline <= kwargs["deadline_monotonic"] - batch.RUN_CHILD_GRACE_SECONDS
+                elif label == "preflight":
+                    assert timeout == batch.GLOBAL_PREFLIGHT_SECONDS
                 if mode == "run_before_popen_signal" and label == "run-01":
                     state["locked"] = True
                     raise batch.BatchSignal(15)
-                return originals[5](command, cwd, campaign_dir, label, timeout)
+                return originals[5](command, cwd, campaign_dir, label, timeout, **kwargs)
             batch.wait_private_process = guarded_wait_private_process
             def guarded_atomic_json(path, value):
                 if mode == "summary_signal" and Path(path).name == "batch-summary.json" and state.get("run_waited") and not state.get("summary_interrupted"):
@@ -367,6 +376,29 @@ def batch_process_control_tests(parent):
     print("batch process control: no kill/killpg/private files+wait/timeout root untouched/no run-02/summary stop/no resume/normal OK")
 
 
+def monotonic_parent_wait_test(parent):
+    """Popenに時間が掛かってもwaitは共通絶対期限から再計測する。"""
+    parent.mkdir(parents=True, mode=0o700)
+    original_popen, original_monotonic = batch.subprocess.Popen, batch.time.monotonic
+    clock, observed = [1000.0], []
+    class FakeProcess:
+        pid = 12345
+        def __init__(self, *_args, **_kwargs):
+            clock[0] += 7.0
+        def wait(self, timeout):
+            observed.append(timeout)
+            return 0
+    try:
+        batch.subprocess.Popen = FakeProcess
+        batch.time.monotonic = lambda: clock[0]
+        result = batch.wait_private_process(["fake"], parent, parent, "slow-popen", 1200,
+                                            deadline_monotonic=1100.0)
+        assert result["exit_code"] == 0 and observed == [93.0]
+    finally:
+        batch.subprocess.Popen, batch.time.monotonic = original_popen, original_monotonic
+    print("batch deadline: Popen後にmonotonic絶対期限を再計測 OK")
+
+
 def _synthetic_main():
     with tempfile.TemporaryDirectory(prefix="p5-analysis-", dir="/private/tmp",
                                      ignore_cleanup_errors=True) as temporary:
@@ -469,7 +501,7 @@ def _synthetic_main():
         original_work, original_preflight, original_subprocess = batch.WORK, batch.require_preflight, batch.subprocess
         try:
             batch.WORK = batch_work
-            batch.require_preflight = lambda _campaign_dir, _expected_binding: None
+            batch.require_preflight = lambda _campaign_dir, _expected_binding, _deadline=None: None
             def unexpected_model_start(*_args, **_kwargs):
                 raise AssertionError("unknown後に次runを起動した")
             batch.subprocess = SimpleNamespace(Popen=unexpected_model_start)
@@ -640,6 +672,7 @@ def _synthetic_main():
         markdown = analyze.public_markdown(positive)
         assert "/private/" not in markdown and "/Users/" not in markdown
         batch_process_control_tests(Path(temporary) / "batch-process-control")
+        monotonic_parent_wait_test(Path(temporary) / "monotonic-parent-wait")
     print("P5 analysis selftest: raw/review/binding/opaque/cache/4gate OK")
 
 

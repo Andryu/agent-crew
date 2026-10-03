@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """P5のABBA/BAABを上限付きで逐次実行する。"""
 
+import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import signal
@@ -12,13 +14,18 @@ import sys
 import time
 
 from harness_fingerprint import (compute_harness_fingerprint, compute_python_runtime_binding,
-                                 compute_codex_executable_binding, formal_base)
+                                 compute_codex_executable_binding, compute_driver_executable_binding,
+                                 compute_driver_config_binding, formal_base)
 import run as harness_run
 
 HERE = Path(__file__).resolve().parent
 WORK = formal_base() / "formal"
 TASKS = ["C1", "C2", "C3", "C4", "C5", "C6"]
-LIMIT_SECONDS = 120 * 60
+GLOBAL_PREFLIGHT_SECONDS = 315
+RUN_PARENT_SECONDS = 1200
+RUN_CHILD_GRACE_SECONDS = 60
+FINALIZATION_GRACE_SECONDS = 300
+LIMIT_SECONDS = 24 * RUN_PARENT_SECONDS + GLOBAL_PREFLIGHT_SECONDS + FINALIZATION_GRACE_SECONDS
 RETENTION_DAYS = 14
 
 
@@ -95,10 +102,12 @@ def remove_private_file(path):
         os.close(directory_fd)
 
 
-def campaign_binding(campaign_dir, fingerprint, python_runtime, codex_executable):
+def campaign_binding(campaign_dir, fingerprint, python_runtime, codex_executable,
+                     driver_executable, driver_config):
     """開始時のCLI/runtimeとprivate directory identityを固定する。"""
     value = {"schema": 1, "fingerprint": fingerprint,
              "codex_executable": codex_executable, "python_runtime": python_runtime,
+             "driver_executable": driver_executable, "driver_config": driver_config,
              "private_directories": harness_run.private_directory_identity(campaign_dir)}
     value["binding_sha256"] = harness_run.canonical_digest(value)
     return value
@@ -112,7 +121,8 @@ def require_campaign_binding(campaign_dir, expected):
     if saved != expected:
         raise RuntimeError("campaign binding fileが開始時期待値と不一致")
     current = campaign_binding(campaign_dir, expected["fingerprint"],
-                               compute_python_runtime_binding(), compute_codex_executable_binding())
+                               compute_python_runtime_binding(), compute_codex_executable_binding(),
+                               compute_driver_executable_binding(), compute_driver_config_binding())
     if current != expected:
         raise RuntimeError("campaign runtime/CLI/private directory identityが変更されました")
     return binding_file
@@ -189,15 +199,18 @@ def stop_reason(record):
     return None
 
 
-def load_clock(path, fingerprint, now=None):
+def load_clock(path, fingerprint, now=None, deadline_monotonic=None):
     now = time.time() if now is None else now
     if os.path.lexists(path):
         clock = json.loads(harness_run.safe_read(path))
-        if clock.get("fingerprint") != fingerprint:
+        if (clock.get("fingerprint") != fingerprint or
+                (deadline_monotonic is not None and clock.get("deadline_monotonic") != deadline_monotonic)):
             raise ValueError("campaign clock fingerprint不一致")
         return clock
+    deadline_monotonic = (time.monotonic() + LIMIT_SECONDS if deadline_monotonic is None else deadline_monotonic)
     clock = {"fingerprint": fingerprint, "started_epoch": now,
-             "deadline_epoch": now + LIMIT_SECONDS}
+             "deadline_epoch": now + max(0, deadline_monotonic - time.monotonic()),
+             "deadline_monotonic": deadline_monotonic}
     atomic_json(path, clock)
     return clock
 
@@ -216,7 +229,7 @@ def interrupt_handler(signum, _frame):
     raise BatchSignal(signum)
 
 
-def wait_private_process(command, cwd, campaign_dir, label, timeout):
+def wait_private_process(command, cwd, campaign_dir, label, timeout, *, deadline_monotonic=None):
     """private fileへ出力しleaderのwaitだけを行う。timeout/例外でkillしない。"""
     evidence = campaign_dir / ".evidence" / ".batch"
     directory = harness_run._open_directory(evidence, create=True)
@@ -234,7 +247,10 @@ def wait_private_process(command, cwd, campaign_dir, label, timeout):
         process = subprocess.Popen(command, cwd=cwd, stdout=handles[0], stderr=handles[1],
                                    stdin=None, start_new_session=True)
         try:
-            code = process.wait(timeout=timeout)
+            remaining = timeout if deadline_monotonic is None else deadline_monotonic - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(command, 0)
+            code = process.wait(timeout=remaining)
         except subprocess.TimeoutExpired:
             code, error = "timeout", "実行完了未確認。自動終了せずcampaignを停止"
         except BatchSignal as interruption:
@@ -261,14 +277,17 @@ def wait_private_process(command, cwd, campaign_dir, label, timeout):
             "automatic_termination": False}
 
 
-def require_preflight(campaign_dir, expected_binding):
+def require_preflight(campaign_dir, expected_binding, campaign_deadline_monotonic=None):
     """正常終了したpreflightだけを読み、不合格・timeoutならmodelを開始させない。"""
     preflight_file = campaign_dir / "sandbox-preflight.json"
     binding_file = require_campaign_binding(campaign_dir, expected_binding)
+    preflight_deadline = min(time.monotonic() + GLOBAL_PREFLIGHT_SECONDS,
+                            (campaign_deadline_monotonic or time.monotonic() + LIMIT_SECONDS) - FINALIZATION_GRACE_SECONDS)
     execution = wait_private_process([sys.executable, "-B", str(HERE / "sandbox_preflight.py"),
                                       "--expected-binding-file", str(binding_file),
                                       "--fingerprint", expected_binding["fingerprint"]],
-                                     HERE, campaign_dir, "preflight", 315)
+                                     HERE, campaign_dir, "preflight", GLOBAL_PREFLIGHT_SECONDS,
+                                     deadline_monotonic=preflight_deadline)
     require_campaign_binding(campaign_dir, expected_binding)
     if execution["exit_code"] != 0:
         atomic_json(preflight_file, {"passed": False, "infrastructure_error": "preflight_execution_failed",
@@ -286,10 +305,13 @@ def require_preflight(campaign_dir, expected_binding):
     return preflight_data
 
 
-def _main():
+def _main(campaign_deadline_monotonic=None):
     os.umask(0o077)
     signal.signal(signal.SIGTERM, interrupt_handler)
     signal.signal(signal.SIGINT, interrupt_handler)
+    if campaign_deadline_monotonic is not None and (not math.isfinite(campaign_deadline_monotonic)
+            or not 0 < campaign_deadline_monotonic - time.monotonic() <= LIMIT_SECONDS + 1):
+        raise SystemExit("campaign monotonic deadlineが固定上限外です")
     if WORK != formal_base() / "formal":
         raise SystemExit("formal campaignの固定保存先が変更されました")
     harness_run.require_formal_locations(WORK)
@@ -315,11 +337,15 @@ def _main():
         raise SystemExit("A補足指示treeが固定indexと不一致")
     python_runtime = compute_python_runtime_binding()
     codex_executable = compute_codex_executable_binding()
+    driver_executable = compute_driver_executable_binding()
+    driver_config = compute_driver_config_binding()
     fingerprint = compute_harness_fingerprint(HERE, python_runtime_binding=python_runtime,
-                                              codex_executable_binding=codex_executable)
+                                              codex_executable_binding=codex_executable,
+                                              driver_executable_binding=driver_executable)
     campaign = f"p5-{fingerprint[:16]}"
     campaign_dir = secure_mkdir(WORK / campaign)
-    expected_binding = campaign_binding(campaign_dir, fingerprint, python_runtime, codex_executable)
+    expected_binding = campaign_binding(campaign_dir, fingerprint, python_runtime, codex_executable,
+                                        driver_executable, driver_config)
     binding_file = campaign_dir / "campaign-binding.json"
     if os.path.lexists(binding_file):
         if json.loads(harness_run.safe_read(binding_file)) != expected_binding:
@@ -340,7 +366,7 @@ def _main():
                 or policy.get("storage") != "account_home_cache_only"):
             raise SystemExit("既存private artifact policyがcampaignと不一致")
     clock_file = campaign_dir / "campaign-clock.json"
-    clock = load_clock(clock_file, fingerprint)
+    clock = load_clock(clock_file, fingerprint, deadline_monotonic=campaign_deadline_monotonic)
     summary_file = campaign_dir / "batch-summary.json"
     previous = json.loads(harness_run.safe_read(summary_file)) if os.path.lexists(summary_file) else None
     if previous and previous.get("fingerprint") != fingerprint:
@@ -353,13 +379,15 @@ def _main():
     atomic_json(active, {"phase": "preflight", "campaign": campaign,
                          "fingerprint": fingerprint, "campaign_binding_file": str(binding_file),
                          "campaign_binding_sha256": expected_binding["binding_sha256"],
-                         "codex_executable": codex_executable, "started_epoch": time.time()})
+                         "codex_executable": codex_executable, "driver_executable": driver_executable,
+                         "driver_config": driver_config, "started_epoch": time.time()})
     try:
-        require_preflight(campaign_dir, expected_binding)
+        require_preflight(campaign_dir, expected_binding, clock["deadline_monotonic"])
         preliminary = {"schema": 2, "campaign": campaign, "fingerprint": fingerprint,
                        "campaign_binding_file": str(binding_file),
                        "campaign_binding_sha256": expected_binding["binding_sha256"],
                        "codex_executable": codex_executable,
+                       "driver_executable": driver_executable, "driver_config": driver_config,
                        "planned_runs": len(schedule), "completed_records": 0,
                        "schedule": schedule, "results": [], "stopped_reason": None}
         atomic_json(summary_file, preliminary)
@@ -369,8 +397,8 @@ def _main():
     for slot in schedule if stopped_reason is None else []:
         task, condition, repeat, run_id = (slot["task_id"], slot["condition"],
                                             slot["repeat"], slot["run_id"])
-        remaining = clock["deadline_epoch"] - time.time()
-        if remaining < 70:
+        remaining = clock["deadline_monotonic"] - time.monotonic()
+        if remaining < RUN_PARENT_SECONDS + FINALIZATION_GRACE_SECONDS:
             stopped_reason = "campaign_deadline"
             break
         require_campaign_binding(campaign_dir, expected_binding)
@@ -391,20 +419,31 @@ def _main():
             results.append(record)
             stopped_reason = stop_reason(record)
             break
+        remaining = clock["deadline_monotonic"] - time.monotonic()
+        if remaining < RUN_PARENT_SECONDS + FINALIZATION_GRACE_SECONDS:
+            stopped_reason = "campaign_deadline"
+            break
         atomic_json(active, {"phase": "run", "task": task, "condition": condition,
                              "repeat": repeat, "run_id": run_id, "started_epoch": time.time(),
                              "campaign": campaign, "fingerprint": fingerprint,
                              "campaign_binding_file": str(binding_file),
                              "campaign_binding_sha256": expected_binding["binding_sha256"],
-                             "codex_executable": codex_executable})
+                             "codex_executable": codex_executable,
+                             "driver_executable": driver_executable, "driver_config": driver_config})
         try:
             require_campaign_binding(campaign_dir, expected_binding)
+            parent_deadline = min(time.monotonic() + RUN_PARENT_SECONDS,
+                                  clock["deadline_monotonic"] - FINALIZATION_GRACE_SECONDS)
+            child_deadline = parent_deadline - RUN_CHILD_GRACE_SECONDS
+            if child_deadline <= time.monotonic():
+                raise RuntimeError("run開始前に子run deadlineが切れました")
             execution = wait_private_process(
                 [sys.executable, "-B", str(HERE / "run.py"), task, condition, str(repeat), "--run-id", run_id,
                  "--campaign", str(campaign_dir), "--fingerprint", fingerprint,
                  "--expected-binding-file", str(binding_file),
-                 "--deadline-epoch", str(clock["deadline_epoch"])],
-                HERE.parents[2], campaign_dir, run_id, min(315, max(1, remaining)))
+                 "--deadline-monotonic", str(child_deadline)],
+                HERE.parents[2], campaign_dir, run_id, RUN_PARENT_SECONDS,
+                deadline_monotonic=parent_deadline)
             require_campaign_binding(campaign_dir, expected_binding)
             code = execution["exit_code"]
             if code == 0:
@@ -434,6 +473,7 @@ def _main():
                    "campaign_binding_file": str(binding_file),
                    "campaign_binding_sha256": expected_binding["binding_sha256"],
                    "codex_executable": codex_executable,
+                   "driver_executable": driver_executable, "driver_config": driver_config,
                    "planned_runs": len(schedule), "completed_records": len(results),
                    "elapsed_seconds": round(time.time() - clock["started_epoch"], 3),
                    "schedule": schedule, "run_slot_mapping_file": str(campaign_dir / "run-slot-mapping.json"),
@@ -453,6 +493,7 @@ def _main():
                "campaign_binding_file": str(binding_file),
                "campaign_binding_sha256": expected_binding["binding_sha256"],
                "codex_executable": codex_executable,
+               "driver_executable": driver_executable, "driver_config": driver_config,
                "elapsed_seconds": round(time.time() - clock["started_epoch"], 3),
                "B_contract_sha256": {contract.parent.name: hashlib.sha256(contract.read_bytes()).hexdigest()
                                      for contract in contracts},
@@ -468,9 +509,9 @@ def _main():
     print(f"summary: {summary_file}", flush=True)
 
 
-def main():
+def main(campaign_deadline_monotonic=None):
     try:
-        return _main()
+        return _main(campaign_deadline_monotonic)
     except BatchSignal:
         # signalがwait後からsummary確定までに届いても、active markerを残して再開を拒否する。
         try:
@@ -492,4 +533,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--campaign-deadline-monotonic", required=True, type=float)
+    arguments = parser.parse_args()
+    main(arguments.campaign_deadline_monotonic)

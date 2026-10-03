@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -21,7 +22,8 @@ import sys
 import time
 
 from harness_fingerprint import (compute_harness_fingerprint, compute_python_runtime_binding,
-                                 compute_codex_executable_binding, CODEX_REAL_PATH,
+                                 compute_codex_executable_binding, compute_driver_executable_binding,
+                                 compute_driver_config_binding, CODEX_REAL_PATH,
                                  account_home, formal_base, reject_platform_temp, PLATFORM_TEMP_DENY_GLOBS,
                                  PYTHON_EXECUTABLE, PYTHON_RUNTIME_ROOT)
 
@@ -34,8 +36,11 @@ A_INDEX = HERE / "a-contract-index.json"
 UNKNOWN = "unknown"
 ALLOWED = {"C1", "C2", "C3", "C4", "C5", "C6"}
 CLI_VERSION = "codex-cli 0.155.1"
-CLI_TIMEOUT_SECONDS = 240
+CLI_TIMEOUT_SECONDS = 900
 VALIDATION_TIMEOUT_SECONDS = 45
+RUN_CHILD_BUDGET_SECONDS = 1140
+POST_MODEL_RESERVE_SECONDS = 135
+POST_VALIDATION_RESERVE_SECONDS = 30
 _EXECUTABLE_HASH_CACHE = {}
 CODEX_EXECUTABLE = str(CODEX_REAL_PATH)
 AUTH_HOME = os.environ.get("CODEX_HOME") or str(account_home() / ".codex")
@@ -141,10 +146,13 @@ def load_campaign_binding(path, campaign, fingerprint):
             raise BoundaryError("campaign bindingが読取中に変更されました")
     finally:
         os.close(fd)
-    fields = {"schema", "fingerprint", "codex_executable", "python_runtime", "private_directories", "binding_sha256"}
+    fields = {"schema", "fingerprint", "codex_executable", "python_runtime", "driver_executable",
+              "driver_config", "private_directories", "binding_sha256"}
     if (set(record) != fields or record["schema"] != 1 or record["fingerprint"] != fingerprint
             or record["binding_sha256"] != canonical_digest({key: value for key, value in record.items() if key != "binding_sha256"})
-            or record["private_directories"] != private_directory_identity(campaign)):
+            or record["private_directories"] != private_directory_identity(campaign)
+            or record["driver_executable"] != compute_driver_executable_binding()
+            or record["driver_config"] != compute_driver_config_binding()):
         raise BoundaryError("campaign bindingのschema/hash/directoryが不一致です")
     return {"path": campaign, "record": record}
 
@@ -1308,11 +1316,18 @@ def require_clean_residual(spec, phase):
     return residual
 
 
-def execute_command(command, root, env, timeout, input_text=None):
+def execute_command(command, root, env, timeout, input_text=None, *, deadline_monotonic=None, reserve_seconds=0):
+    if deadline_monotonic is not None and deadline_monotonic - time.monotonic() <= reserve_seconds:
+        raise RuntimeError("process起動前にrun deadlineが不足しました")
     process = subprocess.Popen(command, text=True, stdin=subprocess.PIPE if input_text is not None else None,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=root, env=env, start_new_session=True)
     try:
-        stdout, stderr = process.communicate(input=input_text, timeout=timeout)
+        remaining = (deadline_monotonic - time.monotonic() - reserve_seconds
+                     if deadline_monotonic is not None else timeout)
+        if remaining <= 0:
+            record_process_interruption(root, process, "timeout")
+            return "timeout", "", ""
+        stdout, stderr = process.communicate(input=input_text, timeout=min(timeout, remaining))
         return process.returncode, stdout, stderr
     except subprocess.TimeoutExpired as error:
         record_process_interruption(root, process, "timeout")
@@ -1362,7 +1377,7 @@ def require_directory_binding(spec, phase):
 
 def validate(task, root, timeout=VALIDATION_TIMEOUT_SECONDS, c6_state_before=None, c6_readonly=None,
              cli_version=CLI_VERSION, harness_fingerprint="unbound", *, expected_runtime_binding,
-             expected_codex_binding=None, campaign_binding=None):
+             expected_codex_binding=None, campaign_binding=None, deadline_monotonic=None):
     # spec生成中のruntime再計算失敗にも、既知のroot文字列だけで外側診断を残す。
     spec = {"root": root, "binding": {"harness_fingerprint": harness_fingerprint}}
     try:
@@ -1388,20 +1403,29 @@ def validate(task, root, timeout=VALIDATION_TIMEOUT_SECONDS, c6_state_before=Non
         cmd = [PYTHON_EXECUTABLE, "-B", str(destination.relative_to(root)), "--state-before-sha256", c6_state_before,
                "--progress-sha256", c6_readonly["progress"], "--readme-sha256", c6_readonly["readme"]]
     before = tree_manifest(root, exclude_bookkeeping=False)
+    require_phase_budget(spec, deadline_monotonic, "validation_manifest", POST_VALIDATION_RESERVE_SECONDS)
     require_runtime_binding(spec, "validation", expected_runtime_binding)
     require_codex_binding(spec, "validation", expected_codex_binding)
     require_directory_binding(spec, "validation")
+    remaining = (deadline_monotonic - time.monotonic() - POST_VALIDATION_RESERVE_SECONDS
+                 if deadline_monotonic is not None else timeout)
+    if remaining <= 0:
+        abort_run(spec, "validation", "run_deadline_before_validator")
     try:
-        code, stdout, stderr = execute_command(sandbox_command(root, task, cmd, spec), root, process_env(spec), timeout)
+        code, stdout, stderr = execute_command(sandbox_command(root, task, cmd, spec), root, process_env(spec),
+                                               min(timeout, remaining), deadline_monotonic=deadline_monotonic,
+                                               reserve_seconds=POST_VALIDATION_RESERVE_SECONDS)
     except (OSError, RuntimeError, subprocess.SubprocessError) as error:
         abort_run(spec, "validation", "execution_error", details={"error_type": type(error).__name__})
     if code != 0:
         abort_run(spec, "validation", "execution_not_successful", code, {"stdout": stdout, "stderr": stderr})
+    require_phase_budget(spec, deadline_monotonic, "validation", POST_VALIDATION_RESERVE_SECONDS)
     require_directory_binding(spec, "validation")
     residual = require_clean_residual(spec, "validation")
     require_codex_binding(spec, "validation", expected_codex_binding)
     require_runtime_binding(spec, "validation", expected_runtime_binding)
     after = tree_manifest(root, exclude_bookkeeping=False)
+    require_phase_budget(spec, deadline_monotonic, "validation_manifest", POST_VALIDATION_RESERVE_SECONDS)
     unchanged = before == after and (destination is None or sha(destination) == validator_hash)
     return {"command": cmd, "sandbox": "canonical_validation_readonly_accepted_plus_scratch_write", "binding": spec["binding"],
             "exit_code": code if unchanged else "validator_changed_snapshot", "stdout_tail": stdout[-2500:], "stderr_tail": stderr[-2500:],
@@ -1468,13 +1492,21 @@ def per_run_preflight(spec):
     return sandbox_preflight.check(spec)
 
 
+def require_phase_budget(spec, deadline, phase, reserve):
+    """monotonic期限切れではrootを再読せずprivate診断だけで停止する。"""
+    if deadline is not None and deadline - time.monotonic() <= reserve:
+        abort_run(spec, phase, "run_deadline_insufficient")
+
+
 def _run(args):
     # run間でcode/runtimeが変わった場合は、fixture作成前に旧campaignを拒否する。
     try:
         expected_runtime = compute_python_runtime_binding()
         expected_codex = compute_codex_executable_binding(CODEX_EXECUTABLE)
+        expected_driver = compute_driver_executable_binding()
         current_fingerprint = compute_harness_fingerprint(HERE, python_runtime_binding=expected_runtime,
-                                                          codex_executable_binding=expected_codex)
+                                                          codex_executable_binding=expected_codex,
+                                                          driver_executable_binding=expected_driver)
     except (Exception, RunSignal):
         raise SystemExit("campaign fingerprintを再検証できません") from None
     if current_fingerprint != args.fingerprint:
@@ -1491,8 +1523,15 @@ def _run(args):
     private_directory_identity(campaign_path)
     campaign_binding = load_campaign_binding(expected_file, campaign_path, args.fingerprint)
     if campaign_binding and (campaign_binding["record"]["codex_executable"] != expected_codex
-                             or campaign_binding["record"]["python_runtime"] != expected_runtime):
+                             or campaign_binding["record"]["python_runtime"] != expected_runtime
+                             or campaign_binding["record"]["driver_executable"] != expected_driver):
         raise BoundaryError("campaign開始時のCLI/runtimeと一致しません")
+    deadline = getattr(args, "deadline_monotonic", None)
+    if deadline is not None and (not math.isfinite(deadline) or
+            not 0 < deadline - time.monotonic() <= RUN_CHILD_BUDGET_SECONDS + 1):
+        raise SystemExit("子run monotonic deadlineが固定上限外です")
+    if deadline is not None and deadline - time.monotonic() <= POST_MODEL_RESERVE_SECONDS:
+        raise SystemExit("子runのmonotonic deadlineが不足しています")
     signal.signal(signal.SIGTERM, terminate_handler)
     signal.signal(signal.SIGINT, terminate_handler)
     version = run_trusted_command([CODEX_EXECUTABLE, "--version"], capture_output=True, text=True, check=True,
@@ -1509,6 +1548,7 @@ def _run(args):
     spec["campaign_binding"] = campaign_binding
     require_codex_binding(spec, "model", expected_codex, spec["binding"]["codex_executable"])
     preflight = per_run_preflight(spec)
+    require_phase_budget(spec, deadline, "preflight", POST_MODEL_RESERVE_SECONDS)
     save(root / ".benchmark-isolation.json", preflight)
     bound = preflight.get("binding") == spec["binding"]
     preflight_valid = validate_preflight_evidence(preflight, spec)
@@ -1533,6 +1573,7 @@ def _run(args):
     prompt = prompt_for(task)
     _write_private(root / ".benchmark-prompt.txt", prompt)
     before_manifest = tree_manifest(root)
+    require_phase_budget(spec, deadline, "manifest", POST_MODEL_RESERVE_SECONDS)
     before = source_inventory(before_manifest)
     c6_state_before = sha(root / "migration-progress/state.json") if args.task == "C6" else None
     c6_readonly = {"progress": sha(root / "migration-progress/progress.py"), "readme": sha(root / "migration-progress/README.md")} if args.task == "C6" else None
@@ -1543,19 +1584,23 @@ def _run(args):
                "-c", "features.hooks=false", "-c", 'default_permissions="p5_fixture"',
                *sum((["-c", value] for value in spec["config"] + tool_environment_config(spec)), []), "-C", str(root), "-o", str(out), "-"]
     started, tick = stamp(), time.monotonic()
-    deadline = getattr(args, "deadline_epoch", None)
-    remaining = deadline - time.time() if deadline is not None else 360
-    if remaining < 70:
-        raise BoundaryError("campaign残時間不足。runを開始しません")
+    require_phase_budget(spec, deadline, "model", POST_MODEL_RESERVE_SECONDS)
     require_runtime_binding(spec, "model", expected_runtime)
     require_codex_binding(spec, "model", expected_codex)
     require_directory_binding(spec, "model")
+    remaining = deadline - time.monotonic() if deadline is not None else CLI_TIMEOUT_SECONDS + POST_MODEL_RESERVE_SECONDS
+    if remaining <= POST_MODEL_RESERVE_SECONDS:
+        abort_run(spec, "model", "run_deadline_before_model")
     try:
-        cli_exit, stdout, stderr = execute_command(command, root, process_env(spec), min(CLI_TIMEOUT_SECONDS, remaining - 60), prompt)
+        cli_exit, stdout, stderr = execute_command(command, root, process_env(spec),
+                                                   min(CLI_TIMEOUT_SECONDS, remaining - POST_MODEL_RESERVE_SECONDS), prompt,
+                                                   deadline_monotonic=deadline,
+                                                   reserve_seconds=POST_MODEL_RESERVE_SECONDS)
     except (OSError, RuntimeError, subprocess.SubprocessError) as error:
         abort_run(spec, "model", "execution_error", details={"error_type": type(error).__name__})
     if cli_exit != 0:
         abort_run(spec, "model", "execution_not_successful", cli_exit, {"stdout": stdout, "stderr": stderr})
+    require_phase_budget(spec, deadline, "model", VALIDATION_TIMEOUT_SECONDS + POST_VALIDATION_RESERVE_SECONDS)
     require_directory_binding(spec, "model")
     model_residual = require_clean_residual(spec, "model")
     require_codex_binding(spec, "model", expected_codex)
@@ -1588,7 +1633,9 @@ def _run(args):
     try:
         if not isolation_pass:
             raise BoundaryError("モデル実行の隔離証拠が不合格です")
+        require_phase_budget(spec, deadline, "snapshot", VALIDATION_TIMEOUT_SECONDS + POST_VALIDATION_RESERVE_SECONDS)
         accepted, snapshot, after_manifest = accepted_snapshot(root)
+        require_phase_budget(spec, deadline, "snapshot", VALIDATION_TIMEOUT_SECONDS + POST_VALIDATION_RESERVE_SECONDS)
         after = source_inventory(after_manifest)
         modified = sorted(key for key in set(before) | set(after) if before.get(key) != after.get(key))
         allowed = {"migration-progress/state.json"} if args.task == "C6" else set(task["input"] + task["fixture"])
@@ -1596,11 +1643,14 @@ def _run(args):
         if {key: value for key, value in before_manifest.items() if key.startswith(".git/")} != {key: value for key, value in after_manifest.items() if key.startswith(".git/")}:
             scope.append(".git/modified_metadata")
         scope.extend(key + "/" for key, value in after_manifest.items() if value["type"] == "directory" and key not in before_manifest and not key.startswith(".git/"))
-        remaining = deadline - time.time() if deadline is not None else 60
-        validation = validate(task, accepted, max(1, min(VALIDATION_TIMEOUT_SECONDS, remaining - 5)),
+        remaining = deadline - time.monotonic() if deadline is not None else VALIDATION_TIMEOUT_SECONDS + POST_VALIDATION_RESERVE_SECONDS
+        if remaining <= POST_VALIDATION_RESERVE_SECONDS:
+            abort_run(spec, "validation", "run_deadline_before_validation")
+        validation = validate(task, accepted, min(VALIDATION_TIMEOUT_SECONDS, remaining - POST_VALIDATION_RESERVE_SECONDS),
                               c6_state_before, c6_readonly, version, args.fingerprint,
                               expected_runtime_binding=expected_runtime, expected_codex_binding=expected_codex,
-                              campaign_binding=campaign_binding)
+                              campaign_binding=campaign_binding, deadline_monotonic=deadline)
+        require_phase_budget(spec, deadline, "validation", POST_VALIDATION_RESERVE_SECONDS)
         validation["derived_from_model_profile_sha256"] = spec["binding"]["profile_sha256"]
         validation_residual = validation["residual_process_evidence"]
         # 非scratch manifestは例外pathを削除せず完全一致を要求する。
@@ -1618,6 +1668,7 @@ def _run(args):
         snapshot = {"matched": False, "error_type": type(error).__name__, "error_sha256": digest_bytes(str(error).encode())}
         scope.append("unsafe_or_unstable_snapshot")
         validation = {"exit_code": "not_run", "reason": "snapshot_boundary_failure"}
+    require_phase_budget(spec, deadline, "postprocess", 0)
     residual_count = model_residual["detected_count"] + validation_residual["detected_count"]
     residual_scan_pass = model_residual["scan_pass"] and validation_residual["scan_pass"]
     isolation_pass = isolation_pass and validation_residual["passed"]
@@ -1646,6 +1697,7 @@ def _run(args):
               "safety_gate": {"status": "pass" if safety else "fail", "passed": safety}, "pass_preliminary": safety and acceptance}
     for key in ("input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens", "total_tokens"):
         result[key] = events["usage"].get(key, UNKNOWN)
+    require_phase_budget(spec, deadline, "result", 0)
     save(root / ".benchmark-result.json", result)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
@@ -1672,7 +1724,7 @@ def main():
     parser.add_argument("--campaign", required=True)
     parser.add_argument("--fingerprint", required=True)
     parser.add_argument("--expected-binding-file", required=True, type=Path)
-    parser.add_argument("--deadline-epoch", type=float)
+    parser.add_argument("--deadline-monotonic", required=True, type=float)
     run(parser.parse_args())
 
 
