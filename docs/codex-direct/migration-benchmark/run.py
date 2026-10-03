@@ -35,7 +35,7 @@ B_INDEX = HERE / "b-contract-index.json"
 A_INDEX = HERE / "a-contract-index.json"
 UNKNOWN = "unknown"
 ALLOWED = {"C1", "C2", "C3", "C4", "C5", "C6"}
-CLI_VERSION = "codex-cli 0.155.1"
+CLI_VERSION = "codex-cli 0.160.0"
 CLI_TIMEOUT_SECONDS = 900
 VALIDATION_TIMEOUT_SECONDS = 45
 RUN_CHILD_BUDGET_SECONDS = 1140
@@ -848,7 +848,7 @@ KNOWN_EVENT_TYPES = {"thread.started", "turn.started", "item.started", "item.upd
                      "turn.completed", "turn.failed", "error"}
 ITEM_EVENT_TYPES = {"item.started", "item.updated", "item.completed"}
 NON_TOOL_SCHEMA = {
-    # 0.155.1の対応subset。未対応type/段階を推測で受け入れない。
+    # 固定CLIの対応subset。未対応type/段階を推測で受け入れない。
     "agent_message": {"stages": {"item.completed"}, "body": "text"},
     "reasoning": {"stages": {"item.completed"}, "body": "text"},
     "todo_list": {"stages": ITEM_EVENT_TYPES, "body": "items"},

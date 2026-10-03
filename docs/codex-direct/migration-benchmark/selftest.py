@@ -40,7 +40,8 @@ def compute_harness_fingerprint(here, **kwargs):
 FAKE = '''#!/usr/bin/env python3.12
 import json,os,pathlib,shlex,subprocess,sys,time,tomllib
 if "--version" in sys.argv:
-    print("codex-cli 0.155.1")
+    mode_path=pathlib.Path(__file__).with_name("mode")
+    print("codex-cli 0.155.1" if mode_path.exists() and mode_path.read_text() == "version_mismatch" else "codex-cli 0.160.0")
     raise SystemExit(0)
 if "sandbox" in sys.argv:
     command=sys.argv[sys.argv.index("--")+1:]
@@ -764,6 +765,13 @@ def integration_test(root):
             assert invalid["exit_code"] == "validator_changed_snapshot" and not invalid["manifest_unchanged"]
         finally:
             runner.execute_command = original_execute
+        (root / "mode").write_text("version_mismatch")
+        mismatch_args = SimpleNamespace(task="C1", condition="A", repeat=1, run_id="run-24",
+                                        campaign=str(campaign), fingerprint=fingerprint)
+        with patch.object(runner, "prepare", side_effect=AssertionError("CLI版不一致後にfixtureを作成")), \
+                patch.object(runner, "execute_command", side_effect=AssertionError("CLI版不一致後にmodel起動")):
+            expect_rejected(lambda: run_synthetic(mismatch_args))
+        assert not (campaign / "run-24").exists()
         for mode in ("env_missing", "env_leak"):
             _, invalid_environment, _ = invoke(mode=mode)
             assert not invalid_environment["isolation_gate"]["passed"] and not invalid_environment["isolation_gate"]["env_canary_pass"]
@@ -803,7 +811,7 @@ def integration_test(root):
             runner.execute_command = original_execute
     finally:
         runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS, runner.scan_residual_processes = originals
-    print("integration: 4 gates/exact replay path/fingerprint+hash tamper/non-mutating result/C6 scratch validator/full manifest/timeout/binding block OK", flush=True)
+    print("integration: 4 gates/exact replay path/fingerprint+hash tamper/non-mutating result/C6 scratch validator/full manifest/timeout/binding/version mismatch block OK", flush=True)
 
 
 def immediate_abort_test(root):
@@ -1586,8 +1594,8 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v2.py"
-    config = root / "drivers/p5-driver-v2-config.json"
+    copy = root / "drivers/p5_driver_v3.py"
+    config = root / "drivers/p5-driver-v3-config.json"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)

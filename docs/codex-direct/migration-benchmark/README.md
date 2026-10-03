@@ -6,7 +6,7 @@ P5は合成fixture上でCodex移行の速度・品質・安全を比較する。
 
 P0の`migration-baseline/snapshot-index.json`とSHA-256が一致する非機密ファイルだけを、`OS account home/Library/Caches/agent-crew-p5-benchmark/formal/p5-<fingerprint>/`の独立fixtureへ復元する。架空のローカルGit identityを使い、元repo、global設定、認証、実資産本文、会話ログはfixtureへコピーしない。旧campaign `p5-cd6cbf5b9eec05c0`と2026-09-24の失敗campaignは証跡として保持し、新campaignへ合算・再採点しない。
 
-課題C1〜C6で`ABBA`と`BAAB`を交互に適用し、A/B各2本、計24本とする。両条件とも`gpt-6-astra`、reasoning `medium`、OpenAI provider、`codex-cli 0.155.1`を要求し、hook・user config・rulesを無効にする。サーバ側の実効model/providerを観測できない場合は`unknown`と記録する。B契約は`b-contract/`とindex、Aのwealth skillは`a-contract/`とindexでpath/hashを固定する。A/Bの開始scriptとtestは同じbytesにする。
+課題C1〜C6で`ABBA`と`BAAB`を交互に適用し、A/B各2本、計24本とする。両条件とも`gpt-6-astra`、reasoning `medium`、OpenAI provider、`codex-cli 0.160.0`を要求し、hook・user config・rulesを無効にする。サーバ側の実効model/providerを観測できない場合は`unknown`と記録する。B契約は`b-contract/`とindex、Aのwealth skillは`a-contract/`とindexでpath/hashを固定する。A/Bの開始scriptとtestは同じbytesにする。
 
 モデル可視directoryは全run同長の`run-01`〜`run-24`とし、A/B対応表をcampaign rootのprivateな`run-slot-mapping.json`へ保存する。resumeはslot、campaign、fingerprint、課題、条件、反復の一致を確認し、停止したcampaignの自動resumeは拒否する。campaign fingerprintには`run.py`、`sandbox_preflight.py`、`batch.py`、`driver.py`、`analyze.py`、`analysis_selftest.py`、比較仕様、固定入力、外部driver copyのidentityを含める。外部driver configはcampaign bindingとreservationで固定する。
 
