@@ -1729,8 +1729,8 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v12.py"
-    config = root / "drivers/p5-driver-v12-config.json"
+    copy = root / "drivers/p5_driver_v13.py"
+    config = root / "drivers/p5-driver-v13-config.json"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
@@ -2095,7 +2095,64 @@ def protocol_subset_v12_tests():
     print(f"v12 protocol subset: {len(cases)} non-pass + synthetic events, {len(safe)} safe PASS",flush=True)
 
 
+def import_subset_v13_tests():
+    """exact importとimport由来objectの用途を、実importなしでevent分類まで検査する。"""
+    root=Path(tempfile.mkdtemp(prefix="p5-v13-import-",dir="/private/tmp"))
+    cases=[
+        "from ctypes import cdll; cdll['../outside.dylib']",
+        "import ctypes; ctypes.cdll.libIndependentProbe",
+        "import ctypes; ctypes.pydll['../outside.dylib']",
+        "import antigravity", "from antigravity import geohash",
+        "import importlib; importlib.import_module('antigravity')",
+        "__import__('antigravity')", "import sys; sys.meta_path",
+        "import sys; sys.modules['ctypes'].cdll['../outside.dylib']",
+        "import sys; p=sys.modules; p['ctypes'].cdll.libIndependentProbe",
+        "import json; json.__dict__", "import os; os.environ",
+        "import os; os.path", "import os; q=os; q.path",
+        "import os; p=[os]; p[0].path", "import os; p={'x':os}; p['x'].path",
+        "import json; callback=json.dumps; callback({})",
+        "import os; getattr(os,'path')", "import os; sorted([0],key=os.remove)",
+        "from pathlib import Path; p=[Path]; p[0]('safe')",
+        "from json import JSONDecoder", "from hashlib import new",
+        "from sys import modules", "from os import __dict__",
+        "import json.tool", "import os.unknown", "import unknown_module",
+        "from . import os", "from ..os import path", "from os import *",
+        "from ctypes import cdll as c; q=c; q['../outside.dylib']",
+        "import ctypes as c; q=[c.cdll]; q[0]['../outside.dylib']",
+        "import sys as s; s.meta_path[0]", "import json as j; j.decoder.JSONDecoder",
+        "import json; json.loads('{}',object_hook=callback)",
+        "import json; json.dumps({},cls=custom)", "import json; json.loads('{}',**options)",
+        "import hashlib; hashlib.sha256(b'x').__class__",
+        "unknown.receiver", "unknown[0].attribute",
+        "print(license)", "p=license; str(p)", "print(unbound_object)",
+        "import os; os.__getattribute__('path')",
+        "import sys; [x for x in sys.meta_path]",
+    ]
+    for code in cases:
+        assert runner._fixed_python_code_attempts(code,root),code
+        raw='\n'.join(json.dumps(e) for e in event_stream(shlex.join([runner.PYTHON_EXECUTABLE,'-I','-B','-c',code])))
+        result=runner.safe_events(raw,root/'events.json',root)
+        assert result['event_audit']['passed'] and not result['attempt_policy']['passed'],code
+    safe=[
+        "import json", "import hashlib", "import pathlib", "import os", "import sys",
+        "import json as j; print(j.dumps({'x':1}))", "from json import loads as parse; print(parse('{}'))",
+        "import hashlib as h; print(h.sha256(b'x').hexdigest())",
+        "from hashlib import sha256; print(sha256(b'x').digest())",
+        "import sys as s; print(s.version_info[0],s.platform)",
+        "from sys import version_info as v; print(v[0])", "import os; print(os.name,os.sep)",
+        "import os.path as p; print(p.join('docs','note.md'))",
+        "from os.path import join as j; open(j('docs','note.md'))",
+        "from pathlib import Path as P; P('safe').read_text()",
+        "import pathlib as p; p.Path('safe').read_text()",
+        "p=['safe']; open(p[0])", "print('/payload is data')",
+    ]
+    for code in safe:
+        assert not runner._fixed_python_code_attempts(code,root),code
+    print(f"v13 import subset: {len(cases)} non-pass + synthetic events, {len(safe)} safe PASS",flush=True)
+
+
 if __name__ == "__main__":
+    import_subset_v13_tests()
     protocol_subset_v12_tests()
     callback_identity_v11_tests()
     binding_path_v9_tests()

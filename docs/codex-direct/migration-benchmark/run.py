@@ -815,6 +815,40 @@ def _fixed_python_code_attempts(code, expected_cwd):
     if any(isinstance(node, protocol_syntax) for node in ast.walk(tree)):
         add("python_execution_protocol_definition_unclassified")
         return findings
+    # 固定CPythonの標準moduleのみ。探索先を広げるmodule/package、任意exportは許可しない。
+    safe_imports = {
+        "os": {"open", "stat", "lstat", "remove", "unlink", "mkdir", "makedirs", "listdir", "scandir",
+               "walk", "access", "readlink", "symlink", "link", "rename", "replace", "chdir",
+               "getcwd", "getuid", "getpid", "name", "sep"},
+        "os.path": {"join", "abspath", "normpath", "basename", "dirname", "split", "relpath",
+                    "commonpath", "exists", "isfile", "isdir", "realpath"},
+        "pathlib": {"Path"}, "json": {"loads", "dumps"}, "hashlib": {"sha256"},
+        "sys": {"version", "version_info", "platform"},
+        "shutil": {"copy", "copy2", "copyfile", "copytree", "move", "rmtree"},
+        "socket": set(),
+        "builtins": {"open", "str", "len", "sorted", "min", "max", "list", "tuple", "dict", "set",
+                     "int", "bytes", "print", "all", "any", "sum", "range", "enumerate", "zip"},
+    }
+    grammar = {
+        ast.Module, ast.Expr, ast.Assign, ast.AnnAssign, ast.AugAssign, ast.Delete, ast.For, ast.If,
+        ast.While, ast.Try, ast.ExceptHandler, ast.Pass, ast.Break, ast.Continue, ast.Assert,
+        ast.Import, ast.ImportFrom, ast.alias, ast.Name, ast.Load, ast.Store, ast.Del, ast.Constant,
+        ast.List, ast.Tuple, ast.Set, ast.Dict, ast.Starred, ast.Subscript, ast.Slice, ast.Attribute,
+        ast.Call, ast.keyword, ast.BinOp, ast.UnaryOp, ast.BoolOp, ast.Compare, ast.IfExp, ast.NamedExpr,
+        ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp, ast.comprehension,
+        ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow, ast.MatMult,
+        ast.LShift, ast.RShift, ast.BitOr, ast.BitXor, ast.BitAnd, ast.Invert, ast.Not, ast.UAdd, ast.USub,
+        ast.And, ast.Or, ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.Is, ast.IsNot,
+        ast.In, ast.NotIn,
+    }
+    if any(type(node) not in grammar for node in ast.walk(tree)):
+        add("python_ast_outside_safe_subset")
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import) and any(item.name not in safe_imports for item in node.names):
+            add("python_import_outside_safe_subset")
+        elif isinstance(node, ast.ImportFrom) and (node.level or node.module not in safe_imports
+                or any(item.name not in safe_imports.get(node.module, ()) for item in node.names)):
+            add("python_import_outside_safe_subset")
     root = os.path.abspath(expected_cwd)
     unknown = object()
     values = {}
@@ -1063,9 +1097,44 @@ def _fixed_python_code_attempts(code, expected_cwd):
                      "builtins.eval", "builtins.exec", "builtins.compile", "builtins.__import__", "importlib.import_module"}
     known_names = {"Path", "str", "print", "all", "any", "len", "range", "dict", "list", "set", "tuple",
                    "int", "bytes", "open", "sum", "sorted", "min", "max", "enumerate", "zip", "isinstance", "hasattr"}
-    safe_module_calls = {"Path.cwd", "pathlib.Path.cwd", "os.getcwd", "os.getuid", "os.getpid", "os.fstat", "os.fdopen",
+    safe_module_calls = {"Path.cwd", "pathlib.Path.cwd", "os.getcwd", "os.getuid", "os.getpid",
                          "os.path.join", "os.path.normpath", "os.path.basename", "os.path.dirname",
-                         "os.path.split", "os.path.relpath", "os.path.commonpath"}
+                         "os.path.split", "os.path.relpath", "os.path.commonpath",
+                         "json.loads", "json.dumps", "hashlib.sha256"}
+    def safe_hash_method(node):
+        return (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr in {"hexdigest", "digest"} and not node.args and not node.keywords
+                and isinstance(node.func.value, ast.Call)
+                and canonical_name(node.func.value.func) == "hashlib.sha256")
+    # import由来objectは直接の検査可能callか、監査済みの不変primitive定数だけに使える。
+    safe_constants = {"os.name", "os.sep", "sys.version", "sys.version_info", "sys.platform"}
+    approved_import_nodes = set()
+    approved_attributes = set()
+    checked_calls = set(path_api) | safe_module_calls
+    for node in ast.walk(tree):
+        candidate = None
+        if isinstance(node, ast.Call) and canonical_name(node.func) in checked_calls:
+            candidate = node.func
+        elif isinstance(node, (ast.Name, ast.Attribute)) and canonical_name(node) in safe_constants:
+            candidate = node
+        if candidate is not None:
+            for part in ast.walk(candidate):
+                approved_import_nodes.add(id(part))
+                if isinstance(part, ast.Attribute):
+                    approved_attributes.add(id(part))
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and (node.func.attr in path_methods or safe_hash_method(node))):
+            approved_attributes.add(id(node.func))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id in aliases:
+            if id(node) not in approved_import_nodes:
+                add("python_imported_object_usage_unclassified")
+        elif isinstance(node, ast.Attribute) and id(node) not in approved_attributes:
+            add("python_attribute_reference_unclassified")
+        elif (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
+              and node.id not in known_names | set(stores) | set(aliases)):
+            # siteが注入したobject等を既知builtin/dataと誤認しない。
+            add("python_name_outside_safe_subset")
     def check_path(expr):
         value = resolve(expr)
         if not isinstance(value, str):
@@ -1081,6 +1150,8 @@ def _fixed_python_code_attempts(code, expected_cwd):
             add("dynamic_python_call_unclassified")
             continue
         name = canonical_name(node.func)
+        if safe_hash_method(node):
+            continue
         if (isinstance(node.func, ast.Attribute) and node.func.attr not in path_methods
                 and name not in set(path_api) | safe_module_calls):
             add("dynamic_python_attribute_call_unclassified")

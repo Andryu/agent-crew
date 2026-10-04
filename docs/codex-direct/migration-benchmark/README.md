@@ -94,3 +94,14 @@ round3はNEEDS_CHANGES、High 1件: 特殊methodがbuiltin/subscriptionから暗
 許可subsetは既知のliteral/container・単純代入・算術/比較/assert・comprehension/generator・importと既存API/path/callback検査を通る処理。comprehension/generator内も全ASTを検査する。type/types.new_class/FunctionType/property等の動的生成は既存canonical call allowlist外として非pass、属性/module辞書への注入は既存mutation/callback境界で非passを維持する。純粋に見える関数やclassも定義だけで拒否する保守性を受け入れ、特殊methodごとの例外許可や実行による証明は採らない。これは一般Python全体の安全性の証明ではない。
 
 分類器＋合成eventのprotocol近縁ケースと安全データ処理、既存v9/v10/v11、security/analysis、構文/diff/privacy、旧v4 raw pass 4の維持を確認する。review上限到達のため独立reviewを追加しない。v12もquality unapproved、正式campaign/model/実sandbox verifyは禁止。旧固定物/campaignを変更せず、新commitから別名v12固定物を作成する。
+
+
+## v12 review NEEDS_CHANGESとv13 safe import/AST grammar（2026-10-04）
+
+High 2件はimport初期化時の外部副作用と、import済みobjectのAttribute/Subscriptからの暗黙protocol実行。v13は任意Pythonの安全性を後追いで推測せず、AST種別・exact import module/export・object利用位置を明示したsubsetだけを扱う。未知構文/import/属性用途はunknown。Load名も既知builtin・明示binding・許可importに限定し、site注入objectを安全なデータとみなさない。relative/star/dynamic importと未知submoduleは許可しない。alias表記は許すが、そのobjectを別名変数・container・getattr・callbackへ渡す用途は非pass。
+
+exact moduleはos、os.path、pathlib、json、hashlib、sys、shutil、socket、builtins。ImportFromはrun.pyのexport集合だけ。os/shutilは既存の複数path等の引数検査、socketは通信callを許可しない既存境界を保つ。sysはversion/version_info/platform、osはname/sepのprimitive定数だけをdataとして許可。その他のimport由来値は既知callのcalleeとして直接使用する場合だけ許可する。jsonはloads/dumps（callback/cls/展開検査あり）、hashlibはsha256と直接生成結果の引数なしdigest/hexdigestに限定。任意attributeのdata参照やmodule辞書・import hook参照は拒否する。
+
+固定CPython 3.12.13のbuiltin/frozen identityとstdlib source hash・初期化経路を確認した。9 moduleをfresh `-I -B` processで個別にimportし、audit hookでsocket/process起動・ctypesロード・環境変更・書込等を拒否して全件成功。観測はstdlib/module読取・import・信頼済み初期化code実行・登録処理であり、任意moduleの無害性を一般化しない。この前提は既存runtime tree/executable bindingで固定する。module個別deny方式は採らない。
+
+旧v4 rawのpass 4件はgit status/cat/rgであり、inline Pythonではない。必要なsafe Pythonは別のliteral/container・exact import caseで固定する。既存v9〜v12と全selftest、構文/diff/privacy、read-only replayを検証後、新commitからv13固定物を作る。v13 quality unapproved、独立reviewは後続の別context。正式campaign/model/実sandbox verifyは未実施・禁止、旧固定物/campaign不変。
