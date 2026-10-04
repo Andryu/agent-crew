@@ -16,6 +16,8 @@ Codex CLI 0.160.0はtool環境へ19個のruntime keyを追加する。strict-env
 
 v5では初回toolに長いinline canaryを転記させず、harnessが事前生成した0600の`.benchmark-env-canary.py`を固定Pythonで実行する短いcommandにする。scriptのbytesとstat identity、command hashはmodel bindingで照合する。固定Pythonの`.benchmark-tmp/`相対script実行とinline Pythonは実行codeを解析し、書込payload内のfixture pathを外部writeと誤読しない。未知commandは安全gate非pass、明示的な外部pathとheredocはfailのまま扱う。旧v4 campaign `p5-e93d6dc7bdb466cc` は初回canary誤引用で停止した証跡として保持し、再開・再採点しない。
 
+v6ではcanaryを初期Git commitの後に生成し、`.git/info/exclude`で未追跡差分から除外する。モデルとaccepted snapshotのGit indexはcanaryを含まず、Git statusも整合する。promptで許すPython code実行は固定絶対Pythonの`-I -B -c`のみ。任意の`.benchmark-tmp/*.py`相対scriptは実行時bytesを証明できないためattempt `unknown`で非passにする。inline codeはpath sinkへ流れるcontainer/subscript値を追跡し、追跡不能なpathや動的callをunknown、明示外部pathをfailとする。静的分類だけで安全を証明したとは扱わない。
+
 ## 実行と独立レビュー
 
 1. 通常shellの固定launcherから`--verify-only`を実行し、selftest、analysis selftest、構文・差分・privacy確認を済ませる。モデルなしの単独preflight probeを合格させ、仕様・品質の独立レビュー後に別の新規campaignを開始する。

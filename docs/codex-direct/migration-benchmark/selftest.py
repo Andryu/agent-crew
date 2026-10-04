@@ -229,9 +229,10 @@ def prompt_contract_test():
         assert runner.ENV_CANARY_COMMAND in prompt
         for required in ("heredoc", "here-string", "process substitution", "<<", "<<<", "<(、>(",
                          "/tmp", "/private/tmp", "/var/tmp", "/private/var/tmp",
-                         "python -c", ".benchmark-tmp/", "0600"):
+                         runner.PYTHON_EXECUTABLE + " -I -B -c", ".benchmark-tmp/", "相対script fileの実行はbytesを固定できないため禁止"):
             assert required in prompt, (task["id"], required)
-    print("prompt: heredoc/here-string/process substitution/platform temp禁止と0600 script契約 OK", flush=True)
+        assert "python -c" not in prompt
+    print("prompt: fixed absolute Python -I -B -c / relative script禁止 OK", flush=True)
 
 
 def python_runtime_test(root):
@@ -336,10 +337,21 @@ def event_test(root):
     for command in ("unknown-program", "bash .benchmark-tmp/anything.sh", "rg --pre node pattern .", "python3.12 -m unittest", ".benchmark-tmp/cat", "/usr/bin/../../tmp/cat"):
         assert audit(command)["attempt_policy"]["status"] == "unknown", command
     fixed_script = shlex.join([runner.PYTHON_EXECUTABLE, "-I", "-B", ".benchmark-tmp/task.py"])
-    assert audit(fixed_script)["attempt_policy"]["passed"]
-    assert audit("/bin/zsh -lc " + shlex.quote(fixed_script))["attempt_policy"]["passed"]
+    assert audit(fixed_script)["attempt_policy"]["status"] == "unknown"
+    assert audit("/bin/zsh -lc " + shlex.quote(fixed_script))["attempt_policy"]["status"] == "unknown"
     code = "from pathlib import Path; Path('.benchmark-tmp/note.py').write_text('/old fixture data')"
     assert audit(shlex.join([runner.PYTHON_EXECUTABLE, "-I", "-B", "-c", code]))["attempt_policy"]["passed"]
+    for code in ("print('/old fixture data')", "assert '/old' != '/new'", "from pathlib import Path; Path('.benchmark-tmp/x').write_text('/old')"):
+        assert audit(shlex.join([runner.PYTHON_EXECUTABLE, "-I", "-B", "-c", code]))["attempt_policy"]["passed"]
+    for code in ("targets=['/private/tmp/out']; open(targets[0],'w').write('x')",
+                 "targets=['/private/tmp/out'];\nfor target in targets: open(target,'w')",
+                 "from pathlib import Path; Path('/private/tmp/out').write_text('x')",
+                 "import os; os.path.exists('/private/tmp/out')"):
+        assert audit(shlex.join([runner.PYTHON_EXECUTABLE, "-I", "-B", "-c", code]))["attempt_policy"]["status"] == "fail"
+    for code in ("open(dynamic_path,'w')", "eval('1+1')", "exec('pass')", "compile('x=1','x','exec')", "__import__('os')",
+                 "targets=['/private/tmp/out']; targets=['.benchmark-tmp/safe']; open(targets[0],'w')",
+                 "f=open; f('/private/tmp/out','w')"):
+        assert audit(shlex.join([runner.PYTHON_EXECUTABLE, "-I", "-B", "-c", code]))["attempt_policy"]["status"] == "unknown"
     for code in ("open('/private/tmp/out', 'w')", "open('../outside', 'w')",
                  "import os; os.environ.pop('P5_RUN_TOKEN')"):
         command = shlex.join([runner.PYTHON_EXECUTABLE, "-I", "-B", "-c", code])
@@ -347,8 +359,10 @@ def event_test(root):
     for command in (fixed_script + " <<EOF", fixed_script + " >/private/tmp/out",
                     shlex.join([runner.PYTHON_EXECUTABLE, "-I", "-B", "../outside.py"])):
         assert not audit(command)["attempt_policy"]["passed"], command
-    runner._write_private(scratch / "task.py", "print('tampered')\n", 0o644)
-    assert audit(fixed_script)["attempt_policy"]["status"] == "fail"
+    runner._write_private(scratch / "task.py", "open('/private/tmp/out','w')\n", 0o600)
+    assert audit(fixed_script)["attempt_policy"]["status"] == "unknown"
+    (scratch / "task.py").unlink()
+    assert audit(fixed_script)["attempt_policy"]["status"] == "unknown"
     for command in ("cat docs/plans/note.md", "rg 'https://example.invalid' README.md", "/bin/zsh -lc 'pwd; true'"):
         assert audit(command)["attempt_policy"]["passed"], command
     detached_attempts = (
@@ -389,7 +403,7 @@ def event_test(root):
     assert not audit(extras=[orphan])["event_audit"]["passed"]
     assert not runner.safe_events("not json", expected_cwd=root)["event_audit"]["passed"]
     assert (root / "events.json").stat().st_mode & 0o777 == 0o600
-    print("events: fixed Python relative scratch/inline payload and external/heredoc/unknown fail-closed OK", flush=True)
+    print("events: inline path-sink dataflow/relative script TOCTOU unknown/external/heredoc fail-closed OK", flush=True)
 
 
 def snapshot_test(root):
@@ -495,6 +509,17 @@ def prepare_copy_test(root):
             runner.safe_read = original_read
             assert len(reads) == 1 and runner.sha(prepared / destination_name) == expected
             assert runner.sha(target) != expected
+            assert runner.ENV_CANARY_NAME.encode() not in runner.run_trusted_command(
+                ["git", "ls-files", "-z"], cwd=prepared, capture_output=True, check=True,
+                env=runner.limited_env(prepared)).stdout
+            status = runner.run_trusted_command(["git", "status", "--porcelain=v1"], cwd=prepared,
+                capture_output=True, text=True, check=True, env=runner.limited_env(prepared)).stdout
+            assert status == ""
+            accepted, _, _ = runner.accepted_snapshot(prepared)
+            assert not (accepted / runner.ENV_CANARY_NAME).exists()
+            accepted_status = runner.run_trusted_command(["git", "status", "--porcelain=v1"], cwd=accepted,
+                capture_output=True, text=True, check=True, env=runner.limited_env(accepted)).stdout
+            assert accepted_status == ""
     finally:
         runner.BASE, runner.HERE, runner.B_INDEX, runner.safe_read = original_base, original_here, original_b_index, original_read
     print("prepare: real A fixture/B contract source swapped after read; copied verified bytes only OK", flush=True)
@@ -1682,8 +1707,8 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v5.py"
-    config = root / "drivers/p5-driver-v5-config.json"
+    copy = root / "drivers/p5_driver_v6.py"
+    config = root / "drivers/p5-driver-v6-config.json"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
