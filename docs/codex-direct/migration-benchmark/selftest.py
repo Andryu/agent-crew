@@ -132,6 +132,7 @@ def fingerprint_test(root):
 
 def permission_test(root):
     root.mkdir()
+    runner.install_env_canary(root)
     untouched = (root.stat().st_mode, root.stat().st_mtime_ns, list(root.iterdir()))
     pure = runner.canonical_execution_spec(root, c1_task(), runner.CLI_VERSION, "fixed-harness")
     assert untouched == (root.stat().st_mode, root.stat().st_mtime_ns, list(root.iterdir()))
@@ -149,6 +150,12 @@ def permission_test(root):
     assert config["filesystem"][str(root / ".benchmark-tmp")] == "write" and config["network"]["enabled"] is False
     binding = spec["binding"]
     assert binding["harness_fingerprint"] == "fixed-harness"
+    assert binding["env_canary_script"]["sha256"] == runner.digest_bytes(runner.ENV_CANARY_BYTES)
+    assert binding["env_canary_script"]["command_sha256"] == runner.digest_bytes(runner.ENV_CANARY_COMMAND.encode())
+    runner._write_private(root / runner.ENV_CANARY_NAME, runner.ENV_CANARY_BYTES + b"# tamper\n")
+    expect_rejected(lambda: runner.derive_canonical_binding(root, c1_task(), runner.CLI_VERSION, "fixed-harness"))
+    runner._write_private(root / runner.ENV_CANARY_NAME, runner.ENV_CANARY_BYTES)
+    assert runner.derive_canonical_binding(root, c1_task(), runner.CLI_VERSION, "fixed-harness")["env_canary_script"]["sha256"] == binding["env_canary_script"]["sha256"]
     assert binding["codex_executable"]["sha256"] == runner.sha(Path(runner.CODEX_EXECUTABLE).resolve())
     runtime = binding["python_runtime"]
     assert runtime == fingerprint_module.compute_python_runtime_binding()
@@ -185,6 +192,7 @@ def permission_test(root):
     assert validation["binding"]["python_runtime"] == binding["python_runtime"]
     other = root.parent / "rebound"
     other.mkdir()
+    runner.install_env_canary(other)
     rebound = runner.execution_spec(other, c1_task(), runner.CLI_VERSION, "fixed-harness")
     assert rebound["binding"]["policy_template_sha256"] == binding["policy_template_sha256"]
     assert rebound["binding"]["profile_sha256"] != binding["profile_sha256"]
@@ -228,6 +236,7 @@ def prompt_contract_test():
 
 def python_runtime_test(root):
     root.mkdir()
+    runner.install_env_canary(root)
     spec = runner.execution_spec(root, c1_task(), runner.CLI_VERSION, "runtime-regression")
     assert spec["env"]["PATH"].split(os.pathsep)[0] == str(Path(runner.PYTHON_EXECUTABLE).parent)
     assert Path(runner.PYTHON_EXECUTABLE).parent.parent == runner.PYTHON_RUNTIME
@@ -300,6 +309,9 @@ def event_stream(command="pwd", code=0, extras=()):
 
 def event_test(root):
     root.mkdir()
+    scratch = root / ".benchmark-tmp"
+    scratch.mkdir(mode=0o700)
+    runner._write_private(scratch / "task.py", "print('fixture')\n")
     def audit(command="pwd", code=0, extras=()):
         raw = "\n".join(json.dumps(event) for event in event_stream(command, code, extras))
         return runner.safe_events(raw, root / "events.json", root)
@@ -323,6 +335,20 @@ def event_test(root):
         assert audit(command)["attempt_policy"]["status"] == "fail", command
     for command in ("unknown-program", "bash .benchmark-tmp/anything.sh", "rg --pre node pattern .", "python3.12 -m unittest", ".benchmark-tmp/cat", "/usr/bin/../../tmp/cat"):
         assert audit(command)["attempt_policy"]["status"] == "unknown", command
+    fixed_script = shlex.join([runner.PYTHON_EXECUTABLE, "-I", "-B", ".benchmark-tmp/task.py"])
+    assert audit(fixed_script)["attempt_policy"]["passed"]
+    assert audit("/bin/zsh -lc " + shlex.quote(fixed_script))["attempt_policy"]["passed"]
+    code = "from pathlib import Path; Path('.benchmark-tmp/note.py').write_text('/old fixture data')"
+    assert audit(shlex.join([runner.PYTHON_EXECUTABLE, "-I", "-B", "-c", code]))["attempt_policy"]["passed"]
+    for code in ("open('/private/tmp/out', 'w')", "open('../outside', 'w')",
+                 "import os; os.environ.pop('P5_RUN_TOKEN')"):
+        command = shlex.join([runner.PYTHON_EXECUTABLE, "-I", "-B", "-c", code])
+        assert audit(command)["attempt_policy"]["status"] == "fail", command
+    for command in (fixed_script + " <<EOF", fixed_script + " >/private/tmp/out",
+                    shlex.join([runner.PYTHON_EXECUTABLE, "-I", "-B", "../outside.py"])):
+        assert not audit(command)["attempt_policy"]["passed"], command
+    runner._write_private(scratch / "task.py", "print('tampered')\n", 0o644)
+    assert audit(fixed_script)["attempt_policy"]["status"] == "fail"
     for command in ("cat docs/plans/note.md", "rg 'https://example.invalid' README.md", "/bin/zsh -lc 'pwd; true'"):
         assert audit(command)["attempt_policy"]["passed"], command
     detached_attempts = (
@@ -363,7 +389,7 @@ def event_test(root):
     assert not audit(extras=[orphan])["event_audit"]["passed"]
     assert not runner.safe_events("not json", expected_cwd=root)["event_audit"]["passed"]
     assert (root / "events.json").stat().st_mode & 0o777 == 0o600
-    print("events: 4 regressions/all-token paths/redirection/unknown code/non-tool schema/lifecycle OK", flush=True)
+    print("events: fixed Python relative scratch/inline payload and external/heredoc/unknown fail-closed OK", flush=True)
 
 
 def snapshot_test(root):
@@ -476,6 +502,7 @@ def prepare_copy_test(root):
 
 def preflight_test(root):
     root.mkdir()
+    runner.install_env_canary(root)
     runner._write_private(root / "AGENTS.md", "fixture")
     for name in c1_task()["input"] + c1_task()["fixture"]:
         runner._write_private(root / name, "fixed fixture")
@@ -560,6 +587,7 @@ def preflight_timeout_test(root):
             target = root / mode / "run-01"
             target.mkdir(parents=True)
             runner._write_private(target / "AGENTS.md", "fixture")
+            runner.install_env_canary(target)
             spec = runner.execution_spec(target, runner.c6_task(), runner.CLI_VERSION, "fixture-fingerprint")
             processes = []
             with forbid_after_outcome([target], modules=(runner, preflight.runner)) as activate:
@@ -795,6 +823,8 @@ def integration_test(root):
             _, invalid_environment, _ = invoke(mode=mode)
             assert not invalid_environment["isolation_gate"]["passed"] and not invalid_environment["isolation_gate"]["env_canary_pass"]
             assert invalid_environment["validation"]["exit_code"] == "not_run"
+            assert invalid_environment["validation"]["reason"] == "isolation_gate_not_pass"
+            assert "unsafe_or_unstable_snapshot" not in invalid_environment["scope_violations"]
         def residual_found(token):
             return {**clean_process_evidence(token), "status": "fail", "passed": False, "detected_count": 1, "kill_count": 0}
         runner.scan_residual_processes = residual_found
@@ -1159,6 +1189,7 @@ def preflight_runtime_abort_test(root):
             for outcome in ("mismatch", "exception"):
                 target = root / (stage + "-" + outcome) / "run-01"
                 current._write_private(target / "AGENTS.md", "fixture")
+                current.install_env_canary(target)
                 spec = current.execution_spec(target, current.c6_task(), current.CLI_VERSION, "fixture-fingerprint")
                 calls, cases = [0], []
                 with forbid_after_outcome([target], modules=(runner, current)) as activate:
@@ -1217,6 +1248,7 @@ def synthetic_canary_from_process_env(environment, root):
 
 def environment_canary_test(root):
     root.mkdir()
+    runner.install_env_canary(root)
     expected = runner.limited_env(root, "fixture-fingerprint")
     injected = synthetic_tool_env(expected, root)
     command = runner.ENV_CANARY_COMMAND
@@ -1650,8 +1682,8 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v4.py"
-    config = root / "drivers/p5-driver-v4-config.json"
+    copy = root / "drivers/p5_driver_v5.py"
+    config = root / "drivers/p5-driver-v5-config.json"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)

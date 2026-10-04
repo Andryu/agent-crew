@@ -14,6 +14,8 @@ P0の`migration-baseline/snapshot-index.json`とSHA-256が一致する非機密�
 
 Codex CLI 0.160.0はtool環境へ19個のruntime keyを追加する。strict-env canaryは従来のrequired 13 keyを値まで照合し、runtime keyは固定allowlist、版・権限profile・sandbox・network・作業directoryなどの安全な値条件を照合する。欠損、未知key、危険値はisolationをfailにする。canaryはrequired環境のdigestとruntime条件の真偽だけを出力し、session/thread IDや環境の生値をrawへ記録しない。promptはheredoc、here-string、process substitution、platform tempを使うcommandを禁じ、複数行Pythonを`python -c`または`.benchmark-tmp/`配下の0600 scriptへ固定する。attempt classifierのfail判定は維持する。旧campaign `p5-8544599f3a8d7a2d`はrun-01のisolation gateで停止した証跡として保持し、新campaignへ合算しない。
 
+v5では初回toolに長いinline canaryを転記させず、harnessが事前生成した0600の`.benchmark-env-canary.py`を固定Pythonで実行する短いcommandにする。scriptのbytesとstat identity、command hashはmodel bindingで照合する。固定Pythonの`.benchmark-tmp/`相対script実行とinline Pythonは実行codeを解析し、書込payload内のfixture pathを外部writeと誤読しない。未知commandは安全gate非pass、明示的な外部pathとheredocはfailのまま扱う。旧v4 campaign `p5-e93d6dc7bdb466cc` は初回canary誤引用で停止した証跡として保持し、再開・再採点しない。
+
 ## 実行と独立レビュー
 
 1. 通常shellの固定launcherから`--verify-only`を実行し、selftest、analysis selftest、構文・差分・privacy確認を済ませる。モデルなしの単独preflight probeを合格させ、仕様・品質の独立レビュー後に別の新規campaignを開始する。

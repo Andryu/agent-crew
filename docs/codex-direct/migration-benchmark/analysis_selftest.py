@@ -81,6 +81,7 @@ def fixtures(campaign_dir, a_seconds=100.0, b_seconds=70.0):
         accepted = campaign_dir / ".accepted" / run_id
         root.mkdir(parents=True, exist_ok=True)
         accepted.mkdir(parents=True, exist_ok=True)
+        harness_run.install_env_canary(root)
         task_definition = harness_run.c6_task() if task == "C6" else next(
             item for item in harness_run.load(harness_run.BASE / "comparison.json")["tasks"]
             if item["id"] == task)

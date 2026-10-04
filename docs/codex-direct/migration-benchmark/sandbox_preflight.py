@@ -308,6 +308,7 @@ def main():
         fixture = directory / "fixture"
         fixture.mkdir(mode=0o700)
         runner._write_private(fixture / "AGENTS.md", "P5 synthetic fixture\n")
+        runner.install_env_canary(fixture)
         version = runner.run_trusted_command([runner.CODEX_EXECUTABLE, "--version"], capture_output=True, text=True, check=True,
                                  env={"PATH": runner.FIXED_PATH}).stdout.strip()
         if version != runner.CLI_VERSION:

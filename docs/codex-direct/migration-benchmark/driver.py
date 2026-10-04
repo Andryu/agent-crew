@@ -19,9 +19,9 @@ import uuid
 ACCOUNT_HOME = Path(pwd.getpwuid(os.getuid()).pw_dir)
 BASE = ACCOUNT_HOME / "Library/Caches/agent-crew-p5-benchmark"
 DRIVERS = BASE / "drivers"
-LOGS = DRIVERS / "logs/v4"
+LOGS = DRIVERS / "logs/v5"
 FORMAL = BASE / "formal"
-CONFIG = DRIVERS / "p5-driver-v4-config.json"
+CONFIG = DRIVERS / "p5-driver-v5-config.json"
 SOURCE = None
 HERE = None
 STATUS = LOGS / "status.json"
@@ -37,7 +37,7 @@ DRIVER_GRACE_SECONDS = 600
 KNOWN_PRIVACY_LINES = {
     ("docs/codex-direct/migration-benchmark/harness_fingerprint.py", 288):
         "e3a5c6c684f77b12d5726043ee75ac55a47f848ceb116e745bc7562dcc2d244f",
-    ("docs/codex-direct/migration-benchmark/selftest.py", 312):
+    ("docs/codex-direct/migration-benchmark/selftest.py", 324):
         "b74639bd80b379b2183ecdea29f134e27d728e328fff6364fd99229cb7efcc3c",
     ("docs/plans/2026-09-22-p5-rerun.md", 144):
         "d205ebe2ffb34164980881f749c36ee5007f76b2b310e5aa45c77e4261dbb7f3",
@@ -127,7 +127,7 @@ def regular_identity(path, mode=0o600):
 def external_binding():
     """repo原本、実行copy、configの同一bytesとstat identityを固定する。"""
     original = HERE / "driver.py"
-    runtime = DRIVERS / "p5_driver_v4.py"
+    runtime = DRIVERS / "p5_driver_v5.py"
     original_bytes = regular_identity(original, mode=0o644)
     runtime_bytes = regular_identity(runtime, mode=0o700)
     config_bytes = regular_identity(CONFIG)

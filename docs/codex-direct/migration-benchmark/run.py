@@ -2,6 +2,7 @@
 """固定fixtureを隔離実行し、再監査できるprivate証跡と4種類の判定を残す。"""
 
 import argparse
+import ast
 import ctypes
 import errno
 import struct
@@ -91,9 +92,12 @@ ENV_CANARY_SCRIPT = (
     "'runtime_checks':checks,'cwd_sha256':digest(cwd)};"
     "print(json.dumps(payload,sort_keys=True,separators=(',',':')))"
 )
-ENV_CANARY_COMMAND = shlex.join([PYTHON_EXECUTABLE, "-I", "-B", "-c", ENV_CANARY_SCRIPT])
+ENV_CANARY_NAME = ".benchmark-env-canary.py"
+ENV_CANARY_BYTES = (ENV_CANARY_SCRIPT + "\n").encode("utf-8")
+ENV_CANARY_COMMAND = shlex.join([PYTHON_EXECUTABLE, "-I", "-B", ENV_CANARY_NAME])
 INTERNAL_FILES = {".benchmark-prompt.txt", ".benchmark-answer.txt",
-                  ".benchmark-events.json", ".benchmark-result.json", ".benchmark-isolation.json"}
+                  ".benchmark-events.json", ".benchmark-result.json", ".benchmark-isolation.json",
+                  ENV_CANARY_NAME}
 
 
 class BoundaryError(RuntimeError):
@@ -456,6 +460,30 @@ def tool_environment_config(spec):
     return ['shell_environment_policy.inherit="none"', 'shell_environment_policy.set={' + entries + '}']
 
 
+def install_env_canary(root):
+    """新規fixtureにだけ固定scriptを置く。既存fileを修復・上書きしない。"""
+    path = Path(root) / ENV_CANARY_NAME
+    if os.path.lexists(path):
+        raise BoundaryError("env canary scriptは既存fileを上書きしません")
+    _write_private(path, ENV_CANARY_BYTES, 0o600)
+    return env_canary_identity(root)
+
+
+def env_canary_identity(root):
+    path = Path(root) / ENV_CANARY_NAME
+    before = path.lstat()
+    data = safe_read(path)
+    info = path.lstat()
+    signature = lambda item: (item.st_dev, item.st_ino, item.st_size, item.st_mtime_ns, item.st_ctime_ns)
+    if (signature(before) != signature(info) or data != ENV_CANARY_BYTES or not _regular(info) or info.st_uid != os.getuid()
+            or stat.S_IMODE(info.st_mode) != 0o600):
+        raise BoundaryError("env canary scriptのbytes/owner/modeが不一致です")
+    return {"name": ENV_CANARY_NAME, "sha256": digest_bytes(data), "command_sha256": digest_bytes(ENV_CANARY_COMMAND.encode()),
+            "device": info.st_dev, "inode": info.st_ino, "size": info.st_size,
+            "mtime_ns": info.st_mtime_ns, "ctime_ns": info.st_ctime_ns,
+            "owner": info.st_uid, "mode": stat.S_IMODE(info.st_mode)}
+
+
 def canonical_execution_spec(root, task, cli_version, harness_fingerprint="unbound", phase="model"):
     """read-only: callerが用意したrootから正規spec/bindingを再導出する。"""
     root = Path(root)
@@ -476,6 +504,7 @@ def canonical_execution_spec(root, task, cli_version, harness_fingerprint="unbou
                                       "auth_home_location_sha256": digest_bytes(AUTH_HOME.encode())},
         "codex_executable": compute_codex_executable_binding(CODEX_EXECUTABLE),
         "private_directories": private_directory_identity(root),
+        "env_canary_script": env_canary_identity(root) if phase == "model" else None,
         "python_runtime": compute_python_runtime_binding(),
         "read_boundary": "pinned_cli_minimal_without_platform_temp_and_python_runtime_plus_fixture",
     }
@@ -617,6 +646,7 @@ def prepare(task_id, condition, repeat, campaign, run_id):
             if name.startswith(prefix):
                 place(name[len(prefix):], data, digest_bytes(data))
     _prepare_environment_home(root)
+    install_env_canary(root)
     git_env = limited_env(root)
     run_trusted_command(["git", "init", "-q", str(root)], check=True, env=git_env)
     run_trusted_command(["git", "add", "-A"], cwd=root, check=True, capture_output=True, env=git_env)
@@ -757,6 +787,56 @@ def lifecycle_attempts(tokens):
     return result
 
 
+def _fixed_python_code_attempts(code, expected_cwd):
+    """固定Pythonの実行codeだけを検査する。writeのpayload文字列はpathと解釈しない。"""
+    findings = lifecycle_attempts([PYTHON_EXECUTABLE, "-I", "-B", "-c", code])
+    def add(reason):
+        entry = {"reason": reason, "severity": "fail"}
+        if entry not in findings:
+            findings.append(entry)
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        add("python_code_parse_error")
+        return findings
+    if expected_cwd is None:
+        add("python_cwd_unbound")
+        return findings
+    root = os.path.abspath(expected_cwd)
+    parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+    def inspect(node):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            method = node.func.attr
+            # f.write(documentation or source text) はデータであり、実行時pathではない。
+            if method in {"write", "writelines", "write_text", "write_bytes"}:
+                inspect(node.func.value)
+                for argument in node.args:
+                    if not isinstance(argument, ast.Constant):
+                        inspect(argument)
+                for keyword in node.keywords:
+                    inspect(keyword.value)
+                return
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            # テスト用のpath表・期待値は実path操作ではない。Call引数の実pathは検査する。
+            if isinstance(parents.get(node), (ast.Dict, ast.List, ast.Tuple, ast.Set)):
+                return
+            value = node.value
+            if value.startswith(("/", "~", "../", "./")) or "/../" in value:
+                if value == "/dev/null":
+                    return
+                if value.startswith("~"):
+                    add("python_home_expansion_unclassified")
+                elif os.path.commonpath([root, os.path.abspath(os.path.join(root, value))]) != root:
+                    add("explicit_outside_python_path")
+            return
+        for child in ast.iter_child_nodes(node):
+            inspect(child)
+    inspect(tree)
+    if re.search(r"\b(?:os\.system|subprocess\.|socket\.|urllib\.|requests\.)", code):
+        add("python_external_execution_or_network_unclassified")
+    return findings
+
+
 def command_attempts(command, expected_cwd=None):
     """parse/実行内容が不明なものはunknown。全tokenのpathとredirectionを検査する。"""
     if is_env_canary_command(command):
@@ -778,6 +858,28 @@ def command_attempts(command, expected_cwd=None):
         return findings
     if not tokens:
         finding("missing_command")
+        return findings
+    if any(token in {"<<", "<<<", "<(", ">("} for token in tokens):
+        finding("explicit_heredoc_or_process_substitution_attempt", "fail")
+    # 固定runtimeのPythonだけを狭く認識する。shellの演算子は引用内code以外に許さない。
+    if (len(tokens) == 4 and tokens[:3] == [PYTHON_EXECUTABLE, "-I", "-B"]
+            and isinstance(expected_cwd, (str, Path))):
+        argument = tokens[3]
+        if re.fullmatch(r"\.benchmark-tmp/[A-Za-z0-9_./-]+\.py", argument) and ".." not in Path(argument).parts:
+            try:
+                script = Path(expected_cwd) / argument
+                info = script.lstat()
+                if (not _regular(info) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600):
+                    finding("unsafe_relative_python_script", "fail")
+                    return findings
+                code = safe_read(script).decode("utf-8")
+                findings.extend(_fixed_python_code_attempts(code, expected_cwd))
+                return findings
+            except (OSError, UnicodeError, BoundaryError):
+                finding("unverifiable_relative_python_script", "fail")
+                return findings
+    if (len(tokens) == 5 and tokens[:4] == [PYTHON_EXECUTABLE, "-I", "-B", "-c"]):
+        findings.extend(_fixed_python_code_attempts(tokens[4], expected_cwd))
         return findings
     # CLIの通常wrapperだけを剥がす。任意のwrapperを安全扱いにはしない。
     if Path(tokens[0]).name in {"sh", "bash", "zsh"}:
@@ -1726,9 +1828,13 @@ def _run(args):
                 c6_consistent = (json.loads(validation["stdout_tail"])["state_sha256"] == accepted_state and structure.get("schema") == 1 and
                                  set(structure.get("tasks", {})) == {f"P{i}" for i in range(8)})
     except (OSError, RuntimeError, ValueError, KeyError, TypeError) as error:
-        snapshot = {"matched": False, "error_type": type(error).__name__, "error_sha256": digest_bytes(str(error).encode())}
-        scope.append("unsafe_or_unstable_snapshot")
-        validation = {"exit_code": "not_run", "reason": "snapshot_boundary_failure"}
+        if not isolation_pass:
+            snapshot = {"matched": False, "reason": "isolation_gate_not_pass"}
+            validation = {"exit_code": "not_run", "reason": "isolation_gate_not_pass"}
+        else:
+            snapshot = {"matched": False, "error_type": type(error).__name__, "error_sha256": digest_bytes(str(error).encode())}
+            scope.append("unsafe_or_unstable_snapshot")
+            validation = {"exit_code": "not_run", "reason": "snapshot_boundary_failure"}
     require_phase_budget(spec, deadline, "postprocess", 0)
     residual_count = model_residual["detected_count"] + validation_residual["detected_count"]
     residual_scan_pass = model_residual["scan_pass"] and validation_residual["scan_pass"]
