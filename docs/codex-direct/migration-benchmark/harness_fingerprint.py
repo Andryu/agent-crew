@@ -52,11 +52,11 @@ def _private_executable_binding(path, expected_mode):
 
 
 def compute_driver_executable_binding():
-    return _private_executable_binding(formal_base() / "drivers/p5_driver_v15.py", 0o700)
+    return _private_executable_binding(formal_base() / "drivers/p5_driver_v16.py", 0o700)
 
 
 def compute_driver_config_binding():
-    return _private_executable_binding(formal_base() / "drivers/p5-driver-v15-config.json", 0o600)
+    return _private_executable_binding(formal_base() / "drivers/p5-driver-v16-config.json", 0o600)
 
 
 def reject_platform_temp(path):
@@ -113,7 +113,7 @@ HARNESS_INPUTS = (
     "run.py", "batch.py", "sandbox_preflight.py", "analyze.py", "analysis_selftest.py", "driver.py", "callback_audit.py", "callback-api-inventory.json",
     "comparison-v2.json", "validate_c6.py", "../migration-baseline/comparison.json",
     "../migration-baseline/snapshot-index.json", "b-contract-index.json", "a-contract-index.json",
-    "harness_fingerprint.py",
+    "harness_fingerprint.py", "probe_v16.py", "fixed_test_runner_v16.py", "v16_selftest.py",
 )
 
 
@@ -313,4 +313,23 @@ def compute_harness_fingerprint(here, *, python_runtime_binding=None, codex_exec
     components.append("codex_executable:" + json.dumps(codex, sort_keys=True, separators=(",", ":")))
     driver = compute_driver_executable_binding() if driver_executable_binding is None else driver_executable_binding
     components.append("driver_executable:" + json.dumps(driver, sort_keys=True, separators=(",", ":")))
+    # 実exec toolの/bin/zsh -lcが参照する固定OS層。説明に使う物をfingerprintから外さない。
+    for shell_input in ("/bin/zsh", "/etc/zprofile", "/usr/libexec/path_helper", "/etc/paths"):
+        target = Path(shell_input)
+        info = target.lstat()
+        components.append("login_shell:" + shell_input + ":" + str(info.st_dev) + ":" + str(info.st_ino)
+                          + ":" + str(target.resolve(strict=True)) + ":"
+                          + hashlib.sha256(_read_regular_file(target.resolve(strict=True))).hexdigest())
+    for shell_input in ("/etc/zshenv", "/etc/zlogin"):
+        target = Path(shell_input)
+        components.append("login_shell_optional:" + shell_input + ":" +
+                          (hashlib.sha256(_read_regular_file(target.resolve(strict=True))).hexdigest()
+                           if target.exists() else "absent"))
+    paths_d = Path("/etc/paths.d")
+    for target in sorted(paths_d.iterdir()) if paths_d.exists() else []:
+        components.append("login_shell:" + str(target) + ":" + str(target.resolve(strict=True)) + ":"
+                          + hashlib.sha256(_read_regular_file(target.resolve(strict=True))).hexdigest())
+    sed = Path("/usr/bin/sed")
+    components.append("fixed_sed:" + str(sed.resolve(strict=True)) + ":"
+                      + hashlib.sha256(_read_regular_file(sed.resolve(strict=True))).hexdigest())
     return hashlib.sha256("".join(components).encode()).hexdigest()

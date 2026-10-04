@@ -342,6 +342,8 @@ def _main(campaign_deadline_monotonic=None):
     fingerprint = compute_harness_fingerprint(HERE, python_runtime_binding=python_runtime,
                                               codex_executable_binding=codex_executable,
                                               driver_executable_binding=driver_executable)
+    import probe_v16
+    probe_v16.require_final_probe(fingerprint)
     campaign = f"p5-{fingerprint[:16]}"
     campaign_dir = secure_mkdir(WORK / campaign)
     expected_binding = campaign_binding(campaign_dir, fingerprint, python_runtime, codex_executable,
@@ -477,7 +479,8 @@ def _main(campaign_deadline_monotonic=None):
                    "planned_runs": len(schedule), "completed_records": len(results),
                    "elapsed_seconds": round(time.time() - clock["started_epoch"], 3),
                    "schedule": schedule, "run_slot_mapping_file": str(campaign_dir / "run-slot-mapping.json"),
-                   "results": results, "stopped_reason": stopped_reason}
+                   "results": results, "stopped_reason": stopped_reason,
+                   "stop_boundary": "after_current_run_before_next_run"}
         summary["preflight_file"] = str(campaign_dir / "sandbox-preflight.json")
         summary["clock_file"] = str(clock_file)
         summary["active_file"] = str(active)
@@ -499,7 +502,8 @@ def _main(campaign_deadline_monotonic=None):
                                      for contract in contracts},
                "B_skill_sha256": hashlib.sha256(skill.read_bytes()).hexdigest(),
                "schedule": schedule, "run_slot_mapping_file": str(campaign_dir / "run-slot-mapping.json"),
-               "results": results, "stopped_reason": stopped_reason}
+               "results": results, "stopped_reason": stopped_reason,
+               "stop_boundary": "after_current_run_before_next_run"}
     summary["preflight_file"] = str(campaign_dir / "sandbox-preflight.json")
     summary["clock_file"] = str(clock_file)
     summary["active_file"] = str(campaign_dir / "active-run.json")

@@ -19,9 +19,9 @@ import uuid
 ACCOUNT_HOME = Path(pwd.getpwuid(os.getuid()).pw_dir)
 BASE = ACCOUNT_HOME / "Library/Caches/agent-crew-p5-benchmark"
 DRIVERS = BASE / "drivers"
-LOGS = DRIVERS / "logs/v15"
+LOGS = DRIVERS / "logs/v16"
 FORMAL = BASE / "formal"
-CONFIG = DRIVERS / "p5-driver-v15-config.json"
+CONFIG = DRIVERS / "p5-driver-v16-config.json"
 SOURCE = None
 HERE = None
 STATUS = LOGS / "status.json"
@@ -127,7 +127,7 @@ def regular_identity(path, mode=0o600):
 def external_binding():
     """repo原本、実行copy、configの同一bytesとstat identityを固定する。"""
     original = HERE / "driver.py"
-    runtime = DRIVERS / "p5_driver_v15.py"
+    runtime = DRIVERS / "p5_driver_v16.py"
     original_bytes = regular_identity(original, mode=0o644)
     runtime_bytes = regular_identity(runtime, mode=0o700)
     config_bytes = regular_identity(CONFIG)
@@ -294,10 +294,11 @@ def privacy_check(log):
 def verification(log, shared):
     directories = source_check(log)
     expected = bindings(shared)
-    for name in ("selftest.py", "analysis_selftest.py"):
+    for name in ("selftest.py", "analysis_selftest.py", "v16_selftest.py"):
         command([PYTHON, "-B", HERE / name], log)
     compile_files = ("run.py", "sandbox_preflight.py", "validate_c6.py", "selftest.py",
-                     "batch.py", "analyze.py", "analysis_selftest.py", "harness_fingerprint.py")
+                     "batch.py", "analyze.py", "analysis_selftest.py", "harness_fingerprint.py",
+                     "probe_v16.py", "fixed_test_runner_v16.py", "v16_selftest.py")
     command([PYTHON, "-B", "-X", "pycache_prefix=" + str(LOGS / "pycache"), "-m", "py_compile",
              *[HERE / name for name in compile_files]], log)
     command([GIT, "diff", "--check"], log)
@@ -428,6 +429,14 @@ def main():
                 advance("verified", 0, "no_campaign_or_reservation_created", privacy=privacy,
                         driver_executable=expected["driver_executable"], driver_config=expected["driver_config"])
                 return 0
+            sys.path.insert(0, str(HERE))
+            probe_spec = importlib.util.spec_from_file_location("p5_probe_v16", HERE / "probe_v16.py")
+            probe_module = importlib.util.module_from_spec(probe_spec)
+            probe_spec.loader.exec_module(probe_module)
+            try:
+                probe_module.require_final_probe(expected["fingerprint"])
+            except (OSError, ValueError) as error:
+                raise Stop("final_fixed_probe_not_passed:" + type(error).__name__) from None
             source_check(log, directories)
             if bindings(shared) != expected:
                 raise Stop("binding_changed_before_batch")

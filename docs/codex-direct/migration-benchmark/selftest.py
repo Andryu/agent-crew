@@ -132,7 +132,7 @@ def fingerprint_test(root):
 
 def permission_test(root):
     root.mkdir()
-    runner.install_env_canary(root)
+    runner.install_env_canary(root, "fixed-harness")
     untouched = (root.stat().st_mode, root.stat().st_mtime_ns, list(root.iterdir()))
     pure = runner.canonical_execution_spec(root, c1_task(), runner.CLI_VERSION, "fixed-harness")
     assert untouched == (root.stat().st_mode, root.stat().st_mtime_ns, list(root.iterdir()))
@@ -192,7 +192,7 @@ def permission_test(root):
     assert validation["binding"]["python_runtime"] == binding["python_runtime"]
     other = root.parent / "rebound"
     other.mkdir()
-    runner.install_env_canary(other)
+    runner.install_env_canary(other, "fixed-harness")
     rebound = runner.execution_spec(other, c1_task(), runner.CLI_VERSION, "fixed-harness")
     assert rebound["binding"]["policy_template_sha256"] == binding["policy_template_sha256"]
     assert rebound["binding"]["profile_sha256"] != binding["profile_sha256"]
@@ -237,7 +237,7 @@ def prompt_contract_test():
 
 def python_runtime_test(root):
     root.mkdir()
-    runner.install_env_canary(root)
+    runner.install_env_canary(root, "runtime-regression")
     spec = runner.execution_spec(root, c1_task(), runner.CLI_VERSION, "runtime-regression")
     assert spec["env"]["PATH"].split(os.pathsep)[0] == str(Path(runner.PYTHON_EXECUTABLE).parent)
     assert Path(runner.PYTHON_EXECUTABLE).parent.parent == runner.PYTHON_RUNTIME
@@ -505,6 +505,7 @@ def prepare_copy_test(root):
     cloned_base, cloned_here = root / "migration-baseline", root / "migration-benchmark"
     copy_tree(original_base, cloned_base)
     copy_tree(original_here / "b-contract", cloned_here / "b-contract")
+    runner._write_private(cloned_here / "fixed_test_runner_v16.py", original_read(original_here / "fixed_test_runner_v16.py"))
     runner._write_private(cloned_here / "b-contract-index.json", original_read(original_b_index))
     runner.BASE, runner.HERE, runner.B_INDEX = cloned_base, cloned_here, cloned_here / "b-contract-index.json"
     try:
@@ -541,7 +542,7 @@ def prepare_copy_test(root):
             assert not (accepted / runner.ENV_CANARY_NAME).exists()
             accepted_status = runner.run_trusted_command(["git", "status", "--porcelain=v1"], cwd=accepted,
                 capture_output=True, text=True, check=True, env=runner.limited_env(accepted)).stdout
-            assert accepted_status == ""
+            assert accepted_status == "", repr(accepted_status)
     finally:
         runner.BASE, runner.HERE, runner.B_INDEX, runner.safe_read = original_base, original_here, original_b_index, original_read
     print("prepare: real A fixture/B contract source swapped after read; copied verified bytes only OK", flush=True)
@@ -549,7 +550,7 @@ def prepare_copy_test(root):
 
 def preflight_test(root):
     root.mkdir()
-    runner.install_env_canary(root)
+    runner.install_env_canary(root, "fixture-fingerprint")
     runner._write_private(root / "AGENTS.md", "fixture")
     for name in c1_task()["input"] + c1_task()["fixture"]:
         runner._write_private(root / name, "fixed fixture")
@@ -634,7 +635,7 @@ def preflight_timeout_test(root):
             target = root / mode / "run-01"
             target.mkdir(parents=True)
             runner._write_private(target / "AGENTS.md", "fixture")
-            runner.install_env_canary(target)
+            runner.install_env_canary(target, "fixture-fingerprint")
             spec = runner.execution_spec(target, runner.c6_task(), runner.CLI_VERSION, "fixture-fingerprint")
             processes = []
             with forbid_after_outcome([target], modules=(runner, preflight.runner)) as activate:
@@ -1236,7 +1237,7 @@ def preflight_runtime_abort_test(root):
             for outcome in ("mismatch", "exception"):
                 target = root / (stage + "-" + outcome) / "run-01"
                 current._write_private(target / "AGENTS.md", "fixture")
-                current.install_env_canary(target)
+                current.install_env_canary(target, "fixture-fingerprint")
                 spec = current.execution_spec(target, current.c6_task(), current.CLI_VERSION, "fixture-fingerprint")
                 calls, cases = [0], []
                 with forbid_after_outcome([target], modules=(runner, current)) as activate:
@@ -1295,7 +1296,7 @@ def synthetic_canary_from_process_env(environment, root):
 
 def environment_canary_test(root):
     root.mkdir()
-    runner.install_env_canary(root)
+    runner.install_env_canary(root, "fixture-fingerprint")
     expected = runner.limited_env(root, "fixture-fingerprint")
     injected = synthetic_tool_env(expected, root)
     command = runner.ENV_CANARY_COMMAND
@@ -1729,8 +1730,8 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v15.py"
-    config = root / "drivers/p5-driver-v15-config.json"
+    copy = root / "drivers/p5_driver_v16.py"
+    config = root / "drivers/p5-driver-v16-config.json"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
