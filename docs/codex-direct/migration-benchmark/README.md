@@ -76,3 +76,12 @@ P5は合成入力の指示比較である。P1/P2/P4の実機E2E、実資産、�
 round1はNEEDS_CHANGES、High 2件: コンテナ要素/slice変異後の古い静的値再利用と、属性変更後の標準API同一性の誤認。v10はASTのSubscript/Attribute Store・DelとAugAssignを変異として扱い、代入由来の無向依存graphでroot・alias・派生値を保守的に失効させる。変更されたimport moduleのcanonical APIを無効にし、未知属性receiverではAPI同一性を保証しない。追跡不能なreceiverは既知値全体を失効させる。setter等の副作用も証明できないため変異自体を非passにする。
 
 case別の文字列禁止は採らない。変異のないコンテナ読取と標準APIは維持し、copyの独立性や制御フロー順を推測せず、変異がある場合の過剰拒否は安全側の制約として残す。既存v9 105ケース、v10再現と合成event、security/analysis、py_compile、diff、privacy固定行、旧raw read-only replayを検証する。新commitからv10 source/driver/config/launcherとmanifestを固定し、旧v1〜v9とcampaignは不変。独立reviewは未実施、v10は未承認（unapproved）。正式campaign・model・実sandbox verifyは起動しない。
+
+
+## v10品質review round2 NEEDS_CHANGESとv11修正（2026-10-04）
+
+round2はNEEDS_CHANGES、High 1件: sorted等が実行するcallbackをdataと扱い、container変異・module辞書更新・外部操作を見逃した。v11はcanonical APIごとのcallable位置とkeywordを監査し、callbackの副作用を証明できなければunknownとして全静的値・API同一性を失効させる。alias、bound mutator、lambda、container/subscript由来、動的callableも同じ扱い。純粋callableの許可listは設けず、callback位置のliteral Noneだけを許可する（len等も引数の特殊methodを呼び得る）。None許可はAPI全体の許可ではない。
+
+監査範囲: sorted/min/max key、map/filter/二引数iter、list.sort key、open opener、os.walk onerror、shutil copytree ignore/copy_functionとrmtree onerror/onexc、functools reduce/partial/cmp_to_key/cache系、itertools accumulate/groupby/各predicate、re sub/subn repl、json hooks/parse/default/cls、defaultdict factory。既存allowlist外のAPI/methodは引き続き非pass。callback位置を隠す高階APIのstar/**kwargsもunknown。通常のmin/max defaultやdictのkey/factory keywordはdataとして区別する。callbackなしのsorted等とNone指定は安全caseで固定する。
+
+個別source文字列禁止やcallbackの実行による検証は採らない。分類器と合成event、既存v9/v10、security/analysis、py_compile、diff、privacy、旧raw read-only replayを確認する。v11も独立review未実施・未承認（unapproved）。旧固定物/campaignは不変、新commitから別名固定物を作り、正式campaign/model/実sandbox verifyは起動しない。

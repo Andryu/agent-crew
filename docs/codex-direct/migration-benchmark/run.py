@@ -947,6 +947,50 @@ def _fixed_python_code_attempts(code, expected_cwd):
             base = canonical_name(node.value)
             return base + "." + node.attr if base else None
         return None
+    # 高階APIの引数はdataではなく実行入口。None以外のcallableの純粋性は証明しない。
+    # 引数位置は0-origin。一般のdefault（min/max等）は値でありcallbackに含めない。
+    callback_slots = {
+        "sorted": (), "min": (), "max": (), "map": (0,), "filter": (0,),
+        "open": (7,), "os.walk": (2,), "shutil.copytree": (2, 4), "shutil.rmtree": (2,),
+        "functools.reduce": (0,), "functools.partial": (0,), "functools.partialmethod": (0,),
+        "functools.cmp_to_key": (0,), "functools.lru_cache": (0,), "functools.cache": (0,),
+        "itertools.accumulate": (1,), "itertools.groupby": (1,),
+        "itertools.dropwhile": (0,), "itertools.takewhile": (0,),
+        "itertools.filterfalse": (0,), "itertools.starmap": (0,),
+        "re.sub": (1,), "re.subn": (1,), "collections.defaultdict": (0,),
+        "json.load": (), "json.loads": (), "json.dump": (), "json.dumps": (),
+    }
+    callback_keywords = {"key", "opener", "onerror", "on_error", "onexc", "ignore", "copy_function",
+                         "callback", "default_factory", "factory", "func", "function", "predicate",
+                         "object_hook", "object_pairs_hook", "parse_float", "parse_int", "parse_constant",
+                         "repl", "cls"}
+    method_slots = {"sort": (), "sub": (0,), "subn": (0,), "walk": (1,)}
+    unsafe_callback = False
+    for call in (node for node in ast.walk(tree) if isinstance(node, ast.Call)):
+        name = canonical_name(call.func) or ""
+        if name.startswith("builtins."):
+            name = name[len("builtins."):]
+        positions = callback_slots.get(name, ())
+        if name == "iter" and len(call.args) >= 2:
+            positions = (0,)
+        method = call.func.attr if isinstance(call.func, ast.Attribute) else None
+        if method in method_slots and name not in callback_slots:
+            positions = method_slots[method]
+        higher_order = name in callback_slots or name == "iter" or method in method_slots
+        candidates = [call.args[index] for index in positions if len(call.args) > index]
+        candidates.extend(item.value for item in call.keywords if higher_order and (
+            item.arg in callback_keywords or (name.startswith("json.") and item.arg == "default")))
+        if higher_order and (any(item.arg is None for item in call.keywords)
+                             or any(isinstance(item, ast.Starred) for item in call.args)):
+            add("python_callback_expansion_unclassified")
+            unsafe_callback = True
+        if any(not (isinstance(item, ast.Constant) and item.value is None) for item in candidates):
+            add("python_callback_effects_unclassified")
+            unsafe_callback = True
+    if unsafe_callback:
+        # callbackのalias/closure/module辞書への副作用を限定できないため全静的値とAPIを失効。
+        invalid_values.update(stores)
+        unknown_attribute_receiver = True
     def resolve(node):
         if isinstance(node, ast.Constant) and isinstance(node.value, (str, int)):
             return node.value
@@ -1011,7 +1055,7 @@ def _fixed_python_code_attempts(code, expected_cwd):
     dynamic_names = {"eval", "exec", "compile", "__import__", "getattr", "globals", "locals", "vars",
                      "builtins.eval", "builtins.exec", "builtins.compile", "builtins.__import__", "importlib.import_module"}
     known_names = {"Path", "str", "print", "all", "any", "len", "range", "dict", "list", "set", "tuple",
-                   "int", "bytes", "open", "sum", "sorted", "enumerate", "zip", "isinstance", "hasattr"}
+                   "int", "bytes", "open", "sum", "sorted", "min", "max", "enumerate", "zip", "isinstance", "hasattr"}
     safe_module_calls = {"Path.cwd", "pathlib.Path.cwd", "os.getcwd", "os.getuid", "os.getpid", "os.fstat", "os.fdopen",
                          "os.path.join", "os.path.normpath", "os.path.basename", "os.path.dirname",
                          "os.path.split", "os.path.relpath", "os.path.commonpath"}

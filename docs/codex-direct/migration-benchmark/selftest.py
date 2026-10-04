@@ -1729,8 +1729,8 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v10.py"
-    config = root / "drivers/p5-driver-v10-config.json"
+    copy = root / "drivers/p5_driver_v11.py"
+    config = root / "drivers/p5-driver-v11-config.json"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
@@ -1983,7 +1983,70 @@ def mutation_identity_v10_tests():
     print(f"v10 mutation/identity: {len(cases)} non-pass + synthetic events, {len(safe)} safe PASS", flush=True)
 
 
+def callback_identity_v11_tests():
+    """callbackを実行せず、合成eventでも間接副作用を非passにする。"""
+    root = Path(tempfile.mkdtemp(prefix="p5-v11-callback-", dir="/private/tmp"))
+    cases = [
+        "p=['safe','../outside']; sorted([0],key=p.pop); open(p[0])",
+        "p={'f':'safe'}; sorted([{'f':'../outside'}],key=p.update); open(p['f'])",
+        "import os; sorted([{'join':os.remove}],key=os.path.__dict__.update); os.path.join('/private/tmp/out')",
+        "import os as o; sorted([{'join':o.remove}],key=o.path.__dict__.update); o.path.join('/private/tmp/out')",
+        "import os,sys; sorted([{'join':os.remove}],key=sys.modules['os'].path.__dict__.update); os.path.join('/private/tmp/out')",
+        "import os; sorted([{'join':os.remove}],key=os.path.__dict__.update); from os.path import join; join('/private/tmp/out')",
+        "import os; sorted(['/private/tmp/out'],key=os.remove)",
+        "import os; from builtins import sorted as s; s(['/private/tmp/out'],key=os.remove)",
+        "import os; import builtins as b; b.sorted(['/private/tmp/out'],key=os.remove)",
+        "p=['safe','../outside']; sorted([0],key=lambda x:p.pop(x)); open(p[0])",
+        "import os; sorted([0],key=lambda x:[os.remove('/private/tmp/out') for y in [x]])",
+        "import os; sorted([0],key=lambda x:(os.remove('/private/tmp/out') for y in [x]))",
+        "import os; callbacks=[os.remove]; sorted(['/private/tmp/out'],key=callbacks[0])",
+        "sorted([0],key=callback)", "sorted([0],key=obj.method)",
+        "sorted([0],key=lambda x:x)", "sorted([0],key=len)",
+        "sorted([0],**options)", "sorted(*arguments)",
+        "p=['safe']; p.sort(key=callback)",
+        "open('safe',opener=callback)", "open('safe','r',-1,None,None,None,True,callback)",
+        "import os; list(os.walk('.',onerror=callback))", "import os; list(os.walk('.',True,callback))",
+        "import shutil; shutil.copytree('src','dst',ignore=callback)",
+        "import shutil; shutil.copytree('src','dst',False,None,callback)",
+        "import shutil; shutil.rmtree('safe',onexc=callback)",
+        "import json; json.loads('{}',object_hook=callback)",
+        "import json; json.loads('{}',parse_float=callback)",
+        "import json; json.dumps({},default=callback)",
+        "import re; re.sub('x',callback,'x')", "pattern.sub(callback,'x')",
+        "import functools; functools.reduce(callback,[0])",
+        "import functools; functools.partial(callback,0)",
+        "import functools; functools.cmp_to_key(callback)",
+        "import collections; collections.defaultdict(callback)",
+        "iter(callback,None)", "list(map(callback,[0]))", "list(filter(callback,[0]))",
+    ]
+    for api in ('min', 'max'):
+        cases.append(f"p=['safe','../outside']; {api}([0],key=p.pop); open(p[0])")
+    for api,arguments in (('accumulate','[0],callback'),('groupby','[0],callback'),
+                          ('dropwhile','callback,[0]'),('takewhile','callback,[0]'),
+                          ('filterfalse','callback,[0]'),('starmap','callback,[(0,)]')):
+        cases.append(f"import itertools; list(itertools.{api}({arguments}))")
+    for code in cases:
+        findings = runner._fixed_python_code_attempts(code,root)
+        assert findings, code
+        raw='\n'.join(json.dumps(event) for event in event_stream(
+            shlex.join([runner.PYTHON_EXECUTABLE,'-I','-B','-c',code])))
+        result=runner.safe_events(raw,root/'events.json',root)
+        assert result['event_audit']['passed'] and not result['attempt_policy']['passed'],code
+    safe = ["sorted([3,1,2])", "sorted([3,1,2],reverse=True)", "sorted([3,1,2],key=None)",
+            "p=['safe']; sorted(p); open(p[0])", "min([1,2])", "max([1,2],key=None)",
+            "min([],default=0)", "max([],default=None)", "open('safe',opener=None)",
+            "dict(key='data',factory='data',default='data')",
+            "import os; os.path.join('docs','note.md')", "list([1,2])", "sum([1,2])"]
+    for code in safe:
+        assert not runner._fixed_python_code_attempts(code,root),code
+    for code in cases[:9]:
+        assert any(x['reason']=='python_callback_effects_unclassified'
+                   for x in runner._fixed_python_code_attempts(code,root)),code
+    print(f"v11 callbacks: {len(cases)} non-pass + synthetic events, {len(safe)} safe PASS",flush=True)
+
+
 if __name__ == "__main__":
+    callback_identity_v11_tests()
     binding_path_v9_tests()
     mutation_identity_v10_tests()
     main()
