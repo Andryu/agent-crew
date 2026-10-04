@@ -52,11 +52,11 @@ def _private_executable_binding(path, expected_mode):
 
 
 def compute_driver_executable_binding():
-    return _private_executable_binding(formal_base() / "drivers/p5_driver_v14.py", 0o700)
+    return _private_executable_binding(formal_base() / "drivers/p5_driver_v15.py", 0o700)
 
 
 def compute_driver_config_binding():
-    return _private_executable_binding(formal_base() / "drivers/p5-driver-v14-config.json", 0o600)
+    return _private_executable_binding(formal_base() / "drivers/p5-driver-v15-config.json", 0o600)
 
 
 def reject_platform_temp(path):
@@ -110,7 +110,7 @@ def compute_codex_executable_binding(executable=None):
 
 # 従来batchの順序を維持し、このmodule自身を末尾へ追加する。
 HARNESS_INPUTS = (
-    "run.py", "batch.py", "sandbox_preflight.py", "analyze.py", "analysis_selftest.py", "driver.py",
+    "run.py", "batch.py", "sandbox_preflight.py", "analyze.py", "analysis_selftest.py", "driver.py", "callback_audit.py", "callback-api-inventory.json",
     "comparison-v2.json", "validate_c6.py", "../migration-baseline/comparison.json",
     "../migration-baseline/snapshot-index.json", "b-contract-index.json", "a-contract-index.json",
     "harness_fingerprint.py",

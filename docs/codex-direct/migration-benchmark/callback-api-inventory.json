@@ -1,0 +1,2363 @@
+{
+  "runtime": [
+    3,
+    12,
+    13
+  ],
+  "scope": "既知call許可集合＋Path method＋hash method。防御専用高階APIは既存v11テストで非passを維持。明示callback引数の監査であり任意protocol安全性の証明ではない。",
+  "cpython_source_base": "https://github.com/python/cpython/tree/v3.12.13",
+  "c_source_evidence": {
+    "Modules__hashopenssl.c": {
+      "sha256": "fbbfbceeb0752f8787e91549aaa2876f483857cb9bf15064d1d21a29f77a167a"
+    },
+    "Objects_listobject.c": {
+      "sha256": "5f33dd1d97bfcc33e60495011fad7d9d02587a966999f28c159971f31aa91531"
+    },
+    "Objects_longobject.c": {
+      "sha256": "315c71c11dacfcffcbc33bc2d778533297f162438d02780ec02de569871a2879"
+    },
+    "Objects_bytesobject.c": {
+      "sha256": "ba826eab3af4004103dd8ad99dff4ed6d23c35c516ec9fd773f77eddc4942c2d"
+    },
+    "Objects_enumobject.c": {
+      "sha256": "3497f25ec42749c07883c01fa3f24bd24576ce885f114eac78843d38b067ab58"
+    },
+    "Objects_setobject.c": {
+      "sha256": "e633e7ae4e427ecead8879965910e27427d34ae0fc5b956142bc337f741a367c"
+    },
+    "Python_bltinmodule.c": {
+      "sha256": "368b677db85bd846fc85271d6e7170ee8e529230bd1ea352d16ccef0a75787e0"
+    },
+    "Modules_posixmodule.c": {
+      "sha256": "a8f1410ad95326648a473672ee3bf8158a5f744b7c032c0142327fb252688ab4"
+    },
+    "Objects_unicodeobject.c": {
+      "sha256": "dd21107aaed90e06b85cae80de86f43f09e6c0bcb35b00037344cf96960bd431"
+    },
+    "Modules__io__iomodule.c": {
+      "sha256": "52b49faafcc2c3c65ee308c1f678b5eab346e05c0d3ffa9d454ac2d503aedeb0"
+    },
+    "Objects_rangeobject.c": {
+      "sha256": "69f852c725935226db115b41a2aa2307a4b5201886a6adb5723c94c0f46e1ab0"
+    },
+    "Objects_tupleobject.c": {
+      "sha256": "924295e1827f08034877cf0f61c475a4f9abdb8f333581726e6610366735c833"
+    },
+    "Objects_dictobject.c": {
+      "sha256": "2139caefe57c6659db766fdda5e53c57f0e42e9335227875756307acfcdb51dd"
+    }
+  },
+  "apis": {
+    "Path": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "args",
+            "VAR_POSITIONAL",
+            "<required>"
+          ],
+          [
+            "kwargs",
+            "VAR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "d17b109ff5f7b8cb7c93aa2ed768fbd788b4fbe69458f37ffa23cb9d59f25458",
+        "doc_sha256": "0377bc185dbec729182fab21b4971e18e783519805621514c8c04a8ca8d3bbb7"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "Path.cwd": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [],
+        "source_sha256": "e624d646e42bddbd6803e751d13660da99da52288e1067e1ac852a548d8d3665",
+        "doc_sha256": "ee13ddf2e10d6ff333356defd3c914d106d7508a084bd0036e29764a357e84b4"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "all": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "iterable",
+            "POSITIONAL_ONLY",
+            "<required>"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "41c33ccada789b4b1ab3ec077cddef07affe8b5dd7673680c087916e8310ce34"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Python/bltinmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "any": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "iterable",
+            "POSITIONAL_ONLY",
+            "<required>"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "e4d26f2d5be9b4c955d916831e3280d6100f5e92960532ddb3c239be715e0c3f"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Python/bltinmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "builtins.open": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "file",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "mode",
+            "POSITIONAL_OR_KEYWORD",
+            "'r'"
+          ],
+          [
+            "buffering",
+            "POSITIONAL_OR_KEYWORD",
+            "-1"
+          ],
+          [
+            "encoding",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "errors",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "newline",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "closefd",
+            "POSITIONAL_OR_KEYWORD",
+            "True"
+          ],
+          [
+            "opener",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "dbad3d24d5347eef3b2b9473396bb3832744ed1eee112d497521ef3908c0a3c0"
+      },
+      "callbacks": [
+        {
+          "name": "opener",
+          "position": 7,
+          "before": [
+            "'safe'",
+            "'r'",
+            "-1",
+            "None",
+            "None",
+            "None",
+            "True"
+          ]
+        }
+      ],
+      "args": [
+        "'safe'"
+      ],
+      "source_evidence": "Modules/_io/_iomodule.c",
+      "conclusion": "明示callback引数あり。位置/keywordを検査"
+    },
+    "bytes": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": null,
+        "source_sha256": null,
+        "doc_sha256": "c4e15231f69ba546d9a8067b87d5f0e59530ab5a0a8801d251fe5409d1abd6e0"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Objects/bytesobject.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "dict": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": null,
+        "source_sha256": null,
+        "doc_sha256": "6e3fb2af1d74c393fe93d5109135c9802420de67d8f2e22dea1478c4baefc1e1"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Objects/dictobject.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "enumerate": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "iterable",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "start",
+            "POSITIONAL_OR_KEYWORD",
+            "0"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "6b6be5b54b621745abc874b00592331084525c59feae795fe88002cd69d32e84"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Objects/enumobject.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "hasattr": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "obj",
+            "POSITIONAL_ONLY",
+            "<required>"
+          ],
+          [
+            "name",
+            "POSITIONAL_ONLY",
+            "<required>"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "b3eb3076c8490e407cdeebef35eca5cae52b9274ffedbb995ddf9c778cc06eea"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Python/bltinmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "hashlib.HASH.digest": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_ONLY",
+            "<required>"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "ef0f8847d764e2af9712df9d3fdf30b054af0dc7becd9ade400f5e85015a5b23"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/_hashopenssl.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "hashlib.HASH.hexdigest": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_ONLY",
+            "<required>"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "f1ccd7fee63f46aed42bfef331e1ff5917f8a6c5fffd021adbd5256aa9544491"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/_hashopenssl.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "hashlib.sha256": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "string",
+            "POSITIONAL_OR_KEYWORD",
+            "b''"
+          ],
+          [
+            "usedforsecurity",
+            "KEYWORD_ONLY",
+            "True"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "2fcf3d5c30c46ebb2ae160e05ea977df047e38f042bff6983f45f6d41cbceb1e"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/_hashopenssl.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "int": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": null,
+        "source_sha256": null,
+        "doc_sha256": "dd8535c843be7af2890c73496ae58e2727011fbb4497275b4f53465e03945db6"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Objects/longobject.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "isinstance": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "obj",
+            "POSITIONAL_ONLY",
+            "<required>"
+          ],
+          [
+            "class_or_tuple",
+            "POSITIONAL_ONLY",
+            "<required>"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "5e92a6d714a35cfae72049dd30f4a029b67584ed0404f89c2661c514ecb64d1e"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Python/bltinmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "json.dumps": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "obj",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "skipkeys",
+            "KEYWORD_ONLY",
+            "False"
+          ],
+          [
+            "ensure_ascii",
+            "KEYWORD_ONLY",
+            "True"
+          ],
+          [
+            "check_circular",
+            "KEYWORD_ONLY",
+            "True"
+          ],
+          [
+            "allow_nan",
+            "KEYWORD_ONLY",
+            "True"
+          ],
+          [
+            "cls",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "indent",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "separators",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "default",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "sort_keys",
+            "KEYWORD_ONLY",
+            "False"
+          ],
+          [
+            "kw",
+            "VAR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "2aeed87f2853842efdcd89d42b98f11d78c77457a972c57d1692aef209192d2b",
+        "doc_sha256": "1713d82934be2d1b27059ae7d3ec60472f48c64e71367d1a4150bf155178e12f"
+      },
+      "callbacks": [
+        {
+          "name": "cls",
+          "position": null,
+          "before": []
+        },
+        {
+          "name": "default",
+          "position": null,
+          "before": []
+        }
+      ],
+      "args": [
+        "{}"
+      ],
+      "source_evidence": "Lib/json/__init__.py + decoder.py + encoder.py",
+      "conclusion": "明示callback引数あり。位置/keywordを検査"
+    },
+    "json.loads": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "s",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "cls",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "object_hook",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "parse_float",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "parse_int",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "parse_constant",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "object_pairs_hook",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "kw",
+            "VAR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "cd42a7fea10191986cd106b2547b3d828bf597deac8c39b847c274a485b1d5dd",
+        "doc_sha256": "c4270fc3e2b86cdfff2a95bc13f5b251f6d8e49cb0940b19c96dc844b273f808"
+      },
+      "callbacks": [
+        {
+          "name": "cls",
+          "position": null,
+          "before": []
+        },
+        {
+          "name": "object_hook",
+          "position": null,
+          "before": []
+        },
+        {
+          "name": "parse_float",
+          "position": null,
+          "before": []
+        },
+        {
+          "name": "parse_int",
+          "position": null,
+          "before": []
+        },
+        {
+          "name": "parse_constant",
+          "position": null,
+          "before": []
+        },
+        {
+          "name": "object_pairs_hook",
+          "position": null,
+          "before": []
+        }
+      ],
+      "args": [
+        "'{}'"
+      ],
+      "source_evidence": "Lib/json/__init__.py + decoder.py + encoder.py",
+      "conclusion": "明示callback引数あり。位置/keywordを検査"
+    },
+    "len": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "obj",
+            "POSITIONAL_ONLY",
+            "<required>"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "59e4fa24884fb5c6e9ac89a3f8024acc4096c886a70d7a6c670969bcb0779458"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Python/bltinmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "list": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "iterable",
+            "POSITIONAL_ONLY",
+            "()"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "e4b7fc2f852bd7bf58200058a214241725a5b7436ca08ad13431ced8299cb044"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Objects/listobject.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "max": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": null,
+        "source_sha256": null,
+        "doc_sha256": "3652e69ebd6595abcc5873162d1d2fd713e1dabd922a05339847aa4d861c1e3e"
+      },
+      "callbacks": [
+        {
+          "name": "key",
+          "position": null,
+          "before": []
+        }
+      ],
+      "args": [
+        "[1,2]"
+      ],
+      "source_evidence": "Python/bltinmodule.c",
+      "conclusion": "明示callback引数あり。位置/keywordを検査"
+    },
+    "min": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": null,
+        "source_sha256": null,
+        "doc_sha256": "e3a6f352fb5e96038d9419d3a02c937d54c3107444c0883729816d0ab872f254"
+      },
+      "callbacks": [
+        {
+          "name": "key",
+          "position": null,
+          "before": []
+        }
+      ],
+      "args": [
+        "[1,2]"
+      ],
+      "source_evidence": "Python/bltinmodule.c",
+      "conclusion": "明示callback引数あり。位置/keywordを検査"
+    },
+    "open": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "file",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "mode",
+            "POSITIONAL_OR_KEYWORD",
+            "'r'"
+          ],
+          [
+            "buffering",
+            "POSITIONAL_OR_KEYWORD",
+            "-1"
+          ],
+          [
+            "encoding",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "errors",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "newline",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "closefd",
+            "POSITIONAL_OR_KEYWORD",
+            "True"
+          ],
+          [
+            "opener",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "dbad3d24d5347eef3b2b9473396bb3832744ed1eee112d497521ef3908c0a3c0"
+      },
+      "callbacks": [
+        {
+          "name": "opener",
+          "position": 7,
+          "before": [
+            "'safe'",
+            "'r'",
+            "-1",
+            "None",
+            "None",
+            "None",
+            "True"
+          ]
+        }
+      ],
+      "args": [
+        "'safe'"
+      ],
+      "source_evidence": "Modules/_io/_iomodule.c",
+      "conclusion": "明示callback引数あり。位置/keywordを検査"
+    },
+    "os.access": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "mode",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "effective_ids",
+            "KEYWORD_ONLY",
+            "False"
+          ],
+          [
+            "follow_symlinks",
+            "KEYWORD_ONLY",
+            "True"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "9c58aa99ee11ba70175cedf63973b964229e0f7216b34645f569356487cebed7"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.chdir": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "65f34f8d16b0331a4e21b7e1d963a36f762fa3b0378c8ae19e149f872f47c7a2"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.getcwd": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [],
+        "source_sha256": null,
+        "doc_sha256": "70a6ff2c348c9ccbf32b4fd0c758f34d57a4bc80337c5cef1461b3e126ffbe4f"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.getpid": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [],
+        "source_sha256": null,
+        "doc_sha256": "16c91bc335fac8496149f56a9c14aa1a49579bb22c3c45d18ec14a8b30ac88be"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.getuid": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [],
+        "source_sha256": null,
+        "doc_sha256": "7e03aa21f7a077226ad72d3d89bc19656652f86de235734e348d76970c9af14f"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.link": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "src",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dst",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "src_dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "dst_dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "follow_symlinks",
+            "KEYWORD_ONLY",
+            "True"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "119c466bbe6274103c77eb81d53e800065a406ac13825ea309ebd7780ba2fbff"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.listdir": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "47cf179ba88c8fb193f8e54d188d788aae6253c96ab7731a7245927315232602"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.lstat": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "91588616e5bbd3eaacd9302928745332c4246a4098b29a7de15d0c79a0b46a01"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.makedirs": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "name",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "mode",
+            "POSITIONAL_OR_KEYWORD",
+            "511"
+          ],
+          [
+            "exist_ok",
+            "POSITIONAL_OR_KEYWORD",
+            "False"
+          ]
+        ],
+        "source_sha256": "5ee1b369382c29899cef32feb01d0e758606a6a95422d28317620b94590b0df5",
+        "doc_sha256": "9f785eff5f047b5afce4f521059c5227c102748246ceb2d3bbda074e0edea8a4"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/os.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.mkdir": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "mode",
+            "POSITIONAL_OR_KEYWORD",
+            "511"
+          ],
+          [
+            "dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "b3f09d27c2ac60541d16bc33db0ef2a4c269b4107512eea531048a885173fcac"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.open": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "flags",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "mode",
+            "POSITIONAL_OR_KEYWORD",
+            "511"
+          ],
+          [
+            "dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "441e126ad31acf5b1644b7c296eda979f10c91616b9342e8b055d50a628f3ef2"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.path.basename": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "p",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "6e85f042f5f145769f3bf1f3c57d83b7afcf2f7a13239327f50161f4921f6d40",
+        "doc_sha256": "c84353f6326fb92aae45df341afe46723afe311db7b30c5ec3ccf8f2bcb4dbd0"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/posixpath.py + genericpath.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.path.commonpath": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "paths",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "3787a1ad5ccbcc475170bed4016e6cc0d55f436448c0ec6240b55d883cdcbcaf",
+        "doc_sha256": "c9fb65e7e44e045350bf692460595a3ee3c9d41fb18b0f3c1627d83ab2d5276a"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/posixpath.py + genericpath.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.path.dirname": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "p",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "39df65dd727cd74276df9479d9576326496c70c253a6b415557ceba42693ed1a",
+        "doc_sha256": "cd2cb51783f35ab0a9203eb05cdcf7a1b4eb2b902abf6f7c9b0ec37e7283244c"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/posixpath.py + genericpath.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.path.exists": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "bae0854ba3bbc16b96517566294029b6ab84c66a649d7bcbc8ae3acfa5d40469",
+        "doc_sha256": "4582fd808c93b548c1438d43804d71298d09e48ecdb23878492611fab202dbfb"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/posixpath.py + genericpath.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.path.isdir": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "s",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "631a48f54c24718443242659d13be6c6fa26ecb64e461768e48b0179b3fc7cab",
+        "doc_sha256": "456f70c782de9824b12914c3540d8a0c73f8314d2cac1c5dcf192e0de13537ea"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/posixpath.py + genericpath.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.path.isfile": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "ff2e64a8420bd4204585becb0c63c54a7368793ff9782903c859bc74bd5b8fb9",
+        "doc_sha256": "90dcb27d5d52bb544c9512f888de21cb2eb2816114c2fb1d036824677ab5548e"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/posixpath.py + genericpath.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.path.join": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "a",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "p",
+            "VAR_POSITIONAL",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "222c429fe9404ae71d6f8e25cf43b3f88fe50d254b68af89727043171fa59d53",
+        "doc_sha256": "f736434cd755eea14a3b5270e05159c1e7f02241df365b543205360b3e3d2e40"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/posixpath.py + genericpath.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.path.normpath": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "e9e3434939f466b1465295de98a666b4d97e9b92e6c49a14fe65cf9a7bac90af"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/posixpath.py + genericpath.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.path.realpath": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "filename",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "strict",
+            "KEYWORD_ONLY",
+            "False"
+          ]
+        ],
+        "source_sha256": "9346d7c5bb23c87bfb45a7eb5afddcdd69e707dc84b08be30af5a8f56e760be7",
+        "doc_sha256": "c44e3d6aebf01aced9be19603e9be1e03689ae2f31b278abc9aec4b9733789c9"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/posixpath.py + genericpath.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.path.relpath": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "start",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ]
+        ],
+        "source_sha256": "854562e49cea05e3aae71459f8ccae58146b6278ce38df5f0f1bcdb8639447a9",
+        "doc_sha256": "752f2eaf69a729e432d101699931dcb7ddad6fce138e30b7a753b50f8b131779"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/posixpath.py + genericpath.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.path.split": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "p",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "e931a31c1f020f72407c27f1ab696a78246e332a8d718804753e685271c3f997",
+        "doc_sha256": "93eb1516b14ecabeb0afb5ce5968f2c65801e598e439700117a60b4b842c138d"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/posixpath.py + genericpath.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.readlink": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "7ad5f9a1530c55f3fe90b29a0118104e6fae1d73452c87ab7532498d2c65891b"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.remove": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "4256ea312553ab37ea44d9fed5622558141b3abdf7c7bc0c01ee51b7fc177fc2"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.rename": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "src",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dst",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "src_dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "dst_dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "d4e3b8863c9291026d5edfd277743317e1fd2e5e9b35ae7afa36bbdba5792e10"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.replace": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "src",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dst",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "src_dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "dst_dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "7feaa9dff1b02b99ed0d8cd502f230f4e5f277da416ecc36901a30dbf98033e5"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.scandir": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "986041b81d247297ceba0c0d7cae90b04868b2f545f699b4ee63f8d23f033cb1"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.stat": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "follow_symlinks",
+            "KEYWORD_ONLY",
+            "True"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "0978b36fb7131d517c9670bdd0aed24e972ad50affec920e4ece8891acf524fd"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.symlink": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "src",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dst",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "target_is_directory",
+            "POSITIONAL_OR_KEYWORD",
+            "False"
+          ],
+          [
+            "dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "16134dce45bb22e561416a13b441b2edc1c12604fe198c17bcab6d0b0921f80b"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.unlink": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "dd362abd454f0ed327eff50e7284427f4de8e786c8041eca2eba5a8fc46a30d1"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Modules/posixmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "os.walk": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "top",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "topdown",
+            "POSITIONAL_OR_KEYWORD",
+            "True"
+          ],
+          [
+            "onerror",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "followlinks",
+            "POSITIONAL_OR_KEYWORD",
+            "False"
+          ]
+        ],
+        "source_sha256": "05dd115007d4802005cb40a367dcc8b1cba972050876438a3385e0e4871015f6",
+        "doc_sha256": "35dcafd2fd4f05d88c7022fb0031878ebabe76967517d61b7abea6ff9ee8a7f2"
+      },
+      "callbacks": [
+        {
+          "name": "onerror",
+          "position": 2,
+          "before": [
+            "'.'",
+            "True"
+          ]
+        }
+      ],
+      "args": [
+        "'.'"
+      ],
+      "source_evidence": "Lib/os.py",
+      "conclusion": "明示callback引数あり。位置/keywordを検査"
+    },
+    "pathlib.Path": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "args",
+            "VAR_POSITIONAL",
+            "<required>"
+          ],
+          [
+            "kwargs",
+            "VAR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "d17b109ff5f7b8cb7c93aa2ed768fbd788b4fbe69458f37ffa23cb9d59f25458",
+        "doc_sha256": "0377bc185dbec729182fab21b4971e18e783519805621514c8c04a8ca8d3bbb7"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.cwd": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [],
+        "source_sha256": "e624d646e42bddbd6803e751d13660da99da52288e1067e1ac852a548d8d3665",
+        "doc_sha256": "ee13ddf2e10d6ff333356defd3c914d106d7508a084bd0036e29764a357e84b4"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.exists": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "follow_symlinks",
+            "KEYWORD_ONLY",
+            "True"
+          ]
+        ],
+        "source_sha256": "c79ca9eefba2611273872832d76a3149b21ceca11eb4a4b23c5ac28aa60b48b5",
+        "doc_sha256": "863ab5c53ace17eff7f0fcc00980c4372a44b7419d1d11de8e88c8bf9638a689"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.glob": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "pattern",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "case_sensitive",
+            "KEYWORD_ONLY",
+            "None"
+          ]
+        ],
+        "source_sha256": "d34410ee9a76e3a51b987b0b522baab63739710efdde2ff119049a50678d759b",
+        "doc_sha256": "a3f0c8fc65b753ca5b1b4bdf15da36b3ebfeecad61eefe4bf9e1138c2802c4cf"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.hardlink_to": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "target",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "fa6c4241e9af515562fb90d27d63fcd8698aa9f3a35bddc905e2b0fe9a2667b9",
+        "doc_sha256": "c1cea78281e528625c57b03a9baa0eb2ded9228563e6177caf436263beb6c941"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.is_dir": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "c92c5348cdcae50d07915f4c16d1f76b4ad7694d3ff08c96638f0063d75d1e94",
+        "doc_sha256": "973823be1a11c2a500cfcf4c29288d90564e78b4838efd639c6007eb6827ab17"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.is_file": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "692bb7d89bdfcc732c6356daa3b177e90669bc1aaeca48ed0cc333de5c7fba79",
+        "doc_sha256": "ee7df7dfd59241e54769d0a709d970f1bfa4a7544f8ec6c0286bb41cddadfbf5"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.iterdir": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "486dbb4cba4c04b156ef6f66fb2ec343cb455a713d23ab7a992b201c913b06e4",
+        "doc_sha256": "3794e04fe35df00584d80829be8a354cde06f0dd5c370c69d7390d7a84da6b85"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.link_to": {
+      "runtime_binding": {
+        "available": false,
+        "parameters": null,
+        "source_sha256": null,
+        "doc_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "固定runtimeには存在しない。既存link作成拒否境界のみ"
+    },
+    "pathlib.Path.lstat": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "90172415f328bf762e492bbc67120fbd5b76252bdcb98e61ddad91362512c36f",
+        "doc_sha256": "870b20ac04c1684097dd443ade6ce0d85cba21e01d3233b9a2af3b0e14289ddb"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.mkdir": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "mode",
+            "POSITIONAL_OR_KEYWORD",
+            "511"
+          ],
+          [
+            "parents",
+            "POSITIONAL_OR_KEYWORD",
+            "False"
+          ],
+          [
+            "exist_ok",
+            "POSITIONAL_OR_KEYWORD",
+            "False"
+          ]
+        ],
+        "source_sha256": "18da17b7bb2b448a949fe11c84dcc02bf02eac5f0cf7afdb126267d86de6a18a",
+        "doc_sha256": "973e660007b2ebadb309ade245f4fa2ff80dc8156e76fe12bba9c6e52f8fa28e"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.open": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "mode",
+            "POSITIONAL_OR_KEYWORD",
+            "'r'"
+          ],
+          [
+            "buffering",
+            "POSITIONAL_OR_KEYWORD",
+            "-1"
+          ],
+          [
+            "encoding",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "errors",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "newline",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ]
+        ],
+        "source_sha256": "955233c02ddabbbb406e9f1783d59ee4ec5ad03a89a32fad237b18a9e392db49",
+        "doc_sha256": "0451eee5cd1cf753fbbff2ec0de3ebc84fe6fa4ae072e2dab552dad50678f9d6"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.read_bytes": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "156af7cda38c8754034a859df40b83880523034aa03021e5b5756fab11bf4839",
+        "doc_sha256": "84f175067fbc3dbd3d8353272582fd9f17a78adc0b88b11b775b87c7decd55fb"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.read_text": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "encoding",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "errors",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ]
+        ],
+        "source_sha256": "82688863abd32501a0fcd3355214f0f129427fd07a8fcca4f7b3b2fc27fc2bf6",
+        "doc_sha256": "476845eba3b97935ce42c4f20cdf785f9f24271bc28959a7f5c8d1e5d85a3e4d"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.rename": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "target",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "5778ceba02e525c2d96e9f77715b6dbbd278f9719b48ca25f4893f43313bdaf7",
+        "doc_sha256": "9ebea3f0266da38cb70c76a25059046575534b4f73191aff0e3cc54d861bf23c"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.replace": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "target",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "f9c3c03ab849de0b3c3859a15f3090f931860a1be2c4fcffce9061837f45794c",
+        "doc_sha256": "4cfb99ea6fd3741715d13a417415db52de31bb29ff150dfec9cad16fbbd8d533"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.rglob": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "pattern",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "case_sensitive",
+            "KEYWORD_ONLY",
+            "None"
+          ]
+        ],
+        "source_sha256": "d488b6ccff440c7dfc617186bde981de6bceea5e8f9150f3941ddf3c44ca3502",
+        "doc_sha256": "5a739799093a2908b4a76d57c5d1e78634833f34b2159bdd25fe3108e1738ff1"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.stat": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "follow_symlinks",
+            "KEYWORD_ONLY",
+            "True"
+          ]
+        ],
+        "source_sha256": "6bb8705d8b81ca01cc2405d16b820521def1ac05fbbe014d1f8ead0650e2dd40",
+        "doc_sha256": "fe7066bcecb9e4a67891491ac039646c6c140ad7b2d709840f8d407b4cb2d884"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.symlink_to": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "target",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "target_is_directory",
+            "POSITIONAL_OR_KEYWORD",
+            "False"
+          ]
+        ],
+        "source_sha256": "d12c72c4c0dcf195660c425a72e41443006dc08bea7d36e4f5175b18f5b978cc",
+        "doc_sha256": "a17ede271f58913809cc63f27f282d2dbbd37fa777c77f980e5af17d1d663e8f"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.unlink": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "missing_ok",
+            "POSITIONAL_OR_KEYWORD",
+            "False"
+          ]
+        ],
+        "source_sha256": "7629a2a6a887673bb3ecfb8e5615160827ad5305ce0d7386cc0ea531135fec82",
+        "doc_sha256": "d5d67ecfd41b2913791758dc9aa90911a1b4e9b6dcaae4382479294d22c6e642"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.write_bytes": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "data",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ]
+        ],
+        "source_sha256": "2b675d8b3b90be780be9bf75221c9fcaf3c80d275528faf324ab3372a12620e8",
+        "doc_sha256": "5131908268fea0f5d5feab096a115c601fc0a6d645fcfa45bd04f1a26f230b7e"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "pathlib.Path.write_text": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "self",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "data",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "encoding",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "errors",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "newline",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ]
+        ],
+        "source_sha256": "0ff4033c34bf992358197175a3a43a00e8106e4f2cd8c19975b6b51751072bdd",
+        "doc_sha256": "4ba09791f3f69367db99d8e6fcae53b5896232915629ec86cfb58465fc39d36e"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/pathlib.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "print": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "args",
+            "VAR_POSITIONAL",
+            "<required>"
+          ],
+          [
+            "sep",
+            "KEYWORD_ONLY",
+            "' '"
+          ],
+          [
+            "end",
+            "KEYWORD_ONLY",
+            "'\\n'"
+          ],
+          [
+            "file",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "flush",
+            "KEYWORD_ONLY",
+            "False"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "6b14f9b21e5c923719935eec6e8bb5c846694f578172e742292906c01ed1b892"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Python/bltinmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "range": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": null,
+        "source_sha256": null,
+        "doc_sha256": "66f514ac947e4b17d09644743638e3b399e5d1e9ca4fae6179d8cfb8da5e7031"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Objects/rangeobject.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "runpy.run_path": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path_name",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "init_globals",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "run_name",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ]
+        ],
+        "source_sha256": "78c3e925c3c91bf4ba4e24728df6ceaf005b38fdc56572384ff77967aaa17737",
+        "doc_sha256": "ef1b535a2a7a5aea1cafbfdadb02287b465ac03a4e7530d6c2fee7e599b21543"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/runpy.py (import禁止の防御表)",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "set": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": null,
+        "source_sha256": null,
+        "doc_sha256": "7483f0a407b115e2de11ad66e8f5b03795c718da5335b709b939f19ae164a4c0"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Objects/setobject.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "shutil.copy": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "src",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dst",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "follow_symlinks",
+            "KEYWORD_ONLY",
+            "True"
+          ]
+        ],
+        "source_sha256": "5a73dc7be51c3a049d1878a501aa6e4dd4b23cf19cfa47e2ce2e174e5a2f037b",
+        "doc_sha256": "1dde64da420d13eb60e01157633b6781c758b0b81c3078b6d579efd992964b8d"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/shutil.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "shutil.copy2": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "src",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dst",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "follow_symlinks",
+            "KEYWORD_ONLY",
+            "True"
+          ]
+        ],
+        "source_sha256": "41ff99b2b28b0f18148c48d44b738b7792ac939c512a5b33a07add8cffe11259",
+        "doc_sha256": "c7110bd99055df454721914ccd6dc4d2019b5a4313d77b7007d341c832370fa1"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/shutil.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "shutil.copyfile": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "src",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dst",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "follow_symlinks",
+            "KEYWORD_ONLY",
+            "True"
+          ]
+        ],
+        "source_sha256": "f0510a67b289836d0a3a8d1dab6a1ca8092b23ee00845b7c20cc4e5742f6675e",
+        "doc_sha256": "7f5874bc7531a7dfbb20e6860abf54c0880f760d8fceeb8c5e245b2ac67344d1"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Lib/shutil.py",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "shutil.copytree": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "src",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dst",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "symlinks",
+            "POSITIONAL_OR_KEYWORD",
+            "False"
+          ],
+          [
+            "ignore",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "copy_function",
+            "POSITIONAL_OR_KEYWORD",
+            "shutil.copy2"
+          ],
+          [
+            "ignore_dangling_symlinks",
+            "POSITIONAL_OR_KEYWORD",
+            "False"
+          ],
+          [
+            "dirs_exist_ok",
+            "POSITIONAL_OR_KEYWORD",
+            "False"
+          ]
+        ],
+        "source_sha256": "27cc5fa2199f495a47ef996277526e4497f9ba112bea8bd1d0409215da6850f9",
+        "doc_sha256": "857715bba8890188fb2906e49a882b943b2744403836a78c40f674fb197773b6"
+      },
+      "callbacks": [
+        {
+          "name": "ignore",
+          "position": 3,
+          "before": [
+            "'src'",
+            "'dst'",
+            "False"
+          ]
+        },
+        {
+          "name": "copy_function",
+          "position": 4,
+          "before": [
+            "'src'",
+            "'dst'",
+            "False",
+            "None"
+          ]
+        }
+      ],
+      "args": [
+        "'src'",
+        "'dst'"
+      ],
+      "source_evidence": "Lib/shutil.py",
+      "conclusion": "明示callback引数あり。位置/keywordを検査"
+    },
+    "shutil.move": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "src",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "dst",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "copy_function",
+            "POSITIONAL_OR_KEYWORD",
+            "shutil.copy2"
+          ]
+        ],
+        "source_sha256": "7f18cd2dec8ab7974275df5ce3c16a8ea9f36a4b98bbaf2e79afe1d6ead7b6fc",
+        "doc_sha256": "3c6dc1e8a10cd3b05f6791c8df2cbf72a7c14988ee44b1c8c69c196c1969999f"
+      },
+      "callbacks": [
+        {
+          "name": "copy_function",
+          "position": 2,
+          "before": [
+            "'src'",
+            "'dst'"
+          ]
+        }
+      ],
+      "args": [
+        "'src'",
+        "'dst'"
+      ],
+      "source_evidence": "Lib/shutil.py",
+      "conclusion": "明示callback引数あり。位置/keywordを検査"
+    },
+    "shutil.rmtree": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "path",
+            "POSITIONAL_OR_KEYWORD",
+            "<required>"
+          ],
+          [
+            "ignore_errors",
+            "POSITIONAL_OR_KEYWORD",
+            "False"
+          ],
+          [
+            "onerror",
+            "POSITIONAL_OR_KEYWORD",
+            "None"
+          ],
+          [
+            "onexc",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "dir_fd",
+            "KEYWORD_ONLY",
+            "None"
+          ]
+        ],
+        "source_sha256": "aa17cdbb664401b6c0429637adea133cbe19ee36b3f905c4a1efa192d9eefd7e",
+        "doc_sha256": "06dd285d92a404205496f09342fd75c381211c07a56ddf23e25b7f5dc2be68c6"
+      },
+      "callbacks": [
+        {
+          "name": "onerror",
+          "position": 2,
+          "before": [
+            "'safe'",
+            "False"
+          ]
+        },
+        {
+          "name": "onexc",
+          "position": null,
+          "before": []
+        }
+      ],
+      "args": [
+        "'safe'"
+      ],
+      "source_evidence": "Lib/shutil.py",
+      "conclusion": "明示callback引数あり。位置/keywordを検査"
+    },
+    "sorted": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "iterable",
+            "POSITIONAL_ONLY",
+            "<required>"
+          ],
+          [
+            "key",
+            "KEYWORD_ONLY",
+            "None"
+          ],
+          [
+            "reverse",
+            "KEYWORD_ONLY",
+            "False"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "f8133db309bf10c62629c3ab326bda62b183230c46c398ee76564eab55171c1b"
+      },
+      "callbacks": [
+        {
+          "name": "key",
+          "position": null,
+          "before": []
+        }
+      ],
+      "args": [
+        "[1,2]"
+      ],
+      "source_evidence": "Python/bltinmodule.c",
+      "conclusion": "明示callback引数あり。位置/keywordを検査"
+    },
+    "str": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": null,
+        "source_sha256": null,
+        "doc_sha256": "fdf09be211280cf353c7e4ee94bd008d236e8f5bde1d9ed6f3e563cf34715d92"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Objects/unicodeobject.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "sum": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "iterable",
+            "POSITIONAL_ONLY",
+            "<required>"
+          ],
+          [
+            "start",
+            "POSITIONAL_OR_KEYWORD",
+            "0"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "51e5aeb1a35fb737740492bdcb39d88f969e8ace7c151cb78e4de634fc37a41f"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Python/bltinmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "tuple": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": [
+          [
+            "iterable",
+            "POSITIONAL_ONLY",
+            "()"
+          ]
+        ],
+        "source_sha256": null,
+        "doc_sha256": "2bcdb9d2c5855cee481592f6fd4670a538a7a4b5b006543d99bebf6d7e36e1ae"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Objects/tupleobject.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    },
+    "zip": {
+      "runtime_binding": {
+        "available": true,
+        "parameters": null,
+        "source_sha256": null,
+        "doc_sha256": "4fb14f6fe7c231e8d1567db5139ffd2cd3a40a8dc96f22364bd4fb9398786741"
+      },
+      "callbacks": [],
+      "args": [],
+      "source_evidence": "Python/bltinmodule.c",
+      "conclusion": "明示callback引数なし。暗黙protocolは既存AST/import subset境界で扱う"
+    }
+  }
+}

@@ -992,7 +992,7 @@ def _fixed_python_code_attempts(code, expected_cwd):
     # 引数位置は0-origin。一般のdefault（min/max等）は値でありcallbackに含めない。
     callback_slots = {
         "sorted": (), "min": (), "max": (), "map": (0,), "filter": (0,),
-        "open": (7,), "os.walk": (2,), "shutil.copytree": (3, 4), "shutil.rmtree": (2,),
+        "open": (7,), "os.walk": (2,), "shutil.copytree": (3, 4), "shutil.move": (2,), "shutil.rmtree": (2,),
         "functools.reduce": (0,), "functools.partial": (0,), "functools.partialmethod": (0,),
         "functools.cmp_to_key": (0,), "functools.lru_cache": (0,), "functools.cache": (0,),
         "itertools.accumulate": (1,), "itertools.groupby": (1,),

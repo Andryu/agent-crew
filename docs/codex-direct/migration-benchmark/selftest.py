@@ -1729,8 +1729,8 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v14.py"
-    config = root / "drivers/p5-driver-v14-config.json"
+    copy = root / "drivers/p5_driver_v15.py"
+    config = root / "drivers/p5-driver-v15-config.json"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
@@ -2197,7 +2197,52 @@ def copytree_callback_v14_tests():
                 metadata.assert_called_once()
     print(f"v14 copytree: {len(cases)} non-pass + synthetic events, {len(safe)} safe, 4 mock callback reachability PASS", flush=True)
 
+
+def move_callback_v15_tests():
+    """rename失敗時の実move callback到達と分類器の位置/keyword同値性を固定する。"""
+    import shutil
+    from unittest.mock import Mock
+    import callback_audit
+    root = Path(tempfile.mkdtemp(prefix="p5-v15-move-", dir="/private/tmp"))
+    cases = []
+    safe = []
+    for prefix, api in [('import shutil', 'shutil.move'),
+                        ('import shutil as s', 's.move'),
+                        ('from shutil import move as m', 'm')]:
+        for callback in ('print', 'open', 'int', 'False'):
+            for suffix in (',' + callback, ',copy_function=' + callback):
+                cases.append(f"{prefix}; {api}('src','dst'{suffix})")
+        for suffix in ('', ',None', ',copy_function=None'):
+            safe.append(f"{prefix}; {api}('src','dst'{suffix})")
+    cases += ["import shutil; shutil.move('src','dst',shutil.copy2)",
+              "from shutil import move, copy2; move('src','dst',copy_function=copy2)"]
+    for code in cases:
+        findings = runner._fixed_python_code_attempts(code, root)
+        assert any(f['reason'] == 'python_callback_effects_unclassified' for f in findings), code
+        raw = '\n'.join(json.dumps(e) for e in event_stream(
+            shlex.join([runner.PYTHON_EXECUTABLE, '-I', '-B', '-c', code])))
+        result = runner.safe_events(raw, root/'events.json', root)
+        assert result['event_audit']['passed'] and not result['attempt_policy']['passed'], code
+    for code in safe:
+        assert not runner._fixed_python_code_attempts(code, root), code
+    assert shutil.move.__defaults__ == (shutil.copy2,)
+    for keyword in (False, True):
+        for name in ('print', 'open'):
+            callback = Mock(name=name)
+            with patch('shutil.os.rename', side_effect=OSError('mock cross-device')), \
+                    patch('shutil.os.path.isdir', return_value=False), \
+                    patch('shutil.os.path.islink', return_value=False), \
+                    patch('shutil.os.unlink') as unlink:
+                result = (shutil.move('src', 'dst', copy_function=callback) if keyword
+                          else shutil.move('src', 'dst', callback))
+                assert result == 'dst'
+                callback.assert_called_once_with('src', 'dst')
+                unlink.assert_called_once_with('src')
+    callback_audit.verify_inventory(runner, root)
+    print(f"v15 move: {len(cases)} non-pass + synthetic events, {len(safe)} safe, 4 mock callback reachability PASS", flush=True)
+
 if __name__ == "__main__":
+    move_callback_v15_tests()
     copytree_callback_v14_tests()
     import_subset_v13_tests()
     protocol_subset_v12_tests()

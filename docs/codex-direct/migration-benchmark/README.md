@@ -110,3 +110,12 @@ exact moduleはos、os.path、pathlib、json、hashlib、sys、shutil、socket�
 ## v13品質指摘とv14 copytree callback位置修正（2026-10-04）
 
 必須指摘1件: 固定CPythonのcopytree署名ではignoreは位置3、copy_functionは位置4。callback slotsを(3,4)へ修正し、位置2のsymlinks=Falseを通常データとして扱う。API別例外の追加ではなく既存callback検査の署名定義を訂正する。位置/keyword、import alias/from-import、print/open、False/None、安全通常利用、実APIをmockしたignore到達を回帰固定する。全security/analysis・旧ケース・構文/diff/privacy・旧v4 raw read-only replayを完了条件とし、新commitからv14固定物を作成する。追加agent/独立reviewは実施せずquality unapprovedを維持。正式campaign/model/実sandbox verifyは未実施。旧固定物/campaignは変更しない。
+
+
+## v14品質指摘とv15 callback全API監査（2026-10-04）
+
+必須指摘: shutil.moveのcopy_function（位置2/keyword）が高階API表から欠落。v15は既存callback検査にmoveを登録する。個別source文字列で塞ぐ案は採らず、既知call許可集合89 APIの明示callback有無を固定CPython署名・実装/docと照合し、callback-api-inventory.jsonとcallback-api-audit.mdへ記録する。None/省略は従来の安全分類を保持し、明示copy2/int等も純粋性を証明せずunknown。実API成功の保証とcallback非実行能力を区別する。
+
+一般則selftestはAPI集合の網羅性、署名/実装/doc変更、callable既定値、引数直接call、callback語彙、位置/keywordの検査登録を確認。全callback引数にprint/openを注入し、callback理由での非passを必須とする。moveはalias/from-importを含む分類器＋合成event、rename失敗をmockした実APIのcallback到達を固定する。C builtinのsignature取得不能は明記し同版C source/docで補完。これは任意Pythonの安全性証明ではなく既存subsetの明示callback監査である。
+
+完了条件は既存v8〜v14を含む全security/analysis、構文/diff/privacy固定行、旧v4 raw replay不変、新固定物のhash/mode/binding、通常push・remote一致・clean・private記録。追加agent/独立reviewを行わずquality unapprovedを維持。正式campaign/model/実sandbox verifyは禁止。旧固定物/campaign・他checkout・global設定は変更しない。
