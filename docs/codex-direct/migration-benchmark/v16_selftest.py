@@ -9,6 +9,8 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import probe_v16
 import batch
@@ -195,6 +197,26 @@ def runner_tests(base):
     print("v16 fixed runner: positive/bug/dependency/test/args binding PASS")
 
 
+def residual_context_tests(base):
+    uid = os.getuid()
+    root = base / "process-root"
+    root.mkdir()
+    def check(ps_rows, open_rows="", lsof_error="", lsof_code=1):
+        def fake_run(command, **_kwargs):
+            if command[0] == "/bin/ps":
+                return SimpleNamespace(returncode=0, stdout=ps_rows, stderr="")
+            return SimpleNamespace(returncode=lsof_code, stdout=open_rows, stderr=lsof_error)
+        with patch.object(run.subprocess, "run", fake_run):
+            return run.scan_residual_context(root, 42)
+    assert check(f"99 99 {uid}\n")["passed"]
+    assert not check(f"42 42 {uid}\n")["passed"]
+    assert not check(f"99 42 {uid}\n")["passed"]
+    assert not check(f"99 99 {uid}\n", "p99\n", lsof_code=0)["passed"]
+    assert not check(f"99 99 {uid}\n", lsof_error="unavailable")["scan_pass"]
+    assert run.scan_residual_context(root, None)["status"] == "unknown"
+    print("v16 residual PID/group/open file/unknown: PASS")
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="p5-v16-selftest-", dir="/private/tmp") as temporary:
         base = Path(temporary)
@@ -203,6 +225,7 @@ def main():
         budget_tests(base)
         old_record_test()
         runner_tests(base)
+        residual_context_tests(base)
 
 
 if __name__ == "__main__":

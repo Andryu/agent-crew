@@ -1964,7 +1964,7 @@ def require_clean_residual(spec, phase):
         residual["process_context"] = extended
         if not extended["passed"]:
             abort_run(spec, phase, "residual_context_unknown", details={"residual_process_evidence": residual})
-    elif Path(spec["root"]).is_relative_to(WORK):
+    elif Path(spec["root"]).is_relative_to(formal_base() / "formal"):
         abort_run(spec, phase, "residual_context_unavailable", details={"residual_process_evidence": residual})
     return residual
 

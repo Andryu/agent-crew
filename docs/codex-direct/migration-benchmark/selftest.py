@@ -1730,8 +1730,8 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v16.py"
-    config = root / "drivers/p5-driver-v16-config.json"
+    copy = root / "drivers/p5_driver_v16r2.py"
+    config = root / "drivers/p5-driver-v16r2-config.json"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)

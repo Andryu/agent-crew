@@ -29,6 +29,7 @@ analyze = load_module("analyze")
 from harness_fingerprint import compute_harness_fingerprint
 import run as harness_run
 import harness_fingerprint as fingerprint_module
+import probe_v16
 HASH = "a" * 64
 
 
@@ -516,9 +517,11 @@ def _synthetic_main():
         first_file = batch_work / summary["campaign"] / first["run_id"] / ".benchmark-result.json"
         batch.atomic_json(first_file, first)
         original_work, original_preflight, original_subprocess = batch.WORK, batch.require_preflight, batch.subprocess
+        original_probe = probe_v16.require_final_probe
         try:
             batch.WORK = batch_work
             batch.require_preflight = lambda _campaign_dir, _expected_binding, _deadline=None: None
+            probe_v16.require_final_probe = lambda fingerprint: {"fingerprint": fingerprint, "state": "synthetic_pass"}
             def unexpected_model_start(*_args, **_kwargs):
                 raise AssertionError("unknown後に次runを起動した")
             batch.subprocess = SimpleNamespace(Popen=unexpected_model_start)
@@ -530,6 +533,7 @@ def _synthetic_main():
             assert not (batch_work / summary["campaign"] / "run-02").exists()
         finally:
             batch.WORK, batch.require_preflight, batch.subprocess = original_work, original_preflight, original_subprocess
+            probe_v16.require_final_probe = original_probe
         first["attempt_policy"] = {"status": "fail", "passed": False}
         assert batch.stop_reason(first) == "attempt_policy_not_pass"
         refresh_evidence(summary, reviews, campaign_dir)
@@ -707,6 +711,7 @@ def main():
     original_base = harness_run.prepare_formal_base
     original_batch_base = batch.formal_base
     original_batch_runtime = batch.compute_python_runtime_binding
+    original_probe_guard = probe_v16.require_final_probe
     def frozen_runtime():
         return json.loads(frozen_json)
     try:
@@ -718,6 +723,7 @@ def main():
         harness_run.prepare_formal_base = lambda: batch.WORK.parent
         batch.formal_base = lambda: batch.WORK.parent
         batch.compute_python_runtime_binding = frozen_runtime
+        probe_v16.require_final_probe = lambda fingerprint: {"fingerprint": fingerprint, "state": "synthetic_pass"}
         _synthetic_main()
     finally:
         fingerprint_module.compute_python_runtime_binding = original_shared
@@ -727,6 +733,7 @@ def main():
         harness_run.prepare_formal_base = original_base
         batch.formal_base = original_batch_base
         batch.compute_python_runtime_binding = original_batch_runtime
+        probe_v16.require_final_probe = original_probe_guard
 
 
 if __name__ == "__main__":

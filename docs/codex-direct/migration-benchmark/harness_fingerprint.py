@@ -52,11 +52,11 @@ def _private_executable_binding(path, expected_mode):
 
 
 def compute_driver_executable_binding():
-    return _private_executable_binding(formal_base() / "drivers/p5_driver_v16.py", 0o700)
+    return _private_executable_binding(formal_base() / "drivers/p5_driver_v16r2.py", 0o700)
 
 
 def compute_driver_config_binding():
-    return _private_executable_binding(formal_base() / "drivers/p5-driver-v16-config.json", 0o600)
+    return _private_executable_binding(formal_base() / "drivers/p5-driver-v16r2-config.json", 0o600)
 
 
 def reject_platform_temp(path):
