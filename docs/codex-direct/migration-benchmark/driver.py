@@ -21,8 +21,8 @@ BASE = ACCOUNT_HOME / "Library/Caches/agent-crew-p5-benchmark"
 DRIVERS = BASE / "drivers"
 LOGS = DRIVERS / "logs/v17"
 FORMAL = BASE / "formal"
-CONFIG = DRIVERS / "p5-driver-v17r4-config.json"
-LAUNCHER = Path("/private/tmp/p5-v17r4-normal-shell.sh")
+CONFIG = DRIVERS / "p5-driver-v17r5-config.json"
+LAUNCHER = Path("/private/tmp/p5-v17r5-normal-shell.sh")
 SOURCE = None
 HERE = None
 STATUS = LOGS / "status.json"
@@ -38,11 +38,11 @@ CAMPAIGN_SECONDS = 24 * 1200 + 315 + 300
 DRIVER_GRACE_SECONDS = 600
 KNOWN_PRIVACY_LINES = {
     ("docs/codex-direct/migration-benchmark/harness_fingerprint.py", 289):
-        "831bafbf519b5d25f48149a1394166801b8f02f02d89aa44647a3c69e9140057",
+        "e3a5c6c684f77b12d5726043ee75ac55a47f848ceb116e745bc7562dcc2d244f",
     ("docs/codex-direct/migration-benchmark/selftest.py", 326):
         "b74639bd80b379b2183ecdea29f134e27d728e328fff6364fd99229cb7efcc3c",
-    ("docs/plans/2026-09-22-p5-rerun.md", 144):
-        "133eb226669becab2ee6ce5970e85c7732bf22dc08beb425ebda87e64779c1e6",
+    ("docs/plans/2026-09-22-p5-rerun.md", 143):
+        "d205ebe2ffb34164980881f749c36ee5007f76b2b310e5aa45c77e4261dbb7f3",
 }
 
 
@@ -129,7 +129,7 @@ def regular_identity(path, mode=0o600):
 def external_binding():
     """repo原本、実行copy、configの同一bytesとstat identityを固定する。"""
     original = HERE / "driver.py"
-    runtime = DRIVERS / "p5_driver_v17r4.py"
+    runtime = DRIVERS / "p5_driver_v17r5.py"
     launcher_bytes = regular_identity(LAUNCHER, mode=0o700)
     original_bytes = regular_identity(original, mode=0o644)
     runtime_bytes = regular_identity(runtime, mode=0o700)
