@@ -1729,8 +1729,8 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v9.py"
-    config = root / "drivers/p5-driver-v9-config.json"
+    copy = root / "drivers/p5_driver_v10.py"
+    config = root / "drivers/p5-driver-v10-config.json"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
@@ -1906,6 +1906,84 @@ def binding_path_v9_tests():
     print(f"v9 binding/path: {len(cases)} non-pass + {len(safe)} safe cases PASS", flush=True)
 
 
+def mutation_identity_v10_tests():
+    """変異を実行せず、alias/派生値とAPI同一性の失効を分類器と合成eventで検証する。"""
+    root = Path(tempfile.mkdtemp(prefix="p5-v10-mutation-", dir="/private/tmp"))
+    cases = [
+        "p=['safe']; p[0]='../outside'; open(p[0])",
+        "p={'f':'safe'}; p['f']='../outside'; open(p['f'])",
+        "p=[['safe']]; p[0][0]='../outside'; open(p[0][0])",
+        "p=['safe']; p[:]=['../outside']; open(p[0])",
+        "p=['safe']; del p[0]; open(p[0])",
+        "p=['safe']; del p[:]; open(p[0])",
+        "p=['safe']; p[0]+='../outside'; open(p[0])",
+        "p=['safe']; q=p; q[0]='../outside'; open(p[0])",
+        "p=['safe']; q=p; r=q; r[0]='../outside'; open(p[0])",
+        "p=['safe']; q=[p]; q[0][0]='../outside'; open(p[0])",
+        "p=[['safe']]; q=p[0]; q[0]='../outside'; open(p[0][0])",
+        "p=['safe']; q=p; q *= 0; open(p[0])",
+        "p=['safe']; q=p[0]; p[0]='../outside'; open(q)",
+        "p=['safe']; q: list=p; q[0]='../outside'; open(p[0])",
+        "p=['safe']; q,=(p,); q[0]='../outside'; open(p[0])",
+        "p=['safe']; (q:=p); q[0]='../outside'; open(p[0])",
+        "p=['safe'];\nfor q in [p]: q[0]='../outside'\nopen(p[0])",
+        "p=['safe']; factory()[0]='../outside'; open(p[0])",
+        "import os; p=['safe']; p[0]='../outside'; os.rename('src',p[0])",
+        "from pathlib import Path; p=['safe']; p[0]='../outside'; Path('src').rename(target=p[0])",
+        "import os; os.path.join=os.remove; os.path.join('/private/tmp/out')",
+        "import os as o; o.path.join=o.remove; o.path.join('/private/tmp/out')",
+        "import os; import os.path as op; op.join=os.remove; os.path.join('/private/tmp/out')",
+        "import os; from os import path as op; op.join=os.remove; os.path.join('/private/tmp/out')",
+        "import os; q=os.path; q.join=os.remove; os.path.join('/private/tmp/out')",
+        "import os; q=[os.path]; q[0].join=os.remove; os.path.join('/private/tmp/out')",
+        "import os; q=os; r=q.path; r.join=os.remove; os.path.join('/private/tmp/out')",
+        "import os; del os.path.join; os.path.join('safe')",
+        "import os; os.path.join += other; os.path.join('safe')",
+        "import os; factory().join=os.remove; os.path.join('/private/tmp/out')",
+        "import os; os.path=other; os.path.join('safe')",
+        "import builtins; builtins.open=other; open('safe')",
+        "import os, sys; sys.modules['os'].path.join=os.remove; os.path.join('safe')",
+        "import os; q=os.path; del q.join; os.path.join('safe')",
+        "import os; q=os.path; q.join += other; os.path.join('safe')",
+        "import os; from os.path import join; os.path.join=os.remove; join('safe')",
+        "p=['safe']; q=p; q[0:1]=['../outside']; open(p[0])",
+        "p={'f':['safe']}; q=p['f']; del q[0]; open(p['f'][0])",
+    ]
+    for method in ('glob', 'rglob'):
+        for argument in ('p[0]', 'pattern=p[0]'):
+            cases.append(f"from pathlib import Path; p=['*.py']; q=p; q[0]='../*'; list(Path('.').{method}({argument}))")
+    for code in cases:
+        assert runner._fixed_python_code_attempts(code, root), code
+        command = shlex.join([runner.PYTHON_EXECUTABLE, '-I', '-B', '-c', code])
+        raw = '\n'.join(json.dumps(event) for event in event_stream(command))
+        result = runner.safe_events(raw, root / 'events.json', root)
+        assert result['event_audit']['passed'] and not result['attempt_policy']['passed'], code
+    safe = [
+        "p=['safe']; open(p[0])",
+        "p={'f':'safe'}; open(p['f'])",
+        "p=[['safe']]; open(p[0][0])",
+        "p=['safe']; q=p; open(q[0])",
+        "p=['safe']; q=p[0]; open(q)",
+        "import os; os.path.join('docs','note.md')",
+        "import os as o; o.path.join('docs','note.md')",
+        "from os.path import join; p=join('docs','note.md'); open(p)",
+        "import os; os.rename('src','dst')",
+        "from pathlib import Path; p=['*.py']; list(Path('.').glob(p[0]))",
+        "from pathlib import Path; p={'pattern':'*.py'}; list(Path('.').rglob(pattern=p['pattern']))",
+    ]
+    for code in safe:
+        assert not runner._fixed_python_code_attempts(code, root), code
+    # sinkの非passだけでなく派生Path値が失効したことも検証する。
+    findings = runner._fixed_python_code_attempts(cases[12], root)
+    assert any(item['reason'] == 'dynamic_python_path_unclassified' for item in findings)
+    for mutation in ("os.path.join=os.remove", "sys.modules['os'].path.join=os.remove"):
+        code = "import os, sys; " + mutation + "; p=os.path.join('safe'); open(p)"
+        findings = runner._fixed_python_code_attempts(code, root)
+        assert any(item['reason'] == 'dynamic_python_attribute_call_unclassified' for item in findings), code
+    print(f"v10 mutation/identity: {len(cases)} non-pass + synthetic events, {len(safe)} safe PASS", flush=True)
+
+
 if __name__ == "__main__":
     binding_path_v9_tests()
+    mutation_identity_v10_tests()
     main()

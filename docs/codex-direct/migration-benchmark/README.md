@@ -69,3 +69,10 @@ P5は合成入力の指示比較である。P1/P2/P4の実機E2E、実資産、�
 追加品質reviewはNEEDS_CHANGES。3 findingは(1) unpack/Starred等のName束縛によるalias迂回、(2) AugAssign等で既知Pathの静的値が残る問題、(3) glob/rglobのpattern引数未検査。v9ではASTのStore/Delと名前を文字列で持つ束縛を集約し、複数定義・未知束縛の値を全sinkでinvalidateする。探索patternはpositional/keywordの両方で静的な相対値を要求し、親参照・絶対値・動的値を非passにする。未知attributeも非pass。個別payload一致や制御フローの推測で許可しない。
 
 代替案のcase別禁止リストは他の束縛形式を見逃すため採らない。安全な単一定義Pathとfixture内patternは維持し、再代入のある安全codeも証明不能ならunknownとなる保守性を受け入れる。完了条件は再現/周辺境界のselftest、既存security/analysis、構文、diff、privacy固定行、可能なread-only replayとv9固定物の検証。独立reviewは今回行わず、v9も未承認（unapproved）。正式campaign、model run、実sandbox verifyは起動しない。旧v1〜v8の固定物とcampaignは変更しない。
+
+
+## v9品質review round1 NEEDS_CHANGESとv10修正（2026-10-04）
+
+round1はNEEDS_CHANGES、High 2件: コンテナ要素/slice変異後の古い静的値再利用と、属性変更後の標準API同一性の誤認。v10はASTのSubscript/Attribute Store・DelとAugAssignを変異として扱い、代入由来の無向依存graphでroot・alias・派生値を保守的に失効させる。変更されたimport moduleのcanonical APIを無効にし、未知属性receiverではAPI同一性を保証しない。追跡不能なreceiverは既知値全体を失効させる。setter等の副作用も証明できないため変異自体を非passにする。
+
+case別の文字列禁止は採らない。変異のないコンテナ読取と標準APIは維持し、copyの独立性や制御フロー順を推測せず、変異がある場合の過剰拒否は安全側の制約として残す。既存v9 105ケース、v10再現と合成event、security/analysis、py_compile、diff、privacy固定行、旧raw read-only replayを検証する。新commitからv10 source/driver/config/launcherとmanifestを固定し、旧v1〜v9とcampaignは不変。独立reviewは未実施、v10は未承認（unapproved）。正式campaign・model・実sandbox verifyは起動しない。

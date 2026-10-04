@@ -880,9 +880,69 @@ def _fixed_python_code_attempts(code, expected_cwd):
         elif isinstance(node, (ast.Global, ast.Nonlocal)):
             invalid_values.update(node.names)
     invalid_values.update(set(stores) & set(aliases))
+    # 代入で共有され得るobjectと派生値を無向依存graphで結ぶ。実行順・copyの独立性は推測しない。
+    dependencies = {}
+    def names_in(node, context=None):
+        return {item.id for item in ast.walk(node) if isinstance(item, ast.Name)
+                and (context is None or isinstance(item.ctx, context))} if node is not None else set()
+    for node in ast.walk(tree):
+        targets, source = [], None
+        if isinstance(node, ast.Assign):
+            targets, source = node.targets, node.value
+        elif isinstance(node, (ast.AnnAssign, ast.AugAssign, ast.NamedExpr)):
+            targets, source = [node.target], node.value
+        elif isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
+            targets, source = [node.target], node.iter
+        elif isinstance(node, ast.withitem):
+            targets, source = [node.optional_vars], node.context_expr
+        bound = set().union(*(names_in(target, ast.Store) for target in targets))
+        related = bound | names_in(source, ast.Load)
+        for name in bound:
+            dependencies.setdefault(name, set()).update(related - {name})
+            for other in related - {name}:
+                dependencies.setdefault(other, set()).add(name)
+    mutations = [node for node in ast.walk(tree)
+                 if isinstance(node, (ast.Subscript, ast.Attribute)) and isinstance(node.ctx, (ast.Store, ast.Del))]
+    mutations.extend(node.target for node in ast.walk(tree)
+                     if isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name))
+    mutated_names = set()
+    unknown_attribute_receiver = False
+    mutated_api_modules = set()
+    for mutation in mutations:
+        # setter、descriptor、slice等の副作用は静的に証明できない。sinkの有無に関係なく非pass。
+        add("python_object_mutation_unclassified")
+        receiver = mutation if isinstance(mutation, ast.Name) else mutation.value
+        related = names_in(receiver)
+        base = receiver
+        while isinstance(base, (ast.Attribute, ast.Subscript)):
+            base = base.value
+        if not isinstance(base, ast.Name):
+            # 名前へ帰着しないreceiverはalias先を限定できず、既知値全体を失効させる。
+            invalid_values.update(stores)
+        related = set(related)
+        pending = list(related)
+        while pending:
+            name = pending.pop()
+            for other in dependencies.get(name, ()):
+                if other not in related:
+                    related.add(other)
+                    pending.append(other)
+        mutated_names.update(related)
+        modules = {aliases[name].split(".")[0] for name in related if name in aliases}
+        mutated_api_modules.update(modules)
+        if isinstance(mutation, ast.Attribute) and (not modules or any(
+                isinstance(item, (ast.Call, ast.Subscript)) for item in ast.walk(receiver))):
+            # factory()/subscript/未知alias経由では標準moduleの変更も否定できない。
+            unknown_attribute_receiver = True
+    invalid_values.update(mutated_names)
     def canonical_name(node):
         if isinstance(node, ast.Name):
-            return None if node.id in shadowed else aliases.get(node.id, node.id)
+            name = aliases.get(node.id, node.id)
+            if (node.id in shadowed or node.id in mutated_names or unknown_attribute_receiver
+                    or name.split(".")[0] in mutated_api_modules
+                    or "builtins" in mutated_api_modules):
+                return None
+            return name
         if isinstance(node, ast.Attribute):
             base = canonical_name(node.value)
             return base + "." + node.attr if base else None
@@ -977,7 +1037,7 @@ def _fixed_python_code_attempts(code, expected_cwd):
         name = name or ""
         if name in dynamic_names:
             add("dynamic_python_call_unclassified")
-        elif isinstance(node.func, ast.Name) and name not in known_names | set(path_api):
+        elif isinstance(node.func, ast.Name) and name not in known_names | set(path_api) | safe_module_calls:
             add("dynamic_python_call_unclassified")
         elif isinstance(node.func, ast.Name) and node.func.id in values:
             add("shadowed_python_call_unclassified")
