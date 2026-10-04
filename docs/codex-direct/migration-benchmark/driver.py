@@ -21,8 +21,8 @@ BASE = ACCOUNT_HOME / "Library/Caches/agent-crew-p5-benchmark"
 DRIVERS = BASE / "drivers"
 LOGS = DRIVERS / "logs/v17"
 FORMAL = BASE / "formal"
-CONFIG = DRIVERS / "p5-driver-v17-config.json"
-LAUNCHER = Path("/private/tmp/p5-v17-normal-shell.sh")
+CONFIG = DRIVERS / "p5-driver-v17r2-config.json"
+LAUNCHER = Path("/private/tmp/p5-v17r2-normal-shell.sh")
 SOURCE = None
 HERE = None
 STATUS = LOGS / "status.json"
@@ -129,7 +129,7 @@ def regular_identity(path, mode=0o600):
 def external_binding():
     """repo原本、実行copy、configの同一bytesとstat identityを固定する。"""
     original = HERE / "driver.py"
-    runtime = DRIVERS / "p5_driver_v17.py"
+    runtime = DRIVERS / "p5_driver_v17r2.py"
     launcher_bytes = regular_identity(LAUNCHER, mode=0o700)
     original_bytes = regular_identity(original, mode=0o644)
     runtime_bytes = regular_identity(runtime, mode=0o700)
