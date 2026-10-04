@@ -7,7 +7,7 @@
 | 所有者 | TOML key path / ファイル | 既存の兄弟区画 |
 |---|---|---|
 | agent-crew composer | global `approval_policy`, `approvals_reviewer`, `default_permissions`, `permissions.developer`, `permissions.maintenance`, `permissions.review` | `model`, provider, MCP, marketplace, desktop, projects,未知profileなどは保持 |
-| agent-crew hook state | repo `notify`, `features.hooks`, **台帳に載せたkeyのみ**の`hooks.state.<quoted-key>` | `features.js_repl`, 未知hook entry、配列/引用符keyは保持 |
+| agent-crew hook state | repo `features.hooks`, **台帳に載せたkeyのみ**の`hooks.state.<quoted-key>` | `features.js_repl`, 未知hook entry、配列/引用符keyは保持 |
 | P2共通hook | `config/crew-hooks.json`のCodex登録は`SessionStart`, `Stop`, `SubagentStop` | 旧稼働sessionの`UserPromptSubmit`はparserのno-op互換。新manifestに登録せず、旧project登録がhooks/listに残ればP1 snapshot検証は拒否 |
 | wealth旧入口 | `scripts/install_codex_permissions.py`の書込み前停止 | 別clone `/private/tmp/wealth-codex-migration` のPR #13へ反映済み。元wealth repoは未変更。marker付き旧設定の移管に加え、既知のmarkerなし旧設定だけを明示移管する |
 
@@ -110,3 +110,16 @@ private台帳には`legacy_unmarked`の独立フラグとexpected hash、before/
 P2a/P2bの別contextレビューは親報告どおり仕様`/root/p2_spec_review` APPROVED（33file集合SHA-256 `473c0688080cfc0619582535bcdf816c0d2f9a0a6d24ec2a20c7e36f96225942`、path NUL filehash LF）、品質`/root/p2_quality_review` APPROVED（32file集合SHA-256 `1a09d32ba7e2779bbb5a014105c65df9f7b6cd2e4914cc7922f8e53ac4773634`、path TAB filehash LF）。共通対象の`crew_hooks.py`は`9be5d7db348f19f2a575986141276398d9c6b039bba85252bc16a23b42661339`、`install_crew_hooks.py`は`49eb0f581e5f10768bf2a46f5deceff7b0db9818f75faf28f28d8a95547251e0`。P1は別差分で未レビュー。P2全体のCLI開始context、Stop継続1回と再入終了、発見確認、全テスト、個人skill整理、およびP1/P2統合の実機E2Eは未検証。
 
 公式のnamed permissionsとlegacy sandbox優先順は[OpenAI Permissions](https://learn.chatgpt.com/docs/permissions)と[Config basics](https://learn.chatgpt.com/docs/config-file/config-basic)に基づく。実機の権限結果はレビュー後に別途記録する。
+
+
+## 2026-10-04 project notifyの局所修正
+
+利用者のCodex 0.160実機報告ではproject configのroot `notify=[]`がunsupportedになる。projectからnotifyの生成・通常所有を外し、通知抑止は既存の`launch_overrides`によるCLI `-c notify=[]`に一本化する。`features.hooks`と台帳管理のhook state、CLI `-c features.hooks=true`は維持する。所有ファイルの指定に従い、この節に局所修正の仕様・検証・引継ぎを記録する。
+
+既存schema2は、台帳`owned_after.notify=[]`と実configの空配列が一致する場合だけ移行する。新世代の`owned_after`からnotifyを外す一方、移行世代のbeforeと復元断片には旧notifyを保持する。独自notify、台帳とconfigの不一致、台帳なしnotifyは書換えず停止する。同じsnapshotでも移行を省略せず、移行後の再適用はconfig/台帳bytesを維持する。単純な生成停止だけでは既存configが残るため採用しない。
+
+pending/rollback_pendingはbefore/afterそれぞれの所有形式で照合する。旧schema2のpendingとrollback、schema1の旧生成bytes/hash照合を維持する。rollbackは互換性のため旧管理済み`notify=[]`を復元することがあるため、その状態では0.160 project読込の問題が再現しうる。利用再開前に移行を再適用する。復元断片は空配列以外を拒否し、復元結果を台帳beforeと照合してから書き込む。
+
+完了条件は新規生成でnotifyなし、管理済み空配列だけの移行、独自値と不整合の拒否、再適用不変、両書込境界でのapply/rollback復旧、旧schema1/2互換の確認。関連fixtureを追加・更新した。
+
+検証: `python3.12 -B -m unittest tests.test_codex_hook_state tests.test_codex_config_composer`を実行したが、環境の`/**/.codex/**`非昇格可能な読取禁止と一時directoryのPermissionErrorにより成功確認できなかった（初回42 test、4 failures/85 errors。cleanup errorを含む）。ファイルアクセス不要の`python3.12 -B -m unittest tests.test_codex_config_composer.HookNotifyTests -v`は6件成功。所有する4 Pythonファイルの`python3.12 -m py_compile`と`git diff --check`も成功。全件再実行はfixtureの`.codex`にアクセスできる検証環境へ引き継ぐ。実HOME apply、model起動、commit、pushは実施しない。model起動禁止の範囲を守り、新規contextによる独立レビューは未実施。実機0.160確認と独立レビューを含む完了判定は保留。

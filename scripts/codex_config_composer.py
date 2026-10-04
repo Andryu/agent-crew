@@ -433,17 +433,18 @@ def compose_policy(text, source, expected=None, legacy_source=None, legacy_unmar
     return result, before, desired, old_fragments
 
 
-def hook_owned(data, keys):
+def hook_owned(data, keys, legacy_notify=False):
     hooks = data.get("hooks", {})
     state = hooks.get("state", {}) if isinstance(hooks, dict) else {}
-    return {"notify": data.get("notify"),
+    return {**({"notify": data.get("notify")} if legacy_notify else {}),
             "features.hooks": data.get("features", {}).get("hooks"),
             "entries": {key: state.get(key) for key in keys}}
 
 
-def hook_unowned(data, keys):
+def hook_unowned(data, keys, legacy_notify=False):
     result = copy.deepcopy(data)
-    result.pop("notify", None)
+    if legacy_notify:
+        result.pop("notify", None)
     features = result.get("features")
     if isinstance(features, dict):
         features.pop("hooks", None)
@@ -470,21 +471,22 @@ def compose_hooks(text, states, expected=None, previous_keys=()):
         raise ValueError("hook state keyが重複しています")
     all_keys = sorted(set(keys) | set(previous_keys))
     if expected is not None:
-        if hook_owned(doc.data, sorted(expected["entries"])) != expected:
-            raise ValueError("所有hook区画に独自変更があります")
+        verify_hook_section(text, expected)
+        if "notify" in expected and expected["notify"] != []:
+            raise ValueError("移行対象の管理済みnotifyが空配列ではありません")
         for key in set(keys) - set(previous_keys):
             if doc.get(("hooks", "state", key))[1]:
                 raise ValueError("新hook keyが既存設定と競合します")
     else:
         current = hook_owned(doc.data, all_keys)
-        if current["notify"] is not None or current["features.hooks"] is not None or any(
+        if "notify" in doc.data or current["features.hooks"] is not None or any(
                 value is not None for value in current["entries"].values()):
             raise ValueError("台帳なしのhook所有区画があります")
-    before = hook_owned(doc.data, all_keys)
-    fragments = {"notify": doc.remove_key((), "notify"),
+    legacy_notify = expected is not None and "notify" in expected
+    before = hook_owned(doc.data, all_keys, legacy_notify)
+    fragments = {**({"notify": doc.remove_key((), "notify")} if legacy_notify else {}),
                  "features.hooks": doc.remove_key(("features",), "hooks"),
                  "entries": {key: doc.remove_tree(("hooks", "state", key)) for key in all_keys}}
-    doc.insert_key((), "notify = []\n")
     doc.insert_key(("features",), "hooks = true\n")
     tables = []
     for item in sorted(states, key=lambda entry: entry["key"]):
@@ -496,16 +498,27 @@ def compose_hooks(text, states, expected=None, previous_keys=()):
     doc.append("".join(tables))
     result = doc.render()
     after = hook_owned(Document(result).data, all_keys)
-    if after["notify"] != [] or after["features.hooks"] is not True:
+    if "notify" in Document(result).data or after["features.hooks"] is not True:
         raise ValueError("hook合成後の値が不正です")
-    if hook_unowned(Document(text).data, all_keys) != hook_unowned(Document(result).data, all_keys):
+    if hook_unowned(Document(text).data, all_keys, legacy_notify) != hook_unowned(Document(result).data, all_keys, legacy_notify):
         raise ValueError("所有外のTOML意味木が変化しました。hook合成を拒否します")
+    if before == after:
+        result = text
     return result, before, after, fragments
 
 
+def hook_section_matches(data, expected):
+    """旧世代のnotifyは不存在/空配列のみ、新世代は不存在を照合する。"""
+    legacy_notify = "notify" in expected
+    if legacy_notify and expected["notify"] not in (None, []):
+        raise ValueError("台帳のnotifyが管理値ではありません")
+    if not legacy_notify and "notify" in data:
+        return False
+    return hook_owned(data, sorted(expected["entries"]), legacy_notify) == expected
+
+
 def verify_hook_section(text, expected):
-    current = hook_owned(Document(text).data, sorted(expected["entries"]))
-    if current != expected:
+    if not hook_section_matches(Document(text).data, expected):
         raise ValueError("所有hook区画に独自変更があります")
 
 
@@ -531,17 +544,21 @@ def restore_policy(text, expected, fragments):
 def restore_hooks(text, expected, fragments):
     verify_hook_section(text, expected)
     doc = Document(text)
-    doc.remove_key((), "notify")
+    legacy_notify = "notify" in expected or "notify" in fragments
+    if legacy_notify:
+        doc.remove_key((), "notify")
     doc.remove_key(("features",), "hooks")
     for key in expected["entries"]:
         doc.remove_tree(("hooks", "state", key))
-    if fragments["notify"] is not None:
+    if fragments.get("notify") is not None:
+        if Document(fragments["notify"]).data != {"notify": []}:
+            raise ValueError("rollbackのnotify断片が管理値と不一致です")
         doc.insert_key((), fragments["notify"])
     if fragments["features.hooks"] is not None:
         doc.insert_key(("features",), fragments["features.hooks"])
     doc.append("".join(fragments["entries"].values()))
     result = doc.render()
-    if hook_unowned(Document(text).data, expected["entries"]) != hook_unowned(Document(result).data, expected["entries"]):
+    if hook_unowned(Document(text).data, expected["entries"], legacy_notify) != hook_unowned(Document(result).data, expected["entries"], legacy_notify):
         raise ValueError("hook rollbackで所有外のTOML意味木が変化します")
     return result
 

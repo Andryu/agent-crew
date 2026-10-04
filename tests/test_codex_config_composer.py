@@ -481,8 +481,9 @@ class ComposerTests(unittest.TestCase):
         self.assertEqual(self.target.read_text(), original)
         hook_text = ('description = """start\nnotify = ["hidden"]\nend"""\n'
                      '[features]\njs_repl = true\n')
-        with self.assertRaisesRegex(ValueError, "所有外のTOML意味木"):
-            composer.compose_hooks(hook_text, [{"key": "fixture", "enabled": False}])
+        composed = composer.compose_hooks(hook_text, [{"key": "fixture", "enabled": False}])[0]
+        self.assertEqual(composer.Document(composed).data["description"],
+                         composer.Document(hook_text).data["description"])
         for inline_or_dotted in ('features = { js_repl = true }\n',
                                  'features.js_repl = true\n'):
             with self.subTest(inline_or_dotted=inline_or_dotted):
@@ -834,9 +835,90 @@ class ComposerTests(unittest.TestCase):
         data = composer.Document(target.read_text()).data
         self.assertEqual(data["model"], "fixture")
         self.assertEqual(composer.policy_owned(data), composer.desired_policy(self.source)[0])
-        self.assertEqual(data["notify"], [])
+        self.assertNotIn("notify", data)
         self.assertIs(data["features"]["hooks"], True)
         self.assertEqual(len(data["hooks"]["state"]), 3)
+
+
+class HookNotifyTests(unittest.TestCase):
+    """実ファイル不要で新旧notify所有境界と復旧照合を検証する。"""
+
+    def setUp(self):
+        self.states = [{"key": "fixture", "enabled": False}]
+        self.initial = 'model = "fixture"\n[features]\njs_repl = true\n'
+        self.content, self.before, self.after, self.fragments = composer.compose_hooks(
+            self.initial, self.states)
+
+    def test_new_generation_has_no_notify_ownership(self):
+        self.assertNotIn("notify", composer.Document(self.content).data)
+        for mapping in (self.before, self.after, self.fragments):
+            self.assertNotIn("notify", mapping)
+        self.assertEqual(composer.compose_hooks(self.content, self.states, self.after, ["fixture"])[0],
+                         self.content)
+        self.assertEqual(composer.Document(composer.restore_hooks(
+            self.content, self.after, self.fragments)).data, composer.Document(self.initial).data)
+        self.assertEqual(composer.hook_unowned({"notify": ["custom"]}, []), {"notify": ["custom"]})
+        self.assertNotIn("notify", composer.Document(hook_state.render_config(self.states)).data)
+
+    def test_legacy_managed_empty_notify_migrates_and_rolls_back(self):
+        legacy = 'notify = [] # 管理済み\n' + self.content
+        expected = {**self.after, "notify": []}
+        content, before, after, fragments = composer.compose_hooks(legacy, self.states, expected, ["fixture"])
+        self.assertEqual(before, expected)
+        self.assertNotIn("notify", after)
+        self.assertNotIn("notify", composer.Document(content).data)
+        for text, match_before, match_after in ((legacy, True, False), (content, False, True)):
+            data = composer.Document(text).data
+            self.assertEqual(composer.hook_section_matches(data, before), match_before)
+            self.assertEqual(composer.hook_section_matches(data, after), match_after)
+        restored = composer.restore_hooks(content.replace('model = "fixture"', 'model = "edited"'),
+                                          after, fragments)
+        self.assertIn('notify = [] # 管理済み', restored)
+        self.assertEqual(composer.Document(restored).data["model"], "edited")
+        self.assertTrue(composer.hook_section_matches(composer.Document(restored).data, before))
+
+    def test_notify_conflicts_fail_closed(self):
+        for value in ('[]', '["custom"]', 'false'):
+            with self.subTest(value=value):
+                text = 'notify = ' + value + '\n' + self.content
+                with self.assertRaises(ValueError):
+                    composer.compose_hooks(text, self.states)
+                with self.assertRaises(ValueError):
+                    composer.compose_hooks(text, self.states, self.after, ["fixture"])
+                with self.assertRaises(ValueError):
+                    composer.restore_hooks(text, self.after, self.fragments)
+        for text, notify in ((self.content, []), ('notify = ["custom"]\n' + self.content, []),
+                             ('notify = ["custom"]\n' + self.content, ["custom"]), (self.content, None)):
+            with self.subTest(notify=notify, text=text):
+                with self.assertRaises(ValueError):
+                    composer.compose_hooks(text, self.states, {**self.after, "notify": notify}, ["fixture"])
+
+    def test_legacy_schema1_verification_keeps_original_notify_bytes(self):
+        root = Path("/fixture")
+        legacy = hook_state.render_config(self.states, legacy_notify=True).encode()
+        record = {"schema_version": 1, "root": str(root), "states": self.states,
+                  "generated_config_hash": hook_state.digest(legacy)}
+        hook_state.verify_previous(legacy, json.dumps(record).encode(), root)
+        without_notify = hook_state.render_config(self.states).encode()
+        record["generated_config_hash"] = hook_state.digest(without_notify)
+        with self.assertRaisesRegex(ValueError, "旧hook schema1"):
+            hook_state.verify_previous(without_notify, json.dumps(record).encode(), root)
+
+    def test_rollback_notify_fragment_tamper_is_rejected(self):
+        for fragment in ('notify = ["custom"]\n', 'notify = []\nmodel = "injected"\n'):
+            with self.subTest(fragment=fragment):
+                with self.assertRaisesRegex(ValueError, "notify断片"):
+                    composer.restore_hooks(self.content, self.after, {**self.fragments, "notify": fragment})
+
+    def test_old_pending_and_rollback_records_still_match(self):
+        before = {**self.before, "notify": None}
+        after = {**self.after, "notify": []}
+        legacy = 'notify = []\n' + self.content
+        fragments = {**self.fragments, "notify": None}
+        self.assertTrue(composer.hook_section_matches(composer.Document(self.initial).data, before))
+        self.assertTrue(composer.hook_section_matches(composer.Document(legacy).data, after))
+        restored = composer.restore_hooks(legacy, after, fragments)
+        self.assertTrue(composer.hook_section_matches(composer.Document(restored).data, before))
 
 
 if __name__ == "__main__":

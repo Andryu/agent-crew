@@ -51,7 +51,7 @@ class HookStateTests(unittest.TestCase):
         self.assertFalse((self.root / ".codex/config.toml").exists())
         self.assertEqual(self.run_main("--apply")[0], 0)
         config = (self.root / ".codex/config.toml").read_text()
-        self.assertIn("notify = []", config)
+        self.assertNotIn("notify", state.Document(config).data)
         self.assertIn("hooks = true", config)
         self.assertEqual(config.count("trusted_hash ="), 3)
         self.assertIn("sha256:" + "a" * 64, config)
@@ -165,7 +165,7 @@ class HookStateTests(unittest.TestCase):
         config.write_text('model = "custom"\n')
         self.assertEqual(self.run_main("--apply")[0], 0)
         self.assertIn('model = "custom"', config.read_text())
-        changed = config.read_text().replace("notify = []", 'notify = ["custom"]')
+        changed = 'notify = ["custom"]\n' + config.read_text()
         config.write_text(changed)
         self.assertEqual(self.run_main("--apply")[0], 2)
         self.assertEqual(config.read_text(), changed)
@@ -186,16 +186,16 @@ class HookStateTests(unittest.TestCase):
         sidecar = self.root / "docs/codex-direct/local-hook-state.json"
         config.parent.mkdir(parents=True, exist_ok=True)
         sidecar.parent.mkdir(parents=True, exist_ok=True)
-        content = state.render_config(old_states)
+        content = state.render_config(old_states, legacy_notify=True)
         config.write_text(content)
         sidecar.write_text(json.dumps({"schema_version": 1, "root": str(self.root),
                                        "generated_config_hash": state.digest(content.encode()), "states": old_states}))
         self.assertEqual(self.run_main("--apply")[0], 0)
         self.assertNotIn(key, config.read_text())
         self.assertEqual(json.loads(sidecar.read_text())["schema_version"], 2)
-        config.write_text(config.read_text().replace("notify = []", "notify = [1]"))
+        config.write_text("notify = [1]\n" + config.read_text())
         self.assertEqual(self.run_main("--apply")[0], 2)
-        config.write_text(config.read_text().replace("notify = [1]", "notify = []"))
+        config.write_text(config.read_text().removeprefix("notify = [1]\n"))
         self.assertEqual(self.run_main("--rollback")[0], 0)
         rolled = json.loads(sidecar.read_text())
         self.assertEqual(rolled["schema_version"], 2)
@@ -212,7 +212,7 @@ class HookStateTests(unittest.TestCase):
         sidecar = self.root / "docs/codex-direct/local-hook-state.json"
         config.parent.mkdir(parents=True, exist_ok=True)
         sidecar.parent.mkdir(parents=True, exist_ok=True)
-        old_config = state.render_config(old_states)
+        old_config = state.render_config(old_states, legacy_notify=True)
         old_sidecar = json.dumps({"schema_version": 1, "root": str(self.root),
                                   "generated_config_hash": state.digest(old_config.encode()),
                                   "states": old_states})
@@ -248,6 +248,88 @@ class HookStateTests(unittest.TestCase):
                 else:
                     self.assertIn(new_key, config.read_text())
                     self.assertEqual(json.loads(sidecar.read_text())["status"], "applied")
+
+    def seed_legacy_schema2(self):
+        self.assertEqual(self.run_main("--apply")[0], 0)
+        config = self.root / ".codex/config.toml"
+        sidecar = self.root / "docs/codex-direct/local-hook-state.json"
+        config.write_text('notify = [] # 管理済み\n' + config.read_text())
+        record = json.loads(sidecar.read_text())
+        record["owned_after"]["notify"] = []
+        record["owned_before"]["notify"] = None
+        record["before_fragments"]["notify"] = None
+        sidecar.write_text(json.dumps(record))
+        return config, sidecar
+
+    def test_schema2_notify_migration_is_idempotent_and_reversible(self):
+        config, sidecar = self.seed_legacy_schema2()
+        old_config, old_sidecar = config.read_bytes(), sidecar.read_bytes()
+        self.assertEqual(self.run_main("--check")[0], 1)
+        self.assertEqual(config.read_bytes(), old_config)
+        self.assertEqual(self.run_main("--apply")[0], 0)
+        self.assertNotIn("notify", state.Document(config.read_text()).data)
+        record = json.loads(sidecar.read_text())
+        self.assertNotIn("notify", record["owned_after"])
+        self.assertEqual(record["owned_before"]["notify"], [])
+        after = config.read_bytes(), sidecar.read_bytes()
+        self.assertEqual(self.run_main("--check")[0], 0)
+        self.assertEqual(self.run_main("--apply")[0], 0)
+        self.assertEqual((config.read_bytes(), sidecar.read_bytes()), after)
+        self.assertEqual(self.run_main("--rollback")[0], 0)
+        self.assertEqual(state.Document(config.read_text()).data, state.Document(old_config.decode()).data)
+        self.assertEqual(sidecar.read_bytes(), old_sidecar)
+        self.assertEqual(self.run_main("--apply")[0], 0)
+
+    def test_schema2_notify_migration_recovers_apply_and_rollback_boundaries(self):
+        config, sidecar = self.seed_legacy_schema2()
+        old_config, old_sidecar = config.read_bytes(), sidecar.read_bytes()
+        for mode in ("--apply", "--rollback"):
+            for failure_call in (2, 3):
+                with self.subTest(mode=mode, failure_call=failure_call):
+                    config.write_bytes(old_config)
+                    sidecar.write_bytes(old_sidecar)
+                    if mode == "--rollback":
+                        self.assertEqual(self.run_main("--apply")[0], 0)
+                    actual_write = state.compose_write
+                    calls = 0
+
+                    def interrupted(*args, **kwargs):
+                        nonlocal calls
+                        calls += 1
+                        if calls == failure_call:
+                            raise OSError("fixture中断")
+                        return actual_write(*args, **kwargs)
+
+                    with mock.patch.object(state, "compose_write", side_effect=interrupted):
+                        self.assertEqual(self.run_main(mode)[0], 2)
+                    expected = {("--apply", 2): "not_applied", ("--apply", 3): "applied",
+                                ("--rollback", 2): "rollback_not_applied", ("--rollback", 3): "rolled_back"}
+                    result, stdout, stderr = self.run_main("--recover")
+                    self.assertEqual(result, 0, stderr)
+                    self.assertEqual(stdout.strip(), expected[(mode, failure_call)])
+                    legacy = (mode == "--apply" and failure_call == 2) or (mode == "--rollback" and failure_call == 3)
+                    self.assertEqual("notify" in state.Document(config.read_text()).data, legacy)
+                    self.assertEqual("notify" in json.loads(sidecar.read_text())["owned_after"], legacy)
+
+    def test_schema2_notify_tamper_and_ledger_mismatch_preserve_bytes(self):
+        config, sidecar = self.seed_legacy_schema2()
+        baseline_config, baseline_record = config.read_text(), json.loads(sidecar.read_text())
+        for config_notify, ledger_notify in ((None, []), ('["custom"]', []),
+                                             ('["custom"]', ["custom"]), ('[]', None)):
+            with self.subTest(config_notify=config_notify, ledger_notify=ledger_notify):
+                text = baseline_config.split('\n', 1)[1]
+                if config_notify is not None:
+                    text = 'notify = ' + config_notify + '\n' + text
+                record = copy.deepcopy(baseline_record)
+                if ledger_notify is None:
+                    record["owned_after"].pop("notify")
+                else:
+                    record["owned_after"]["notify"] = ledger_notify
+                config.write_text(text)
+                sidecar.write_text(json.dumps(record))
+                before = config.read_bytes(), sidecar.read_bytes()
+                self.assertEqual(self.run_main("--apply")[0], 2)
+                self.assertEqual((config.read_bytes(), sidecar.read_bytes()), before)
 
     def test_schema2_pending_recovery_and_section_rollback(self):
         config = self.root / ".codex/config.toml"
