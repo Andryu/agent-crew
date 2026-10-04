@@ -122,4 +122,10 @@ pending/rollback_pendingはbefore/afterそれぞれの所有形式で照合す�
 
 完了条件は新規生成でnotifyなし、管理済み空配列だけの移行、独自値と不整合の拒否、再適用不変、両書込境界でのapply/rollback復旧、旧schema1/2互換の確認。関連fixtureを追加・更新した。
 
-検証: `python3.12 -B -m unittest tests.test_codex_hook_state tests.test_codex_config_composer`を実行したが、環境の`/**/.codex/**`非昇格可能な読取禁止と一時directoryのPermissionErrorにより成功確認できなかった（初回42 test、4 failures/85 errors。cleanup errorを含む）。ファイルアクセス不要の`python3.12 -B -m unittest tests.test_codex_config_composer.HookNotifyTests -v`は6件成功。所有する4 Pythonファイルの`python3.12 -m py_compile`と`git diff --check`も成功。全件再実行はfixtureの`.codex`にアクセスできる検証環境へ引き継ぐ。実HOME apply、model起動、commit、pushは実施しない。model起動禁止の範囲を守り、新規contextによる独立レビューは未実施。実機0.160確認と独立レビューを含む完了判定は保留。
+検証・レビュー実績（P1/P2 notify退役の最終証跡）: 対象code commitは`5388441a8927643b118c0dc9ab5969f21aa72787`。初回の制限環境での全件検証はPermissionErrorにより成功確認できなかったが、その後Herdr通常shellで`tests.test_codex_hook_state`と`tests.test_codex_config_composer`の51件PASSを確認した。`py_compile`と`git diff --check`もPASS。独立レビューは仕様review round1 APPROVED、品質review round1 APPROVEDで、上記notify退役差分の全件検証・レビュー保留を解消した。
+
+実repo適用: 対象5ファイルが旧commit `3b103a4`のbytesと一致することを確認してから、承認済みcode commitのbytesへ同期した。fresh snapshotによる`--check`はconfig `changed=true`、before `48c021e5…`、after `1f77511c…`（hashは省略表記）、states=10、schema2。実repoへの`--apply`はexit 0で完了し、適用後に取得したfresh snapshotによる`--check`は`changed=false`となった。未変更のuser hook 9件は保持された。
+
+最終task-scoped E2E: MCPの`notion`、`chrome-devtools`、`node_repl`を明示disableして実施し、stderr空、error events 0を確認した。queue source、`invest-dept-charter [DONE]` scope、未完0、QA未承認警告、およびStop初回block→再入を観測した。E2E前後でconfig・sidecar・queueのhashは不変だった。この結果は当該task scopeでのP1/P2統合確認であり、他のP2全体検証やP5正式比較の完了を意味しない。公開docには検証結果だけを記載し、一時領域の証跡pathや実設定本文は掲載しない。
+
+残る制約: rollbackで旧管理済み`notify=[]`が復元された場合は、利用再開前に再移行が必要。
