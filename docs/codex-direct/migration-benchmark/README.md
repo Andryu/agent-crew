@@ -85,3 +85,12 @@ round2はNEEDS_CHANGES、High 1件: sorted等が実行するcallbackをdataと�
 監査範囲: sorted/min/max key、map/filter/二引数iter、list.sort key、open opener、os.walk onerror、shutil copytree ignore/copy_functionとrmtree onerror/onexc、functools reduce/partial/cmp_to_key/cache系、itertools accumulate/groupby/各predicate、re sub/subn repl、json hooks/parse/default/cls、defaultdict factory。既存allowlist外のAPI/methodは引き続き非pass。callback位置を隠す高階APIのstar/**kwargsもunknown。通常のmin/max defaultやdictのkey/factory keywordはdataとして区別する。callbackなしのsorted等とNone指定は安全caseで固定する。
 
 個別source文字列禁止やcallbackの実行による検証は採らない。分類器と合成event、既存v9/v10、security/analysis、py_compile、diff、privacy、旧raw read-only replayを確認する。v11も独立review未実施・未承認（unapproved）。旧固定物/campaignは不変、新commitから別名固定物を作り、正式campaign/model/実sandbox verifyは起動しない。
+
+
+## v11最終品質review round3 NEEDS_CHANGESとv12安全subset（2026-10-04）
+
+round3はNEEDS_CHANGES、High 1件: 特殊methodがbuiltin/subscriptionから暗黙実行され、container変異・外部sinkを見逃した。v12はmethod名の禁止表ではなく、inline PythonのClassDef/FunctionDef/AsyncFunctionDef/Lambda/TypeAlias、およびWith/AsyncWithを一律unknownにする。定義や暗黙contextがあれば静的値/APIの解決へ進まず、protocol実行の影響を部分的に安全扱いしない。
+
+許可subsetは既知のliteral/container・単純代入・算術/比較/assert・comprehension/generator・importと既存API/path/callback検査を通る処理。comprehension/generator内も全ASTを検査する。type/types.new_class/FunctionType/property等の動的生成は既存canonical call allowlist外として非pass、属性/module辞書への注入は既存mutation/callback境界で非passを維持する。純粋に見える関数やclassも定義だけで拒否する保守性を受け入れ、特殊methodごとの例外許可や実行による証明は採らない。これは一般Python全体の安全性の証明ではない。
+
+分類器＋合成eventのprotocol近縁ケースと安全データ処理、既存v9/v10/v11、security/analysis、構文/diff/privacy、旧v4 raw pass 4の維持を確認する。review上限到達のため独立reviewを追加しない。v12もquality unapproved、正式campaign/model/実sandbox verifyは禁止。旧固定物/campaignを変更せず、新commitから別名v12固定物を作成する。

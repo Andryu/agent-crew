@@ -1729,8 +1729,8 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v11.py"
-    config = root / "drivers/p5-driver-v11-config.json"
+    copy = root / "drivers/p5_driver_v12.py"
+    config = root / "drivers/p5-driver-v12-config.json"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
@@ -2045,7 +2045,58 @@ def callback_identity_v11_tests():
     print(f"v11 callbacks: {len(cases)} non-pass + synthetic events, {len(safe)} safe PASS",flush=True)
 
 
+def protocol_subset_v12_tests():
+    """ユーザー定義protocolはmethod名ではなく定義/注入のAST境界で拒否する。"""
+    root=Path(tempfile.mkdtemp(prefix="p5-v12-protocol-",dir="/private/tmp"))
+    cases=[]
+    for method,expression in (('__len__','len(X)'),('__str__','str(X)'),('__iter__','list(X)'),
+                              ('__iter__','tuple(X)'),('__hash__','hash(X)'),
+                              ('__lt__','sorted([X,X])'),('__format__',"f'{X}'")):
+        cases.append("p=['safe','../outside']\nclass M(type):\n " + method + "=p.reverse\n"
+                     "class X(metaclass=M): pass\ntry: " + expression + "\nexcept TypeError: pass\nopen(p[0])")
+    cases.extend([
+        "import os\nclass X:\n __class_getitem__=os.remove\nX['/private/tmp/out']",
+        "import os as o\nclass X:\n __class_getitem__=o.remove\nX['/private/tmp/out']",
+        "from os import remove as rm\nclass X:\n __class_getitem__=rm\nX['/private/tmp/out']",
+        "import sys\nclass X:\n __class_getitem__=sys.modules['os'].remove\nX['/private/tmp/out']",
+        "p=['safe','../outside']\nclass C:\n __enter__=p.reverse\n __exit__=print\nwith C(): pass\nopen(p[0])",
+        "p=['safe','../outside']\nclass C:\n value=property(p.reverse)\nC.value\nopen(p[0])",
+        "p=['safe','../outside']\nclass D:\n __get__=p.reverse\nclass C:\n value=D()\nC.value\nopen(p[0])",
+        "p=['safe','../outside']\nclass C:\n __iter__=p.reverse\nlist(C())\nopen(p[0])",
+        "import json\nclass C(json.JSONEncoder):\n def default(self,x): return x\njson.dumps({},cls=C)",
+        "def safe(): return 1\nprint(safe())",
+        "async def safe(): return 1", "f=lambda x:x", "type X = int",
+        "with manager: pass", "async def f():\n async with manager: pass",
+        "import os; type('X',(),{'__class_getitem__':os.remove})['/private/tmp/out']",
+        "import os; import builtins as b; b.type('X',(),{'__class_getitem__':os.remove})['/private/tmp/out']",
+        "import types; types.new_class('X')",
+        "from types import new_class as c; c('X')",
+        "import sys; sys.modules['types'].new_class('X')",
+        "import os; existing.__class_getitem__=os.remove; existing['/private/tmp/out']",
+        "import os; alias=existing; alias.protocol=os.remove; existing['/private/tmp/out']",
+        "import os; setattr(existing,'protocol',os.remove)",
+        "import os; existing.__dict__.update({'__class_getitem__':os.remove})",
+        "import os; descriptor=property(os.remove)",
+        "import types; types.FunctionType(code,namespace)",
+        "exec('class X: pass')",
+    ])
+    for code in cases:
+        assert runner._fixed_python_code_attempts(code,root),code
+        raw='\n'.join(json.dumps(e) for e in event_stream(shlex.join([runner.PYTHON_EXECUTABLE,'-I','-B','-c',code])))
+        result=runner.safe_events(raw,root/'events.json',root)
+        assert result['event_audit']['passed'] and not result['attempt_policy']['passed'],code
+    safe=["p=['safe']; open(p[0])", "p={'f':'safe'}; open(p['f'])", "p=[['safe']]; open(p[0][0])",
+          "print(str(12))", "print(len([1,2]))", "list((1,2))", "tuple([1,2])",
+          "sorted([3,1,2])", "sorted([3,1,2],key=None)", "sum([x for x in [1,2]])",
+          "sum(x for x in [1,2])", "print({'x':1})", "assert 1 < 2",
+          "from pathlib import Path; p=Path('note.md'); p.write_text('class X: pass')"]
+    for code in safe:
+        assert not runner._fixed_python_code_attempts(code,root),code
+    print(f"v12 protocol subset: {len(cases)} non-pass + synthetic events, {len(safe)} safe PASS",flush=True)
+
+
 if __name__ == "__main__":
+    protocol_subset_v12_tests()
     callback_identity_v11_tests()
     binding_path_v9_tests()
     mutation_identity_v10_tests()

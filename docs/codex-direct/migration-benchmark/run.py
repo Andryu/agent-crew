@@ -808,6 +808,13 @@ def _fixed_python_code_attempts(code, expected_cwd):
     if expected_cwd is None:
         add("python_cwd_unbound")
         return findings
+    # inline Pythonはデータ処理用subset。ユーザー定義の実行protocolを解析・実行して証明しない。
+    # method名に依存せず定義構文と暗黙実行contextを拒否し、古い静的値/APIの利用へ進まない。
+    protocol_syntax = (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda,
+                       ast.With, ast.AsyncWith, ast.TypeAlias)
+    if any(isinstance(node, protocol_syntax) for node in ast.walk(tree)):
+        add("python_execution_protocol_definition_unclassified")
+        return findings
     root = os.path.abspath(expected_cwd)
     unknown = object()
     values = {}
