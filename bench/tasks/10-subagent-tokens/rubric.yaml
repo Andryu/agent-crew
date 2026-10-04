@@ -1,0 +1,47 @@
+# 10-subagent-tokens 採点表
+# 注: server_ws_personas_bonus は加点項目（aiohttp が無い環境では skip = 通過扱い）。
+#     既定の弁別は discovery/tokens の純ロジック6チェックで行う。
+checks:
+  - id: regression_main_session_discovery
+    type: pytest
+    file: holdout_test/test_subagent_tokens.py
+    node: test_regression_main_session_discovery
+    points: 1
+    regression: true
+  - id: regression_aggregator_backcompat
+    type: pytest
+    file: holdout_test/test_subagent_tokens.py
+    node: test_regression_aggregator_backcompat
+    points: 1
+    regression: true
+  - id: subagent_discovery_with_persona
+    type: pytest
+    file: holdout_test/test_subagent_tokens.py
+    node: test_subagent_discovery_with_persona
+    points: 2
+  - id: meta_missing_or_broken_persona_none
+    type: pytest
+    file: holdout_test/test_subagent_tokens.py
+    node: test_meta_missing_or_broken_persona_none
+    points: 2
+  - id: subagent_mtime_window
+    type: pytest
+    file: holdout_test/test_subagent_tokens.py
+    node: test_subagent_mtime_window
+    points: 1
+  - id: persona_totals_excludes_none
+    type: pytest
+    file: holdout_test/test_subagent_tokens.py
+    node: test_persona_totals_excludes_none
+    points: 2
+  - id: dedupe_with_persona
+    type: pytest
+    file: holdout_test/test_subagent_tokens.py
+    node: test_dedupe_across_polls_with_persona
+    points: 1
+  - id: server_ws_personas_bonus
+    type: pytest
+    file: holdout_test/test_server_bonus.py
+    node: test_ws_init_and_tokens_include_personas
+    points: 1
+    optional: true

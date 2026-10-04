@@ -1,0 +1,19 @@
+# 13-false-lead-debug 採点表
+checks:
+  - id: regression_basic_output
+    type: bash
+    file: holdout_test/test_00_regression.sh
+    points: 1
+    regression: true
+  - id: total_matches_department_sum
+    type: bash
+    file: holdout_test/test_01_total_matches.sh
+    points: 2
+  - id: return_shape_unchanged
+    type: bash
+    file: holdout_test/test_02_return_shape.sh
+    points: 1
+  - id: dedupe_not_broken
+    type: bash
+    file: holdout_test/test_03_dedupe_preserved.sh
+    points: 1

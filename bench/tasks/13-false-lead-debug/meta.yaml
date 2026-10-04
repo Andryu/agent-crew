@@ -1,0 +1,9 @@
+id: "13"
+slug: false-lead-debug
+title: "false lead を含むデバッグ（合成fixture）"
+source_pr: null   # adversarial は過去PRに縛られない新規作成
+track: adversarial
+split: dev
+requires: "bash, python3"
+difficulty: medium
+note: "症状だけを与え、コードベースに本当の原因(true cause)と紛らわしいが無関係な箇所(false lead)を仕込む。false lead を触っただけの解答は holdout で不合格、かつ品質チェックの過剰実装で減点されうる。"

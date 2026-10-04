@@ -73,7 +73,10 @@ model: sonnet
 
 ### ステップ-1: team-lead のモデル運用モード確認（ADR-017）
 
-メインセッション（team-lead）が Fable 5 でない場合（現行は Opus）、スプリント内の complexity M 以上または risk_level medium 以上のタスクは fable-class（`.claude/skills/fable-class/SKILL.md`）の5フェーズで回し、設計判断は critic（Kagami）で反証してから確定する。計画書の各タスクに `model` 列（ルーティング表 v2 に基づく推奨モデル）を付ける。
+メインセッション（team-lead）が Fable 5 でない場合、fable-class（`.claude/skills/fable-class/SKILL.md`）の5フェーズで回す。発動基準は team-lead の実効モデルで分かれる（`scripts/model-mode.sh` の注入行に従う）:
+
+- **Opus**（ADR-017）: complexity M 以上または risk_level medium 以上のタスクで発動。設計判断は critic（Kagami サブエージェント）で反証してから確定。計画書の各タスクに `model` 列（ルーティング表 v2）を付ける。
+- **Opus 以上でない（Pro/Sonnet 運用、ADR-018）**: complexity S 以上＝ほぼ全タスクで発動（免除は SKILL.md の4条件を全て満たすもののみ）。risk high の設計判断は `scripts/critic.sh`（従量 API）で反証し、CRITICAL は却下不可。計画書の各タスクに「判断の所在」列（ルーティング表 v3: セッション内 / Codex / fresh Sonnet / 決定的コマンド / critic）を付ける。
 
 ### ステップ0: ブランチ最新化
 

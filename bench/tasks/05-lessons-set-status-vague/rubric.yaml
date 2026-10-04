@@ -1,0 +1,31 @@
+# 05-lessons-set-status 採点表
+checks:
+  - id: regression_add_unchanged
+    type: bash
+    file: holdout_test/test_00_regression_add.sh
+    points: 2
+    regression: true
+  - id: add_default_status_proposed
+    type: bash
+    file: holdout_test/test_01_default_status.sh
+    points: 1
+  - id: add_status_option_stored
+    type: bash
+    file: holdout_test/test_02_status_option.sh
+    points: 1
+  - id: add_invalid_status_rejected
+    type: bash
+    file: holdout_test/test_03_add_invalid_status.sh
+    points: 1
+  - id: set_status_updates_only_target
+    type: bash
+    file: holdout_test/test_04_set_status.sh
+    points: 2
+  - id: set_status_invalid_rejected
+    type: bash
+    file: holdout_test/test_05_set_status_invalid.sh
+    points: 1
+  - id: set_status_missing_id_rejected
+    type: bash
+    file: holdout_test/test_06_set_status_missing_id.sh
+    points: 1

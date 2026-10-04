@@ -3,6 +3,7 @@
 - **Status**: Proposed（v2: 専門家レビュー3件〔Alex・Hana・critic(Opus)〕を反映済み。オーナー承認で Accepted）
 - **Date**: 2026-08-15
 - **Issue**: なし（オーナー指示: プラン変更により Fable 5 が利用不可になるため）
+- **後続**: **ADR-018**（`ADR-018-pro-sonnet-operation.md`）— team-lead が Opus 以上でない（Pro/Sonnet 運用）場合の運用を定める。本 ADR は Opus 運用時の記録として維持し、Pro 運用時は ADR-018 が上書きする（表 v2 → v3、critic のサブエージェント → 従量 API、非対称ルールの強化）
 - **関連**: `fable-class-opus-adr.md`（工程設計の原本）、ADR-004（トークン最適化・リカバリ手順）、ADR-016（フック追加の抑制方針）
 
 > 用語: 本 ADR では **team-lead ＝ メインセッション ＝ オーケストレーター**（`fable-class-opus-adr.md` の用語）を同一視する。製品名は「Fable 5」、CLI/設定のリテラルは `fable` と書き分ける。

@@ -4,6 +4,7 @@
 - **担当**: <team-lead / エージェント名>
 - **complexity**: <S/M/L>
 - **risk_level**: <low/medium/high>
+- **mode**: <fable / opus / pro（`scripts/model-mode.sh` の判定。src=hook|transcript|settings も記す。このタスクの発動条件・critic 却下権はこの値に従う）>
 - **ADR参照**: <関連するADRファイルパス（あれば）>
 
 ## SPEC
@@ -49,7 +50,7 @@
 
 - **発動有無**: <risk_level medium 以上で発動。low の場合は不要だった旨を明記>
 - **指摘と採否**: <critic の指摘一覧と、それぞれの採用/却下と根拠>
-- **CRITICAL却下の反論**: <CRITICAL 指摘を却下した場合の反論1文（非対称ルール）>
+- **CRITICAL却下の反論**: <mode が opus/fable: 反論1文。mode が pro: 決定的コマンドの生出力で事実誤認を示した場合のみ却下可。その生出力をここに貼る（ADR-018）>
 
 ## DoD
 

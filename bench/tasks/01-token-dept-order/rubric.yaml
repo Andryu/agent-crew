@@ -1,0 +1,28 @@
+# 01-token-dept-order 採点表
+checks:
+  - id: regression_existing_classification
+    type: pytest
+    file: holdout_test/test_departments.py
+    node: test_regression_existing_classification
+    points: 1
+    regression: true
+  - id: game_worktree_not_product
+    type: pytest
+    file: holdout_test/test_departments.py
+    node: test_game_worktree_is_game_not_product
+    points: 2
+  - id: stonefish_video
+    type: pytest
+    file: holdout_test/test_departments.py
+    node: test_stonefish_video_is_video
+    points: 1
+  - id: alpha_predict_sub_stays_product
+    type: pytest
+    file: holdout_test/test_departments.py
+    node: test_agent_crew_sub_with_alpha_predict_stays_product
+    points: 1
+  - id: departments_tables_identical
+    type: pytest
+    file: holdout_test/test_departments.py
+    node: test_departments_tables_identical
+    points: 1

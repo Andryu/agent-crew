@@ -1,0 +1,31 @@
+# 03-task-completed-hook 採点表
+checks:
+  - id: regression_queue_readonly
+    type: bash
+    file: holdout_test/test_00_regression.sh
+    points: 1
+    regression: true
+  - id: single_inprogress_signal
+    type: bash
+    file: holdout_test/test_01_single_inprogress.sh
+    points: 2
+  - id: multiple_inprogress_first_only
+    type: bash
+    file: holdout_test/test_02_multiple_inprogress.sh
+    points: 1
+  - id: zero_inprogress_noop
+    type: bash
+    file: holdout_test/test_03_zero_inprogress.sh
+    points: 1
+  - id: queue_missing_exit0
+    type: bash
+    file: holdout_test/test_04_queue_missing.sh
+    points: 1
+  - id: jq_missing_exit0
+    type: bash
+    file: holdout_test/test_05_jq_missing.sh
+    points: 1
+  - id: tricky_slug_valid_jsonl
+    type: bash
+    file: holdout_test/test_06_slug_tricky.sh
+    points: 2

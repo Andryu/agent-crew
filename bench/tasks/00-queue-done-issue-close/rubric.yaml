@@ -1,0 +1,23 @@
+# 00-queue-done-issue-close 採点表
+checks:
+  - id: regression_done_basics
+    type: bash
+    file: holdout_test/test_00_regression.sh
+    points: 1
+    regression: true
+  - id: issue_close_first_number_with_comment
+    type: bash
+    file: holdout_test/test_01_issue_close.sh
+    points: 2
+  - id: no_issue_number_no_gh_call
+    type: bash
+    file: holdout_test/test_02_no_issue.sh
+    points: 1
+  - id: gh_missing_still_succeeds
+    type: bash
+    file: holdout_test/test_03_no_gh.sh
+    points: 1
+  - id: gh_failure_not_propagated
+    type: bash
+    file: holdout_test/test_04_gh_fail.sh
+    points: 1
