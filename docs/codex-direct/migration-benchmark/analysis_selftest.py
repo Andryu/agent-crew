@@ -8,6 +8,8 @@ from types import SimpleNamespace
 import json
 import importlib.util
 import os
+import pwd
+import shlex
 import subprocess
 from pathlib import Path
 import tempfile
@@ -28,6 +30,20 @@ from harness_fingerprint import compute_harness_fingerprint
 import run as harness_run
 import harness_fingerprint as fingerprint_module
 HASH = "a" * 64
+
+
+def synthetic_canary_output(required, root):
+    environment = {**required, "CODEX_CI": "1", "CODEX_PERMISSION_PROFILE": "p5_fixture",
+                   "CODEX_SANDBOX": "seatbelt", "CODEX_SANDBOX_NETWORK_DISABLED": "1",
+                   "CODEX_SESSION_ID": "abcdefab-cdef-7abc-8def-abcdefabcdef",
+                   "CODEX_THREAD_ID": "abcdefab-cdef-7abc-8def-abcdefabcdee",
+                   "CODEX_VERSION": "0.160.0", "COLORTERM": "", "GH_PAGER": "cat", "GIT_PAGER": "cat",
+                   "LC_CTYPE": "C.UTF-8", "LOGNAME": pwd.getpwuid(os.getuid()).pw_name,
+                   "NO_COLOR": "1", "OLDPWD": str(root), "PAGER": "cat", "PWD": str(root),
+                   "SHLVL": "0", "TERM": "dumb", "_": harness_run.PYTHON_EXECUTABLE}
+    result = subprocess.run(shlex.split(harness_run.ENV_CANARY_COMMAND), cwd=root, env=environment,
+                            text=True, capture_output=True, check=True)
+    return result.stdout.strip()
 
 
 def binding(root, fingerprint, phase, task):
@@ -75,7 +91,7 @@ def fixtures(campaign_dir, a_seconds=100.0, b_seconds=70.0):
         raw = campaign_dir / ".evidence" / run_id / "events.raw.jsonl"
         raw.parent.mkdir(parents=True, exist_ok=True)
         canary = harness_run.ENV_CANARY_COMMAND
-        env_output = json.dumps(model_spec["env"], sort_keys=True)
+        env_output = synthetic_canary_output(model_spec["env"], root)
         events = [
             {"type": "thread.started", "thread_id": "synthetic"},
             {"type": "turn.started"},

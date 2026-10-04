@@ -7,6 +7,7 @@ import importlib.util
 import io
 import json
 import os
+import pwd
 import shlex
 import signal
 import struct
@@ -38,7 +39,7 @@ def compute_harness_fingerprint(here, **kwargs):
     return fingerprint_module.compute_harness_fingerprint(here, **kwargs)
 
 FAKE = '''#!/usr/bin/env python3.12
-import json,os,pathlib,shlex,subprocess,sys,time,tomllib
+import json,os,pathlib,pwd,shlex,subprocess,sys,time,tomllib
 if "--version" in sys.argv:
     mode_path=pathlib.Path(__file__).with_name("mode")
     print("codex-cli 0.155.1" if mode_path.exists() and mode_path.read_text() == "version_mismatch" else "codex-cli 0.160.0")
@@ -70,6 +71,13 @@ command="python3.12 .benchmark-tmp/network.py" if mode == "unknown" else "pwd; t
 canary_command=@CANARY_COMMAND@
 env_config=next(value for value in sys.argv if value.startswith("shell_environment_policy.set="))
 tool_env=tomllib.loads(env_config)["shell_environment_policy"]["set"]
+tool_env.update({"CODEX_CI":"1","CODEX_PERMISSION_PROFILE":"p5_fixture","CODEX_SANDBOX":"seatbelt",
+ "CODEX_SANDBOX_NETWORK_DISABLED":"1","CODEX_SESSION_ID":"abcdefab-cdef-7abc-8def-abcdefabcdef",
+ "CODEX_THREAD_ID":"abcdefab-cdef-7abc-8def-abcdefabcdee","CODEX_VERSION":"0.160.0",
+ "COLORTERM":"","GH_PAGER":"cat","GIT_PAGER":"cat","LC_CTYPE":"C.UTF-8",
+ "LOGNAME":pwd.getpwuid(os.getuid()).pw_name,"NO_COLOR":"1","OLDPWD":str(pathlib.Path.cwd()),
+ "PAGER":"cat","PWD":str(pathlib.Path.cwd()),"SHLVL":"0","TERM":"dumb",
+ "_":shlex.split(canary_command)[0]})
 if mode == "env_leak":
     tool_env["CODEX_HOME"]=os.environ["CODEX_HOME"]
 canary_output=subprocess.run(shlex.split(canary_command),env=tool_env,text=True,capture_output=True,check=True).stdout
@@ -205,6 +213,17 @@ def permission_test(root):
     finally:
         runner.safe_read = original_read
     print("permission: canonical/phase/root/tool+process env/auth hash/executable cache invalidation/harness/parent mode OK", flush=True)
+
+
+def prompt_contract_test():
+    for task in (c1_task(), runner.c6_task()):
+        prompt = runner.prompt_for(task)
+        assert runner.ENV_CANARY_COMMAND in prompt
+        for required in ("heredoc", "here-string", "process substitution", "<<", "<<<", "<(、>(",
+                         "/tmp", "/private/tmp", "/var/tmp", "/private/var/tmp",
+                         "python -c", ".benchmark-tmp/", "0600"):
+            assert required in prompt, (task["id"], required)
+    print("prompt: heredoc/here-string/process substitution/platform temp禁止と0600 script契約 OK", flush=True)
 
 
 def python_runtime_test(root):
@@ -793,7 +812,7 @@ def integration_test(root):
                 def interrupted_execute(_command, _root, env, *_args, **_kwargs):
                     # 完全な成功eventがあっても、実行完了未確認なら受入禁止。
                     events = event_stream(runner.ENV_CANARY_COMMAND)
-                    events[3]["item"]["aggregated_output"] = json.dumps({key: value for key, value in env.items() if key != "CODEX_HOME"})
+                    events[3]["item"]["aggregated_output"] = synthetic_canary_from_process_env(env, _root)
                     return incomplete_code, "\n".join(json.dumps(event) for event in events), ""
                 runner.execute_command = interrupted_execute
                 _, _, timed_path = invoke(expected_exit=1)
@@ -841,7 +860,7 @@ def immediate_abort_test(root):
                         if current_phase == "model":
                             runner._write_private(execution_root / ".benchmark-answer.txt", "目的 検証 次")
                             events = event_stream(runner.ENV_CANARY_COMMAND)
-                            events[3]["item"]["aggregated_output"] = json.dumps({key: value for key, value in env.items() if key != "CODEX_HOME"})
+                            events[3]["item"]["aggregated_output"] = synthetic_canary_from_process_env(env, execution_root)
                             return 0, "\n".join(json.dumps(event) for event in events), ""
                         return 0, "OK", ""
                     def scan(token):
@@ -960,7 +979,7 @@ def directory_completion_abort_test(root):
                             return 0, "unadopted normal process output", ""
                         runner._write_private(execution_root / ".benchmark-answer.txt", "目的 検証 次")
                         events = event_stream(runner.ENV_CANARY_COMMAND)
-                        events[3]["item"]["aggregated_output"] = json.dumps({key: value for key, value in env.items() if key != "CODEX_HOME"})
+                        events[3]["item"]["aggregated_output"] = synthetic_canary_from_process_env(env, execution_root)
                         return 0, "\n".join(json.dumps(event) for event in events), ""
                     with patch.object(runner, "private_directory_identity", identity), patch.object(runner, "execute_command", execute):
                         try:
@@ -1100,7 +1119,7 @@ def runtime_abort_test(root):
                             return 0, "OK", ""
                         runner._write_private(execution_root / ".benchmark-answer.txt", "目的 検証 次")
                         events = event_stream(runner.ENV_CANARY_COMMAND)
-                        events[3]["item"]["aggregated_output"] = json.dumps({k: v for k, v in env.items() if k != "CODEX_HOME"})
+                        events[3]["item"]["aggregated_output"] = synthetic_canary_from_process_env(env, execution_root)
                         phase["model_done"] = True
                         return 0, "\n".join(json.dumps(event) for event in events), ""
                     runner.compute_python_runtime_binding, runner.execute_command = changing_runtime, execute
@@ -1175,13 +1194,35 @@ def preflight_runtime_abort_test(root):
     print("preflight runtime abort: post-check/rebound mismatch+exception; no root access/cleanup OK (mock)", flush=True)
 
 
+def synthetic_tool_env(required, root):
+    return {**required, "CODEX_CI": "1", "CODEX_PERMISSION_PROFILE": "p5_fixture",
+            "CODEX_SANDBOX": "seatbelt", "CODEX_SANDBOX_NETWORK_DISABLED": "1",
+            "CODEX_SESSION_ID": "abcdefab-cdef-7abc-8def-abcdefabcdef",
+            "CODEX_THREAD_ID": "abcdefab-cdef-7abc-8def-abcdefabcdee", "CODEX_VERSION": "0.160.0",
+            "COLORTERM": "", "GH_PAGER": "cat", "GIT_PAGER": "cat", "LC_CTYPE": "C.UTF-8",
+            "LOGNAME": pwd.getpwuid(os.getuid()).pw_name, "NO_COLOR": "1", "OLDPWD": str(root),
+            "PAGER": "cat", "PWD": str(root), "SHLVL": "0", "TERM": "dumb", "_": runner.PYTHON_EXECUTABLE}
+
+
+def synthetic_canary_output(environment, root):
+    result = subprocess.run(shlex.split(runner.ENV_CANARY_COMMAND), cwd=root, env=environment,
+                            text=True, capture_output=True, check=True)
+    return result.stdout.strip()
+
+
+def synthetic_canary_from_process_env(environment, root):
+    required = {key: value for key, value in environment.items() if key in runner.REQUIRED_TOOL_ENV_KEYS}
+    return synthetic_canary_output(synthetic_tool_env(required, root), root)
+
+
 def environment_canary_test(root):
     root.mkdir()
     expected = runner.limited_env(root, "fixture-fingerprint")
+    injected = synthetic_tool_env(expected, root)
     command = runner.ENV_CANARY_COMMAND
     def audit(canary_command=command, output=None, prefix=()):
         events = event_stream(canary_command)
-        events[3]["item"]["aggregated_output"] = json.dumps(expected) if output is None else output
+        events[3]["item"]["aggregated_output"] = synthetic_canary_output(injected, root) if output is None else output
         if prefix:
             events[2:2] = prefix
         return runner.safe_events("\n".join(json.dumps(event) for event in events), expected_cwd=root, expected_env=expected)
@@ -1190,9 +1231,19 @@ def environment_canary_test(root):
     assert not audit(command + "; true")["env_canary_evidence"]["passed"]
     assert not audit("pwd")["env_canary_evidence"]["passed"]
     assert not audit(output="{}")["env_canary_evidence"]["passed"]
-    assert not audit(output=json.dumps({**expected, "CODEX_HOME": "/synthetic/auth"}))["env_canary_evidence"]["passed"]
-    assert not audit(output=json.dumps({key: value for key, value in expected.items() if key != "P5_RUN_TOKEN"}))["env_canary_evidence"]["passed"]
-    assert not audit(output=json.dumps({**expected, "P5_RUN_TOKEN": "different"}))["env_canary_evidence"]["passed"]
+    for changed in ({**injected, "CODEX_HOME": "/synthetic/auth"},
+                    {key: value for key, value in injected.items() if key != "P5_RUN_TOKEN"},
+                    {**injected, "P5_RUN_TOKEN": "different"},
+                    {key: value for key, value in injected.items() if key != "CODEX_CI"},
+                    *({**injected, name: value} for name, value in (
+                        ("PWD", "/private/tmp/escape"), ("OLDPWD", "/private/tmp/escape"),
+                        ("CODEX_PERMISSION_PROFILE", "danger"), ("CODEX_SANDBOX", "none"),
+                        ("CODEX_SANDBOX_NETWORK_DISABLED", "0"), ("CODEX_VERSION", "0.155.1"),
+                        ("CODEX_SESSION_ID", "invalid"), ("CODEX_THREAD_ID", "invalid"),
+                        ("LOGNAME", "other"), ("TERM", "xterm"),
+                        ("_", "/private/tmp/python3.12")))):
+        assert not audit(output=synthetic_canary_output(changed, root))["env_canary_evidence"]["passed"]
+    assert not audit(output=json.dumps(injected))["env_canary_evidence"]["passed"]
     patch = {"type": "item.completed", "item": {"id": "patch", "type": "file_change", "status": "completed", "changes": []}}
     assert not audit(prefix=[patch])["env_canary_evidence"]["passed"]
     prior = event_stream("pwd")[2:4]
@@ -1201,7 +1252,11 @@ def environment_canary_test(root):
     assert not audit(prefix=prior)["env_canary_evidence"]["passed"]
     evidence = json.dumps(audit())
     assert expected["P5_RUN_TOKEN"] not in evidence and expected["HOME"] not in evidence
-    print("env canary: actual command/order/strict env/missing/leak/token tamper/no public values OK", flush=True)
+    sanitized = synthetic_canary_output(injected, root)
+    assert expected["P5_RUN_TOKEN"] not in sanitized and injected["CODEX_SESSION_ID"] not in sanitized
+    assert injected["CODEX_THREAD_ID"] not in sanitized and injected["PWD"] not in sanitized
+    assert set(json.loads(sanitized)["runtime_checks"]) == runner.RUNTIME_TOOL_ENV_KEYS
+    print("env canary: allowed runtime injection/unknown/missing/tamper/unsafe cwd+profile/redacted values OK", flush=True)
 
 
 def residual_process_test():
@@ -1424,6 +1479,7 @@ def _synthetic_main():
     assert len(runner.verified_a_inputs()) == 1 and len(runner.verified_b_inputs()) == 7
     fingerprint_test(root / "fingerprint")
     permission_test(root / "permissions")
+    prompt_contract_test()
     python_runtime_test(root / "python-runtime")
     event_test(root / "events")
     environment_canary_test(root / "env-canary")
@@ -1594,8 +1650,8 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v3.py"
-    config = root / "drivers/p5-driver-v3-config.json"
+    copy = root / "drivers/p5_driver_v4.py"
+    config = root / "drivers/p5-driver-v4-config.json"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)

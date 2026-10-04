@@ -49,8 +49,49 @@ FIXED_PATH = os.pathsep.join(dict.fromkeys([
     str(Path(PYTHON_EXECUTABLE).parent),
     "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin",
 ]))
-ENV_CANARY_COMMAND = shlex.join([PYTHON_EXECUTABLE, "-I", "-B", "-c",
-    "import json,os; print(json.dumps(dict(os.environ),sort_keys=True,separators=(',',':')))"])
+REQUIRED_TOOL_ENV_KEYS = tuple(sorted(("PATH", "LANG", "LC_ALL", "HOME", "TMPDIR", "TMP", "TEMP",
+    "PYTHONDONTWRITEBYTECODE", "GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_GLOBAL", "GIT_OPTIONAL_LOCKS",
+    "P5_RUN_TOKEN") + (("__CF_USER_TEXT_ENCODING",) if sys.platform == "darwin" else ())))
+RUNTIME_TOOL_ENV_KEYS = frozenset(("CODEX_CI", "CODEX_PERMISSION_PROFILE", "CODEX_SANDBOX",
+    "CODEX_SANDBOX_NETWORK_DISABLED", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "CODEX_VERSION",
+    "COLORTERM", "GH_PAGER", "GIT_PAGER", "LC_CTYPE", "LOGNAME", "NO_COLOR", "OLDPWD",
+    "PAGER", "PWD", "SHLVL", "TERM", "_"))
+_UUID7_PATTERN = r"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+# raw eventへenvironment値を出さず、required全値のdigestと注入keyの安全判定だけを出す。
+ENV_CANARY_SCRIPT = (
+    "import hashlib,json,os,pwd,re,sys;"
+    "env=dict(os.environ);"
+    f"required={REQUIRED_TOOL_ENV_KEYS!r};"
+    "required_env={key:env[key] for key in required if key in env};"
+    "digest=lambda value:hashlib.sha256(value.encode()).hexdigest();"
+    f"uuid7=lambda value:re.fullmatch({_UUID7_PATTERN!r},value or '') is not None;"
+    "cwd=os.getcwd();"
+    "checks={"
+    "'CODEX_CI':env.get('CODEX_CI')=='1',"
+    "'CODEX_PERMISSION_PROFILE':env.get('CODEX_PERMISSION_PROFILE')=='p5_fixture',"
+    "'CODEX_SANDBOX':env.get('CODEX_SANDBOX')=='seatbelt',"
+    "'CODEX_SANDBOX_NETWORK_DISABLED':env.get('CODEX_SANDBOX_NETWORK_DISABLED')=='1',"
+    "'CODEX_SESSION_ID':uuid7(env.get('CODEX_SESSION_ID')) ,"
+    "'CODEX_THREAD_ID':uuid7(env.get('CODEX_THREAD_ID')) ,"
+    f"'CODEX_VERSION':env.get('CODEX_VERSION')=={CLI_VERSION.split()[-1]!r},"
+    "'COLORTERM':env.get('COLORTERM')=='',"
+    "'GH_PAGER':env.get('GH_PAGER')=='cat',"
+    "'GIT_PAGER':env.get('GIT_PAGER')=='cat',"
+    "'LC_CTYPE':env.get('LC_CTYPE')=='C.UTF-8',"
+    "'LOGNAME':env.get('LOGNAME')==pwd.getpwuid(os.getuid()).pw_name,"
+    "'NO_COLOR':env.get('NO_COLOR')=='1',"
+    "'OLDPWD':env.get('OLDPWD')==cwd,"
+    "'PAGER':env.get('PAGER')=='cat',"
+    "'PWD':env.get('PWD')==cwd,"
+    "'SHLVL':env.get('SHLVL')=='0',"
+    "'TERM':env.get('TERM')=='dumb',"
+    "'_':env.get('_')==sys.executable};"
+    "payload={'schema':1,'keys':sorted(env),"
+    "'required_sha256':digest(json.dumps(required_env,sort_keys=True,separators=(',',':'))),"
+    "'runtime_checks':checks,'cwd_sha256':digest(cwd)};"
+    "print(json.dumps(payload,sort_keys=True,separators=(',',':')))"
+)
+ENV_CANARY_COMMAND = shlex.join([PYTHON_EXECUTABLE, "-I", "-B", "-c", ENV_CANARY_SCRIPT])
 INTERNAL_FILES = {".benchmark-prompt.txt", ".benchmark-answer.txt",
                   ".benchmark-events.json", ".benchmark-result.json", ".benchmark-isolation.json"}
 
@@ -596,6 +637,8 @@ def prompt_for(task):
         ENV_CANARY_COMMAND,
         "この環境観測commandが成功してから課題を進め、観測した環境の値は最終回答に掲載しないでください。",
         "一時ファイルは.benchmark-tmp/以下だけに置き、ほかのscratch directoryは作らないでください。",
+        "shellのheredoc、here-string、process substitution（<<、<<<、<(、>(）は禁止です。platform temp（/tmp、/private/tmp、/var/tmp、/private/var/tmp）を使うcommandも実行しないでください。",
+        "複数行Pythonはpython -cで実行するか、python -cから.benchmark-tmp/以下にmode 0600のscriptを作成して実行してください。",
         "完了時に目的、実施内容、検証コマンドと結果、未完、次の一手を明記してください。",
     ]
     if task["id"] == "C6":
@@ -1028,11 +1071,29 @@ def safe_events(raw, destination=None, expected_cwd=None, expected_env=None):
                                 result[key] = value
                             return result
                         observed = json.loads(output, object_pairs_hook=unique_object)
-                        if not isinstance(observed, dict) or any(not isinstance(key, str) or not isinstance(value, str) for key, value in observed.items()):
-                            raise ValueError("invalid environment")
-                        observed_env_sha256 = canonical_digest(observed)
-                        if expected_env is None or observed != expected_env:
+                        fields = {"schema", "keys", "required_sha256", "runtime_checks", "cwd_sha256"}
+                        if (not isinstance(observed, dict) or set(observed) != fields or observed["schema"] != 1
+                                or not isinstance(observed["keys"], list)
+                                or not isinstance(observed["runtime_checks"], dict)
+                                or set(observed["runtime_checks"]) != RUNTIME_TOOL_ENV_KEYS
+                                or any(type(value) is not bool for value in observed["runtime_checks"].values())
+                                or not isinstance(observed["required_sha256"], str)
+                                or not re.fullmatch(r"[0-9a-f]{64}", observed["required_sha256"])
+                                or not isinstance(observed["cwd_sha256"], str)
+                                or not re.fullmatch(r"[0-9a-f]{64}", observed["cwd_sha256"])):
+                            raise ValueError("invalid redacted environment evidence")
+                        observed_env_sha256 = observed["required_sha256"]
+                        if expected_env is None or set(expected_env) != set(REQUIRED_TOOL_ENV_KEYS):
+                            canary_issues.append("expected_environment_unbound")
+                        elif observed_env_sha256 != canonical_digest(expected_env):
                             canary_issues.append("tool_environment_mismatch")
+                        if (expected_env is None or observed["keys"] !=
+                                sorted(set(expected_env) | RUNTIME_TOOL_ENV_KEYS)):
+                            canary_issues.append("tool_environment_keys_mismatch")
+                        if not all(observed["runtime_checks"].values()):
+                            canary_issues.append("unsafe_runtime_environment")
+                        if expected_cwd is None or observed["cwd_sha256"] != digest_bytes(str(expected_cwd).encode()):
+                            canary_issues.append("tool_cwd_mismatch")
                     except (ValueError, TypeError):
                         canary_issues.append("canary_output_invalid")
             commands.append({"line": number, "event": kind, "item_id_sha256": canonical_digest(item_id),
