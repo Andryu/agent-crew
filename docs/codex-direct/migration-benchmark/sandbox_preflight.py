@@ -205,7 +205,14 @@ def check(spec):
     spec["preflight_execution_incomplete"] = False
     report = {"schema": 3, "started_at": runner.stamp(), "cli_version": spec["binding"]["cli_version"],
               "tool_environment_scope": "auxiliary_env_i_probe_not_actual_exec_tool",
-              "binding": spec["binding"], "binding_comparison": "entire_canonical_binding_equal_before_model", "passed": False, "cases": []}
+              "binding": spec["binding"], "binding_comparison": "entire_canonical_binding_equal_before_model",
+              "execution_profile_evidence": {"schema": 1, "profile_name": "p5_fixture", "network_enabled": False,
+                  "read_boundary": spec["binding"]["read_boundary"],
+                  "write_paths": sorted(str(path.relative_to(root)) for path in runner.permission_policy(root, spec["task"])),
+                  "policy_template_sha256": spec["binding"]["policy_template_sha256"],
+                  "profile_sha256": spec["binding"]["profile_sha256"],
+                  "binding_sha256": runner.canonical_digest(spec["binding"])},
+              "passed": False, "cases": []}
     try:
         listener.bind(("127.0.0.1", 0))
         listener.listen(1)
@@ -273,6 +280,15 @@ def check(spec):
         and all(not os.path.lexists(entry[key]) for entry in boundaries for key in ("alias", "directory")))
     report["process_may_still_be_running"] = spec.pop("preflight_execution_incomplete")
     report["passed"] = report["passed"] and report["canaries_removed"] and not report["process_may_still_be_running"]
+    # Post-case残存確認。各caseはcommunicate完了を確認しており、ここではrun-rootのopen fileを再走査する。
+    residual = runner.scan_run_root_open_files(root)
+    token_residual = runner.scan_residual_processes(spec["env"]["P5_RUN_TOKEN"])
+    report["residual_scan_evidence"] = {"status": residual["status"], "passed": residual["passed"],
+        "scan_pass": residual["scan_pass"], "run_root_open_file_process_count": residual.get("run_root_open_file_process_count"),
+        "token_process_scan_pass": token_residual.get("passed") is True,
+        "token_process_scan_count": token_residual.get("scan_count"),
+        "complete_detection_claimed": False}
+    report["passed"] = report["passed"] and residual["passed"] and token_residual.get("passed") is True
     report["ended_at"] = runner.stamp()
     diagnostics = root.parent / ".evidence" / root.name / "preflight.raw.json"
     runner.save(diagnostics, spec.pop("private_preflight_diagnostics", []))
@@ -285,6 +301,8 @@ def main():
     parser.add_argument("--cleanup", action="store_true")
     parser.add_argument("--fingerprint")
     parser.add_argument("--expected-binding-file", type=Path)
+    parser.add_argument("--report-output", type=Path,
+                        help="private v17 logs内の新規schema3 report fileへ保存する")
     args = parser.parse_args()
     with runner.private_umask():
         runner.require_formal_locations()
@@ -318,6 +336,13 @@ def main():
         runner.require_codex_binding(spec, "preflight", expected_cli, spec["binding"]["codex_executable"])
         runner.require_runtime_binding(spec, "preflight", expected_runtime, spec["binding"]["python_runtime"])
         report = check(spec)
+        if args.report_output is not None:
+            destination = args.report_output
+            expected_parent = runner.formal_base() / "drivers/logs/v17"
+            if (destination.parent != expected_parent or os.path.lexists(destination)):
+                raise SystemExit("preflight report output pathはprivate v17 logsの新規fileに限定されます")
+            runner.private_directory_identity(expected_parent)
+            runner._write_private(destination, json.dumps(report, ensure_ascii=False, indent=2) + "\n")
         print(json.dumps(report, ensure_ascii=False, indent=2))
         if args.cleanup and not report.get("process_may_still_be_running"):
             shutil.rmtree(directory)

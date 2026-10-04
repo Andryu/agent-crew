@@ -495,7 +495,7 @@ def analyze(summary, preflight, reviews, campaign_dir=None):
     return aggregate
 
 
-def public_markdown(aggregate):
+def public_markdown(aggregate, *, forbidden_values=()):
     speed = aggregate["speed_target"]
     lines = [
         "# P5 新campaign集計",
@@ -519,11 +519,17 @@ def public_markdown(aggregate):
             value = speed["tasks"][task]
             lines.append(f"| {task} | {value['A_median_seconds']:.3f} | {value['B_median_seconds']:.3f} | {value['B_over_A']:.3f} |")
         lines.extend(["", f"6課題の比率中央値: **{speed['ratio_median']:.3f}**"])
-    return "\n".join(lines) + "\n"
+    output = "\n".join(lines) + "\n"
+    try:
+        harness_run.assert_artifact_clean(output, forbidden_values)
+    except harness_run.BoundaryError as error:
+        raise AnalysisError("public output secret detected") from error
+    return output
 
 
-def write_public(path, text):
+def write_public(path, text, *, forbidden_values=()):
     path = Path(path)
+    harness_run.assert_artifact_clean(text, forbidden_values)
     if path.is_symlink():
         raise AnalysisError("public outputがsymlinkです")
     path.parent.mkdir(parents=True, exist_ok=True)

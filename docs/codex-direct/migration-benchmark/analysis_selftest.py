@@ -29,7 +29,7 @@ analyze = load_module("analyze")
 from harness_fingerprint import compute_harness_fingerprint
 import run as harness_run
 import harness_fingerprint as fingerprint_module
-import probe_v16
+import probe_v17 as probe_v16
 HASH = "a" * 64
 
 

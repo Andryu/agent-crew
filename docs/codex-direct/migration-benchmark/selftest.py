@@ -10,6 +10,7 @@ import os
 import pwd
 import shlex
 import signal
+import stat
 import struct
 from pathlib import Path
 import subprocess
@@ -505,7 +506,7 @@ def prepare_copy_test(root):
     cloned_base, cloned_here = root / "migration-baseline", root / "migration-benchmark"
     copy_tree(original_base, cloned_base)
     copy_tree(original_here / "b-contract", cloned_here / "b-contract")
-    runner._write_private(cloned_here / "fixed_test_runner_v16.py", original_read(original_here / "fixed_test_runner_v16.py"))
+    runner._write_private(cloned_here / "fixed_test_runner_v17.py", original_read(original_here / "fixed_test_runner_v17.py"))
     runner._write_private(cloned_here / "b-contract-index.json", original_read(original_b_index))
     runner.BASE, runner.HERE, runner.B_INDEX = cloned_base, cloned_here, cloned_here / "b-contract-index.json"
     try:
@@ -573,7 +574,9 @@ def preflight_test(root):
         assert report["passed"] and report["binding"] == spec["binding"] and report["canaries_removed"]
         assert runner.validate_preflight_evidence(report, spec)
         for mutation in ({"cases": report["cases"][:-1]}, {"cases": report["cases"] + report["cases"][:1]},
-                         {"canaries_removed": False}, {"postconditions": {}}, {"tool_environment_scope": "exec_verified"}):
+                         {"canaries_removed": False}, {"postconditions": {}}, {"tool_environment_scope": "exec_verified"},
+                         {"process_may_still_be_running": True}, {"execution_profile_evidence": {}},
+                         {"residual_scan_evidence": {"status": "unknown"}}):
             assert not runner.validate_preflight_evidence({**report, **mutation}, spec)
         changed_cases = json.loads(json.dumps(report["cases"]))
         changed_cases[-1]["binding_sha256"] = "0" * 64
@@ -697,10 +700,21 @@ def preflight_timeout_test(root):
 
 
 def fake_preflight_report(spec):
-    return {"schema": 3, "passed": True, "binding": spec["binding"], "cli_version": runner.CLI_VERSION,
+    profile = {"schema": 1, "profile_name": "p5_fixture", "network_enabled": False,
+        "read_boundary": spec["binding"]["read_boundary"],
+        "write_paths": sorted(str(path.relative_to(spec["root"])) for path in runner.permission_policy(spec["root"], spec["task"])),
+        "policy_template_sha256": spec["binding"]["policy_template_sha256"],
+        "profile_sha256": spec["binding"]["profile_sha256"],
+        "binding_sha256": runner.canonical_digest(spec["binding"])}
+    return {"schema": 3, "started_at": runner.stamp(), "ended_at": runner.stamp(),
+            "private_diagnostics_sha256": "0" * 64, "passed": True, "binding": spec["binding"], "cli_version": runner.CLI_VERSION,
             "binding_comparison": "entire_canonical_binding_equal_before_model",
             "tool_environment_scope": "auxiliary_env_i_probe_not_actual_exec_tool",
-            "sandbox_initialized": True, "canaries_removed": True,
+            "sandbox_initialized": True, "canaries_removed": True, "process_may_still_be_running": False,
+            "execution_profile_evidence": profile,
+            "residual_scan_evidence": {"status": "pass", "passed": True, "scan_pass": True,
+                "run_root_open_file_process_count": 0, "token_process_scan_pass": True,
+                "token_process_scan_count": 3, "complete_detection_claimed": False},
             "postconditions": {name: True for name in ("canary_writes_observed", "outside_writes_absent",
                 "private_sentinel_unchanged", "task_file_contents_unchanged", "binding_unchanged", "python_runtime_unchanged")},
             "cases": [{"name": name, "expected": expected,
@@ -1730,16 +1744,23 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v16r2.py"
-    config = root / "drivers/p5-driver-v16r2-config.json"
+    copy = root / "drivers/p5_driver_v17.py"
+    config = root / "drivers/p5-driver-v17-config.json"
+    launcher = root / "drivers/p5-v17-normal-shell.sh"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
-    runner._write_private(config, json.dumps({"schema": 1, "source": str(source),
-                                              "head": head, "fingerprint": "a" * 64}), 0o600)
+    runner._write_private(launcher, "#!/bin/sh\nexit 0\n", 0o700)
+    launcher_info = launcher.lstat()
+    launcher_binding = {"path": str(launcher), "sha256": hashlib.sha256(launcher.read_bytes()).hexdigest(),
+        "device": launcher_info.st_dev, "inode": launcher_info.st_ino, "size": launcher_info.st_size,
+        "mtime_ns": launcher_info.st_mtime_ns, "ctime_ns": launcher_info.st_ctime_ns,
+        "owner": launcher_info.st_uid, "mode": stat.S_IMODE(launcher_info.st_mode)}
+    runner._write_private(config, json.dumps({"schema": 2, "source": str(source),
+        "head": head, "fingerprint": "a" * 64, "launcher_binding": launcher_binding}), 0o600)
     with patch.object(driver_source, "BASE", root), patch.object(driver_source, "DRIVERS", root / "drivers"), \
             patch.object(driver_source, "CONFIG", config), patch.object(driver_source, "SOURCE", None), \
-            patch.object(driver_source, "HERE", None):
+            patch.object(driver_source, "HERE", None), patch.object(driver_source, "LAUNCHER", launcher):
         driver_source.load_config()
         assert driver_source.SOURCE == source and driver_source.HERE == here
         binding = driver_source.external_binding()

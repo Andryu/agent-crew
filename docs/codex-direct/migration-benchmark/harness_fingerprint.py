@@ -52,11 +52,11 @@ def _private_executable_binding(path, expected_mode):
 
 
 def compute_driver_executable_binding():
-    return _private_executable_binding(formal_base() / "drivers/p5_driver_v16r2.py", 0o700)
+    return _private_executable_binding(formal_base() / "drivers/p5_driver_v17.py", 0o700)
 
 
 def compute_driver_config_binding():
-    return _private_executable_binding(formal_base() / "drivers/p5-driver-v16r2-config.json", 0o600)
+    return _private_executable_binding(formal_base() / "drivers/p5-driver-v17-config.json", 0o600)
 
 
 def reject_platform_temp(path):
@@ -114,6 +114,7 @@ HARNESS_INPUTS = (
     "comparison-v2.json", "validate_c6.py", "../migration-baseline/comparison.json",
     "../migration-baseline/snapshot-index.json", "b-contract-index.json", "a-contract-index.json",
     "harness_fingerprint.py", "probe_v16.py", "fixed_test_runner_v16.py", "v16_selftest.py",
+    "probe_v17.py", "fixed_test_runner_v17.py", "v17_selftest.py",
 )
 
 
@@ -315,21 +316,45 @@ def compute_harness_fingerprint(here, *, python_runtime_binding=None, codex_exec
     components.append("driver_executable:" + json.dumps(driver, sort_keys=True, separators=(",", ":")))
     # 実exec toolの/bin/zsh -lcが参照する固定OS層。説明に使う物をfingerprintから外さない。
     for shell_input in ("/bin/zsh", "/etc/zprofile", "/usr/libexec/path_helper", "/etc/paths"):
-        target = Path(shell_input)
-        info = target.lstat()
-        components.append("login_shell:" + shell_input + ":" + str(info.st_dev) + ":" + str(info.st_ino)
-                          + ":" + str(target.resolve(strict=True)) + ":"
-                          + hashlib.sha256(_read_regular_file(target.resolve(strict=True))).hexdigest())
+        components.append("login_shell:" + json.dumps(_shell_file_identity(shell_input), sort_keys=True,
+                                                        separators=(",", ":")))
     for shell_input in ("/etc/zshenv", "/etc/zlogin"):
         target = Path(shell_input)
-        components.append("login_shell_optional:" + shell_input + ":" +
-                          (hashlib.sha256(_read_regular_file(target.resolve(strict=True))).hexdigest()
-                           if target.exists() else "absent"))
+        components.append("login_shell_optional:" + json.dumps(_shell_file_identity(shell_input, optional=True),
+                                                                 sort_keys=True, separators=(",", ":")))
     paths_d = Path("/etc/paths.d")
+    paths_info = paths_d.lstat()
+    components.append("login_shell_paths_d:" + json.dumps({"path": str(paths_d),
+        "realpath": str(paths_d.resolve(strict=True)), "device": paths_info.st_dev, "inode": paths_info.st_ino,
+        "owner": paths_info.st_uid, "mode": stat.S_IMODE(paths_info.st_mode), "size": paths_info.st_size,
+        "mtime_ns": paths_info.st_mtime_ns, "ctime_ns": paths_info.st_ctime_ns,
+        "entries": sorted(entry.name for entry in paths_d.iterdir())}, sort_keys=True, separators=(",", ":")))
     for target in sorted(paths_d.iterdir()) if paths_d.exists() else []:
-        components.append("login_shell:" + str(target) + ":" + str(target.resolve(strict=True)) + ":"
-                          + hashlib.sha256(_read_regular_file(target.resolve(strict=True))).hexdigest())
-    sed = Path("/usr/bin/sed")
-    components.append("fixed_sed:" + str(sed.resolve(strict=True)) + ":"
-                      + hashlib.sha256(_read_regular_file(sed.resolve(strict=True))).hexdigest())
+        components.append("login_shell:" + json.dumps(_shell_file_identity(target), sort_keys=True,
+                                                        separators=(",", ":")))
+    components.append("fixed_sed:" + json.dumps(_shell_file_identity("/usr/bin/sed"), sort_keys=True,
+                                                  separators=(",", ":")))
     return hashlib.sha256("".join(components).encode()).hexdigest()
+
+
+def _shell_file_identity(value, optional=False):
+    """login shellの実効性に関わるfile modeとinode metadataを固定する。"""
+    target = Path(value)
+    try:
+        alias = target.lstat()
+        resolved = target.resolve(strict=True)
+        info = resolved.stat()
+        return {"path": str(target), "realpath": str(resolved),
+                "alias_identity": {"device": alias.st_dev, "inode": alias.st_ino, "owner": alias.st_uid,
+                    "mode": stat.S_IMODE(alias.st_mode), "executable": bool(alias.st_mode & 0o111),
+                    "size": alias.st_size, "mtime_ns": alias.st_mtime_ns, "ctime_ns": alias.st_ctime_ns,
+                    "symlink_target": os.readlink(target) if stat.S_ISLNK(alias.st_mode) else None},
+                "device": info.st_dev,
+                "inode": info.st_ino, "owner": info.st_uid, "mode": stat.S_IMODE(info.st_mode),
+                "executable": bool(info.st_mode & 0o111), "size": info.st_size,
+                "mtime_ns": info.st_mtime_ns, "ctime_ns": info.st_ctime_ns,
+                "sha256": hashlib.sha256(_read_regular_file(resolved)).hexdigest()}
+    except FileNotFoundError:
+        if optional:
+            return {"path": str(target), "absent": True}
+        raise

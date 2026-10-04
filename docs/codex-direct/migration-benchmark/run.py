@@ -332,8 +332,40 @@ def _write_private(path, value, mode=0o600):
         os.close(parent)
 
 
-def save(path, value):
-    _write_private(path, json.dumps(value, ensure_ascii=False, indent=2) + "\n")
+def assert_artifact_clean(value, forbidden_values=()):
+    payload = value.encode("utf-8") if isinstance(value, str) else value
+    if not isinstance(payload, bytes):
+        payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    for secret in forbidden_values:
+        secret = secret.encode("utf-8") if isinstance(secret, str) else secret
+        if not isinstance(secret, bytes):
+            raise BoundaryError("artifact_secret_type_unknown")
+        if secret and secret in payload:
+            raise BoundaryError("artifact_secret_detected")
+    return payload
+
+
+def save(path, value, *, forbidden_values=()):
+    payload = json.dumps(value, ensure_ascii=False, indent=2) + "\n"
+    assert_artifact_clean(payload, forbidden_values)
+    _write_private(path, payload)
+
+
+def save_raw_events(path, raw, *, forbidden_values=(), audit_passed=False):
+    """rawは安全監査後に限り保存し、既知のsynthetic secretがあれば保存自体を拒否する。"""
+    if audit_passed is not True:
+        raise BoundaryError("raw_event_audit_not_passed")
+    encoded = raw.encode("utf-8") if isinstance(raw, str) else raw
+    if not isinstance(encoded, bytes):
+        raise BoundaryError("raw_event_encoding_unknown")
+    for value in forbidden_values:
+        if not isinstance(value, (str, bytes)):
+            raise BoundaryError("raw_event_secret_type_unknown")
+        secret = value.encode("utf-8") if isinstance(value, str) else value
+        if secret and secret in encoded:
+            raise BoundaryError("raw_event_secret_detected")
+    _write_private(path, encoded)
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def load(path):
@@ -518,13 +550,22 @@ def canonical_execution_spec(root, task, cli_version, harness_fingerprint="unbou
     if phase in {"model", "probe"} and safe_read(root / ENV_EXPECTED_NAME) != env_expected_bytes(root, harness_fingerprint, phase):
         raise BoundaryError("env expected specのbinding不一致")
     spec = {"root": root, "task": task, "env": env, "config": permission_config(root, task, phase=phase)}
+    process_environment = process_env(spec)
+    tool_dynamic = frozenset(("HOME", "TMPDIR", "TMP", "TEMP", "P5_RUN_TOKEN"))
+    process_dynamic = tool_dynamic | frozenset(("PWD", "OLDPWD"))
+    normalize_environment = lambda values, dynamic: {key: ("<allowed-root-or-token>" if key in dynamic else value)
+                                                        for key, value in sorted(values.items())}
     spec["binding"] = {
         "schema": 3, "phase": phase, "cli_version": cli_version, "harness_fingerprint": harness_fingerprint,
         "root_realpath": str(root.resolve()), "root_device": info.st_dev, "root_inode": info.st_ino,
         "policy_template_sha256": canonical_digest(policy_template(task, phase)),
         "profile_sha256": canonical_digest(spec["config"]),
-        "tool_environment": {"keys": sorted(env), "sha256": canonical_digest(env)},
-        "codex_process_environment": {"keys": sorted(process_env(spec)), "sha256": canonical_digest(process_env(spec)),
+        "tool_environment": {"keys": sorted(env), "sha256": canonical_digest(env),
+                              "normalized_sha256": canonical_digest(normalize_environment(env, tool_dynamic)),
+                              "allowed_value_differences": sorted(tool_dynamic)},
+        "codex_process_environment": {"keys": sorted(process_environment), "sha256": canonical_digest(process_environment),
+                                      "normalized_sha256": canonical_digest(normalize_environment(process_environment, process_dynamic)),
+                                      "allowed_value_differences": sorted(process_dynamic),
                                       "auth_home_location_sha256": digest_bytes(AUTH_HOME.encode())},
         "codex_executable": compute_codex_executable_binding(CODEX_EXECUTABLE),
         "private_directories": private_directory_identity(root),
@@ -680,7 +721,7 @@ def prepare(task_id, condition, repeat, campaign, run_id, fingerprint="unbound")
         if digest_bytes(fixed_data) != hashes[test_name]:
             raise BoundaryError("fixed test初期bytesが不一致")
         _write_private(fixed_test, fixed_data)
-        _write_private(root / FIXED_TEST_RUNNER_NAME, safe_read(HERE / "fixed_test_runner_v16.py"))
+        _write_private(root / FIXED_TEST_RUNNER_NAME, safe_read(HERE / "fixed_test_runner_v17.py"))
     _prepare_environment_home(root)
     git_env = limited_env(root)
     run_trusted_command(["git", "init", "-q", str(root)], check=True, env=git_env)
@@ -1264,7 +1305,7 @@ def command_attempts(command, expected_cwd=None):
         try:
             initial = next(entry["sha256"] for entry in load(BASE / "snapshot-index.json")["entries"]
                            if entry["source"] == test_file)
-            if sha(fixed) != initial or sha(runner_file) != sha(HERE / "fixed_test_runner_v16.py"):
+            if sha(fixed) != initial or sha(runner_file) != sha(HERE / "fixed_test_runner_v17.py"):
                 return [{"reason": "fixed_runner_or_test_asset_changed", "severity": "fail"}]
             index = load(BASE / "snapshot-index.json")["entries"]
             for dependency in FIXED_TEST_DEPENDENCIES[task_id]:
@@ -1460,8 +1501,12 @@ def non_tool_schema_errors(kind, item):
     return errors
 
 
-def safe_events(raw, destination=None, expected_cwd=None, expected_env=None):
+def safe_events(raw, destination=None, expected_cwd=None, expected_env=None, forbidden_values=()):
     """private rawから同じ判定を再生成する。本文は返却・集計へ含めない。"""
+    raw_bytes = raw.encode("utf-8") if isinstance(raw, str) else raw
+    secret_found = any((secret.encode("utf-8") if isinstance(secret, str) else secret) in raw_bytes
+                       for secret in forbidden_values if secret)
+    source = "" if secret_found else raw
     usage, event_types, item_types, categories = {}, {}, {}, {}
     violations, attempts, commands, diagnostics = [], [], [], []
     lifecycles = {}
@@ -1474,7 +1519,7 @@ def safe_events(raw, destination=None, expected_cwd=None, expected_env=None):
     thread_started = turn_started = turn_ended = False
     def violation(reason, line):
         violations.append({"reason": reason, "line": line, "severity": "unknown"})
-    for number, line in enumerate(raw.splitlines(), 1):
+    for number, line in enumerate(source.splitlines(), 1):
         try:
             event = json.loads(line)
         except (ValueError, TypeError):
@@ -1670,6 +1715,9 @@ def safe_events(raw, destination=None, expected_cwd=None, expected_env=None):
             violation("unpaired_item_event", 0)
     if not parsed or not thread_started or not turn_started or event_types.get("turn.completed", 0) != 1:
         violation("incomplete_run_lifecycle", 0)
+    if secret_found:
+        violation("synthetic_secret_detected", 0)
+        canary_issues.append("synthetic_secret_detected")
     event_pass = not violations
     attempt_status = "fail" if any(entry["severity"] == "fail" for entry in attempts) else "unknown" if attempts else "pass"
     if expected_env is None:
@@ -1692,10 +1740,10 @@ def safe_events(raw, destination=None, expected_cwd=None, expected_env=None):
                                          "unknown": "unclassified_execution_requires_independent_review"}[attempt_status],
                            "complete_detection_claimed": False},
         "usage": usage, "commands": commands, "diagnostics": diagnostics,
-        "tool_seconds": UNKNOWN, "raw_event_sha256": digest_bytes(raw.encode()),
+        "tool_seconds": UNKNOWN, "raw_event_sha256": digest_bytes(raw_bytes),
     }
     if destination is not None:
-        save(destination, cleaned)
+        save(destination, cleaned, forbidden_values=forbidden_values)
     return cleaned
 
 
@@ -1856,7 +1904,7 @@ def scan_residual_context(root, leader_pid):
     try:
         ps = subprocess.run(["/bin/ps", "-A", "-o", "pid=,pgid=,uid="], text=True,
                             capture_output=True, timeout=5, env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
-        if ps.returncode != 0:
+        if ps.returncode != 0 or ps.stderr or not ps.stdout.strip():
             raise BoundaryError("process_group_inventory_failed")
         group_count = leader_count = 0
         for line in ps.stdout.splitlines():
@@ -1871,8 +1919,11 @@ def scan_residual_context(root, leader_pid):
         opened = subprocess.run(["/usr/sbin/lsof", "-F", "p", "+D", str(root)], text=True,
                                 capture_output=True, timeout=5,
                                 env={"PATH": "/usr/sbin:/usr/bin:/bin", "LC_ALL": "C"})
-        if opened.returncode not in {0, 1} or (opened.returncode == 1 and opened.stderr.strip()):
+        # lsofのstderrはexit 0でも部分取得・permission警告を示し得るため、空以外はunknown。
+        if opened.returncode not in {0, 1} or opened.stderr != "":
             raise BoundaryError("run_root_open_file_scan_failed")
+        if opened.returncode == 0 and not opened.stdout.strip():
+            raise BoundaryError("run_root_open_file_scan_output_contradiction")
         pids = {line[1:] for line in opened.stdout.splitlines() if line.startswith("p") and line[1:].isdigit()}
         if any(not line.startswith("p") or not line[1:].isdigit() for line in opened.stdout.splitlines()):
             raise BoundaryError("run_root_open_file_scan_invalid")
@@ -1881,10 +1932,32 @@ def scan_residual_context(root, leader_pid):
                 "leader_present_count": leader_count, "group_member_count": group_count,
                 "run_root_open_file_process_count": len(pids), "argv_or_environment_values_saved": False,
                 "complete_detection_claimed": False}
-    except (OSError, RuntimeError, subprocess.SubprocessError):
+    except (OSError, RuntimeError, UnicodeError, subprocess.SubprocessError):
         return {"status": "unknown", "passed": False, "scan_pass": False,
                 "reason": "process_context_scan_unavailable", "argv_or_environment_values_saved": False,
                 "complete_detection_claimed": False}
+
+
+def scan_run_root_open_files(root):
+    """PIDを推測せずrun-root open fileのみを取得。取得不完全はunknown。"""
+    try:
+        opened = subprocess.run(["/usr/sbin/lsof", "-F", "p", "+D", str(root)], text=True,
+                                capture_output=True, timeout=5,
+                                env={"PATH": "/usr/sbin:/usr/bin:/bin", "LC_ALL": "C"})
+        if opened.returncode not in {0, 1} or opened.stderr != "":
+            raise BoundaryError("run_root_open_file_scan_failed")
+        lines = opened.stdout.splitlines()
+        if opened.returncode == 0 and not lines:
+            raise BoundaryError("run_root_open_file_scan_output_contradiction")
+        pids = [line[1:] for line in lines if line.startswith("p") and line[1:].isdigit()]
+        if len(pids) != len(lines):
+            raise BoundaryError("run_root_open_file_scan_invalid")
+        return {"status": "pass" if not pids else "fail", "passed": not pids,
+                "scan_pass": True, "run_root_open_file_process_count": len(set(pids)),
+                "complete_detection_claimed": False}
+    except (OSError, RuntimeError, UnicodeError, subprocess.SubprocessError):
+        return {"status": "unknown", "passed": False, "scan_pass": False,
+                "run_root_open_file_process_count": None, "complete_detection_claimed": False}
 
 
 class RunSignal(SystemExit):
@@ -1947,7 +2020,8 @@ def abort_run(spec, phase, reason, exit_status=None, details=None):
                   "reason": reason, "exit_status": exit_status, "automatic_termination": False,
                   "process_may_still_be_running": True, "root_access_after_failure": False,
                   "harness_fingerprint": spec["binding"]["harness_fingerprint"], "details": details or {}}
-    save(campaign / ".evidence" / root.name / f"{phase}-interruption.json", diagnostic)
+    save(campaign / ".evidence" / root.name / f"{phase}-interruption.json", diagnostic,
+         forbidden_values=tuple(value for value in spec.get("env", {}).values() if value))
     raise SystemExit(1)
 
 
@@ -2109,6 +2183,30 @@ def validate_preflight_evidence(report, spec):
     """reportの自己申告だけでなく、固定case集合・binding・個別outcomeを照合する。"""
     if not isinstance(report, dict):
         return False
+    required_fields = {"schema", "started_at", "cli_version", "tool_environment_scope", "binding",
+        "binding_comparison", "execution_profile_evidence", "passed", "cases", "sandbox_initialized",
+        "postconditions", "canaries_removed", "process_may_still_be_running", "residual_scan_evidence",
+        "ended_at", "private_diagnostics_sha256"}
+    binding_fields = {"schema", "phase", "cli_version", "harness_fingerprint", "root_realpath", "root_device",
+        "root_inode", "policy_template_sha256", "profile_sha256", "tool_environment", "codex_process_environment",
+        "codex_executable", "private_directories", "env_canary_script", "env_expected_sha256", "python_runtime", "read_boundary"}
+    if set(report) != required_fields:
+        return False
+    binding = report.get("binding")
+    if (not isinstance(binding, dict) or set(binding) != binding_fields or binding.get("phase") != "model"
+            or binding.get("harness_fingerprint") != spec["binding"].get("harness_fingerprint")
+            or any(not isinstance(report.get(key), str) or not report[key] for key in ("started_at", "ended_at"))
+            or not isinstance(report.get("private_diagnostics_sha256"), str)
+            or not re.fullmatch(r"[a-f0-9]{64}", report["private_diagnostics_sha256"])):
+        return False
+    for key in ("policy_template_sha256", "profile_sha256", "harness_fingerprint", "env_expected_sha256"):
+        value = binding.get(key)
+        if value is not None and (not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value)):
+            return False
+    if (not isinstance(binding.get("codex_executable"), dict) or not isinstance(binding.get("python_runtime"), dict)
+            or not isinstance(binding.get("private_directories"), dict) or not isinstance(binding.get("env_canary_script"), dict)
+            or not isinstance(binding.get("tool_environment"), dict) or not isinstance(binding.get("codex_process_environment"), dict)):
+        return False
     cases = report.get("cases")
     required = required_preflight_cases(spec)
     if not isinstance(cases, list) or len(cases) != len(required):
@@ -2133,11 +2231,26 @@ def validate_preflight_evidence(report, spec):
     conditions = report.get("postconditions")
     expected_conditions = {"canary_writes_observed", "outside_writes_absent", "private_sentinel_unchanged",
                            "task_file_contents_unchanged", "binding_unchanged", "python_runtime_unchanged"}
+    residual = report.get("residual_scan_evidence")
+    profile = report.get("execution_profile_evidence")
+    expected_writes = sorted(str(path.relative_to(spec["root"])) for path in permission_policy(spec["root"], spec["task"]))
+    profile_valid = (isinstance(profile, dict) and set(profile) == {"schema", "profile_name", "network_enabled",
+        "read_boundary", "write_paths", "policy_template_sha256", "profile_sha256", "binding_sha256"}
+        and profile == {"schema": 1, "profile_name": "p5_fixture", "network_enabled": False,
+            "read_boundary": spec["binding"]["read_boundary"], "write_paths": expected_writes,
+            "policy_template_sha256": spec["binding"]["policy_template_sha256"],
+            "profile_sha256": spec["binding"]["profile_sha256"], "binding_sha256": canonical_digest(spec["binding"])})
     return (report.get("schema") == 3 and report.get("passed") is True and report.get("sandbox_initialized") is True
             and report.get("binding") == spec["binding"] and report.get("cli_version") == spec["binding"]["cli_version"]
             and report.get("binding_comparison") == "entire_canonical_binding_equal_before_model"
             and report.get("tool_environment_scope") == "auxiliary_env_i_probe_not_actual_exec_tool"
-            and report.get("canaries_removed") is True and isinstance(conditions, dict)
+            and report.get("canaries_removed") is True and report.get("process_may_still_be_running") is False
+            and profile_valid and isinstance(residual, dict) and set(residual) == {"status", "passed", "scan_pass",
+                "run_root_open_file_process_count", "token_process_scan_pass", "token_process_scan_count", "complete_detection_claimed"}
+            and residual == {"status": "pass", "passed": True, "scan_pass": True,
+                "run_root_open_file_process_count": 0, "token_process_scan_pass": True,
+                "token_process_scan_count": 3, "complete_detection_claimed": False}
+            and isinstance(conditions, dict)
             and set(conditions) == expected_conditions and all(value is True for value in conditions.values()))
 
 
@@ -2266,9 +2379,15 @@ def _run(args):
     if current_binding != spec["binding"]:
         abort_run(spec, "model", "model_binding_changed")
     current_binding_matches = True
+    events = safe_events(stdout, root / ".benchmark-events.json", root, expected_env=spec["env"],
+                         forbidden_values=tuple(value for value in spec["env"].values() if value))
     raw_path = root.parent / ".evidence" / root.name / "events.raw.jsonl"
-    _write_private(raw_path, stdout)
-    events = safe_events(stdout, root / ".benchmark-events.json", root, expected_env=spec["env"])
+    try:
+        raw_digest = save_raw_events(raw_path, stdout,
+            forbidden_values=tuple(value for value in spec["env"].values() if value),
+            audit_passed=events.get("event_audit", {}).get("passed") is True)
+    except (BoundaryError, OSError, ValueError):
+        abort_run(spec, "event_audit", "raw_event_save_refused")
     guard_after = host_guard()
     try:
         preflight_unchanged = sha(root / ".benchmark-isolation.json") == common["preflight_evidence_sha256"]
@@ -2346,7 +2465,7 @@ def _run(args):
               "llm_seconds": UNKNOWN, "tool_seconds": events["tool_seconds"], "usage": events["usage"], "cost_usd": UNKNOWN,
               "rework_count": UNKNOWN, "review_findings": "not_reviewed", "stderr_sha256": digest_bytes(stderr.encode()),
               "answer_sha256": digest_bytes(answer.encode()) if answer else None, "snapshot_evidence": snapshot,
-              "raw_event_evidence": {"path_relative_to_campaign": str(raw_path.relative_to(root.parent)), "sha256": sha(raw_path),
+              "raw_event_evidence": {"path_relative_to_campaign": str(raw_path.relative_to(root.parent)), "sha256": raw_digest,
                                      "mode": "0600", "retention": "private_until_independent_review_completed"},
               "host_guard": {"before": guard_before, "after": guard_after, "unchanged": guard_before == guard_after},
               "accepted_state_sha256": accepted_state, "c6_validator_consistent": c6_consistent if args.task == "C6" else None,

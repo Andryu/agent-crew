@@ -19,9 +19,10 @@ import uuid
 ACCOUNT_HOME = Path(pwd.getpwuid(os.getuid()).pw_dir)
 BASE = ACCOUNT_HOME / "Library/Caches/agent-crew-p5-benchmark"
 DRIVERS = BASE / "drivers"
-LOGS = DRIVERS / "logs/v16"
+LOGS = DRIVERS / "logs/v17"
 FORMAL = BASE / "formal"
-CONFIG = DRIVERS / "p5-driver-v16r2-config.json"
+CONFIG = DRIVERS / "p5-driver-v17-config.json"
+LAUNCHER = Path("/private/tmp/p5-v17-normal-shell.sh")
 SOURCE = None
 HERE = None
 STATUS = LOGS / "status.json"
@@ -31,16 +32,17 @@ GIT = "/usr/bin/git"
 BASH = "/bin/bash"
 EXPECTED_HEAD = None
 EXPECTED_FINGERPRINT = None
+LOADED_LAUNCHER_BINDING = None
 FIXED_PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 CAMPAIGN_SECONDS = 24 * 1200 + 315 + 300
 DRIVER_GRACE_SECONDS = 600
 KNOWN_PRIVACY_LINES = {
-    ("docs/codex-direct/migration-benchmark/harness_fingerprint.py", 288):
-        "e3a5c6c684f77b12d5726043ee75ac55a47f848ceb116e745bc7562dcc2d244f",
-    ("docs/codex-direct/migration-benchmark/selftest.py", 325):
-        "b74639bd80b379b2183ecdea29f134e27d728e328fff6364fd99229cb7efcc3c",
+    ("docs/codex-direct/migration-benchmark/harness_fingerprint.py", 289):
+        "831bafbf519b5d25f48149a1394166801b8f02f02d89aa44647a3c69e9140057",
+    ("docs/codex-direct/migration-benchmark/selftest.py", 326):
+        "4337c459d32f55173ac0ecbe404746d82f86b602f1750211509692ec9a398a35",
     ("docs/plans/2026-09-22-p5-rerun.md", 144):
-        "d205ebe2ffb34164980881f749c36ee5007f76b2b310e5aa45c77e4261dbb7f3",
+        "133eb226669becab2ee6ce5970e85c7732bf22dc08beb425ebda87e64779c1e6",
 }
 
 
@@ -127,7 +129,8 @@ def regular_identity(path, mode=0o600):
 def external_binding():
     """repo原本、実行copy、configの同一bytesとstat identityを固定する。"""
     original = HERE / "driver.py"
-    runtime = DRIVERS / "p5_driver_v16r2.py"
+    runtime = DRIVERS / "p5_driver_v17.py"
+    launcher_bytes = regular_identity(LAUNCHER, mode=0o700)
     original_bytes = regular_identity(original, mode=0o644)
     runtime_bytes = regular_identity(runtime, mode=0o700)
     config_bytes = regular_identity(CONFIG)
@@ -139,23 +142,37 @@ def external_binding():
                 "device": info.st_dev, "inode": info.st_ino, "size": info.st_size,
                 "mtime_ns": info.st_mtime_ns, "ctime_ns": info.st_ctime_ns,
                 "owner": info.st_uid, "mode": stat.S_IMODE(info.st_mode)}
+    launcher_info = LAUNCHER.lstat()
+    launcher = {"path": str(LAUNCHER), "sha256": hashlib.sha256(launcher_bytes).hexdigest(),
+        "device": launcher_info.st_dev, "inode": launcher_info.st_ino, "size": launcher_info.st_size,
+        "mtime_ns": launcher_info.st_mtime_ns, "ctime_ns": launcher_info.st_ctime_ns,
+        "owner": launcher_info.st_uid, "mode": stat.S_IMODE(launcher_info.st_mode)}
     return {"source": metadata(original), "copy": metadata(runtime), "config": metadata(CONFIG),
-            "config_sha256": hashlib.sha256(config_bytes).hexdigest()}
+            "config_sha256": hashlib.sha256(config_bytes).hexdigest(), "launcher": launcher}
 
 
 def load_config():
-    global SOURCE, HERE, EXPECTED_HEAD, EXPECTED_FINGERPRINT
+    global SOURCE, HERE, EXPECTED_HEAD, EXPECTED_FINGERPRINT, LOADED_LAUNCHER_BINDING
     config = json.loads(regular_identity(CONFIG))
-    if (set(config) != {"schema", "source", "head", "fingerprint"} or config["schema"] != 1
+    expected_fields = {"schema", "source", "head", "fingerprint", "launcher_binding"}
+    if (set(config) != expected_fields or config["schema"] != 2
             or not isinstance(config["head"], str) or len(config["head"]) != 40
             or not isinstance(config["fingerprint"], str) or len(config["fingerprint"]) != 64):
         raise Stop("invalid_driver_config")
+    launcher_info = LAUNCHER.lstat()
+    launcher_binding = {"path": str(LAUNCHER), "sha256": hashlib.sha256(regular_identity(LAUNCHER, mode=0o700)).hexdigest(),
+        "device": launcher_info.st_dev, "inode": launcher_info.st_ino, "size": launcher_info.st_size,
+        "mtime_ns": launcher_info.st_mtime_ns, "ctime_ns": launcher_info.st_ctime_ns,
+        "owner": launcher_info.st_uid, "mode": stat.S_IMODE(launcher_info.st_mode)}
+    if config["launcher_binding"] != launcher_binding:
+        raise Stop("normal_shell_launcher_binding_changed")
     source = Path(config["source"])
     if (not source.is_absolute() or source.parent != BASE / "source"
             or source.name != "agent-crew-p5-" + config["head"][:7] + "-sparse"):
         raise Stop("driver_config_source_path_invalid")
     SOURCE, HERE = source, source / "docs/codex-direct/migration-benchmark"
     EXPECTED_HEAD, EXPECTED_FINGERPRINT = config["head"], config["fingerprint"]
+    LOADED_LAUNCHER_BINDING = launcher_binding
 
 
 def new_file(path, data):
@@ -269,6 +286,8 @@ def bindings(shared):
     external = external_binding()
     if external["copy"] != driver or external["config"] != config:
         raise Stop("external_driver_binding_changed")
+    if external["launcher"] != LOADED_LAUNCHER_BINDING:
+        raise Stop("normal_shell_launcher_binding_changed")
     fingerprint = shared.compute_harness_fingerprint(HERE, python_runtime_binding=runtime,
                                                       codex_executable_binding=cli,
                                                       driver_executable_binding=driver)
@@ -294,11 +313,12 @@ def privacy_check(log):
 def verification(log, shared):
     directories = source_check(log)
     expected = bindings(shared)
-    for name in ("selftest.py", "analysis_selftest.py", "v16_selftest.py"):
+    for name in ("selftest.py", "analysis_selftest.py", "v16_selftest.py", "v17_selftest.py"):
         command([PYTHON, "-B", HERE / name], log)
     compile_files = ("run.py", "sandbox_preflight.py", "validate_c6.py", "selftest.py",
                      "batch.py", "analyze.py", "analysis_selftest.py", "harness_fingerprint.py",
-                     "probe_v16.py", "fixed_test_runner_v16.py", "v16_selftest.py")
+                     "probe_v16.py", "fixed_test_runner_v16.py", "v16_selftest.py",
+                     "probe_v17.py", "fixed_test_runner_v17.py", "v17_selftest.py")
     command([PYTHON, "-B", "-X", "pycache_prefix=" + str(LOGS / "pycache"), "-m", "py_compile",
              *[HERE / name for name in compile_files]], log)
     command([GIT, "diff", "--check"], log)
@@ -430,11 +450,12 @@ def main():
                         driver_executable=expected["driver_executable"], driver_config=expected["driver_config"])
                 return 0
             sys.path.insert(0, str(HERE))
-            probe_spec = importlib.util.spec_from_file_location("p5_probe_v16", HERE / "probe_v16.py")
+            probe_spec = importlib.util.spec_from_file_location("p5_probe_v17", HERE / "probe_v17.py")
             probe_module = importlib.util.module_from_spec(probe_spec)
             probe_spec.loader.exec_module(probe_module)
             try:
-                probe_module.require_final_probe(expected["fingerprint"])
+                probe_module.require_final_probe(expected["fingerprint"],
+                    driver_config_binding=expected["driver_config"])
             except (OSError, ValueError) as error:
                 raise Stop("final_fixed_probe_not_passed:" + type(error).__name__) from None
             source_check(log, directories)

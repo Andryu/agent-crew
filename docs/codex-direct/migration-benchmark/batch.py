@@ -65,11 +65,12 @@ def secure_mkdir(path):
     return path
 
 
-def atomic_json(path, value):
+def atomic_json(path, value, *, forbidden_values=()):
     """検証したdirectory fdとO_NOFOLLOWを用いて0600 JSONを保存する。"""
     path = Path(path)
-    secure_mkdir(path.parent)
     payload = (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode()
+    harness_run.assert_artifact_clean(payload, forbidden_values)
+    secure_mkdir(path.parent)
     harness_run._write_private(path, payload)
     directory_fd = harness_run._open_directory(path.parent)
     try:
@@ -342,8 +343,8 @@ def _main(campaign_deadline_monotonic=None):
     fingerprint = compute_harness_fingerprint(HERE, python_runtime_binding=python_runtime,
                                               codex_executable_binding=codex_executable,
                                               driver_executable_binding=driver_executable)
-    import probe_v16
-    probe_v16.require_final_probe(fingerprint)
+    import probe_v17
+    probe_v17.require_final_probe(fingerprint)
     campaign = f"p5-{fingerprint[:16]}"
     campaign_dir = secure_mkdir(WORK / campaign)
     expected_binding = campaign_binding(campaign_dir, fingerprint, python_runtime, codex_executable,
