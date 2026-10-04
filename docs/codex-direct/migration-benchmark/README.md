@@ -105,3 +105,8 @@ exact moduleはos、os.path、pathlib、json、hashlib、sys、shutil、socket�
 固定CPython 3.12.13のbuiltin/frozen identityとstdlib source hash・初期化経路を確認した。9 moduleをfresh `-I -B` processで個別にimportし、audit hookでsocket/process起動・ctypesロード・環境変更・書込等を拒否して全件成功。観測はstdlib/module読取・import・信頼済み初期化code実行・登録処理であり、任意moduleの無害性を一般化しない。この前提は既存runtime tree/executable bindingで固定する。module個別deny方式は採らない。
 
 旧v4 rawのpass 4件はgit status/cat/rgであり、inline Pythonではない。必要なsafe Pythonは別のliteral/container・exact import caseで固定する。既存v9〜v12と全selftest、構文/diff/privacy、read-only replayを検証後、新commitからv13固定物を作る。v13 quality unapproved、独立reviewは後続の別context。正式campaign/model/実sandbox verifyは未実施・禁止、旧固定物/campaign不変。
+
+
+## v13品質指摘とv14 copytree callback位置修正（2026-10-04）
+
+必須指摘1件: 固定CPythonのcopytree署名ではignoreは位置3、copy_functionは位置4。callback slotsを(3,4)へ修正し、位置2のsymlinks=Falseを通常データとして扱う。API別例外の追加ではなく既存callback検査の署名定義を訂正する。位置/keyword、import alias/from-import、print/open、False/None、安全通常利用、実APIをmockしたignore到達を回帰固定する。全security/analysis・旧ケース・構文/diff/privacy・旧v4 raw read-only replayを完了条件とし、新commitからv14固定物を作成する。追加agent/独立reviewは実施せずquality unapprovedを維持。正式campaign/model/実sandbox verifyは未実施。旧固定物/campaignは変更しない。

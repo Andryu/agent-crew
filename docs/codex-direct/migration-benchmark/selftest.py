@@ -1729,8 +1729,8 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v13.py"
-    config = root / "drivers/p5-driver-v13-config.json"
+    copy = root / "drivers/p5_driver_v14.py"
+    config = root / "drivers/p5-driver-v14-config.json"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
@@ -2151,7 +2151,54 @@ def import_subset_v13_tests():
     print(f"v13 import subset: {len(cases)} non-pass + synthetic events, {len(safe)} safe PASS",flush=True)
 
 
+
+def copytree_callback_v14_tests():
+    """固定CPythonの実APIと位置/keyword分類を照合し、副作用はmockで遮断する。"""
+    import inspect
+    import shutil
+    from unittest.mock import Mock
+    assert list(inspect.signature(shutil.copytree).parameters)[2:5] == [
+        'symlinks', 'ignore', 'copy_function']
+    root = Path(tempfile.mkdtemp(prefix="p5-v14-copytree-", dir="/private/tmp"))
+    cases = []
+    for prefix, api in [('import shutil', 'shutil.copytree'),
+                        ('import shutil as s', 's.copytree'),
+                        ('from shutil import copytree as c', 'c')]:
+        for callback in ('print', 'open'):
+            for arguments in (f"False,{callback}", f"ignore={callback}",
+                              f"False,None,{callback}", f"copy_function={callback}"):
+                cases.append(f"{prefix}; {api}('src','dst',{arguments})")
+    for code in cases:
+        findings = runner._fixed_python_code_attempts(code, root)
+        assert any(x['reason'] == 'python_callback_effects_unclassified' for x in findings), code
+        raw = '\n'.join(json.dumps(e) for e in event_stream(
+            shlex.join([runner.PYTHON_EXECUTABLE, '-I', '-B', '-c', code])))
+        result = runner.safe_events(raw, root/'events.json', root)
+        assert result['event_audit']['passed'] and not result['attempt_policy']['passed'], code
+    safe = ["", ",False", ",False,None", ",symlinks=False,ignore=None",
+            ",False,None,None", ",ignore=None,copy_function=None"]
+    for suffix in safe:
+        code = f"import shutil; shutil.copytree('src','dst'{suffix})"
+        assert not runner._fixed_python_code_attempts(code, root), code
+    # 実copytree→実_copytreeでignoreまで到達。走査/作成/metadata操作とcallbackをmockする。
+    for keyword in (False, True):
+        for name in ('print', 'open'):
+            callback = Mock(name=name, return_value=[])
+            with patch('shutil.os.scandir') as scan, patch('shutil.os.makedirs') as mkdir, \
+                    patch('shutil.copystat') as metadata:
+                scan.return_value.__enter__.return_value = []
+                if keyword:
+                    result = shutil.copytree('src', 'dst', symlinks=False, ignore=callback)
+                else:
+                    result = shutil.copytree('src', 'dst', False, callback)
+                assert result == 'dst'
+                callback.assert_called_once_with('src', [])
+                mkdir.assert_called_once_with('dst', exist_ok=False)
+                metadata.assert_called_once()
+    print(f"v14 copytree: {len(cases)} non-pass + synthetic events, {len(safe)} safe, 4 mock callback reachability PASS", flush=True)
+
 if __name__ == "__main__":
+    copytree_callback_v14_tests()
     import_subset_v13_tests()
     protocol_subset_v12_tests()
     callback_identity_v11_tests()
