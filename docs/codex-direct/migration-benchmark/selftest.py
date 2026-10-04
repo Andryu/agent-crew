@@ -346,11 +346,28 @@ def event_test(root):
     for code in ("targets=['/private/tmp/out']; open(targets[0],'w').write('x')",
                  "targets=['/private/tmp/out'];\nfor target in targets: open(target,'w')",
                  "from pathlib import Path; Path('/private/tmp/out').write_text('x')",
-                 "import os; os.path.exists('/private/tmp/out')"):
+                 "import os; os.path.exists('/private/tmp/out')",
+                 "import os as x; x.remove('/private/tmp/out')",
+                 "from os import remove as rm; rm('/private/tmp/out')",
+                 "import shutil; shutil.copy('.benchmark-tmp/x','/private/tmp/out')",
+                 "import shutil; shutil.copy('README.md','/private/tmp/out')",
+                 "import shutil; shutil.copy(src='README.md',dst='/private/tmp/out')",
+                 "import shutil; shutil.copy(src='/private/tmp/out',dst='.benchmark-tmp/x')",
+                 "import shutil as s; s.copy(src='.benchmark-tmp/x',dst='/private/tmp/out')",
+                 "from pathlib import Path; Path('.benchmark-tmp/link').symlink_to('/private/tmp')",
+                 "from pathlib import Path as P; P('.benchmark-tmp/link').symlink_to(target='/private/tmp')",
+                 "import os; os.symlink(src='.benchmark-tmp/x',dst='/private/tmp/link')",
+                 "import os; os.rename(src='.benchmark-tmp/x',dst='/private/tmp/out')"):
         assert audit(shlex.join([runner.PYTHON_EXECUTABLE, "-I", "-B", "-c", code]))["attempt_policy"]["status"] == "fail"
     for code in ("open(dynamic_path,'w')", "eval('1+1')", "exec('pass')", "compile('x=1','x','exec')", "__import__('os')",
                  "targets=['/private/tmp/out']; targets=['.benchmark-tmp/safe']; open(targets[0],'w')",
-                 "f=open; f('/private/tmp/out','w')"):
+                 "f=open; f('/private/tmp/out','w')",
+                 "import os as x; x.system('touch /private/tmp/out')",
+                 "import socket as s; s.create_connection(('127.0.0.1',80))",
+                 "import builtins as b; b.eval('1+1')",
+                 "import mystery as m; m.unknown('/private/tmp/out')",
+                 "import os as x; x=object(); x.getcwd()",
+                 "import mystery as x; import os as x; x.getcwd()"):
         assert audit(shlex.join([runner.PYTHON_EXECUTABLE, "-I", "-B", "-c", code]))["attempt_policy"]["status"] == "unknown"
     for code in ("open('/private/tmp/out', 'w')", "open('../outside', 'w')",
                  "import os; os.environ.pop('P5_RUN_TOKEN')"):
@@ -1707,8 +1724,8 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v6.py"
-    config = root / "drivers/p5-driver-v6-config.json"
+    copy = root / "drivers/p5_driver_v7.py"
+    config = root / "drivers/p5-driver-v7-config.json"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)

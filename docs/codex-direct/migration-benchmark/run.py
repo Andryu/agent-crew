@@ -811,6 +811,50 @@ def _fixed_python_code_attempts(code, expected_cwd):
     root = os.path.abspath(expected_cwd)
     unknown = object()
     values = {}
+    aliases = {}
+    shadowed = set()
+    top_level_imports = {id(statement) for statement in tree.body if isinstance(statement, (ast.Import, ast.ImportFrom))}
+    def root_name(node):
+        while isinstance(node, ast.Attribute):
+            node = node.value
+        return node.id if isinstance(node, ast.Name) else None
+    for statement in ast.walk(tree):
+        if isinstance(statement, ast.Import):
+            for item in statement.names:
+                local = item.asname or item.name.split(".")[0]
+                if local in aliases or id(statement) not in top_level_imports:
+                    shadowed.add(local)
+                aliases[local] = item.name if item.asname else item.name.split(".")[0]
+        elif isinstance(statement, ast.ImportFrom):
+            if statement.level or statement.module is None:
+                add("relative_python_import_unclassified")
+            else:
+                for item in statement.names:
+                    if item.name == "*":
+                        add("star_python_import_unclassified")
+                    else:
+                        local = item.asname or item.name
+                        if local in aliases or id(statement) not in top_level_imports:
+                            shadowed.add(local)
+                        aliases[local] = statement.module + "." + item.name
+        elif isinstance(statement, (ast.Assign, ast.AnnAssign, ast.NamedExpr)):
+            targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target]
+            shadowed.update(target.id for target in targets if isinstance(target, ast.Name))
+        elif isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            shadowed.add(statement.name)
+        elif isinstance(statement, ast.arg):
+            shadowed.add(statement.arg)
+        elif isinstance(statement, ast.For) and isinstance(statement.target, ast.Name):
+            shadowed.add(statement.target.id)
+        elif isinstance(statement, ast.withitem) and isinstance(statement.optional_vars, ast.Name):
+            shadowed.add(statement.optional_vars.id)
+    def canonical_name(node):
+        if isinstance(node, ast.Name):
+            return None if node.id in shadowed and node.id in aliases else aliases.get(node.id, node.id)
+        if isinstance(node, ast.Attribute):
+            base = canonical_name(node.value)
+            return base + "." + node.attr if base else None
+        return None
     def resolve(node):
         if isinstance(node, ast.Constant) and isinstance(node.value, (str, int)):
             return node.value
@@ -836,10 +880,10 @@ def _fixed_python_code_attempts(code, expected_cwd):
             if isinstance(left, str) and isinstance(right, str):
                 return os.path.join(left, right) if isinstance(node.op, ast.Div) else left + right
         if isinstance(node, ast.Call):
-            name = ast.unparse(node.func)
-            if name == "Path.cwd" and not node.args:
+            name = canonical_name(node.func)
+            if name in {"Path.cwd", "pathlib.Path.cwd"} and not node.args:
                 return root
-            if name in {"Path", "str", "os.path.abspath"} and len(node.args) == 1:
+            if name in {"Path", "pathlib.Path", "str", "os.path.abspath"} and len(node.args) == 1:
                 return resolve(node.args[0])
             if name == "os.path.join" and node.args:
                 items = [resolve(item) for item in node.args]
@@ -855,16 +899,28 @@ def _fixed_python_code_attempts(code, expected_cwd):
         elif isinstance(node, ast.For) and isinstance(node.target, ast.Name):
             source = resolve(node.iter)
             bind(node.target.id, source[0] if isinstance(source, list) and len(source) == 1 else unknown)
-    path_names = {"open", "os.open", "runpy.run_path", "os.chdir", "Path", "pathlib.Path", "os.stat", "os.lstat",
-                  "os.remove", "os.unlink", "os.mkdir", "os.makedirs", "os.listdir", "os.scandir", "os.walk",
-                  "os.access", "os.readlink", "os.path.exists", "os.path.isfile", "os.path.isdir",
-                  "os.path.realpath", "shutil.rmtree", "shutil.copy", "shutil.move"}
+    # APIごとに全path位置を列挙。未指定、**kwargs、動的式はunknownへ落とす。
+    path_api = {
+        "open": ((0, "file"),), "builtins.open": ((0, "file"),), "os.open": ((0, "path"),),
+        "runpy.run_path": ((0, "path_name"),), "os.chdir": ((0, "path"),),
+        "Path": ((0, "path"),), "pathlib.Path": ((0, "path"),),
+        **{name: ((0, "path"),) for name in (
+            "os.stat", "os.lstat", "os.remove", "os.unlink", "os.mkdir", "os.makedirs",
+            "os.listdir", "os.scandir", "os.walk", "os.access", "os.readlink",
+            "os.path.exists", "os.path.isfile", "os.path.isdir", "os.path.realpath", "shutil.rmtree")},
+        **{name: ((0, "src"), (1, "dst")) for name in (
+            "shutil.copy", "shutil.copy2", "shutil.copyfile", "shutil.copytree", "shutil.move",
+            "os.symlink", "os.link", "os.rename", "os.replace")},
+    }
     path_methods = {"open", "read_text", "read_bytes", "write_text", "write_bytes", "mkdir", "unlink",
-                    "rename", "replace", "stat", "lstat", "exists", "is_file", "is_dir", "iterdir", "glob", "rglob"}
-    dynamic_names = {"eval", "exec", "compile", "__import__", "getattr", "globals", "locals", "vars"}
+                    "rename", "replace", "stat", "lstat", "exists", "is_file", "is_dir", "iterdir", "glob", "rglob",
+                    "symlink_to", "hardlink_to", "link_to"}
+    two_path_methods = {"rename", "replace", "symlink_to", "hardlink_to", "link_to"}
+    dynamic_names = {"eval", "exec", "compile", "__import__", "getattr", "globals", "locals", "vars",
+                     "builtins.eval", "builtins.exec", "builtins.compile", "builtins.__import__", "importlib.import_module"}
     known_names = {"Path", "str", "print", "all", "any", "len", "range", "dict", "list", "set", "tuple",
                    "int", "bytes", "open", "sum", "sorted", "enumerate", "zip", "isinstance", "hasattr"}
-    safe_module_calls = {"Path.cwd", "os.getcwd", "os.getuid", "os.getpid", "os.fstat", "os.fdopen",
+    safe_module_calls = {"Path.cwd", "pathlib.Path.cwd", "os.getcwd", "os.getuid", "os.getpid", "os.fstat", "os.fdopen",
                          "os.path.join", "os.path.normpath", "os.path.basename", "os.path.dirname",
                          "os.path.split", "os.path.relpath", "os.path.commonpath"}
     def check_path(expr):
@@ -881,29 +937,50 @@ def _fixed_python_code_attempts(code, expected_cwd):
         if not isinstance(node.func, (ast.Name, ast.Attribute)):
             add("dynamic_python_call_unclassified")
             continue
-        name = ast.unparse(node.func)
+        name = canonical_name(node.func)
+        if name is None and isinstance(node.func, ast.Attribute) and node.func.attr not in path_methods:
+            add("dynamic_python_attribute_call_unclassified")
+            continue
+        name = name or ""
         if name in dynamic_names:
             add("dynamic_python_call_unclassified")
-        elif isinstance(node.func, ast.Name) and name not in known_names:
+        elif isinstance(node.func, ast.Name) and name not in known_names | set(path_api):
             add("dynamic_python_call_unclassified")
-        elif isinstance(node.func, ast.Name) and name in values:
+        elif isinstance(node.func, ast.Name) and node.func.id in values:
             add("shadowed_python_call_unclassified")
-        if name.startswith(("subprocess.", "socket.", "urllib.", "requests.")) or name == "os.system":
+        if name.startswith(("subprocess.", "socket.", "urllib.", "requests.", "http.", "ftplib.")) or name in {"os.system", "os.popen"}:
             add("python_external_execution_or_network_unclassified")
-        if name.startswith(("os.", "shutil.", "pathlib.", "tempfile.")) and name not in path_names | safe_module_calls:
+        if name.startswith(("os.", "shutil.", "pathlib.", "tempfile.", "builtins.", "importlib.")) and name not in set(path_api) | safe_module_calls:
             add("python_module_call_unclassified")
-        if name in path_names:
-            if node.args:
-                check_path(node.args[0])
-            else:
-                add("dynamic_python_path_unclassified")
-        elif isinstance(node.func, ast.Attribute) and node.func.attr in path_methods:
-            check_path(node.func.value)
-            if node.func.attr in {"rename", "replace"}:
-                if node.args:
-                    check_path(node.args[0])
+        if (isinstance(node.func, ast.Attribute) and root_name(node.func) in aliases
+                and name not in set(path_api) | safe_module_calls
+                and not name.startswith(("subprocess.", "socket.", "urllib.", "requests.", "http.", "ftplib."))):
+            add("imported_python_attribute_unclassified")
+        if name in path_api:
+            for position, keyword in path_api[name]:
+                matches = [item.value for item in node.keywords if item.arg == keyword]
+                if len(node.args) > position and not matches:
+                    check_path(node.args[position])
+                elif len(matches) == 1 and len(node.args) <= position:
+                    check_path(matches[0])
                 else:
                     add("dynamic_python_path_unclassified")
+            if any(item.arg is None for item in node.keywords):
+                add("dynamic_python_keyword_expansion_unclassified")
+            if name in {"os.symlink", "os.link"}:
+                add("link_creation_requires_review")
+        elif isinstance(node.func, ast.Attribute) and node.func.attr in path_methods:
+            check_path(node.func.value)
+            if node.func.attr in two_path_methods:
+                matches = [item.value for item in node.keywords if item.arg == "target"]
+                if node.args and not matches:
+                    check_path(node.args[0])
+                elif len(matches) == 1 and not node.args:
+                    check_path(matches[0])
+                else:
+                    add("dynamic_python_path_unclassified")
+                if node.func.attr in {"symlink_to", "hardlink_to", "link_to"}:
+                    add("link_creation_requires_review")
     return findings
 
 
