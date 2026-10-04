@@ -54,6 +54,12 @@ def binding(root, fingerprint, phase, task):
 
 def synthetic_preflight(spec):
     model = spec["binding"]
+    profile = {"schema": 1, "profile_name": "p5_fixture", "network_enabled": False,
+        "read_boundary": model["read_boundary"],
+        "write_paths": sorted(str(path.relative_to(spec["root"])) for path in harness_run.permission_policy(spec["root"], spec["task"])),
+        "policy_template_sha256": model["policy_template_sha256"],
+        "profile_sha256": model["profile_sha256"],
+        "binding_sha256": harness_run.canonical_digest(model)}
     required = harness_run.required_preflight_cases(spec)
     cases = [{"name": name, "expected": expected,
               "outcome": "allowed" if expected == "allow" else "sandbox_denied",
@@ -61,10 +67,15 @@ def synthetic_preflight(spec):
               "command_sha256": HASH, "stdout_sha256": HASH, "stderr_sha256": HASH,
               "binding_sha256": harness_run.canonical_digest(model)}
              for name, expected in required.items()]
-    return {"schema": 3, "cli_version": harness_run.CLI_VERSION, "binding": model,
+    return {"schema": 3, "started_at": "synthetic-start", "ended_at": "synthetic-end",
+            "private_diagnostics_sha256": HASH, "cli_version": harness_run.CLI_VERSION, "binding": model,
             "binding_comparison": "entire_canonical_binding_equal_before_model",
             "tool_environment_scope": "auxiliary_env_i_probe_not_actual_exec_tool",
             "passed": True, "canaries_removed": True, "sandbox_initialized": True,
+            "process_may_still_be_running": False, "execution_profile_evidence": profile,
+            "residual_scan_evidence": {"status": "pass", "passed": True, "scan_pass": True,
+                "run_root_open_file_process_count": 0, "token_process_scan_pass": True,
+                "token_process_scan_count": 3, "complete_detection_claimed": False},
             "postconditions": {"canary_writes_observed": True, "outside_writes_absent": True,
                                "private_sentinel_unchanged": True, "task_file_contents_unchanged": True,
                                "binding_unchanged": True, "python_runtime_unchanged": True}, "cases": cases}

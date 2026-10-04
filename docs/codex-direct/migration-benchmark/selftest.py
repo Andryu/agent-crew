@@ -551,12 +551,15 @@ def prepare_copy_test(root):
 
 def preflight_test(root):
     root.mkdir()
-    runner.install_env_canary(root, "fixture-fingerprint")
+    fixture_fingerprint = "f" * 64
+    runner.install_env_canary(root, fixture_fingerprint)
     runner._write_private(root / "AGENTS.md", "fixture")
     for name in c1_task()["input"] + c1_task()["fixture"]:
         runner._write_private(root / name, "fixed fixture")
-    spec = runner.execution_spec(root, c1_task(), runner.CLI_VERSION, "fixture-fingerprint")
+    spec = runner.execution_spec(root, c1_task(), runner.CLI_VERSION, fixture_fingerprint)
     original = preflight.run_case
+    original_residual = runner.scan_residual_processes
+    original_open_files = runner.scan_run_root_open_files
     seen = []
     def fake_case(name, passed_spec, command, expected):
         assert passed_spec is spec
@@ -569,6 +572,9 @@ def preflight_test(root):
                 "exit_code": 0 if expected == "allow" else 1, "binding_sha256": runner.canonical_digest(spec["binding"]),
                 "command_sha256": runner.canonical_digest(command), "stdout_sha256": "0" * 64, "stderr_sha256": "0" * 64}
     preflight.run_case = fake_case
+    runner.scan_residual_processes = clean_process_evidence
+    runner.scan_run_root_open_files = lambda _root: {"status": "pass", "passed": True, "scan_pass": True,
+        "run_root_open_file_process_count": 0, "complete_detection_claimed": False}
     try:
         report = preflight.check(spec)
         assert report["passed"] and report["binding"] == spec["binding"] and report["canaries_removed"]
@@ -586,6 +592,8 @@ def preflight_test(root):
         assert not preflight.check(spec)["passed"]
     finally:
         preflight.run_case = original
+        runner.scan_residual_processes = original_residual
+        runner.scan_run_root_open_files = original_open_files
     print("preflight: exact binding/tool env/canary cleanup/fail closed OK (sandbox outcomes mocked)", flush=True)
 
 
@@ -638,8 +646,9 @@ def preflight_timeout_test(root):
             target = root / mode / "run-01"
             target.mkdir(parents=True)
             runner._write_private(target / "AGENTS.md", "fixture")
-            runner.install_env_canary(target, "fixture-fingerprint")
-            spec = runner.execution_spec(target, runner.c6_task(), runner.CLI_VERSION, "fixture-fingerprint")
+            fixture_fingerprint = "f" * 64
+            runner.install_env_canary(target, fixture_fingerprint)
+            spec = runner.execution_spec(target, runner.c6_task(), runner.CLI_VERSION, fixture_fingerprint)
             processes = []
             with forbid_after_outcome([target], modules=(runner, preflight.runner)) as activate:
                 class MockCanary:
@@ -1744,9 +1753,9 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v17r2.py"
-    config = root / "drivers/p5-driver-v17r2-config.json"
-    launcher = root / "drivers/p5-v17r2-normal-shell.sh"
+    copy = root / "drivers/p5_driver_v17r3.py"
+    config = root / "drivers/p5-driver-v17r3-config.json"
+    launcher = root / "drivers/p5-v17r3-normal-shell.sh"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)

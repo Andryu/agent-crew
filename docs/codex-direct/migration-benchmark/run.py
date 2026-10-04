@@ -141,6 +141,13 @@ def canonical_digest(value):
     return digest_bytes(json.dumps(value, sort_keys=True, separators=(",", ":")).encode())
 
 
+def secret_env_values(env):
+    """固定envのうちsecretとして扱う値だけをartifact部分文字列検査へ渡す。"""
+    return tuple(value for key, value in env.items()
+                 if isinstance(value, str) and value and
+                 (key == "P5_RUN_TOKEN" or re.search(r"TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY", key, re.I)))
+
+
 def _open_directory(path, create=False):
     """各componentをopenat/O_NOFOLLOWで開き、途中のsymlinkも追従しない。"""
     absolute = Path(os.path.abspath(path))
@@ -2021,7 +2028,7 @@ def abort_run(spec, phase, reason, exit_status=None, details=None):
                   "process_may_still_be_running": True, "root_access_after_failure": False,
                   "harness_fingerprint": spec["binding"]["harness_fingerprint"], "details": details or {}}
     save(campaign / ".evidence" / root.name / f"{phase}-interruption.json", diagnostic,
-         forbidden_values=tuple(value for value in spec.get("env", {}).values() if value))
+         forbidden_values=secret_env_values(spec.get("env", {})))
     raise SystemExit(1)
 
 
@@ -2380,11 +2387,11 @@ def _run(args):
         abort_run(spec, "model", "model_binding_changed")
     current_binding_matches = True
     events = safe_events(stdout, root / ".benchmark-events.json", root, expected_env=spec["env"],
-                         forbidden_values=tuple(value for value in spec["env"].values() if value))
+                         forbidden_values=secret_env_values(spec["env"]))
     raw_path = root.parent / ".evidence" / root.name / "events.raw.jsonl"
     try:
         raw_digest = save_raw_events(raw_path, stdout,
-            forbidden_values=tuple(value for value in spec["env"].values() if value),
+            forbidden_values=secret_env_values(spec["env"]),
             audit_passed=events.get("event_audit", {}).get("passed") is True)
     except (BoundaryError, OSError, ValueError):
         abort_run(spec, "event_audit", "raw_event_save_refused")
