@@ -1729,8 +1729,8 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v8.py"
-    config = root / "drivers/p5-driver-v8-config.json"
+    copy = root / "drivers/p5_driver_v9.py"
+    config = root / "drivers/p5-driver-v9-config.json"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
@@ -1848,5 +1848,64 @@ def main():
         _synthetic_main()
 
 
+def binding_path_v9_tests():
+    """codeは実行せず、Pythonの束縛形式と探索patternを分類する。"""
+    root = Path("/private/tmp/p5-v9-synthetic-root")
+    cases = []
+    for module, value, call in (
+        ("os", "os", "x.remove('/private/tmp/out')"),
+        ("socket", "socket", "x.create_connection(('127.0.0.1',80))"),
+        ("builtins", "builtins", "x.eval('1+1')"),
+        ("sys", "sys.modules['os']", "x.remove('/private/tmp/out')"),
+    ):
+        for binding in ("x,=({value},)", "[x]=[{value}]", "x,*rest=({value},0)",
+                        "(x,),=(({value},),)", "*x,=({value},)"):
+            cases.append(f"import {module}; " + binding.format(value=value) + "; " + call)
+        cases.extend((
+            f"import {module}\nfor [x] in [({value},)]: {call}",
+            f"import {module}; [{call} for x in [{value}]]",
+            f"import {module}; [{call} for [x] in [({value},)]]",
+            f"import {module}; ({call} for x in [{value}])",
+            f"import {module}; (x:={value}); {call}",
+        ))
+    cases.extend((
+        "with manager as (x,y): x.unknown()",
+        "try: pass\nexcept Exception as x: x.unknown()",
+        "async def f():\n async for x in source: x.unknown()",
+        "async def f():\n async with manager as x: x.unknown()",
+        "match source:\n case {'x': x, **rest}: x.unknown()",
+        "match source:\n case [*x]: x.unknown()",
+        "unknown.receiver.method()",
+        "from pathlib import Path; p=Path('.'); p=other; p.read_text()",
+        "from pathlib import Path; p=Path('.'); p,=('../outside',); p.read_text()",
+        "from pathlib import Path; p=Path('.'); (p:='../outside'); p.read_text()",
+        "from pathlib import Path; p=Path('.'); del p; p.read_text()",
+        "from pathlib import Path; p=Path('.'); q=p; p /= '../outside'; q.read_text()",
+        "from pathlib import Path; p=Path('.'); [p.read_text() for p in paths]",
+        "from pathlib import Path; p=Path('.');\nwith manager as p: p.read_text()",
+        "from pathlib import Path; p=Path('.');\ntry: pass\nexcept Exception as p: p.read_text()",
+    ))
+    for operator in ('+=', '-=', '*=', '/=', '//=', '%=', '**=', '@=', '<<=', '>>=', '&=', '|=', '^='):
+        cases.append(f"from pathlib import Path; p=Path('.'); p {operator} '../outside'; p.read_text()")
+    for method in ('glob', 'rglob'):
+        for pattern in ("'../*'", "'/private/tmp/*'", "'safe/../../*'", "dynamic", "get_pattern()"):
+            for argument in (pattern, 'pattern=' + pattern):
+                cases.append(f"from pathlib import Path; p=Path('.'); list(p.{method}({argument}))")
+        cases.append(f"from pathlib import Path; Path('.').{method}(**options)")
+    for code in cases:
+        assert runner._fixed_python_code_attempts(code, root), code
+    safe = ["from pathlib import Path; p=Path('.'); p.read_text()",
+            "from pathlib import Path; p=Path('docs')/'note.md'; p.read_text()",
+            "from pathlib import Path; p=Path('note.md'); p.write_text('../payload')"]
+    for method in ('glob', 'rglob'):
+        for pattern in ('*.py', '**/*.md', 'docs/[ab]*.md'):
+            for argument in (repr(pattern), 'pattern=' + repr(pattern)):
+                safe.append(f"from pathlib import Path; p=Path('.'); list(p.{method}({argument}))")
+    for code in safe:
+        assert not runner._fixed_python_code_attempts(code, root), code
+    print(f"v9 binding/path: {len(cases)} non-pass + {len(safe)} safe cases PASS", flush=True)
+
+
 if __name__ == "__main__":
+    binding_path_v9_tests()
     main()

@@ -62,3 +62,10 @@ v7品質review round3は`NEEDS_CHANGES`。v8では再代入された名前をali
 prompt、answer、raw JSONL、event要約、validator結果、preflight、review sidecar、private aggregateはcampaign内のprivate artifactとし、公開repoへcommitしない。campaign directoryは0700、fileは0600、保持14日。rawは独立review完了まで保持し、公開aggregateの確認後に削除する。未完了なら期限前に保持延長を明示記録する。公開Markdownに生command、回答本文、reviewer記述、private pathを含めない。
 
 P5は合成入力の指示比較である。P1/P2/P4の実機E2E、実資産、外部サービスへの送信、global認証設定の変更、PRのmerge、P6/P7はこの測定に含めない。旧ハーネスの当時説明は[README v1](README-v1-2026-09-21.md)、旧campaignの結果は[formal-report](formal-report.md)を参照する。
+
+
+## v8追加品質review NEEDS_CHANGESとv9修正（2026-10-04）
+
+追加品質reviewはNEEDS_CHANGES。3 findingは(1) unpack/Starred等のName束縛によるalias迂回、(2) AugAssign等で既知Pathの静的値が残る問題、(3) glob/rglobのpattern引数未検査。v9ではASTのStore/Delと名前を文字列で持つ束縛を集約し、複数定義・未知束縛の値を全sinkでinvalidateする。探索patternはpositional/keywordの両方で静的な相対値を要求し、親参照・絶対値・動的値を非passにする。未知attributeも非pass。個別payload一致や制御フローの推測で許可しない。
+
+代替案のcase別禁止リストは他の束縛形式を見逃すため採らない。安全な単一定義Pathとfixture内patternは維持し、再代入のある安全codeも証明不能ならunknownとなる保守性を受け入れる。完了条件は再現/周辺境界のselftest、既存security/analysis、構文、diff、privacy固定行、可能なread-only replayとv9固定物の検証。独立reviewは今回行わず、v9も未承認（unapproved）。正式campaign、model run、実sandbox verifyは起動しない。旧v1〜v8の固定物とcampaignは変更しない。

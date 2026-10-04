@@ -837,17 +837,49 @@ def _fixed_python_code_attempts(code, expected_cwd):
                         if local in aliases or id(statement) not in top_level_imports:
                             shadowed.add(local)
                         aliases[local] = statement.module + "." + item.name
-        elif isinstance(statement, (ast.Assign, ast.AnnAssign, ast.NamedExpr)):
-            targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target]
-            shadowed.update(target.id for target in targets if isinstance(target, ast.Name))
+        # Store/Del contextはunpack、Starred、loop/comprehension、with、walrusも含む。
+        elif isinstance(statement, ast.Name) and isinstance(statement.ctx, (ast.Store, ast.Del)):
+            shadowed.add(statement.id)
         elif isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             shadowed.add(statement.name)
         elif isinstance(statement, ast.arg):
             shadowed.add(statement.arg)
-        elif isinstance(statement, ast.For) and isinstance(statement.target, ast.Name):
-            shadowed.add(statement.target.id)
-        elif isinstance(statement, ast.withitem) and isinstance(statement.optional_vars, ast.Name):
-            shadowed.add(statement.optional_vars.id)
+        elif isinstance(statement, ast.ExceptHandler) and statement.name:
+            shadowed.add(statement.name)
+        elif isinstance(statement, (ast.MatchAs, ast.MatchStar)) and statement.name:
+            shadowed.add(statement.name)
+        elif isinstance(statement, ast.MatchMapping) and statement.rest:
+            shadowed.add(statement.rest)
+        elif isinstance(statement, (ast.Global, ast.Nonlocal)):
+            shadowed.update(statement.names)
+    # スコープや分岐の到達順を証明しない。単一定義と証明できない値は全sinkでunknown。
+    stores = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+            stores[node.id] = stores.get(node.id, 0) + 1
+    static_targets = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            static_targets.add(id(node.targets[0]))
+        elif isinstance(node, (ast.AnnAssign, ast.For)) and isinstance(node.target, ast.Name):
+            static_targets.add(id(node.target))
+    invalid_values = {name for name, count in stores.items() if count != 1}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)) and id(node) not in static_targets:
+            invalid_values.add(node.id)
+        elif isinstance(node, ast.arg):
+            invalid_values.add(node.arg)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            invalid_values.add(node.name)
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            invalid_values.add(node.name)
+        elif isinstance(node, (ast.MatchAs, ast.MatchStar)) and node.name:
+            invalid_values.add(node.name)
+        elif isinstance(node, ast.MatchMapping) and node.rest:
+            invalid_values.add(node.rest)
+        elif isinstance(node, (ast.Global, ast.Nonlocal)):
+            invalid_values.update(node.names)
+    invalid_values.update(set(stores) & set(aliases))
     def canonical_name(node):
         if isinstance(node, ast.Name):
             return None if node.id in shadowed else aliases.get(node.id, node.id)
@@ -859,7 +891,7 @@ def _fixed_python_code_attempts(code, expected_cwd):
         if isinstance(node, ast.Constant) and isinstance(node.value, (str, int)):
             return node.value
         if isinstance(node, ast.Name):
-            return values.get(node.id, unknown)
+            return unknown if node.id in invalid_values else values.get(node.id, unknown)
         if isinstance(node, (ast.List, ast.Tuple)):
             items = [resolve(item) for item in node.elts]
             return items if unknown not in items else unknown
@@ -938,7 +970,8 @@ def _fixed_python_code_attempts(code, expected_cwd):
             add("dynamic_python_call_unclassified")
             continue
         name = canonical_name(node.func)
-        if name is None and isinstance(node.func, ast.Attribute) and node.func.attr not in path_methods:
+        if (isinstance(node.func, ast.Attribute) and node.func.attr not in path_methods
+                and name not in set(path_api) | safe_module_calls):
             add("dynamic_python_attribute_call_unclassified")
             continue
         name = name or ""
@@ -971,6 +1004,16 @@ def _fixed_python_code_attempts(code, expected_cwd):
                 add("link_creation_requires_review")
         elif isinstance(node.func, ast.Attribute) and node.func.attr in path_methods:
             check_path(node.func.value)
+            if any(item.arg is None for item in node.keywords):
+                add("dynamic_python_keyword_expansion_unclassified")
+            if node.func.attr in {"glob", "rglob"}:
+                matches = [item.value for item in node.keywords if item.arg == "pattern"]
+                pattern = (resolve(node.args[0]) if len(node.args) == 1 and not matches
+                           else resolve(matches[0]) if len(matches) == 1 and not node.args else unknown)
+                if not isinstance(pattern, str):
+                    add("dynamic_python_pattern_unclassified")
+                elif os.path.isabs(pattern) or ".." in Path(pattern).parts:
+                    add("explicit_outside_python_pattern", "fail")
             if node.func.attr in two_path_methods:
                 matches = [item.value for item in node.keywords if item.arg == "target"]
                 if node.args and not matches:
