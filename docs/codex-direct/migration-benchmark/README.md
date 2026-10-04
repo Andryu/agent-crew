@@ -20,6 +20,8 @@ v6ではcanaryを初期Git commitの後に生成し、`.git/info/exclude`で未�
 
 v7ではimport aliasをcanonical API名へ戻し、`shutil.copy`などのsource/destination、`Path.symlink_to`などのreceiver/targetをpositionalとkeywordの双方から検査する。識別できないalias・attribute・path値は`unknown`、明示外部pathは`fail`とする。networkや動的実行APIもalias経由で非passにする。これは静的な明示試行分類であり、OS sandboxと独立raw reviewの代わりにはしない。
 
+v7品質review round3は`NEEDS_CHANGES`。v8では再代入された名前をalias登録の有無にかかわらず解決不能とし、既知path methodのreceiver検査を維持しつつ、他のattribute callを`unknown`にする。修正後の追加reviewは往復上限3回により実施しないため、品質は`unapproved`である。正式campaignは開始禁止。旧campaignとv1〜v7 artifactは証跡として保持する。
+
 ## 実行と独立レビュー
 
 1. 通常shellの固定launcherから`--verify-only`を実行し、selftest、analysis selftest、構文・差分・privacy確認を済ませる。モデルなしの単独preflight probeを合格させ、仕様・品質の独立レビュー後に別の新規campaignを開始する。

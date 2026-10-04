@@ -850,7 +850,7 @@ def _fixed_python_code_attempts(code, expected_cwd):
             shadowed.add(statement.optional_vars.id)
     def canonical_name(node):
         if isinstance(node, ast.Name):
-            return None if node.id in shadowed and node.id in aliases else aliases.get(node.id, node.id)
+            return None if node.id in shadowed else aliases.get(node.id, node.id)
         if isinstance(node, ast.Attribute):
             base = canonical_name(node.value)
             return base + "." + node.attr if base else None
