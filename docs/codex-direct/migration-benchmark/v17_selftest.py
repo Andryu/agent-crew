@@ -118,7 +118,11 @@ def sed_tests(base):
 
 def budget_tests(base):
     path = base / "ledger" / "probe-ledger.json"
-    first = probe_v16.reserve("a" * 64, path)
+    # Ledger state-machine tests use a synthetic supervisor identity; actual
+    # ps/process-group behavior is covered by dedicated residual/failure tests.
+    supervisor = {"pid": os.getpid(), "pgid": os.getpgrp(), "uid": os.getuid(), "started": "synthetic"}
+    with patch.object(probe_v16, "_process_identity", return_value=supervisor):
+        first = probe_v16.reserve("a" * 64, path)
     try:
         probe_v16.reserve("a" * 64, path)
     except ValueError as error:
@@ -133,8 +137,9 @@ def budget_tests(base):
         raise AssertionError("finish without child/residual proof accepted")
     assert probe_v16.ledger_record(path)["attempts"][0]["state"] == "reserved"
     probe_v16.finish(first["id"], False, "auth", path, child_reaped=True, residual_verified=True)
-    second = probe_v16.reserve("b" * 64, path)
-    probe_v16.finish(second["id"], True, "pass", path, child_reaped=True, residual_verified=True)
+    with patch.object(probe_v16, "_process_identity", return_value=supervisor):
+        second = probe_v16.reserve("b" * 64, path)
+        probe_v16.finish(second["id"], True, "pass", path, child_reaped=True, residual_verified=True)
     for fingerprint in ("a" * 64, "b" * 64):
         try:
             probe_v16.require_final_probe(fingerprint, path)
@@ -143,7 +148,8 @@ def budget_tests(base):
         else:
             raise AssertionError("後発passが先行failを隠した")
     clean = base / "ledger-single-pass" / "probe-ledger.json"
-    only_pass = probe_v16.reserve("d" * 64, clean)
+    with patch.object(probe_v16, "_process_identity", return_value=supervisor):
+        only_pass = probe_v16.reserve("d" * 64, clean)
     probe_v16.finish(only_pass["id"], True, "pass", clean, child_reaped=True, residual_verified=True)
     assert probe_v16.require_final_probe("d" * 64, clean)["id"] == only_pass["id"]
     try:
@@ -165,12 +171,14 @@ def budget_tests(base):
     first_reservation.write_bytes(saved_reservation)
     for label in ("timeout", "auth", "quota", "audit_unavailable"):
         isolated = base / ("ledger-" + label) / "probe-ledger.json"
-        attempt = probe_v16.reserve("a" * 64, isolated)
+        with patch.object(probe_v16, "_process_identity", return_value=supervisor):
+            attempt = probe_v16.reserve("a" * 64, isolated)
         probe_v16.finish(attempt["id"], False, label, isolated, child_reaped=True, residual_verified=True)
         assert len(probe_v16.ledger_record(isolated)["attempts"]) == 1
         assert probe_v16.ledger_record(isolated)["attempts"][0]["slot_seconds"] == 600
     crashed = base / "crash" / "probe-ledger.json"
-    probe_v16.reserve("a" * 64, crashed)
+    with patch.object(probe_v16, "_process_identity", return_value=supervisor):
+        probe_v16.reserve("a" * 64, crashed)
     for operation in (lambda: probe_v16.reserve("b" * 64, crashed),
                       lambda: probe_v16.require_final_probe("b" * 64, crashed)):
         try:
@@ -183,14 +191,16 @@ def budget_tests(base):
     stale.parent.mkdir(mode=0o700)
     stale.with_name("probe-ledger.lock").write_bytes(b"")
     stale.with_name("probe-ledger.lock").chmod(0o600)
-    attempt = probe_v16.reserve("a" * 64, stale)
+    with patch.object(probe_v16, "_process_identity", return_value=supervisor):
+        attempt = probe_v16.reserve("a" * 64, stale)
     probe_v16.finish(attempt["id"], False, "stale_lock_recovered", stale,
                      child_reaped=True, residual_verified=True)
     concurrent = base / "concurrent" / "probe-ledger.json"
     outcomes = []
     def contender():
         try:
-            outcomes.append(("reserved", probe_v16.reserve("c" * 64, concurrent)["id"]))
+            with patch.object(probe_v16, "_process_identity", return_value=supervisor):
+                outcomes.append(("reserved", probe_v16.reserve("c" * 64, concurrent)["id"]))
         except ValueError as error:
             outcomes.append(("rejected", str(error)))
     workers = [threading.Thread(target=contender) for _ in range(2)]
@@ -202,15 +212,16 @@ def budget_tests(base):
     assert not probe_v16.process_identity_matches(reused, {"pid": 9, "pgid": 9, "started": "Mon Jan  1 00:00:01 2024"})
     timeout_child = subprocess.Popen(["/bin/sleep", "30"], start_new_session=True,
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    child_identity = probe_v16._process_identity(timeout_child.pid)
-    assert child_identity is not None and child_identity["pgid"] == timeout_child.pid
+    child_identity = {"pid": timeout_child.pid, "pgid": timeout_child.pid,
+                      "uid": os.getuid(), "started": "synthetic-child-start"}
     child_entry = {"child_pid": timeout_child.pid, "child_pgid": timeout_child.pid,
                    "child_started": child_identity["started"]}
     try:
         timeout_child.communicate(timeout=0.02)
     except subprocess.TimeoutExpired:
         pass
-    assert probe_v16.reap_probe_child(timeout_child, child_entry)
+    with patch.object(probe_v16, "_process_identity", return_value=child_identity):
+        assert probe_v16.reap_probe_child(timeout_child, child_entry)
     assert timeout_child.returncode is not None
     print("v16 stable probe budget: PASS")
 
@@ -386,7 +397,8 @@ def binding_and_preflight_tests(base):
         with patch.object(harness_fingerprint, "_shell_file_identity", identity):
             return harness_fingerprint.compute_harness_fingerprint(run.HERE,
                 python_runtime_binding={"synthetic": True}, codex_executable_binding={"synthetic": True},
-                driver_executable_binding={"synthetic": True})
+                driver_executable_binding={"synthetic": True},
+                normal_shell_launcher_binding={"synthetic_launcher": True})
     before = fingerprint_with_mode(0o755)
     after = fingerprint_with_mode(0o644)
     assert before != after

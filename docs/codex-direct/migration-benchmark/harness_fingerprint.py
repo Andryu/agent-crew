@@ -19,11 +19,28 @@ PYTHON_VERSION = (3, 12, 13)
 CODEX_LAUNCH_PATH = Path(os.path.abspath(shutil.which("codex") or "/opt/homebrew/bin/codex"))
 CODEX_REAL_PATH = CODEX_LAUNCH_PATH.resolve(strict=True)
 _CLI_HASH_CACHE = {}
+_C_UTF8_SHA256 = hashlib.sha256(b"C.UTF-8").hexdigest()
 PLATFORM_TEMP_ROOTS = tuple(Path(value) for value in ("/tmp", "/private/tmp", "/var/tmp", "/private/var/tmp"))
 # character classでroot自身をglob denyにし、/**を別に追加して全子孫も遮断する。
 # 0.155.1はsaw_glob=trueのpatternに子孫suffixを自動追加しない。
 PLATFORM_TEMP_DENY_GLOBS = tuple(pattern for root in
     ("/t[m]p", "/private/t[m]p", "/var/t[m]p", "/private/var/t[m]p") for pattern in (root, root + "/**"))
+# 実exec toolの決定論的正規化仕様。値そのものは保存せず、許可値・正規化後hash・由来をfingerprintに含める。
+CODEX_TOOL_ENV_NORMALIZATION = {
+    "schema": 1,
+    "source": "v19_fixed_macos_codex_tool_environment_spec",
+    "keys": {
+        "LANG": {"kind": "exact_value_sha256", "sha256": _C_UTF8_SHA256,
+                 "derivation": "model_free_normal_shell_preflight_locale_observation"},
+        "LC_ALL": {"kind": "exact_value_sha256", "sha256": _C_UTF8_SHA256,
+                   "derivation": "model_free_normal_shell_preflight_locale_observation"},
+        "PATH": {"kind": "codex_macos_path_v1", "allowed_profile_sha256": {
+                    "normal_shell_login": "104462fab1d53252cbc8ca3562d5e04ce4718369c9dfe647a01df810728f09d7",
+                    "codex_host": "8283ba217254d7532bdd107b5dd947a6c6d1ec66f684b69a999975c4979b0acb"},
+                 "derivation": "model_free_normal_shell_preflight_and_codex_host_path_projection"},
+    },
+    "path_normalizer": "allowlisted_components_ordered_with_ephemeral_codex_paths_tokenized_v1",
+}
 
 
 def account_home():
@@ -52,16 +69,16 @@ def _private_executable_binding(path, expected_mode):
 
 
 def compute_driver_executable_binding():
-    return _private_executable_binding(formal_base() / "drivers/p5_driver_v18r2.py", 0o700)
+    return _private_executable_binding(formal_base() / "drivers/p5_driver_v19.py", 0o700)
 
 
 def compute_driver_config_binding():
-    return _private_executable_binding(formal_base() / "drivers/p5-driver-v18r2-config.json", 0o600)
+    return _private_executable_binding(formal_base() / "drivers/p5-driver-v19-config.json", 0o600)
 
 
 def compute_normal_shell_launcher_binding(path=None):
     """永続Cache配下の正本launcher identity。temporary wrapperには依存しない。"""
-    return _private_executable_binding(path or formal_base() / "drivers/p5-v18r2-normal-shell.sh", 0o700)
+    return _private_executable_binding(path or formal_base() / "drivers/p5-v19-normal-shell.sh", 0o700)
 
 
 def reject_platform_temp(path):
@@ -120,6 +137,7 @@ HARNESS_INPUTS = (
     "../migration-baseline/snapshot-index.json", "b-contract-index.json", "a-contract-index.json",
     "harness_fingerprint.py", "probe_v16.py", "fixed_test_runner_v16.py", "v16_selftest.py",
     "probe_v17.py", "fixed_test_runner_v17.py", "v17_selftest.py", "v18_selftest.py",
+    "probe_v19.py", "v19_selftest.py",
 )
 
 
@@ -322,6 +340,8 @@ def compute_harness_fingerprint(here, *, python_runtime_binding=None, codex_exec
     launcher = (compute_normal_shell_launcher_binding() if normal_shell_launcher_binding is None
                 else normal_shell_launcher_binding)
     components.append("normal_shell_launcher:" + json.dumps(launcher, sort_keys=True, separators=(",", ":")))
+    components.append("actual_tool_environment_normalization:" + json.dumps(
+        CODEX_TOOL_ENV_NORMALIZATION, sort_keys=True, separators=(",", ":")))
     # 実exec toolの/bin/zsh -lcが参照する固定OS層。説明に使う物をfingerprintから外さない。
     for shell_input in ("/bin/zsh", "/etc/zprofile", "/usr/libexec/path_helper", "/etc/paths"):
         components.append("login_shell:" + json.dumps(_shell_file_identity(shell_input), sort_keys=True,

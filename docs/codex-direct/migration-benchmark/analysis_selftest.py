@@ -30,7 +30,23 @@ from harness_fingerprint import compute_harness_fingerprint
 import run as harness_run
 import harness_fingerprint as fingerprint_module
 import probe_v17 as probe_v16
+import probe_v19 as probe_v19
 HASH = "a" * 64
+
+# Synthetic campaign tests do not depend on external immutable driver artifacts.
+# The production driver separately verifies their real identities before use.
+_compute_fingerprint = fingerprint_module.compute_harness_fingerprint
+def compute_harness_fingerprint(here, **kwargs):
+    kwargs.setdefault("driver_executable_binding", {"synthetic_driver": True})
+    kwargs.setdefault("normal_shell_launcher_binding", {"synthetic_launcher": True})
+    return _compute_fingerprint(here, **kwargs)
+
+batch.compute_harness_fingerprint = compute_harness_fingerprint
+analyze.compute_harness_fingerprint = compute_harness_fingerprint
+batch.compute_driver_executable_binding = lambda: {"synthetic_driver": True}
+batch.compute_driver_config_binding = lambda: {"synthetic_config": True}
+harness_run.compute_driver_executable_binding = batch.compute_driver_executable_binding
+harness_run.compute_driver_config_binding = batch.compute_driver_config_binding
 
 
 def synthetic_canary_output(required, root):
@@ -528,11 +544,11 @@ def _synthetic_main():
         first_file = batch_work / summary["campaign"] / first["run_id"] / ".benchmark-result.json"
         batch.atomic_json(first_file, first)
         original_work, original_preflight, original_subprocess = batch.WORK, batch.require_preflight, batch.subprocess
-        original_probe = probe_v16.require_final_probe
+        original_probe = probe_v19.require_final_probe
         try:
             batch.WORK = batch_work
             batch.require_preflight = lambda _campaign_dir, _expected_binding, _deadline=None: None
-            probe_v16.require_final_probe = lambda fingerprint: {"fingerprint": fingerprint, "state": "synthetic_pass"}
+            probe_v19.require_final_probe = lambda fingerprint: {"fingerprint": fingerprint, "state": "synthetic_pass"}
             def unexpected_model_start(*_args, **_kwargs):
                 raise AssertionError("unknown後に次runを起動した")
             batch.subprocess = SimpleNamespace(Popen=unexpected_model_start)
@@ -544,7 +560,7 @@ def _synthetic_main():
             assert not (batch_work / summary["campaign"] / "run-02").exists()
         finally:
             batch.WORK, batch.require_preflight, batch.subprocess = original_work, original_preflight, original_subprocess
-            probe_v16.require_final_probe = original_probe
+            probe_v19.require_final_probe = original_probe
         first["attempt_policy"] = {"status": "fail", "passed": False}
         assert batch.stop_reason(first) == "attempt_policy_not_pass"
         refresh_evidence(summary, reviews, campaign_dir)
@@ -722,7 +738,7 @@ def main():
     original_base = harness_run.prepare_formal_base
     original_batch_base = batch.formal_base
     original_batch_runtime = batch.compute_python_runtime_binding
-    original_probe_guard = probe_v16.require_final_probe
+    original_probe_guard = probe_v19.require_final_probe
     def frozen_runtime():
         return json.loads(frozen_json)
     try:
@@ -734,7 +750,7 @@ def main():
         harness_run.prepare_formal_base = lambda: batch.WORK.parent
         batch.formal_base = lambda: batch.WORK.parent
         batch.compute_python_runtime_binding = frozen_runtime
-        probe_v16.require_final_probe = lambda fingerprint: {"fingerprint": fingerprint, "state": "synthetic_pass"}
+        probe_v19.require_final_probe = lambda fingerprint: {"fingerprint": fingerprint, "state": "synthetic_pass"}
         _synthetic_main()
     finally:
         fingerprint_module.compute_python_runtime_binding = original_shared
@@ -744,7 +760,7 @@ def main():
         harness_run.prepare_formal_base = original_base
         batch.formal_base = original_batch_base
         batch.compute_python_runtime_binding = original_batch_runtime
-        probe_v16.require_final_probe = original_probe_guard
+        probe_v19.require_final_probe = original_probe_guard
 
 
 if __name__ == "__main__":

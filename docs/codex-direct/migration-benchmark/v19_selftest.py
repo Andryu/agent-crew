@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""v18のphase遷移、secret gate、preflight binding、probe ledger回帰をmodelなしで検証する。"""
+"""v19のphase遷移、secret gate、preflight binding、probe ledger回帰をmodelなしで検証する。"""
 
 import json
 import os
@@ -13,7 +13,7 @@ import analyze
 import batch
 import driver as driver_module
 import harness_fingerprint
-import probe_v17 as probe
+import probe_v19 as probe
 import run
 import v17_selftest
 
@@ -33,7 +33,7 @@ def _prepare_spec(root, base, fingerprint, phase, task):
     root.mkdir(mode=0o700, parents=True)
     (root / ".benchmark-tmp/home").mkdir(mode=0o700, parents=True)
     (root / "migration-progress").mkdir(mode=0o700)
-    run._write_private(root / "AGENTS.md", "P5 model-free v18 fixture\n")
+    run._write_private(root / "AGENTS.md", "P5 model-free v19 fixture\n")
     run.install_env_canary(root, fingerprint, phase)
     return run.execution_spec(root, task, run.CLI_VERSION, fingerprint, phase)
 
@@ -55,6 +55,11 @@ def _preflight_report(spec):
     return {"schema": 3, "started_at": "2026-10-10T00:00:00+00:00",
         "cli_version": binding["cli_version"],
         "tool_environment_scope": "auxiliary_env_i_probe_not_actual_exec_tool",
+        "actual_tool_environment_normalization": {"schema": 1,
+            "policy_sha256": run.canonical_digest(run.CODEX_TOOL_ENV_NORMALIZATION),
+            "source": "normal_shell_preflight_process_environment",
+            "checks": {"LANG": True, "LC_ALL": True, "PATH": True},
+            "path_profile": "normal_shell_login", "passed": True},
         "binding": binding,
         "binding_comparison": "entire_canonical_binding_equal_before_model",
         "execution_profile_evidence": {"schema": 1, "profile_name": "p5_fixture", "network_enabled": False,
@@ -126,11 +131,100 @@ def phase_transition_and_preflight_tests(base):
         # canonical preflight bindingが有効な通常系を最後に再確認。
         _private_json(report_path, report)
         assert probe.check_preflight(report_path, fingerprint)[1] == preflight_spec["binding"]
-    print("v18 model-free phase transition and fixed nested preflight binding: PASS")
+    print("v19 model-free phase transition and fixed nested preflight binding: PASS")
+
+
+def normalization_tests(base):
+    policy = run.CODEX_TOOL_ENV_NORMALIZATION["keys"]
+    home = str(run.account_home())
+    projected = {
+        "normal_shell_login": ["/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin", "/System/Cryptexes/App/usr/bin",
+            "/usr/bin", "/bin", "/usr/sbin", "/sbin", "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin",
+            "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin", "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin",
+            "/pkg/env/global/bin", "/opt/homebrew/bin", "<HOME>/.volta/bin", "<CODEX_APP_SERVER_RELEASE>/codex-path",
+            "<CODEX_ARG0_TEMP>", "<CODEX_ARG0_TEMP>", "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>",
+            "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>", "<CODEX_APP_SERVER_RELEASE>/codex-path",
+            "<CODEX_ARG0_TEMP>", "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>",
+            "<CODEX_CASKROOM_RELEASE>/codex-path", "<HOME>/.pyenv/shims", "<HOME>/.antigravity/antigravity/bin",
+            "<HOME>/.local/bin", "/opt/homebrew/sbin"],
+        "codex_host": ["<HOME>/.volta/bin", "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>",
+            "<CODEX_ARG0_TEMP>", "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>",
+            "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>", "<CODEX_APP_SERVER_RELEASE>/codex-path",
+            "<CODEX_ARG0_TEMP>", "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>",
+            "<CODEX_CASKROOM_RELEASE>/codex-path", "<HOME>/.pyenv/shims", "<HOME>/.antigravity/antigravity/bin",
+            "<HOME>/.local/bin", "/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin",
+            "/System/Cryptexes/App/usr/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin",
+            "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin",
+            "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin",
+            "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin", "/pkg/env/global/bin",
+            "/opt/homebrew/bin", "<HOME>/.volta/bin", "<HOME>/.antigravity/antigravity/bin",
+            "<HOME>/.local/bin", "/opt/homebrew/sbin"],
+    }
+    samples = {}
+    for name, parts in projected.items():
+        arg0_index = 0
+        concrete = []
+        for part in parts:
+            if part.startswith("<HOME>"):
+                concrete.append(home + part[len("<HOME>"):])
+            elif part == "<CODEX_APP_SERVER_RELEASE>/codex-path":
+                concrete.append(home + "/.codex/packages/app-server-daemon/releases/0.162.1-aarch64-apple-darwin/codex-path")
+            elif part == "<CODEX_ARG0_TEMP>":
+                arg0_index += 1
+                concrete.append(home + f"/.codex/tmp/arg0/codex-arg0TEST{arg0_index}")
+            elif part == "<CODEX_CASKROOM_RELEASE>/codex-path":
+                concrete.append("/opt/homebrew/Caskroom/codex/0.160.0/codex-path")
+            else:
+                concrete.append(part)
+        value = os.pathsep.join(concrete)
+        samples[name] = value
+        assert run.normalize_codex_tool_path(value) == policy["PATH"]["allowed_profile_sha256"][name]
+        evil = value + os.pathsep + "/tmp/p5-unapproved-bin"
+        assert run.normalize_codex_tool_path(evil) is None
+        reordered = os.pathsep.join(reversed(concrete))
+        assert run.normalize_codex_tool_path(reordered) not in set(policy["PATH"]["allowed_profile_sha256"].values())
+        shape_tamper = value.replace("codex-arg0TEST1", "unexpected-name")
+        assert run.normalize_codex_tool_path(shape_tamper) is None
+    assert policy["LANG"]["sha256"] == policy["LC_ALL"]["sha256"]
+    good_env = {"LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "PATH": samples["codex_host"]}
+    assert run.actual_tool_environment_evidence(good_env)["passed"]
+    assert not run.actual_tool_environment_evidence({**good_env, "LANG": "en_US.UTF-8"})["passed"]
+    assert not run.actual_tool_environment_evidence({**good_env, "PATH": good_env["PATH"] + ":/tmp/evil"})["passed"]
+
+    root = base / "normalization" / "fixture"
+    root.mkdir(mode=0o700, parents=True)
+    run.install_env_canary(root, "v19-normalization-test")
+    expected = run.limited_env(root, "v19-normalization-test")
+    environment = v17_selftest.tool_env(expected, root)
+    environment.update({"LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "PATH": samples["codex_host"]})
+    result = v17_selftest.observe(root, environment)
+    assert result.returncode == 0 and result.stderr == ""
+    payload = json.loads(result.stdout)
+    assert payload["aggregate_match"] is True
+    for key in ("PATH", "LANG", "LC_ALL"):
+        assert payload["required_checks"][key] == {"present": True, "expected_match": True}
+    from probe_v19 import exact_canary_events
+    command = run.ENV_CANARY_TOOL_COMMAND
+    events = [{"type": "thread.started", "thread_id": "synthetic"}, {"type": "turn.started"},
+        {"type": "item.started", "item": {"type": "command_execution", "id": "fixed", "command": command,
+         "status": "in_progress"}},
+        {"type": "item.completed", "item": {"type": "command_execution", "id": "fixed", "command": command,
+         "status": "completed", "exit_code": 0, "aggregated_output": result.stdout}},
+        {"type": "turn.completed", "usage": {"input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1}}]
+    raw = "\n".join(json.dumps(item) for item in events)
+    audit = run.safe_events(raw, expected_cwd=root, expected_env=expected)
+    assert audit["env_canary_evidence"]["passed"] and exact_canary_events(audit)
+    changed = json.loads(json.dumps(audit))
+    changed["commands"][0]["command_sha256"] = "0" * 64
+    assert not exact_canary_events(changed)
+    changed = json.loads(json.dumps(audit))
+    changed["commands"].append(changed["commands"][0])
+    assert not exact_canary_events(changed)
+    print("v19 deterministic locale/PATH normalization, first-tool canary and tamper denial: PASS")
 
 
 def secret_save_tests(base):
-    secret = "v18_Synthetic_API_TOKEN_9f6e4d2c8b7a1"
+    secret = "v19_Synthetic_API_TOKEN_9f6e4d2c8b7a1"
     token = "f1a37d9c02e84b6a7d31c5e9a4028b6d"
     assert run.secret_env_values({"ZERO": "0", "ONE": "1", "P5_RUN_TOKEN": "1"}) == ()
     assert run.secret_env_values({"PATH": run.FIXED_PATH, "HOME": str(base),
@@ -142,8 +236,8 @@ def secret_save_tests(base):
     root.mkdir(mode=0o700)
     canary_root = root / "canary"
     canary_root.mkdir(mode=0o700)
-    run.install_env_canary(canary_root, "v18-secret-test")
-    expected_env = run.limited_env(canary_root, "v18-secret-test")
+    run.install_env_canary(canary_root, "v19-secret-test")
+    expected_env = run.limited_env(canary_root, "v19-secret-test")
     canary_result = v17_selftest.observe(canary_root, v17_selftest.tool_env(expected_env, canary_root))
     assert canary_result.returncode == 0 and canary_result.stderr == ""
     valid_raw = v17_selftest.event_stream(canary_result.stdout)
@@ -174,7 +268,7 @@ def secret_save_tests(base):
     else:
         raise AssertionError("secret summary accepted")
 
-    public_candidate = {"campaign": "p5-v18-synthetic", "fingerprint": "a" * 64,
+    public_candidate = {"campaign": "p5-v19-synthetic", "fingerprint": "a" * 64,
         "campaign_complete": False, "all_runs_final_pass": False,
         "quality_gate": {"status": "unknown"}, "safety_gate": {"status": "unknown"},
         "cache_comparability": {"status": "unknown"}, "speed_target": {"status": "unknown"},
@@ -215,7 +309,7 @@ def secret_save_tests(base):
         raise AssertionError("secret diagnostic saved") from error
     else:
         raise AssertionError("secret diagnostic injection accepted")
-    print("v18 secret candidate filtering + real saver success/refusal integration: PASS")
+    print("v19 secret candidate filtering + real saver success/refusal integration: PASS")
 
 
 def ledger_timeout_then_pass_test(base):
@@ -235,12 +329,24 @@ def ledger_timeout_then_pass_test(base):
     else:
         raise AssertionError("later pass masked prior timeout/fail")
     assert [item["state"] for item in probe.ledger_record(path)["attempts"]] == ["fail", "pass"]
-    print("v18 timeout→pass ledger cannot authorize formal: PASS")
+    one_pass = base / "ledger-one-pass" / "probe-ledger.json"
+    only = reserve_test(one_pass)
+    probe.finish(only["id"], True, "pass", one_pass, child_reaped=True, residual_verified=True)
+    assert probe.require_final_probe("a" * 64, one_pass, driver_config_binding={"sha256": "b" * 64})["state"] == "pass"
+    second = reserve_test(one_pass)
+    probe.finish(second["id"], True, "pass", one_pass, child_reaped=True, residual_verified=True)
+    try:
+        probe.require_final_probe("a" * 64, one_pass, driver_config_binding={"sha256": "b" * 64})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("formal gate accepted more than one v19 PASS")
+    print("v19 timeout→pass ledger cannot authorize formal: PASS")
 
 
 def persistent_launcher_test(base):
     assert driver_module.LAUNCHER == harness_fingerprint.formal_base() / "drivers/p5-v19-normal-shell.sh"
-    launcher = base / "Library/Caches/p5/drivers/p5-v18-normal-shell.sh"
+    launcher = base / "Library/Caches/p5/drivers/p5-v19-normal-shell.sh"
     launcher.parent.mkdir(mode=0o700, parents=True)
     launcher.write_text("#!/bin/zsh\nexec fixed-driver verify\n")
     launcher.chmod(0o700)
@@ -251,7 +357,7 @@ def persistent_launcher_test(base):
     first_fp = harness_fingerprint.compute_harness_fingerprint(run.HERE,
         python_runtime_binding=runtime, codex_executable_binding=cli,
         driver_executable_binding=driver, normal_shell_launcher_binding=first)
-    wrapper = Path("/private/tmp") / ("p5-v18-wrapper-" + uuid.uuid4().hex)
+    wrapper = Path("/private/tmp") / ("p5-v19-wrapper-" + uuid.uuid4().hex)
     wrapper.write_text("#!/bin/zsh\nexec "+str(launcher)+" \"$@\"\n")
     wrapper.chmod(0o700)
     wrapper.unlink()
@@ -266,17 +372,18 @@ def persistent_launcher_test(base):
         python_runtime_binding=runtime, codex_executable_binding=cli,
         driver_executable_binding=driver, normal_shell_launcher_binding=changed)
     assert changed_fp != first_fp
-    print("v18 persistent Cache launcher binding survives /private/tmp wrapper loss: PASS")
+    print("v19 persistent Cache launcher binding survives /private/tmp wrapper loss: PASS")
 
 
 def main():
-    with tempfile.TemporaryDirectory(prefix="p5-v18-selftest-", dir="/private/tmp") as temp:
+    with tempfile.TemporaryDirectory(prefix="p5-v19-selftest-", dir="/private/tmp") as temp:
         base = Path(temp)
         phase_transition_and_preflight_tests(base)
+        normalization_tests(base)
         secret_save_tests(base)
         ledger_timeout_then_pass_test(base)
         persistent_launcher_test(base)
-    print("P5 v18 selftest: all passed; model call count 0")
+    print("P5 v19 selftest: all passed; model call count 0")
 
 
 if __name__ == "__main__":

@@ -37,6 +37,8 @@ import harness_fingerprint as fingerprint_module
 def compute_harness_fingerprint(here, **kwargs):
     # 合成CLIを使う統合caseでは、campaignも同じ合成実体へbindingする。
     kwargs.setdefault("codex_executable_binding", runner.compute_codex_executable_binding(runner.CODEX_EXECUTABLE))
+    kwargs.setdefault("driver_executable_binding", {"synthetic_driver_sha256": "1" * 64})
+    kwargs.setdefault("normal_shell_launcher_binding", {"synthetic_launcher_sha256": "2" * 64})
     return fingerprint_module.compute_harness_fingerprint(here, **kwargs)
 
 FAKE = '''#!/usr/bin/env python3.12
@@ -560,6 +562,7 @@ def preflight_test(root):
     original = preflight.run_case
     original_residual = runner.scan_residual_processes
     original_open_files = runner.scan_run_root_open_files
+    original_tool_normalization = runner.actual_tool_environment_evidence
     seen = []
     def fake_case(name, passed_spec, command, expected):
         assert passed_spec is spec
@@ -573,6 +576,14 @@ def preflight_test(root):
                 "command_sha256": runner.canonical_digest(command), "stdout_sha256": "0" * 64, "stderr_sha256": "0" * 64}
     preflight.run_case = fake_case
     runner.scan_residual_processes = clean_process_evidence
+    # The benchmark requires real normal-shell identity; this legacy synthetic
+    # preflight test isolates report/binding logic and uses a fixed passing proof.
+    runner.actual_tool_environment_evidence = lambda _env: {
+        "schema": 1, "policy_sha256": runner.canonical_digest(runner.CODEX_TOOL_ENV_NORMALIZATION),
+        "source": "normal_shell_preflight_process_environment",
+        "checks": {"LANG": True, "LC_ALL": True, "PATH": True},
+        "path_profile": runner.CODEX_TOOL_ENV_NORMALIZATION["keys"]["PATH"]["allowed_profile_sha256"]["normal_shell_login"],
+        "passed": True}
     runner.scan_run_root_open_files = lambda _root: {"status": "pass", "passed": True, "scan_pass": True,
         "run_root_open_file_process_count": 0, "complete_detection_claimed": False}
     try:
@@ -594,6 +605,7 @@ def preflight_test(root):
         preflight.run_case = original
         runner.scan_residual_processes = original_residual
         runner.scan_run_root_open_files = original_open_files
+        runner.actual_tool_environment_evidence = original_tool_normalization
     print("preflight: exact binding/tool env/canary cleanup/fail closed OK (sandbox outcomes mocked)", flush=True)
 
 
@@ -1649,20 +1661,30 @@ def codex_binding_test(root):
     runner._write_private(executable, b"same-version-before", 0o700)
     original = fingerprint_module.compute_codex_executable_binding(executable)
     runtime = fingerprint_module.compute_python_runtime_binding()
-    old_fp = fingerprint_module.compute_harness_fingerprint(HERE, python_runtime_binding=runtime, codex_executable_binding=original)
+    old_fp = compute_harness_fingerprint(HERE, python_runtime_binding=runtime, codex_executable_binding=original)
     runner._write_private(executable, b"same-version-after!", 0o700)
     changed = fingerprint_module.compute_codex_executable_binding(executable)
     assert changed != original and changed["sha256"] != original["sha256"]
-    assert fingerprint_module.compute_harness_fingerprint(HERE, python_runtime_binding=runtime, codex_executable_binding=changed) != old_fp
+    assert compute_harness_fingerprint(HERE, python_runtime_binding=runtime, codex_executable_binding=changed) != old_fp
     executable.unlink()
     executable.symlink_to(runner.CODEX_EXECUTABLE)
     expect_rejected(lambda: fingerprint_module.compute_codex_executable_binding(executable))
     campaign = root / "campaign"
     directories = runner.private_directory_identity(campaign, create=True)
+    synthetic_driver = {"synthetic_driver_sha256": "1" * 64}
+    synthetic_config = {"synthetic_config_sha256": "3" * 64}
+    original_driver_binding = fingerprint_module.compute_driver_executable_binding
+    original_config_binding = fingerprint_module.compute_driver_config_binding
+    original_runner_driver_binding = runner.compute_driver_executable_binding
+    original_runner_config_binding = runner.compute_driver_config_binding
+    fingerprint_module.compute_driver_executable_binding = lambda: synthetic_driver
+    fingerprint_module.compute_driver_config_binding = lambda: synthetic_config
+    runner.compute_driver_executable_binding = lambda: synthetic_driver
+    runner.compute_driver_config_binding = lambda: synthetic_config
     record = {"schema": 1, "fingerprint": old_fp, "codex_executable": original,
               "python_runtime": runtime,
-              "driver_executable": fingerprint_module.compute_driver_executable_binding(),
-              "driver_config": fingerprint_module.compute_driver_config_binding(),
+              "driver_executable": synthetic_driver,
+              "driver_config": synthetic_config,
               "private_directories": directories}
     record["binding_sha256"] = runner.canonical_digest(record)
     path = campaign / "campaign-binding.json"
@@ -1688,6 +1710,10 @@ def codex_binding_test(root):
                 assert error.code == 1
             else:
                 raise AssertionError("CLI差替えから停止しませんでした")
+    fingerprint_module.compute_driver_executable_binding = original_driver_binding
+    fingerprint_module.compute_driver_config_binding = original_config_binding
+    runner.compute_driver_executable_binding = original_runner_driver_binding
+    runner.compute_driver_config_binding = original_runner_config_binding
     assert (campaign / ".evidence/run-01/model-interruption.json").stat().st_mode & 0o777 == 0o600
     print("CLI binding: same-version bytes/stat/symlink/fingerprint/private campaign file/root-free abort OK", flush=True)
 
@@ -1753,9 +1779,9 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v18r2.py"
-    config = root / "drivers/p5-driver-v18r2-config.json"
-    launcher = root / "drivers/p5-v18r2-normal-shell.sh"
+    copy = root / "drivers/p5_driver_v19.py"
+    config = root / "drivers/p5-driver-v19-config.json"
+    launcher = root / "drivers/p5-v19-normal-shell.sh"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
@@ -1871,6 +1897,13 @@ def main():
         for module in {runner, preflight.runner}:
             stack.enter_context(patch.object(module, "require_formal_locations", lambda *_args: None))
             stack.enter_context(patch.object(module, "require_source_directory", lambda: None))
+        synthetic_driver_binding = {"synthetic_driver_sha256": "1" * 64}
+        synthetic_config_binding = {"synthetic_config_sha256": "3" * 64}
+        for module in {runner, fingerprint_module}:
+            stack.enter_context(patch.object(module, "compute_driver_executable_binding",
+                                             lambda value=synthetic_driver_binding: value))
+            stack.enter_context(patch.object(module, "compute_driver_config_binding",
+                                             lambda value=synthetic_config_binding: value))
         stack.enter_context(patch.object(runner, "compute_harness_fingerprint", compute_harness_fingerprint))
         stack.enter_context(patch.object(preflight, "boundary_parents", lambda root: {
             label: root.parent / "synthetic-boundaries" / label for label in preflight.BOUNDARY_LABELS}))

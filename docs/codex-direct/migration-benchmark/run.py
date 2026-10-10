@@ -26,7 +26,7 @@ from harness_fingerprint import (compute_harness_fingerprint, compute_python_run
                                  compute_codex_executable_binding, compute_driver_executable_binding,
                                  compute_driver_config_binding, CODEX_REAL_PATH,
                                  account_home, formal_base, reject_platform_temp, PLATFORM_TEMP_DENY_GLOBS,
-                                 PYTHON_EXECUTABLE, PYTHON_RUNTIME_ROOT)
+                                 PYTHON_EXECUTABLE, PYTHON_RUNTIME_ROOT, CODEX_TOOL_ENV_NORMALIZATION)
 
 HERE = Path(__file__).resolve().parent
 BASE = HERE.parent / "migration-baseline"
@@ -66,7 +66,19 @@ ENV_CANARY_SCRIPT = (
     f"required={REQUIRED_TOOL_ENV_KEYS!r};"
     "expected=json.load(open('.benchmark-env-expected.json',encoding='utf-8'));"
     "assert expected['schema']==2 and set(expected['env'])==set(required);"
-    "required_checks={key:{'present':key in env,'expected_match':env.get(key)==expected['env'][key]} for key in required};"
+    "import hashlib;"
+    "policy=expected['actual_tool_normalization'];"
+    f"home={str(account_home())!r};"
+    "fixed={home+'/.volta/bin',home+'/.pyenv/shims',home+'/.antigravity/antigravity/bin',home+'/.local/bin',"
+    "'/opt/homebrew/bin','/opt/homebrew/sbin','/usr/local/bin','/System/Cryptexes/App/usr/bin','/usr/bin','/bin','/usr/sbin','/sbin',"
+    "'/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin','/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin',"
+    "'/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin','/pkg/env/global/bin'};"
+    "path_digest=lambda value:(lambda parts:hashlib.sha256(json.dumps(parts,separators=(',',':')).encode()).hexdigest() if all(part is not None for part in parts) else None)(["
+    "part.replace(home,'<HOME>') if part in fixed else '<CODEX_APP_SERVER_RELEASE>/codex-path' if re.fullmatch(re.escape(home)+r'/\\.codex/packages/app-server-daemon/releases/[0-9]+\\.[0-9]+\\.[0-9]+-[A-Za-z0-9_-]+/codex-path',part) else "
+    "'<CODEX_ARG0_TEMP>' if re.fullmatch(re.escape(home)+r'/\\.codex/tmp/arg0/codex-arg0[A-Za-z0-9]+',part) else "
+    "'<CODEX_CASKROOM_RELEASE>/codex-path' if re.fullmatch(r'/opt/homebrew/Caskroom/codex/[0-9]+\\.[0-9]+\\.[0-9]+/codex-path',part) else None for part in value.split(os.pathsep)]);"
+    "normalized_match=lambda key,value:(hashlib.sha256(value.encode()).hexdigest()==policy['keys'][key].get('sha256') if key in policy['keys'] and policy['keys'][key].get('kind')=='exact_value_sha256' and isinstance(value,str) else path_digest(value) in set(policy['keys']['PATH'].get('allowed_profile_sha256',{}).values()) if key=='PATH' and isinstance(value,str) else False);"
+    "required_checks={key:{'present':key in env,'expected_match':(env.get(key)==expected['env'][key] or normalized_match(key,env.get(key)))} for key in required};"
     f"allowed=set(required)|set({tuple(sorted(RUNTIME_TOOL_ENV_KEYS))!r});"
     "unknown=set(env)-allowed;"
     f"uuid7=lambda value:re.fullmatch({_UUID7_PATTERN!r},value or '') is not None;"
@@ -103,6 +115,7 @@ ENV_CANARY_NAME = ".benchmark-env-canary.py"
 ENV_EXPECTED_NAME = ".benchmark-env-expected.json"
 ENV_CANARY_BYTES = (ENV_CANARY_SCRIPT + "\n").encode("utf-8")
 ENV_CANARY_COMMAND = shlex.join([PYTHON_EXECUTABLE, "-I", "-B", ENV_CANARY_NAME])
+ENV_CANARY_TOOL_COMMAND = shlex.join(["/bin/zsh", "-lc", ENV_CANARY_COMMAND])
 FIXED_TEST_RUNNER_NAME = ".p5-test-runner.py"
 FIXED_TEST_TASKS = {"C1", "C2", "C3", "C5"}
 FIXED_TEST_DEPENDENCIES = {"C1": ("scripts/crew_hooks.py", "scripts/codex_hook_state.py", "scripts/install_crew_hooks.py"),
@@ -527,7 +540,52 @@ def tool_environment_config(spec):
 
 def env_expected_bytes(root, fingerprint="unbound", phase="model"):
     return (json.dumps({"schema": 2, "env": limited_env(Path(root), fingerprint, phase),
-                        "cwd": str(root)}, sort_keys=True, separators=(",", ":")) + "\n").encode()
+                        "cwd": str(root), "actual_tool_normalization": CODEX_TOOL_ENV_NORMALIZATION},
+                       sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+
+def normalize_codex_tool_path(value):
+    """許可した固定PATH要素とCodexの版/arg0一時要素だけを正規化する。"""
+    if not isinstance(value, str) or not value or "\x00" in value:
+        return None
+    home = str(account_home())
+    fixed = {home + suffix for suffix in ("/.volta/bin", "/.pyenv/shims", "/.antigravity/antigravity/bin", "/.local/bin")}
+    fixed.update(("/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin", "/System/Cryptexes/App/usr/bin",
+        "/usr/bin", "/bin", "/usr/sbin", "/sbin", "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin",
+        "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin",
+        "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin", "/pkg/env/global/bin"))
+    normalized = []
+    for part in value.split(os.pathsep):
+        if part in fixed:
+            normalized.append(part.replace(home, "<HOME>"))
+        elif re.fullmatch(re.escape(home) + r"/\.codex/packages/app-server-daemon/releases/[0-9]+\.[0-9]+\.[0-9]+-[A-Za-z0-9_-]+/codex-path", part):
+            normalized.append("<CODEX_APP_SERVER_RELEASE>/codex-path")
+        elif re.fullmatch(re.escape(home) + r"/\.codex/tmp/arg0/codex-arg0[A-Za-z0-9]+", part):
+            normalized.append("<CODEX_ARG0_TEMP>")
+        elif re.fullmatch(r"/opt/homebrew/Caskroom/codex/[0-9]+\.[0-9]+\.[0-9]+/codex-path", part):
+            normalized.append("<CODEX_CASKROOM_RELEASE>/codex-path")
+        else:
+            return None
+    return hashlib.sha256(json.dumps(normalized, separators=(",", ":")).encode()).hexdigest()
+
+
+def actual_tool_environment_evidence(environment):
+    """通常shell preflightで正規化policyの許容値だけを確認し、値は保存しない。"""
+    keys = CODEX_TOOL_ENV_NORMALIZATION["keys"]
+    checks = {
+        "LANG": isinstance(environment.get("LANG"), str)
+            and digest_bytes(environment["LANG"].encode()) == keys["LANG"]["sha256"],
+        "LC_ALL": isinstance(environment.get("LC_ALL"), str)
+            and digest_bytes(environment["LC_ALL"].encode()) == keys["LC_ALL"]["sha256"],
+        "PATH": False,
+    }
+    path_hash = normalize_codex_tool_path(environment.get("PATH"))
+    path_profile = next((name for name, value in keys["PATH"]["allowed_profile_sha256"].items()
+                         if value == path_hash), "unknown")
+    checks["PATH"] = path_profile != "unknown"
+    return {"schema": 1, "policy_sha256": canonical_digest(CODEX_TOOL_ENV_NORMALIZATION),
+            "source": "normal_shell_preflight_process_environment", "checks": checks,
+            "path_profile": path_profile, "passed": all(checks.values())}
 
 
 def install_env_canary(root, fingerprint="unbound", phase="model"):
@@ -579,7 +637,8 @@ def canonical_execution_spec(root, task, cli_version, harness_fingerprint="unbou
         "profile_sha256": canonical_digest(spec["config"]),
         "tool_environment": {"keys": sorted(env), "sha256": canonical_digest(env),
                               "normalized_sha256": canonical_digest(normalize_environment(env, tool_dynamic)),
-                              "allowed_value_differences": sorted(tool_dynamic)},
+                              "allowed_value_differences": sorted(tool_dynamic),
+                              "actual_tool_normalization": CODEX_TOOL_ENV_NORMALIZATION},
         "codex_process_environment": {"keys": sorted(process_environment), "sha256": canonical_digest(process_environment),
                                       "normalized_sha256": canonical_digest(normalize_environment(process_environment, process_dynamic)),
                                       "allowed_value_differences": sorted(process_dynamic),
@@ -2204,10 +2263,11 @@ def validate_preflight_evidence(report, spec):
         "binding_comparison", "execution_profile_evidence", "passed", "cases", "sandbox_initialized",
         "postconditions", "canaries_removed", "process_may_still_be_running", "residual_scan_evidence",
         "ended_at", "private_diagnostics_sha256"}
+    normalization_field = {"actual_tool_environment_normalization"}
     binding_fields = {"schema", "phase", "cli_version", "harness_fingerprint", "root_realpath", "root_device",
         "root_inode", "policy_template_sha256", "profile_sha256", "tool_environment", "codex_process_environment",
         "codex_executable", "private_directories", "env_canary_script", "env_expected_sha256", "python_runtime", "read_boundary"}
-    if set(report) != required_fields:
+    if set(report) not in (required_fields, required_fields | normalization_field):
         return False
     binding = report.get("binding")
     if (not isinstance(binding, dict) or set(binding) != binding_fields or binding.get("phase") != "model"
@@ -2226,6 +2286,17 @@ def validate_preflight_evidence(report, spec):
         return False
     if binding != spec.get("binding"):
         return False
+    if "actual_tool_environment_normalization" in report:
+        normalization = report.get("actual_tool_environment_normalization")
+        if (not isinstance(normalization, dict)
+                or set(normalization) != {"schema", "policy_sha256", "source", "checks", "path_profile", "passed"}
+                or normalization.get("schema") != 1
+                or normalization.get("policy_sha256") != canonical_digest(CODEX_TOOL_ENV_NORMALIZATION)
+                or normalization.get("source") != "normal_shell_preflight_process_environment"
+                or normalization.get("checks") != {"LANG": True, "LC_ALL": True, "PATH": True}
+                or normalization.get("path_profile") not in CODEX_TOOL_ENV_NORMALIZATION["keys"]["PATH"]["allowed_profile_sha256"]
+                or normalization.get("passed") is not True):
+            return False
     cases = report.get("cases")
     required = required_preflight_cases(spec)
     if not isinstance(cases, list) or len(cases) != len(required):

@@ -343,8 +343,8 @@ def _main(campaign_deadline_monotonic=None):
     fingerprint = compute_harness_fingerprint(HERE, python_runtime_binding=python_runtime,
                                               codex_executable_binding=codex_executable,
                                               driver_executable_binding=driver_executable)
-    import probe_v17
-    probe_v17.require_final_probe(fingerprint)
+    import probe_v19
+    probe_v19.require_final_probe(fingerprint)
     campaign = f"p5-{fingerprint[:16]}"
     campaign_dir = secure_mkdir(WORK / campaign)
     expected_binding = campaign_binding(campaign_dir, fingerprint, python_runtime, codex_executable,

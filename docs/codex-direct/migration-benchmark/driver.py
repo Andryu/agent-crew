@@ -19,10 +19,10 @@ import uuid
 ACCOUNT_HOME = Path(pwd.getpwuid(os.getuid()).pw_dir)
 BASE = ACCOUNT_HOME / "Library/Caches/agent-crew-p5-benchmark"
 DRIVERS = BASE / "drivers"
-LOGS = DRIVERS / "logs/v18"
+LOGS = DRIVERS / "logs/v19"
 FORMAL = BASE / "formal"
-CONFIG = DRIVERS / "p5-driver-v18r2-config.json"
-LAUNCHER = DRIVERS / "p5-v18r2-normal-shell.sh"
+CONFIG = DRIVERS / "p5-driver-v19-config.json"
+LAUNCHER = DRIVERS / "p5-v19-normal-shell.sh"
 SOURCE = None
 HERE = None
 STATUS = LOGS / "status.json"
@@ -37,9 +37,9 @@ FIXED_PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 CAMPAIGN_SECONDS = 24 * 1200 + 315 + 300
 DRIVER_GRACE_SECONDS = 600
 KNOWN_PRIVACY_LINES = {
-    ("docs/codex-direct/migration-benchmark/harness_fingerprint.py", 294):
+    ("docs/codex-direct/migration-benchmark/harness_fingerprint.py", 311):
         "e3a5c6c684f77b12d5726043ee75ac55a47f848ceb116e745bc7562dcc2d244f",
-    ("docs/codex-direct/migration-benchmark/selftest.py", 326):
+    ("docs/codex-direct/migration-benchmark/selftest.py", 328):
         "b74639bd80b379b2183ecdea29f134e27d728e328fff6364fd99229cb7efcc3c",
     ("docs/plans/2026-09-22-p5-rerun.md", 143):
         "d205ebe2ffb34164980881f749c36ee5007f76b2b310e5aa45c77e4261dbb7f3",
@@ -129,7 +129,7 @@ def regular_identity(path, mode=0o600):
 def external_binding():
     """repo原本、実行copy、configの同一bytesとstat identityを固定する。"""
     original = HERE / "driver.py"
-    runtime = DRIVERS / "p5_driver_v18r2.py"
+    runtime = DRIVERS / "p5_driver_v19.py"
     launcher_bytes = regular_identity(LAUNCHER, mode=0o700)
     original_bytes = regular_identity(original, mode=0o644)
     runtime_bytes = regular_identity(runtime, mode=0o700)
@@ -315,12 +315,13 @@ def privacy_check(log):
 def verification(log, shared):
     directories = source_check(log)
     expected = bindings(shared)
-    for name in ("selftest.py", "analysis_selftest.py", "v16_selftest.py", "v17_selftest.py", "v18_selftest.py"):
+    for name in ("selftest.py", "analysis_selftest.py", "v16_selftest.py", "v17_selftest.py", "v18_selftest.py", "v19_selftest.py"):
         command([PYTHON, "-B", HERE / name], log)
     compile_files = ("run.py", "sandbox_preflight.py", "validate_c6.py", "selftest.py",
                      "batch.py", "analyze.py", "analysis_selftest.py", "harness_fingerprint.py",
                      "probe_v16.py", "fixed_test_runner_v16.py", "v16_selftest.py",
-                     "probe_v17.py", "fixed_test_runner_v17.py", "v17_selftest.py", "v18_selftest.py")
+                     "probe_v17.py", "fixed_test_runner_v17.py", "v17_selftest.py", "v18_selftest.py",
+                     "probe_v19.py", "v19_selftest.py")
     command([PYTHON, "-B", "-X", "pycache_prefix=" + str(LOGS / "pycache"), "-m", "py_compile",
              *[HERE / name for name in compile_files]], log)
     command([GIT, "diff", "--check"], log)
@@ -452,7 +453,7 @@ def main():
                         driver_executable=expected["driver_executable"], driver_config=expected["driver_config"])
                 return 0
             sys.path.insert(0, str(HERE))
-            probe_spec = importlib.util.spec_from_file_location("p5_probe_v17", HERE / "probe_v17.py")
+            probe_spec = importlib.util.spec_from_file_location("p5_probe_v19", HERE / "probe_v19.py")
             probe_module = importlib.util.module_from_spec(probe_spec)
             probe_spec.loader.exec_module(probe_module)
             try:

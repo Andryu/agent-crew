@@ -205,6 +205,7 @@ def check(spec):
     spec["preflight_execution_incomplete"] = False
     report = {"schema": 3, "started_at": runner.stamp(), "cli_version": spec["binding"]["cli_version"],
               "tool_environment_scope": "auxiliary_env_i_probe_not_actual_exec_tool",
+              "actual_tool_environment_normalization": runner.actual_tool_environment_evidence(os.environ),
               "binding": spec["binding"], "binding_comparison": "entire_canonical_binding_equal_before_model",
               "execution_profile_evidence": {"schema": 1, "profile_name": "p5_fixture", "network_enabled": False,
                   "read_boundary": spec["binding"]["read_boundary"],
@@ -270,7 +271,8 @@ def check(spec):
                       "python_runtime_unchanged": spec["binding"]["python_runtime"] == rebound["binding"]["python_runtime"],
                       "binding_unchanged": spec["binding"] == rebound["binding"]}
         report["postconditions"] = conditions
-        report["passed"] = all(conditions.values()) and all(case_matches_expected(case) for case in report["cases"])
+        report["passed"] = (report["actual_tool_environment_normalization"]["passed"] is True
+                             and all(conditions.values()) and all(case_matches_expected(case) for case in report["cases"]))
     finally:
         listener.close()
     for path in (link, scratch, task_write, sentinel, outside, repository_target):
@@ -338,7 +340,7 @@ def main():
         report = check(spec)
         if args.report_output is not None:
             destination = args.report_output
-            expected_parent = runner.formal_base() / "drivers/logs/v18"
+            expected_parent = runner.formal_base() / "drivers/logs/v19"
             if (destination.parent != expected_parent or os.path.lexists(destination)):
                 raise SystemExit("preflight report output pathはprivate v17 logsの新規fileに限定されます")
             runner.private_directory_identity(expected_parent)
