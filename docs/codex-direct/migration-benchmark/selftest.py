@@ -580,10 +580,12 @@ def preflight_test(root):
     # The benchmark requires real normal-shell identity; this legacy synthetic
     # preflight test isolates report/binding logic and uses a fixed passing proof.
     synthetic_tool_normalization = lambda _env: {
-        "schema": 1, "policy_sha256": runner.canonical_digest(runner.CODEX_TOOL_ENV_NORMALIZATION),
+        "schema": 2, "policy_sha256": runner.canonical_digest(runner.CODEX_TOOL_ENV_NORMALIZATION),
         "source": "normal_shell_preflight_process_environment",
         "checks": {"LANG": True, "LC_ALL": True, "PATH": True},
         "path_profile": "normal_shell_login",
+        "path_projection_sha256": runner.CODEX_TOOL_ENV_NORMALIZATION["keys"]["PATH"]["allowed_profile_sha256"]["normal_shell_login"],
+        "unapproved_component_sha256": [],
         "passed": True}
     runner.actual_tool_environment_evidence = synthetic_tool_normalization
     preflight.runner = runner

@@ -55,11 +55,13 @@ def _preflight_report(spec):
     return {"schema": 3, "started_at": "2026-10-10T00:00:00+00:00",
         "cli_version": binding["cli_version"],
         "tool_environment_scope": "auxiliary_env_i_probe_not_actual_exec_tool",
-        "actual_tool_environment_normalization": {"schema": 1,
+        "actual_tool_environment_normalization": {"schema": 2,
             "policy_sha256": run.canonical_digest(run.CODEX_TOOL_ENV_NORMALIZATION),
             "source": "normal_shell_preflight_process_environment",
             "checks": {"LANG": True, "LC_ALL": True, "PATH": True},
-            "path_profile": "normal_shell_login", "passed": True},
+            "path_profile": "normal_shell_login",
+            "path_projection_sha256": run.CODEX_TOOL_ENV_NORMALIZATION["keys"]["PATH"]["allowed_profile_sha256"]["normal_shell_login"],
+            "unapproved_component_sha256": [], "passed": True},
         "binding": binding,
         "binding_comparison": "entire_canonical_binding_equal_before_model",
         "execution_profile_evidence": {"schema": 1, "profile_name": "p5_fixture", "network_enabled": False,
@@ -190,7 +192,8 @@ def normalization_tests(base):
     good_env = {"LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "PATH": samples["codex_host"]}
     assert run.actual_tool_environment_evidence(good_env)["passed"]
     assert not run.actual_tool_environment_evidence({**good_env, "LANG": "en_US.UTF-8"})["passed"]
-    assert not run.actual_tool_environment_evidence({**good_env, "PATH": good_env["PATH"] + ":/tmp/evil"})["passed"]
+    evil_evidence = run.actual_tool_environment_evidence({**good_env, "PATH": good_env["PATH"] + ":/tmp/evil"})
+    assert not evil_evidence["passed"] and evil_evidence["unapproved_component_sha256"] == [run.digest_bytes(b"/tmp/evil")]
 
     root = base / "normalization" / "fixture"
     root.mkdir(mode=0o700, parents=True)

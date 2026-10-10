@@ -544,17 +544,17 @@ def env_expected_bytes(root, fingerprint="unbound", phase="model"):
                        sort_keys=True, separators=(",", ":")) + "\n").encode()
 
 
-def normalize_codex_tool_path(value):
-    """許可した固定PATH要素とCodexの版/arg0一時要素だけを正規化する。"""
+def project_codex_tool_path(value):
+    """PATHの順序を保って投影し、未知要素は値を出さず個別hashだけ返す。"""
     if not isinstance(value, str) or not value or "\x00" in value:
-        return None
+        return None, []
     home = str(account_home())
     fixed = {home + suffix for suffix in ("/.volta/bin", "/.pyenv/shims", "/.antigravity/antigravity/bin", "/.local/bin")}
     fixed.update(("/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin", "/System/Cryptexes/App/usr/bin",
         "/usr/bin", "/bin", "/usr/sbin", "/sbin", "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin",
         "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin",
         "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin", "/pkg/env/global/bin"))
-    normalized = []
+    normalized, unknown = [], []
     for part in value.split(os.pathsep):
         if part in fixed:
             normalized.append(part.replace(home, "<HOME>"))
@@ -565,8 +565,17 @@ def normalize_codex_tool_path(value):
         elif re.fullmatch(r"/opt/homebrew/Caskroom/codex/[0-9]+\.[0-9]+\.[0-9]+/codex-path", part):
             normalized.append("<CODEX_CASKROOM_RELEASE>/codex-path")
         else:
-            return None
-    return hashlib.sha256(json.dumps(normalized, separators=(",", ":")).encode()).hexdigest()
+            digest = hashlib.sha256(part.encode()).hexdigest()
+            normalized.append("<UNAPPROVED:" + digest + ">")
+            unknown.append(digest)
+    projection = hashlib.sha256(json.dumps(normalized, separators=(",", ":")).encode()).hexdigest()
+    return projection, unknown
+
+
+def normalize_codex_tool_path(value):
+    """許可した固定PATH要素とCodexの版/arg0一時要素だけを正規化する。"""
+    projection, unknown = project_codex_tool_path(value)
+    return projection if projection is not None and not unknown else None
 
 
 def actual_tool_environment_evidence(environment):
@@ -579,13 +588,14 @@ def actual_tool_environment_evidence(environment):
             and digest_bytes(environment["LC_ALL"].encode()) == keys["LC_ALL"]["sha256"],
         "PATH": False,
     }
-    path_hash = normalize_codex_tool_path(environment.get("PATH"))
+    path_hash, unknown_components = project_codex_tool_path(environment.get("PATH"))
     path_profile = next((name for name, value in keys["PATH"]["allowed_profile_sha256"].items()
                          if value == path_hash), "unknown")
-    checks["PATH"] = path_profile != "unknown"
-    return {"schema": 1, "policy_sha256": canonical_digest(CODEX_TOOL_ENV_NORMALIZATION),
+    checks["PATH"] = path_profile != "unknown" and not unknown_components
+    return {"schema": 2, "policy_sha256": canonical_digest(CODEX_TOOL_ENV_NORMALIZATION),
             "source": "normal_shell_preflight_process_environment", "checks": checks,
-            "path_profile": path_profile, "passed": all(checks.values())}
+            "path_profile": path_profile, "path_projection_sha256": path_hash,
+            "unapproved_component_sha256": unknown_components, "passed": all(checks.values())}
 
 
 def install_env_canary(root, fingerprint="unbound", phase="model"):
@@ -2316,12 +2326,15 @@ def validate_preflight_evidence(report, spec):
     if "actual_tool_environment_normalization" in report:
         normalization = report.get("actual_tool_environment_normalization")
         if (not isinstance(normalization, dict)
-                or set(normalization) != {"schema", "policy_sha256", "source", "checks", "path_profile", "passed"}
-                or normalization.get("schema") != 1
+                or set(normalization) != {"schema", "policy_sha256", "source", "checks", "path_profile",
+                    "path_projection_sha256", "unapproved_component_sha256", "passed"}
+                or normalization.get("schema") != 2
                 or normalization.get("policy_sha256") != canonical_digest(CODEX_TOOL_ENV_NORMALIZATION)
                 or normalization.get("source") != "normal_shell_preflight_process_environment"
                 or normalization.get("checks") != {"LANG": True, "LC_ALL": True, "PATH": True}
                 or normalization.get("path_profile") not in CODEX_TOOL_ENV_NORMALIZATION["keys"]["PATH"]["allowed_profile_sha256"]
+                or normalization.get("path_projection_sha256") != CODEX_TOOL_ENV_NORMALIZATION["keys"]["PATH"]["allowed_profile_sha256"].get(normalization.get("path_profile"))
+                or normalization.get("unapproved_component_sha256") != []
                 or normalization.get("passed") is not True):
             return False
     cases = report.get("cases")
