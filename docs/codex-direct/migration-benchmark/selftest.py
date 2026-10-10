@@ -1433,22 +1433,55 @@ def residual_process_test():
     original_ps_run = runner.subprocess.run
     try:
         runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout="", stderr="")
-        assert runner.process_absence_confirmed(905) is True
+        assert runner.process_absence_confirmed(905, 501) is True
         runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="905 501 S\n", stderr="")
-        assert runner.process_absence_confirmed(905) is False  # 生存PID/PID reuseはunknownのまま
+        assert runner.process_absence_confirmed(905, 501) is False  # 生存PID/PID reuseはunknownのまま
         runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="905 501 Z\n", stderr="")
-        assert runner.process_absence_confirmed(905) is True  # zombieは環境を保持できない
+        assert runner.process_absence_confirmed(905, 501) is True  # same-UID zombieは環境を保持できない
         runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="905 502 S\n", stderr="")
-        assert runner.process_absence_confirmed(905) is False  # 別UIDへのPID再利用もunknown
+        try:
+            runner.process_absence_confirmed(905, 501)
+        except runner.BoundaryError:
+            pass  # 別UIDへのPID再利用はunknown
+        else:
+            raise AssertionError("別UID PID再利用を受理しました")
+        runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="905 502 Z\n", stderr="")
+        try:
+            runner.process_absence_confirmed(905, 501)
+        except runner.BoundaryError:
+            pass
+        else:
+            raise AssertionError("別UIDのzombieをabsence-confirmedとして受理しました")
         runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout="", stderr="permission warning")
         try:
-            runner.process_absence_confirmed(905)
+            runner.process_absence_confirmed(905, 501)
         except runner.BoundaryError:
             pass
         else:
             raise AssertionError("stderr付きPID再照合を受理しました")
     finally:
         runner.subprocess.run = original_ps_run
+    original_popen = runner.subprocess.Popen
+    class InventoryProcess:
+        def __init__(self, stdout, stderr="", returncode=0):
+            self.stdout, self.stderr, self.returncode = io.StringIO(), io.StringIO(), returncode
+            self._output, self._error = stdout, stderr
+        def communicate(self, **_kwargs):
+            return self._output, self._error
+    try:
+        # PID 901は親子関係のないsetsid/detached process。全UID inventoryから検出される。
+        runner.subprocess.Popen = lambda *_a, **_k: InventoryProcess("899 501\n901 501\n902 502\n")
+        assert 901 in runner.candidate_process_ids()
+        for stdout, stderr, code in (("899 501\n", "ps warning", 0), ("", "", 0), ("899 501\n", "", 1), ("899 501\npartial", "", 0)):
+            runner.subprocess.Popen = lambda *_a, _stdout=stdout, _stderr=stderr, _code=code, **_k: InventoryProcess(_stdout, _stderr, _code)
+            try:
+                runner.candidate_process_ids()
+            except runner.BoundaryError:
+                pass
+            else:
+                raise AssertionError("不完全なps inventoryを受理しました")
+    finally:
+        runner.subprocess.Popen = original_popen
     originals = runner.candidate_process_ids, runner.process_environment_entries, runner.os.kill, runner.time.sleep
     processes = {901: (marker,), 902: (marker + b"-suffix",), 903: (b"OTHER=" + marker,), 904: (b"PATH=/usr/bin",)}
     calls = []
@@ -1846,9 +1879,9 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v19_final11.py"
-    config = root / "drivers/p5-driver-v19-final11-config.json"
-    launcher = root / "drivers/p5-v19-final11-normal-shell.sh"
+    copy = root / "drivers/p5_driver_v19_final12.py"
+    config = root / "drivers/p5-driver-v19-final12-config.json"
+    launcher = root / "drivers/p5-v19-final12-normal-shell.sh"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)

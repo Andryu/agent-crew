@@ -70,16 +70,16 @@ def _private_executable_binding(path, expected_mode):
 
 
 def compute_driver_executable_binding():
-    return _private_executable_binding(formal_base() / "drivers/p5_driver_v19_final11.py", 0o700)
+    return _private_executable_binding(formal_base() / "drivers/p5_driver_v19_final12.py", 0o700)
 
 
 def compute_driver_config_binding():
-    return _private_executable_binding(formal_base() / "drivers/p5-driver-v19-final11-config.json", 0o600)
+    return _private_executable_binding(formal_base() / "drivers/p5-driver-v19-final12-config.json", 0o600)
 
 
 def compute_normal_shell_launcher_binding(path=None):
     """永続Cache配下の正本launcher identity。temporary wrapperには依存しない。"""
-    return _private_executable_binding(path or formal_base() / "drivers/p5-v19-final11-normal-shell.sh", 0o700)
+    return _private_executable_binding(path or formal_base() / "drivers/p5-v19-final12-normal-shell.sh", 0o700)
 
 
 def reject_platform_temp(path):

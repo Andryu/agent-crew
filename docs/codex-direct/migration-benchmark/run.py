@@ -1905,8 +1905,10 @@ def parse_macos_procargs_environment(payload):
     return tuple(entry for entry in payload[offset:].split(b"\0") if entry)
 
 
-def process_absence_confirmed(pid):
+def process_absence_confirmed(pid, expected_uid=None):
     """PID消失またはzombieをstrict psで確認。稼働/PID再利用はunknown。"""
+    if expected_uid is None:
+        expected_uid = os.getuid()
     probe = subprocess.run(["/bin/ps", "-p", str(pid), "-o", "pid=,uid=,stat="], text=True,
         capture_output=True, timeout=5, env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
     if probe.stderr or probe.returncode not in (0, 1):
@@ -1917,6 +1919,8 @@ def process_absence_confirmed(pid):
     if probe.returncode == 0 and len(rows) == 1 and len(rows[0]) == 3:
         if not rows[0][0].isdigit() or not rows[0][1].isdigit() or int(rows[0][0]) != pid or not rows[0][2]:
             raise BoundaryError("process identity recheck invalid")
+        if int(rows[0][1]) != expected_uid:
+            raise BoundaryError("process identity UID changed")
         # zombieは実行・環境・open fileを保持しない。PID再利用/稼働中はunknown。
         return rows[0][2].startswith("Z")
     if not rows and probe.returncode == 0:
@@ -1940,7 +1944,7 @@ def process_environment_entries(pid):
                 # KERN_PROCARGS2. Treat EINVAL as disappearance only when a fresh,
                 # strict PID/UID lookup confirms that PID is gone. A reused or
                 # still-live PID remains unknown and fails closed.
-                if process_absence_confirmed(pid):
+                if process_absence_confirmed(pid, os.getuid()):
                     raise ProcessLookupError(error, "process disappeared during environment scan")
                 raise OSError(error, "live PID environment identity unavailable")
             raise OSError(error, "process environment scan failed")
@@ -1958,8 +1962,8 @@ def candidate_process_ids():
     process = subprocess.Popen(["/bin/ps", "-A", "-o", "pid=,uid="], text=True, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE, env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
     try:
-        stdout, _stderr = process.communicate(timeout=5)
-        if process.returncode != 0:
+        stdout, stderr = process.communicate(timeout=5)
+        if process.returncode != 0 or stderr or not stdout.strip():
             raise BoundaryError("process inventory実行失敗")
     finally:
         close_process_streams(process)

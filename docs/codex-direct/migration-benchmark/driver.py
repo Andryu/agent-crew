@@ -19,10 +19,10 @@ import uuid
 ACCOUNT_HOME = Path(pwd.getpwuid(os.getuid()).pw_dir)
 BASE = ACCOUNT_HOME / "Library/Caches/agent-crew-p5-benchmark"
 DRIVERS = BASE / "drivers"
-LOGS = DRIVERS / "logs/v19-final11"
+LOGS = DRIVERS / "logs/v19-final12"
 FORMAL = BASE / "formal"
-CONFIG = DRIVERS / "p5-driver-v19-final11-config.json"
-LAUNCHER = DRIVERS / "p5-v19-final11-normal-shell.sh"
+CONFIG = DRIVERS / "p5-driver-v19-final12-config.json"
+LAUNCHER = DRIVERS / "p5-v19-final12-normal-shell.sh"
 SOURCE = None
 HERE = None
 STATUS = LOGS / "status.json"
@@ -129,7 +129,7 @@ def regular_identity(path, mode=0o600):
 def external_binding():
     """repo原本、実行copy、configの同一bytesとstat identityを固定する。"""
     original = HERE / "driver.py"
-    runtime = DRIVERS / "p5_driver_v19_final11.py"
+    runtime = DRIVERS / "p5_driver_v19_final12.py"
     launcher_bytes = regular_identity(LAUNCHER, mode=0o700)
     original_bytes = regular_identity(original, mode=0o644)
     runtime_bytes = regular_identity(runtime, mode=0o700)
