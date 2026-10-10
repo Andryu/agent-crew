@@ -142,10 +142,20 @@ def canonical_digest(value):
 
 
 def secret_env_values(env):
-    """固定envのうちsecretとして扱う値だけをartifact部分文字列検査へ渡す。"""
-    return tuple(value for key, value in env.items()
-                 if isinstance(value, str) and value and
-                 (key == "P5_RUN_TOKEN" or re.search(r"TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY", key, re.I)))
+    """名前または高entropyを根拠にした、長さのあるsecret候補だけを返す。"""
+    candidates = []
+    known_environment = (set(REQUIRED_TOOL_ENV_KEYS) - {"P5_RUN_TOKEN"}) | set(RUNTIME_TOOL_ENV_KEYS)
+    for key, value in env.items():
+        if not isinstance(value, str) or len(value) < 16:
+            continue
+        frequencies = {character: value.count(character) for character in set(value)}
+        entropy = -sum((count / len(value)) * math.log2(count / len(value))
+                       for count in frequencies.values())
+        named_secret = bool(re.search(r"TOKEN|SECRET|PASSWORD|CREDENTIAL|(?:API|ACCESS|PRIVATE)[_-]?KEY|BEARER|AUTH", key, re.I))
+        high_entropy = len(set(value)) >= 8 and entropy >= 2.75
+        if named_secret or (key not in known_environment and high_entropy):
+            candidates.append(value)
+    return tuple(dict.fromkeys(candidates))
 
 
 def _open_directory(path, create=False):
@@ -2213,6 +2223,8 @@ def validate_preflight_evidence(report, spec):
     if (not isinstance(binding.get("codex_executable"), dict) or not isinstance(binding.get("python_runtime"), dict)
             or not isinstance(binding.get("private_directories"), dict) or not isinstance(binding.get("env_canary_script"), dict)
             or not isinstance(binding.get("tool_environment"), dict) or not isinstance(binding.get("codex_process_environment"), dict)):
+        return False
+    if binding != spec.get("binding"):
         return False
     cases = report.get("cases")
     required = required_preflight_cases(spec)

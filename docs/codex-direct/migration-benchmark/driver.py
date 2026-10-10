@@ -19,10 +19,10 @@ import uuid
 ACCOUNT_HOME = Path(pwd.getpwuid(os.getuid()).pw_dir)
 BASE = ACCOUNT_HOME / "Library/Caches/agent-crew-p5-benchmark"
 DRIVERS = BASE / "drivers"
-LOGS = DRIVERS / "logs/v17"
+LOGS = DRIVERS / "logs/v18"
 FORMAL = BASE / "formal"
-CONFIG = DRIVERS / "p5-driver-v17r5-config.json"
-LAUNCHER = Path("/private/tmp/p5-v17r5-normal-shell.sh")
+CONFIG = DRIVERS / "p5-driver-v18-config.json"
+LAUNCHER = DRIVERS / "p5-v18-normal-shell.sh"
 SOURCE = None
 HERE = None
 STATUS = LOGS / "status.json"
@@ -37,7 +37,7 @@ FIXED_PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 CAMPAIGN_SECONDS = 24 * 1200 + 315 + 300
 DRIVER_GRACE_SECONDS = 600
 KNOWN_PRIVACY_LINES = {
-    ("docs/codex-direct/migration-benchmark/harness_fingerprint.py", 289):
+    ("docs/codex-direct/migration-benchmark/harness_fingerprint.py", 294):
         "e3a5c6c684f77b12d5726043ee75ac55a47f848ceb116e745bc7562dcc2d244f",
     ("docs/codex-direct/migration-benchmark/selftest.py", 326):
         "b74639bd80b379b2183ecdea29f134e27d728e328fff6364fd99229cb7efcc3c",
@@ -129,7 +129,7 @@ def regular_identity(path, mode=0o600):
 def external_binding():
     """repo原本、実行copy、configの同一bytesとstat identityを固定する。"""
     original = HERE / "driver.py"
-    runtime = DRIVERS / "p5_driver_v17r5.py"
+    runtime = DRIVERS / "p5_driver_v18.py"
     launcher_bytes = regular_identity(LAUNCHER, mode=0o700)
     original_bytes = regular_identity(original, mode=0o644)
     runtime_bytes = regular_identity(runtime, mode=0o700)
@@ -155,7 +155,7 @@ def load_config():
     global SOURCE, HERE, EXPECTED_HEAD, EXPECTED_FINGERPRINT, LOADED_LAUNCHER_BINDING
     config = json.loads(regular_identity(CONFIG))
     expected_fields = {"schema", "source", "head", "fingerprint", "launcher_binding"}
-    if (set(config) != expected_fields or config["schema"] != 2
+    if (set(config) != expected_fields or config["schema"] != 3
             or not isinstance(config["head"], str) or len(config["head"]) != 40
             or not isinstance(config["fingerprint"], str) or len(config["fingerprint"]) != 64):
         raise Stop("invalid_driver_config")
@@ -283,14 +283,16 @@ def bindings(shared):
     cli = shared.compute_codex_executable_binding()
     driver = shared.compute_driver_executable_binding()
     config = shared.compute_driver_config_binding()
+    launcher_binding = shared.compute_normal_shell_launcher_binding()
     external = external_binding()
     if external["copy"] != driver or external["config"] != config:
         raise Stop("external_driver_binding_changed")
-    if external["launcher"] != LOADED_LAUNCHER_BINDING:
+    if external["launcher"] != LOADED_LAUNCHER_BINDING or external["launcher"] != launcher_binding:
         raise Stop("normal_shell_launcher_binding_changed")
     fingerprint = shared.compute_harness_fingerprint(HERE, python_runtime_binding=runtime,
                                                       codex_executable_binding=cli,
-                                                      driver_executable_binding=driver)
+                                                      driver_executable_binding=driver,
+                                                      normal_shell_launcher_binding=launcher_binding)
     if fingerprint != EXPECTED_FINGERPRINT:
         raise Stop("unexpected_harness_fingerprint")
     return {"fingerprint": fingerprint, "python_runtime": runtime, "codex_executable": cli,
@@ -313,12 +315,12 @@ def privacy_check(log):
 def verification(log, shared):
     directories = source_check(log)
     expected = bindings(shared)
-    for name in ("selftest.py", "analysis_selftest.py", "v16_selftest.py", "v17_selftest.py"):
+    for name in ("selftest.py", "analysis_selftest.py", "v16_selftest.py", "v17_selftest.py", "v18_selftest.py"):
         command([PYTHON, "-B", HERE / name], log)
     compile_files = ("run.py", "sandbox_preflight.py", "validate_c6.py", "selftest.py",
                      "batch.py", "analyze.py", "analysis_selftest.py", "harness_fingerprint.py",
                      "probe_v16.py", "fixed_test_runner_v16.py", "v16_selftest.py",
-                     "probe_v17.py", "fixed_test_runner_v17.py", "v17_selftest.py")
+                     "probe_v17.py", "fixed_test_runner_v17.py", "v17_selftest.py", "v18_selftest.py")
     command([PYTHON, "-B", "-X", "pycache_prefix=" + str(LOGS / "pycache"), "-m", "py_compile",
              *[HERE / name for name in compile_files]], log)
     command([GIT, "diff", "--check"], log)

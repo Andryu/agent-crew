@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import pwd
+import re
 import shlex
 import signal
 import stat
@@ -20,9 +21,9 @@ import run as harness
 from harness_fingerprint import compute_harness_fingerprint
 
 BASE = harness.formal_base()
-LEDGER_DIR = BASE / "drivers/logs/v17"
+LEDGER_DIR = BASE / "drivers/logs/v18"
 LEDGER = LEDGER_DIR / "probe-ledger.json"
-PROBE_BASE = BASE / "probe-v17"
+PROBE_BASE = BASE / "probe-v18"
 MAX_ATTEMPTS = 2
 MAX_TOTAL_SECONDS = 1200
 SLOT_SECONDS = 600
@@ -98,11 +99,11 @@ def ledger_record(path=LEDGER):
     if not path.exists():
         if any(path.with_name(f"probe-attempt-{index:02d}.json").exists() for index in (1, 2)):
             raise ValueError("probe_ledger_missing_with_reservation")
-        return {"schema": 2, "version": 17, "max_attempts": MAX_ATTEMPTS,
+        return {"schema": 2, "version": 18, "max_attempts": MAX_ATTEMPTS,
                 "max_reserved_seconds": MAX_TOTAL_SECONDS, "attempts": []}
     record = strict_json(_private_file(path))
     if (set(record) != {"schema", "version", "max_attempts", "max_reserved_seconds", "attempts"}
-            or record["schema"] != 2 or record["version"] != 17
+            or record["schema"] != 2 or record["version"] != 18
             or record["max_attempts"] != MAX_ATTEMPTS or record["max_reserved_seconds"] != MAX_TOTAL_SECONDS
             or not isinstance(record["attempts"], list) or len(record["attempts"]) > MAX_ATTEMPTS
             or any(not isinstance(entry, dict) or entry.get("slot_seconds") != SLOT_SECONDS
@@ -246,7 +247,7 @@ def require_final_probe(fingerprint, path=LEDGER, *, driver_config_binding=None)
     attempts = ledger_record(path)["attempts"]
     expected_driver_config = (driver_config_binding if driver_config_binding is not None else
                               harness.compute_driver_config_binding() if path == LEDGER else None)
-    if (not attempts or any(item.get("state") not in {"pass", "fail"} or item.get("residual_verified") is not True
+    if (not attempts or any(item.get("state") != "pass" or item.get("residual_verified") is not True
                             or item.get("child_reaped") is not True for item in attempts)
             or attempts[-1].get("state") != "pass" or attempts[-1].get("fingerprint") != fingerprint
             or attempts[-1].get("driver_config_binding") != expected_driver_config):
@@ -270,7 +271,18 @@ def check_preflight(path, fingerprint):
             or not isinstance(binding.get("tool_environment"), dict)
             or not isinstance(binding.get("codex_process_environment"), dict)):
         raise ValueError("normal_shell_preflight_schema_or_binding_invalid")
-    spec = {"root": Path(binding["root_realpath"]), "task": harness.c6_task(), "binding": binding}
+    root = Path(binding["root_realpath"])
+    if (not root.is_absolute() or root.name != "fixture" or root.parent.parent != BASE / "preflight"
+            or not re.fullmatch(r"sandbox-preflight-[a-f0-9]{32}", root.parent.name)):
+        raise ValueError("normal_shell_preflight_root_location_invalid")
+    try:
+        expected = harness.canonical_execution_spec(root, harness.c6_task(), harness.CLI_VERSION,
+                                                    fingerprint, phase="model")
+    except (OSError, ValueError, RuntimeError) as error:
+        raise ValueError("normal_shell_preflight_expected_binding_unavailable:" + type(error).__name__) from None
+    if binding != expected["binding"]:
+        raise ValueError("normal_shell_preflight_binding_not_fixed_spec")
+    spec = expected
     if not harness.validate_preflight_evidence(report, spec):
         raise ValueError("normal_shell_preflight_evidence_incomplete_or_inconsistent")
     if (binding["codex_executable"] != harness.compute_codex_executable_binding()
@@ -279,7 +291,7 @@ def check_preflight(path, fingerprint):
     return hashlib.sha256(harness.safe_read(path)).hexdigest(), binding, report
 
 
-PREFLIGHT_ALLOWED_BINDING_DIFFERENCES = frozenset({"root_realpath", "root_device", "root_inode",
+PREFLIGHT_ALLOWED_BINDING_DIFFERENCES = frozenset({"phase", "root_realpath", "root_device", "root_inode",
     "private_directories", "tool_environment", "codex_process_environment", "policy_template_sha256",
     "profile_sha256", "env_canary_script", "env_expected_sha256"})
 
@@ -298,7 +310,22 @@ def compare_preflight_binding(preflight, probe, profile, probe_spec):
     if (preflight["codex_process_environment"].get("auth_home_location_sha256")
             != probe["codex_process_environment"].get("auth_home_location_sha256")):
         return False
+    preflight_root = Path(preflight["root_realpath"])
+    probe_root = Path(probe["root_realpath"])
+    model_task = harness.c6_task()
+    expected_preflight_policy = harness.canonical_digest(harness.policy_template(model_task, "model"))
+    expected_probe_policy = harness.canonical_digest(harness.policy_template(probe_spec["task"], "probe"))
+    expected_preflight_profile = harness.canonical_digest(harness.permission_config(preflight_root, model_task, phase="model"))
+    expected_probe_profile = harness.canonical_digest(harness.permission_config(probe_root, probe_spec["task"], phase="probe"))
     return (preflight["phase"] == "model" and probe["phase"] == "probe"
+            and preflight["policy_template_sha256"] == expected_preflight_policy
+            and probe["policy_template_sha256"] == expected_probe_policy
+            and preflight["profile_sha256"] == expected_preflight_profile
+            and probe["profile_sha256"] == expected_probe_profile
+            and preflight["env_expected_sha256"] == harness.digest_bytes(
+                harness.env_expected_bytes(preflight_root, preflight["harness_fingerprint"], "model"))
+            and probe["env_expected_sha256"] == harness.digest_bytes(
+                harness.env_expected_bytes(probe_root, probe["harness_fingerprint"], "probe"))
             and preflight["harness_fingerprint"] == probe["harness_fingerprint"]
             and probe["read_boundary"] == preflight["read_boundary"]
             and profile.get("profile_name") == "p5_fixture" and profile.get("network_enabled") is False
@@ -394,10 +421,11 @@ def probe(fingerprint, preflight_path):
             raise ValueError(result_code) from None
         if time.monotonic() - started > SLOT_SECONDS:
             raise ValueError("probe_slot_timeout")
+        secrets = harness.secret_env_values(spec["env"])
         audit = harness.safe_events(stdout, expected_cwd=root, expected_env=spec["env"],
-                                    forbidden_values=tuple(value for value in spec["env"].values() if value))
+                                    forbidden_values=secrets)
         raw = PROBE_BASE / (root.name + ".raw.jsonl")
-        harness.save_raw_events(raw, stdout, forbidden_values=tuple(value for value in spec["env"].values() if value),
+        harness.save_raw_events(raw, stdout, forbidden_values=secrets,
                                 audit_passed=audit.get("event_audit", {}).get("passed") is True)
         harness.save(PROBE_BASE / (root.name + ".audit.json"), audit)
         diagnosis = diagnose_layers(root, spec, audit["env_canary_evidence"]["required_checks"])

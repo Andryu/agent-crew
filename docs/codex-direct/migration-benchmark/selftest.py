@@ -1753,9 +1753,9 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v17r5.py"
-    config = root / "drivers/p5-driver-v17r5-config.json"
-    launcher = root / "drivers/p5-v17r5-normal-shell.sh"
+    copy = root / "drivers/p5_driver_v18.py"
+    config = root / "drivers/p5-driver-v18-config.json"
+    launcher = root / "drivers/p5-v18-normal-shell.sh"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
@@ -1765,7 +1765,7 @@ def driver_identity_test(root):
         "device": launcher_info.st_dev, "inode": launcher_info.st_ino, "size": launcher_info.st_size,
         "mtime_ns": launcher_info.st_mtime_ns, "ctime_ns": launcher_info.st_ctime_ns,
         "owner": launcher_info.st_uid, "mode": stat.S_IMODE(launcher_info.st_mode)}
-    runner._write_private(config, json.dumps({"schema": 2, "source": str(source),
+    runner._write_private(config, json.dumps({"schema": 3, "source": str(source),
         "head": head, "fingerprint": "a" * 64, "launcher_binding": launcher_binding}), 0o600)
     with patch.object(driver_source, "BASE", root), patch.object(driver_source, "DRIVERS", root / "drivers"), \
             patch.object(driver_source, "CONFIG", config), patch.object(driver_source, "SOURCE", None), \

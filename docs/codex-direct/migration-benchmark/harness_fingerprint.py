@@ -52,11 +52,16 @@ def _private_executable_binding(path, expected_mode):
 
 
 def compute_driver_executable_binding():
-    return _private_executable_binding(formal_base() / "drivers/p5_driver_v17r5.py", 0o700)
+    return _private_executable_binding(formal_base() / "drivers/p5_driver_v18.py", 0o700)
 
 
 def compute_driver_config_binding():
-    return _private_executable_binding(formal_base() / "drivers/p5-driver-v17r5-config.json", 0o600)
+    return _private_executable_binding(formal_base() / "drivers/p5-driver-v18-config.json", 0o600)
+
+
+def compute_normal_shell_launcher_binding(path=None):
+    """永続Cache配下の正本launcher identity。temporary wrapperには依存しない。"""
+    return _private_executable_binding(path or formal_base() / "drivers/p5-v18-normal-shell.sh", 0o700)
 
 
 def reject_platform_temp(path):
@@ -114,7 +119,7 @@ HARNESS_INPUTS = (
     "comparison-v2.json", "validate_c6.py", "../migration-baseline/comparison.json",
     "../migration-baseline/snapshot-index.json", "b-contract-index.json", "a-contract-index.json",
     "harness_fingerprint.py", "probe_v16.py", "fixed_test_runner_v16.py", "v16_selftest.py",
-    "probe_v17.py", "fixed_test_runner_v17.py", "v17_selftest.py",
+    "probe_v17.py", "fixed_test_runner_v17.py", "v17_selftest.py", "v18_selftest.py",
 )
 
 
@@ -299,7 +304,7 @@ def compute_python_runtime_binding():
 
 
 def compute_harness_fingerprint(here, *, python_runtime_binding=None, codex_executable_binding=None,
-                                driver_executable_binding=None):
+                                driver_executable_binding=None, normal_shell_launcher_binding=None):
     """benchmark directoryの現行固定入力から64桁SHA-256を返す。保存・実行はしない。"""
     here = Path(os.path.abspath(here))
     repository = here.parents[2]
@@ -314,6 +319,9 @@ def compute_harness_fingerprint(here, *, python_runtime_binding=None, codex_exec
     components.append("codex_executable:" + json.dumps(codex, sort_keys=True, separators=(",", ":")))
     driver = compute_driver_executable_binding() if driver_executable_binding is None else driver_executable_binding
     components.append("driver_executable:" + json.dumps(driver, sort_keys=True, separators=(",", ":")))
+    launcher = (compute_normal_shell_launcher_binding() if normal_shell_launcher_binding is None
+                else normal_shell_launcher_binding)
+    components.append("normal_shell_launcher:" + json.dumps(launcher, sort_keys=True, separators=(",", ":")))
     # 実exec toolの/bin/zsh -lcが参照する固定OS層。説明に使う物をfingerprintから外さない。
     for shell_input in ("/bin/zsh", "/etc/zprofile", "/usr/libexec/path_helper", "/etc/paths"):
         components.append("login_shell:" + json.dumps(_shell_file_identity(shell_input), sort_keys=True,
