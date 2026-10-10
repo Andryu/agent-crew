@@ -239,7 +239,7 @@ def ledger_timeout_then_pass_test(base):
 
 
 def persistent_launcher_test(base):
-    assert driver_module.LAUNCHER == harness_fingerprint.formal_base() / "drivers/p5-v19-final7-normal-shell.sh"
+    assert driver_module.LAUNCHER == harness_fingerprint.formal_base() / "drivers/p5-v19-final8-normal-shell.sh"
     launcher = base / "Library/Caches/p5/drivers/p5-v18-normal-shell.sh"
     launcher.parent.mkdir(mode=0o700, parents=True)
     launcher.write_text("#!/bin/zsh\nexec fixed-driver verify\n")
