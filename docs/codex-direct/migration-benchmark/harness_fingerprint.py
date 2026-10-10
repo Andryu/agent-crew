@@ -36,8 +36,9 @@ CODEX_TOOL_ENV_NORMALIZATION = {
                    "derivation": "model_free_normal_shell_preflight_locale_observation"},
         "PATH": {"kind": "codex_macos_path_v1", "allowed_profile_sha256": {
                     "normal_shell_login": "22c1cd8ce1b055b6ff63df7ffd1e6b9d3999216e4d10c48b02d26bcef77b8efc",
+                    "normal_shell_codex_host_projection": "8005165d1cd846fa8cb1971a0b8ecbbd066c2d6fb465bb8e4b4906fd9f48887c",
                     "codex_host": "8283ba217254d7532bdd107b5dd947a6c6d1ec66f684b69a999975c4979b0acb"},
-                 "derivation": "model_free_normal_shell_preflight_observed_merged_codex_login_path_projection"},
+                 "derivation": "model_free_normal_shell_preflight_observed_ordered_projection_zero_unapproved_components"},
     },
     "path_normalizer": "allowlisted_components_ordered_with_ephemeral_codex_paths_tokenized_v1",
 }
