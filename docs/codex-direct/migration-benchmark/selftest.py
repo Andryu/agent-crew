@@ -779,10 +779,15 @@ def integration_test(root):
     fake = root / "codex"
     fake.write_text(FAKE)
     fake.chmod(0o700)
-    originals = runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS, runner.scan_residual_processes
+    originals = (runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS,
+                 runner.scan_residual_processes, runner.scan_residual_context)
     runner.CODEX_EXECUTABLE = str(fake)
     runner.per_run_preflight = fake_preflight_report
     runner.scan_residual_processes = clean_process_evidence
+    runner.scan_residual_context = lambda _root, _leader: {
+        "status": "pass", "passed": True, "scan_pass": True, "leader_present_count": 0,
+        "group_member_count": 0, "run_root_open_file_process_count": 0,
+        "argv_or_environment_values_saved": False, "complete_detection_claimed": False}
     fingerprint = compute_harness_fingerprint(HERE)
     campaign = root / ("p5-" + fingerprint[:16])
     summary_path = campaign / "batch-summary.json"
@@ -946,7 +951,8 @@ def integration_test(root):
         finally:
             runner.execute_command = original_execute
     finally:
-        runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS, runner.scan_residual_processes = originals
+        (runner.CODEX_EXECUTABLE, runner.per_run_preflight, runner.CLI_TIMEOUT_SECONDS,
+         runner.scan_residual_processes, runner.scan_residual_context) = originals
     print("integration: 4 gates/exact replay path/fingerprint+hash tamper/non-mutating result/C6 scratch validator/full manifest/timeout/binding/version mismatch block OK", flush=True)
 
 
@@ -1783,9 +1789,9 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v19_final.py"
-    config = root / "drivers/p5-driver-v19-final-config.json"
-    launcher = root / "drivers/p5-v19-final-normal-shell.sh"
+    copy = root / "drivers/p5_driver_v19_final3.py"
+    config = root / "drivers/p5-driver-v19-final3-config.json"
+    launcher = root / "drivers/p5-v19-final3-normal-shell.sh"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)

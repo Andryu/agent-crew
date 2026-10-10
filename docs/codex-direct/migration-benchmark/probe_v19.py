@@ -21,9 +21,9 @@ import run as harness
 from harness_fingerprint import compute_harness_fingerprint
 
 BASE = harness.formal_base()
-LEDGER_DIR = BASE / "drivers/logs/v19-final"
+LEDGER_DIR = BASE / "drivers/logs/v19-final3"
 LEDGER = LEDGER_DIR / "probe-ledger.json"
-PROBE_BASE = BASE / "probe-v19-final"
+PROBE_BASE = BASE / "probe-v19-final3"
 MAX_ATTEMPTS = 2
 MAX_TOTAL_SECONDS = 1200
 SLOT_SECONDS = 600
