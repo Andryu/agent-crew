@@ -141,12 +141,12 @@ def normalization_tests(base):
         "normal_shell_login": ["/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin", "/System/Cryptexes/App/usr/bin",
             "/usr/bin", "/bin", "/usr/sbin", "/sbin", "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin",
             "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin", "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin",
-            "/pkg/env/global/bin", "/opt/homebrew/bin", "<HOME>/.volta/bin", "<CODEX_APP_SERVER_RELEASE>/codex-path",
-            "<CODEX_ARG0_TEMP>", "<CODEX_ARG0_TEMP>", "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>",
+            "/pkg/env/global/bin", "/opt/homebrew/bin", "<HOME>/.volta/bin", "/opt/homebrew/sbin",
+            "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>", "<CODEX_ARG0_TEMP>", "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>",
             "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>", "<CODEX_APP_SERVER_RELEASE>/codex-path",
             "<CODEX_ARG0_TEMP>", "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>",
             "<CODEX_CASKROOM_RELEASE>/codex-path", "<HOME>/.pyenv/shims", "<HOME>/.antigravity/antigravity/bin",
-            "<HOME>/.local/bin", "/opt/homebrew/sbin"],
+            "<HOME>/.local/bin"],
         "codex_host": ["<HOME>/.volta/bin", "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>",
             "<CODEX_ARG0_TEMP>", "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>",
             "<CODEX_APP_SERVER_RELEASE>/codex-path", "<CODEX_ARG0_TEMP>", "<CODEX_APP_SERVER_RELEASE>/codex-path",
@@ -178,7 +178,8 @@ def normalization_tests(base):
                 concrete.append(part)
         value = os.pathsep.join(concrete)
         samples[name] = value
-        assert run.normalize_codex_tool_path(value) == policy["PATH"]["allowed_profile_sha256"][name]
+        normalized_hash = run.normalize_codex_tool_path(value)
+        assert normalized_hash == policy["PATH"]["allowed_profile_sha256"][name], (name, normalized_hash)
         evil = value + os.pathsep + "/tmp/p5-unapproved-bin"
         assert run.normalize_codex_tool_path(evil) is None
         reordered = os.pathsep.join(reversed(concrete))

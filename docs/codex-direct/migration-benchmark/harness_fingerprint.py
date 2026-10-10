@@ -35,9 +35,9 @@ CODEX_TOOL_ENV_NORMALIZATION = {
         "LC_ALL": {"kind": "exact_value_sha256", "sha256": _C_UTF8_SHA256,
                    "derivation": "model_free_normal_shell_preflight_locale_observation"},
         "PATH": {"kind": "codex_macos_path_v1", "allowed_profile_sha256": {
-                    "normal_shell_login": "104462fab1d53252cbc8ca3562d5e04ce4718369c9dfe647a01df810728f09d7",
+                    "normal_shell_login": "22c1cd8ce1b055b6ff63df7ffd1e6b9d3999216e4d10c48b02d26bcef77b8efc",
                     "codex_host": "8283ba217254d7532bdd107b5dd947a6c6d1ec66f684b69a999975c4979b0acb"},
-                 "derivation": "model_free_normal_shell_preflight_and_codex_host_path_projection"},
+                 "derivation": "model_free_normal_shell_preflight_observed_merged_codex_login_path_projection"},
     },
     "path_normalizer": "allowlisted_components_ordered_with_ephemeral_codex_paths_tokenized_v1",
 }

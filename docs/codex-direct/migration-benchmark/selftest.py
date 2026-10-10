@@ -1428,6 +1428,21 @@ def residual_process_test():
     assert marker not in runner.parse_macos_procargs_environment(payload)
     with_env = payload + marker + b"\0"
     assert marker in runner.parse_macos_procargs_environment(with_env)
+    original_ps_run = runner.subprocess.run
+    try:
+        runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout="", stderr="")
+        assert runner.process_absence_confirmed(905) is True
+        runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="905 501\n", stderr="")
+        assert runner.process_absence_confirmed(905) is False  # 生存PID/PID reuseはunknownのまま
+        runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout="", stderr="permission warning")
+        try:
+            runner.process_absence_confirmed(905)
+        except runner.BoundaryError:
+            pass
+        else:
+            raise AssertionError("stderr付きPID再照合を受理しました")
+    finally:
+        runner.subprocess.run = original_ps_run
     originals = runner.candidate_process_ids, runner.process_environment_entries, runner.os.kill, runner.time.sleep
     processes = {901: (marker,), 902: (marker + b"-suffix",), 903: (b"OTHER=" + marker,), 904: (b"PATH=/usr/bin",)}
     calls = []
