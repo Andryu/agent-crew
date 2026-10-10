@@ -121,21 +121,45 @@ def create_boundary_canaries(spec, token):
     roots = boundary_parents(spec["root"])
     roots.update(platform_temp_parents())
     entries = []
-    for label, parent in roots.items():
-        # systemの既知aliasはtemp probeに限ってrealpath化する。他のcomponentはnofollow。
-        physical_parent = parent.resolve(strict=True) if label in TEMP_LABELS else parent
-        directory = physical_parent / (".p5-boundary-" + token + "-" + label)
-        if os.path.lexists(directory):
-            raise runner.BoundaryError("boundary canaryを上書きしません")
-        identity = runner.private_directory_identity(directory, create=True, include_parent=False)
-        read = directory / "read-canary"
-        write = directory / "write-canary"
-        runner._write_private(read, "synthetic boundary canary\n")
-        alias = spec["root"] / ".benchmark-tmp" / ("boundary-link-" + token + "-" + label)
-        alias.symlink_to(directory)
-        visible = parent / directory.name
-        entries.append({"label": label, "directory": directory, "identity": identity, "read": read,
-                        "write": write, "sha256": runner.sha(read), "alias": alias, "visible": visible})
+    try:
+        for label, parent in roots.items():
+            # systemの既知aliasはtemp probeに限ってrealpath化する。他のcomponentはnofollow。
+            physical_parent = parent.resolve(strict=True) if label in TEMP_LABELS else parent
+            directory = physical_parent / (".p5-boundary-" + token + "-" + label)
+            if os.path.lexists(directory):
+                raise runner.BoundaryError("boundary canaryを上書きしません")
+            identity = runner.private_directory_identity(directory, create=True, include_parent=False)
+            read = directory / "read-canary"
+            write = directory / "write-canary"
+            alias = spec["root"] / ".benchmark-tmp" / ("boundary-link-" + token + "-" + label)
+            visible = parent / directory.name
+            entry = {"label": label, "directory": directory, "identity": identity, "read": read,
+                     "write": write, "sha256": None, "alias": alias, "visible": visible}
+            entries.append(entry)
+            runner._write_private(read, "synthetic boundary canary\n")
+            entry["sha256"] = runner.sha(read)
+            alias.symlink_to(directory)
+    except BaseException:
+        try:
+            remove_boundary_canaries(entries)
+            # Preserve rollback even if a platform's dir-fd rmdir reports success
+            # while leaving an already-empty leaf visible.
+            for entry in entries:
+                directory = entry["directory"]
+                if os.path.lexists(directory):
+                    parent_fd = runner._open_directory(directory.parent)
+                    try:
+                        current = os.stat(directory.name, dir_fd=parent_fd, follow_symlinks=False)
+                        expected = entry["identity"]["root"]
+                        if ((current.st_dev, current.st_ino) != (expected["device"], expected["inode"])
+                                or not stat.S_ISDIR(current.st_mode) or os.listdir(directory)):
+                            raise runner.BoundaryError("partial boundary directory cleanup identity/content unknown")
+                        os.rmdir(directory.name, dir_fd=parent_fd)
+                    finally:
+                        os.close(parent_fd)
+        except BaseException as cleanup_error:
+            raise runner.BoundaryError("boundary canary partial cleanup could not be verified") from cleanup_error
+        raise
     return entries
 
 
@@ -169,7 +193,7 @@ def remove_boundary_canaries(entries):
                 os.unlink(name, dir_fd=fd)
         finally:
             os.close(fd)
-        entry["alias"].unlink()
+        entry["alias"].unlink(missing_ok=True)
         parent_fd = runner._open_directory(directory.parent)
         try:
             current = os.stat(directory.name, dir_fd=parent_fd, follow_symlinks=False)
@@ -340,7 +364,7 @@ def main():
         report = check(spec)
         if args.report_output is not None:
             destination = args.report_output
-            expected_parent = runner.formal_base() / "drivers/logs/v19-final4"
+            expected_parent = runner.formal_base() / "drivers/logs/v19-final5"
             if (destination.parent != expected_parent or os.path.lexists(destination)):
                 raise SystemExit("preflight report output pathはprivate v17 logsの新規fileに限定されます")
             runner.private_directory_identity(expected_parent)

@@ -613,6 +613,42 @@ def preflight_test(root):
     print("preflight: exact binding/tool env/canary cleanup/fail closed OK (sandbox outcomes mocked)", flush=True)
 
 
+def partial_boundary_creation_test(root):
+    root.mkdir()
+    fixture = root / "fixture"
+    fixture.mkdir()
+    (fixture / ".benchmark-tmp").mkdir()
+    first_parent, second_parent = root / "source", root / "external"
+    first_parent.mkdir()
+    second_parent.mkdir()
+    original_boundaries = preflight.boundary_parents
+    original_temps = preflight.platform_temp_parents
+    original_identity = preflight.runner.private_directory_identity
+    preflight.boundary_parents = lambda _root: {"source_worktree": first_parent, "main_repository": second_parent}
+    preflight.platform_temp_parents = lambda: {}
+    def fail_second(path, *args, **kwargs):
+        if Path(path).parent == second_parent and kwargs.get("create"):
+            raise PermissionError("synthetic boundary creation denial")
+        return original_identity(path, *args, **kwargs)
+    preflight.runner.private_directory_identity = fail_second
+    token = "synthetic-partial-create"
+    first_dir = first_parent / (".p5-boundary-" + token + "-source_worktree")
+    alias = fixture / ".benchmark-tmp" / ("boundary-link-" + token + "-source_worktree")
+    try:
+        try:
+            preflight.create_boundary_canaries({"root": fixture}, token)
+        except PermissionError:
+            pass
+        else:
+            raise AssertionError("synthetic boundary creation failure not raised")
+        assert not first_dir.exists() and not os.path.lexists(alias), (str(first_dir.exists()), str(os.path.lexists(alias)))
+    finally:
+        preflight.boundary_parents = original_boundaries
+        preflight.platform_temp_parents = original_temps
+        preflight.runner.private_directory_identity = original_identity
+    print("preflight: partial external canary creation rollback/identity cleanup PASS", flush=True)
+
+
 @contextlib.contextmanager
 def forbid_after_outcome(roots, modules=(runner,)):
     """outcome観測後はroot操作と監査・再bindingを禁止し、root外診断だけ許す。"""
@@ -1789,9 +1825,9 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v19_final4.py"
-    config = root / "drivers/p5-driver-v19-final4-config.json"
-    launcher = root / "drivers/p5-v19-final4-normal-shell.sh"
+    copy = root / "drivers/p5_driver_v19_final5.py"
+    config = root / "drivers/p5-driver-v19-final5-config.json"
+    launcher = root / "drivers/p5-v19-final5-normal-shell.sh"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
@@ -1884,6 +1920,8 @@ def main():
     guard_root = Path(tempfile.mkdtemp(prefix="p5-boundary-selftest-", dir="/private/tmp"))
     temp_boundary_test(guard_root / "boundaries")
     codex_binding_test(guard_root / "cli")
+    # 実OSのロールバック経路を外側のpreflight用cleanup mockより先に検証する。
+    partial_boundary_creation_test(guard_root / "preflight-partial-boundary")
     # 実sandboxを起動しない合成caseだけtempへ配置する。production guardは上で実検証。
     # 実repo/旧campaignにはcanaryを作らず、同じ作成/照合/cleanupを専用合成親で試す。
     with contextlib.ExitStack() as stack:
