@@ -135,13 +135,17 @@ def budget_tests(base):
     probe_v16.finish(first["id"], False, "auth", path, child_reaped=True, residual_verified=True)
     second = probe_v16.reserve("b" * 64, path)
     probe_v16.finish(second["id"], True, "pass", path, child_reaped=True, residual_verified=True)
-    assert probe_v16.require_final_probe("b" * 64, path)["id"] == second["id"]
-    try:
-        probe_v16.require_final_probe("a" * 64, path)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("old fingerprint probe reused")
+    for fingerprint in ("a" * 64, "b" * 64):
+        try:
+            probe_v16.require_final_probe(fingerprint, path)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("後発passが先行failを隠した")
+    clean = base / "ledger-single-pass" / "probe-ledger.json"
+    only_pass = probe_v16.reserve("d" * 64, clean)
+    probe_v16.finish(only_pass["id"], True, "pass", clean, child_reaped=True, residual_verified=True)
+    assert probe_v16.require_final_probe("d" * 64, clean)["id"] == only_pass["id"]
     try:
         probe_v16.reserve("c" * 64, path)
     except ValueError as error:
