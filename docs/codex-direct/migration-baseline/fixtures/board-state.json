@@ -1,0 +1,83 @@
+{
+  "overall": "比較用の合成表示台帳",
+  "panes": {
+    "parent": {
+      "id": "wC:pR",
+      "model": "Astra",
+      "role": "計画判断"
+    },
+    "implementer": {
+      "id": "wC:pV",
+      "model": "Sol",
+      "role": "編集検証"
+    },
+    "report": {
+      "id": "wC:pW",
+      "model": "Python",
+      "role": "表示のみ"
+    }
+  },
+  "tasks": {
+    "P0": {
+      "title": "現状と比較基準の固定",
+      "status": "未着手",
+      "current": "",
+      "next": "",
+      "blocker": ""
+    },
+    "P1": {
+      "title": "設定管理の一本化",
+      "status": "未確認",
+      "current": "",
+      "next": "",
+      "blocker": ""
+    },
+    "P2": {
+      "title": "指示とhookの整理",
+      "status": "未確認",
+      "current": "",
+      "next": "",
+      "blocker": ""
+    },
+    "P3": {
+      "title": "引継ぎの整備",
+      "status": "未確認",
+      "current": "",
+      "next": "",
+      "blocker": ""
+    },
+    "P4": {
+      "title": "wealth開発への適用",
+      "status": "未確認",
+      "current": "",
+      "next": "",
+      "blocker": ""
+    },
+    "P5": {
+      "title": "速度・品質の比較",
+      "status": "未確認",
+      "current": "",
+      "next": "",
+      "blocker": ""
+    },
+    "P6": {
+      "title": "実資産の読み取り",
+      "status": "未確認",
+      "current": "",
+      "next": "",
+      "blocker": ""
+    },
+    "P7": {
+      "title": "更新運用",
+      "status": "未確認",
+      "current": "",
+      "next": "",
+      "blocker": ""
+    }
+  },
+  "current": "開始",
+  "next": "検証",
+  "blocker": "なし",
+  "updated_at": "2026-09-21T00:00:00+09:00",
+  "schema": 1
+}

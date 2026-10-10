@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "overall": "P0・P3受入済み、P1・P2・P4・P5を並行検証中",
+  "panes": {
+    "parent": {
+      "id": "wC:pR",
+      "model": "Astra",
+      "role": "計画判断"
+    },
+    "implementer": {
+      "id": "wC:pV",
+      "model": "Sol",
+      "role": "編集検証"
+    },
+    "report": {
+      "id": "wC:pW",
+      "model": "Python",
+      "role": "表示のみ"
+    }
+  },
+  "tasks": {
+    "P0": {
+      "title": "現状と比較基準の固定",
+      "status": "完了",
+      "current": "開始版と比較基準を固定・親受入済み",
+      "next": "",
+      "blocker": ""
+    },
+    "P1": {
+      "title": "設定管理の一本化",
+      "status": "検証中",
+      "current": "P1仕様差戻し2件を修正・fixture39件成功",
+      "next": "仕様再レビューと品質独立レビュー",
+      "blocker": "親のP1再レビュー判定待ち"
+    },
+    "P2": {
+      "title": "指示とhookの整理",
+      "status": "進行中",
+      "current": "実装の仕様・品質2観点APPROVED、個人skill配置整理中",
+      "next": "実機適用とE2E検証",
+      "blocker": "実機適用未完"
+    },
+    "P3": {
+      "title": "引継ぎの整備",
+      "status": "完了",
+      "current": "fresh scope recheck APPROVED・親受入済み",
+      "next": "",
+      "blocker": ""
+    },
+    "P4": {
+      "title": "wealth開発への適用",
+      "status": "検証中",
+      "current": "/private/tmp/wealth-codex-migrationで実装・限定34件成功",
+      "next": "レビュー後に停止stubをcloneへ反映しP1統合",
+      "blocker": "レビュー中・P1統合待ち"
+    },
+    "P5": {
+      "title": "速度・品質の比較",
+      "status": "進行中",
+      "current": "比較harnessのレビュー差戻しを修正中",
+      "next": "修正レビュー後に正式24run",
+      "blocker": "正式24run未実施"
+    },
+    "P6": {
+      "title": "実資産の読み取り",
+      "status": "合意待ち",
+      "current": "",
+      "next": "対象と情報経路の合意",
+      "blocker": "対象/経路の合意待ち"
+    },
+    "P7": {
+      "title": "更新運用",
+      "status": "別マイルストーン",
+      "current": "",
+      "next": "",
+      "blocker": ""
+    }
+  },
+  "current": "P1仕様差戻し2件を修正・fixture39件成功",
+  "next": "仕様再レビューと品質独立レビュー",
+  "blocker": "親のP1再レビュー判定待ち",
+  "updated_at": "2026-09-21T19:57:21+09:00"
+}

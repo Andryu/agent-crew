@@ -1,0 +1,778 @@
+{
+  "schema": 1,
+  "source_head": "875dd67062d7a16fc27017965066a99303e3d0a9",
+  "target_base_head": "875dd67062d7a16fc27017965066a99303e3d0a9",
+  "files": [
+    {
+      "category": "contract",
+      "source": "agent-crew:.agents/skills/fable-class/SKILL.md",
+      "target": ".agents/skills/fable-class/SKILL.md",
+      "sha256": "2eacac42182afb8a69ddad5101ee62c5035a2f73cba5eb2eb8ea9a82d2d775d1",
+      "disposition": "copied"
+    },
+    {
+      "category": "contract",
+      "source": "agent-crew:.agents/skills/fable-class/references/delegation.md",
+      "target": ".agents/skills/fable-class/references/delegation.md",
+      "sha256": "eeab5755a8ce148b62543ac6a1eabcafc545fc29238a82d9cce57344fa0bc46e",
+      "disposition": "copied"
+    },
+    {
+      "category": "contract",
+      "source": "agent-crew:.agents/skills/fable-class/references/planning.md",
+      "target": ".agents/skills/fable-class/references/planning.md",
+      "sha256": "ff1c705ea6434008ae2a2b2c7a4ca796d222fa047caf82064d1f5add1623f3d4",
+      "disposition": "copied"
+    },
+    {
+      "category": "contract",
+      "source": "agent-crew:.agents/skills/fable-class/references/verification.md",
+      "target": ".agents/skills/fable-class/references/verification.md",
+      "sha256": "83f018a6910011a8b3093741657b3f1de5044330939f03ce4857a9e8a7e73bf8",
+      "disposition": "copied"
+    },
+    {
+      "category": "contract",
+      "source": "agent-crew:.codex/agents/direct-reviewer.toml",
+      "target": ".codex/agents/direct-reviewer.toml",
+      "sha256": "dbaa8de7ee5c4c3102522ead57106aad9bcbc57e1fac91428ead2b1eab44df3d",
+      "disposition": "copied"
+    },
+    {
+      "category": "contract",
+      "source": "agent-crew:AGENTS.md",
+      "target": "AGENTS.md",
+      "sha256": "bb067ce35b66e1767ceaaa03bdd97f0502d63e5b7b0c4c36a552f43c88205e68",
+      "disposition": "copied"
+    },
+    {
+      "category": "runtime",
+      "source": "agent-crew:config/codex/legacy-developer.toml",
+      "target": "config/codex/legacy-developer.toml",
+      "sha256": "17081a191d7766934a755dcab6e2d1ecb27a3ac79045399780742a73c4aaf61a",
+      "disposition": "copied"
+    },
+    {
+      "category": "runtime",
+      "source": "agent-crew:config/codex/permissions.toml",
+      "target": "config/codex/permissions.toml",
+      "sha256": "b6778934a2e620a4a2b1b7871b9a33f56202f418677894ffd83c0212badcf945",
+      "disposition": "copied"
+    },
+    {
+      "category": "runtime",
+      "source": "agent-crew:config/crew-hooks.json",
+      "target": "config/crew-hooks.json",
+      "sha256": "9d673cb11caee60bb149104a2886d6f9d8ee0d5dd2c14ee0ff161d7c2375798e",
+      "disposition": "copied"
+    },
+    {
+      "category": "plans_and_guides",
+      "source": "agent-crew:docs/codex-direct/README.md",
+      "target": "docs/codex-direct/README.md",
+      "sha256": "f77a04d61c982661471a3f03f23a9ed59b40d7bec477555d4941f7f9f42b509e",
+      "disposition": "copied"
+    },
+    {
+      "category": "plans_and_guides",
+      "source": "agent-crew:docs/codex-direct/handoff.md",
+      "target": "docs/codex-direct/handoff.md",
+      "sha256": "130b67eda2141a9e3697dda3d6a1badc56b9dcafc6b9d346f57a71b7ee99446f",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/architect.toml",
+      "target": "docs/codex-direct/legacy-agents/architect.toml",
+      "sha256": "3f5cfff68f900e2c63c0a5a9d5e972c75ab3d8a863e7420bc59a0933a085a5d0",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/coo.toml",
+      "target": "docs/codex-direct/legacy-agents/coo.toml",
+      "sha256": "9f4f20cb575963e27c06ff1031904f10a4c40aa496685711d63bd0a7a2a9d494",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/critic.toml",
+      "target": "docs/codex-direct/legacy-agents/critic.toml",
+      "sha256": "7a0ba028d51c75de568fa70beab6a791476428e2fd841996e9794d462076e420",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/data-analyst.toml",
+      "target": "docs/codex-direct/legacy-agents/data-analyst.toml",
+      "sha256": "0ceb6b59f286ab36ea681f74f17da8bf8bbc8c00ec32c77a7099fc3940caa03a",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/devops.toml",
+      "target": "docs/codex-direct/legacy-agents/devops.toml",
+      "sha256": "6ed1ce76f69d3f1efea6b38fd0c2a06d1771fd20b252b694cf4b5056b72e7fd3",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/doc-reviewer.toml",
+      "target": "docs/codex-direct/legacy-agents/doc-reviewer.toml",
+      "sha256": "25527921340009bb62eced90071a15b103130f8d2b3cee8b7f80a457a6fbcdec",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/engineer-go.toml",
+      "target": "docs/codex-direct/legacy-agents/engineer-go.toml",
+      "sha256": "643aacc4012f8d3218902946281c6b4b0c0d048a4cc1afe3ca8c14dab30baa5e",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/engineer-next.toml",
+      "target": "docs/codex-direct/legacy-agents/engineer-next.toml",
+      "sha256": "2d612702ab9e6b2d6f86c84143eb0581e6ebb49704559a19d0e8685582ef0cf0",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/engineer-vue.toml",
+      "target": "docs/codex-direct/legacy-agents/engineer-vue.toml",
+      "sha256": "7c225486efbf06c587f7e41f1676364e31f3f83e55019fda185e34193acd5d77",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/manifest.json",
+      "target": "docs/codex-direct/legacy-agents/manifest.json",
+      "sha256": "9f39f1759bd95c802c48a59739e503d34a9a8f0081427d0e9fded3809a80531f",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/pm-estimation.toml",
+      "target": "docs/codex-direct/legacy-agents/pm-estimation.toml",
+      "sha256": "147e83bcbbc0f7ca085c779c593956ad6bd99660b80c94eb8ed4bc2ab03c546a",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/pm-protocol.toml",
+      "target": "docs/codex-direct/legacy-agents/pm-protocol.toml",
+      "sha256": "eb9be0a7cf61242c285e56f46a5965c5a9391d83d7b521f23a825f65e9f9fe59",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/pm.toml",
+      "target": "docs/codex-direct/legacy-agents/pm.toml",
+      "sha256": "448a9b71ca56625941b3be2ba33fcfac2fe3c21f00cffa21034d49eda8fffbce",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/qa.toml",
+      "target": "docs/codex-direct/legacy-agents/qa.toml",
+      "sha256": "3782178b6a0c6ab4efbd85c36e6d78d3cae583083c531ea7b83f5ad1e3be2e97",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/retro.toml",
+      "target": "docs/codex-direct/legacy-agents/retro.toml",
+      "sha256": "6975756fcd7ed4505acb0375b32909825f0d65756093ba20c4df57d67a031839",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/security.toml",
+      "target": "docs/codex-direct/legacy-agents/security.toml",
+      "sha256": "247db1170cd37ff9374a8dff7fe776a8ac70e091641e709964197d841ee2e606",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/ux-designer.toml",
+      "target": "docs/codex-direct/legacy-agents/ux-designer.toml",
+      "sha256": "bc61e383b9b8502b1fa640b470202d9591d3c1f6046cc916ab4c30a4116214fa",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_retired_agents",
+      "source": "agent-crew:docs/codex-direct/legacy-agents/viral-video-researcher.toml",
+      "target": "docs/codex-direct/legacy-agents/viral-video-researcher.toml",
+      "sha256": "50a227a2019250231bd39a6c1072a24f677d44fde5e26a80ff20b9054eb5e742",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/README.md",
+      "target": "docs/codex-direct/migration-baseline/README.md",
+      "sha256": "7d82fcadc30b4f6e9fee2e7d377af4d15312a6b753abe173ee086b47a3fa75c3",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/capture.py",
+      "target": "docs/codex-direct/migration-baseline/capture.py",
+      "sha256": "d6b7396d129136782bbfcd4aceefec4dc3dc470181fd643de0e61ce8e1032b46",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/comparison.json",
+      "target": "docs/codex-direct/migration-baseline/comparison.json",
+      "sha256": "3214b75d3a6f37cf474d167a358d5f1ed24344dfe88f6e6e11ead220b0d823e5",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/fixtures/board-state.json",
+      "target": "docs/codex-direct/migration-baseline/fixtures/board-state.json",
+      "sha256": "95d84ce2bf8ab2de32a6cc379953b82285b9f113b62e8471f1523ab9a7e04fe3",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/manifest.json",
+      "target": "docs/codex-direct/migration-baseline/manifest.json",
+      "sha256": "db7f4406505cb5879207c1ae7889946cdfbb9f4217ab551c8ec69ae311b6d4ee",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/smoke-result.json",
+      "target": "docs/codex-direct/migration-baseline/smoke-result.json",
+      "sha256": "495e13e6aa3bc72ba71e2277a07aba110336ec48695c9827ea57de64ec0e4959",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/smoke.py",
+      "target": "docs/codex-direct/migration-baseline/smoke.py",
+      "sha256": "0e894472893153f22f0cc8390f5749e2bb01367a836182ad04ff69f0b892977f",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot-index.json",
+      "target": "docs/codex-direct/migration-baseline/snapshot-index.json",
+      "sha256": "273b627b173605014a4061e964d744fd53bc4567b70c78811993fa575a8d9e3f",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/.agents/skills/fable-class/SKILL.md",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/.agents/skills/fable-class/SKILL.md",
+      "sha256": "0beaebacc99d339279becde7d0fac41f62bfa03655981dd9f3a0ea938f845dbd",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/.agents/skills/fable-class/references/delegation.md",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/.agents/skills/fable-class/references/delegation.md",
+      "sha256": "5a1a17c42ad029d400ebc617516669d6db956f3ae82b39e733333d92e5f7934d",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/.agents/skills/fable-class/references/planning.md",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/.agents/skills/fable-class/references/planning.md",
+      "sha256": "c3ff9d1392c1a3cf139c5a954288f92583dbb2300535cb5bf1b32fc83ad9b198",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/.agents/skills/fable-class/references/verification.md",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/.agents/skills/fable-class/references/verification.md",
+      "sha256": "534372db5d30ebfa29e119f753fd839fa2c5fa535ba7d0e2309b79c418355400",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/AGENTS.md",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/AGENTS.md",
+      "sha256": "3bb53637cc6b91734163e4149cc825c0638ae061466059db9308359586365d4e",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/config/crew-hooks.json",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/config/crew-hooks.json",
+      "sha256": "7ef2af27c4c5313a428df6e8805584e7a58e193ceca3d3f3654010e3f2602bab",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/migration-progress/README.md",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/migration-progress/README.md",
+      "sha256": "48d30ccdc161628610cfd687d18c018e707b7faad2afde8529437aab2b8dad4f",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/migration-progress/progress.py",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/migration-progress/progress.py",
+      "sha256": "bfea2ddbf1cc8686ca93383db6803a08288929ce0989c2dd49aa87f1f3505575",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/scripts/codex_hook_state.py",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/scripts/codex_hook_state.py",
+      "sha256": "ef0eb453737d3ec4ed55f40ef8eac6c4a9a5fe837636154701e8f3ba4532273c",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/scripts/crew",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/scripts/crew",
+      "sha256": "325b5a2d703969c25be4d9181b5b62a24730d18beb2bf5a6cd324beeaf2ac98b",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/scripts/crew_hooks.py",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/scripts/crew_hooks.py",
+      "sha256": "aecc87c7907aae66c10a173928524a7457d87577e713be90d3660fedec6ee041",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/scripts/install_crew_hooks.py",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/scripts/install_crew_hooks.py",
+      "sha256": "2583d8ab14f795ed8455343836fe4d04cab7ebe5f2d0cbe2c4f4b93e6c2316c4",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/tests/test_codex_hook_state.py",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/tests/test_codex_hook_state.py",
+      "sha256": "104ffefccf7ac950b125eb680ee70a128f1f0868e341c3f3af528162c0924d9a",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/tests/test_crew_launcher.py",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/tests/test_crew_launcher.py",
+      "sha256": "98295b6adaffea2f589dd4031a25c0a478c0d8f035fd819ce9a6545b613b09fd",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/agent_crew/tests/test_install_crew_hooks.py",
+      "target": "docs/codex-direct/migration-baseline/snapshot/agent_crew/tests/test_install_crew_hooks.py",
+      "sha256": "ebfbf375fe59da8324c7ac20bbd3420672e90febeb29eff220c7f8ab7bd56a80",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/wealth_advisor/AGENTS.md",
+      "target": "docs/codex-direct/migration-baseline/snapshot/wealth_advisor/AGENTS.md",
+      "sha256": "b454a3e54154e4caf5c57804c8adb09ec1bca0ca5549012d50a5c0f22c2229c4",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/wealth_advisor/scripts/check_operational_readiness.py",
+      "target": "docs/codex-direct/migration-baseline/snapshot/wealth_advisor/scripts/check_operational_readiness.py",
+      "sha256": "86f1f68efef40e3768f3a184d0da88497a8319e5af545d61ee25299cfd662bff",
+      "disposition": "copied"
+    },
+    {
+      "category": "p0_baseline",
+      "source": "agent-crew:docs/codex-direct/migration-baseline/snapshot/wealth_advisor/tests/test_operational_readiness.py",
+      "target": "docs/codex-direct/migration-baseline/snapshot/wealth_advisor/tests/test_operational_readiness.py",
+      "sha256": "c722b654fb284f9e36ec9523f69f7625af0e6455b4530cffa8c619a3c16a422c",
+      "disposition": "copied"
+    },
+    {
+      "category": "plans_and_guides",
+      "source": "agent-crew:docs/codex-direct/p1-config-composer.md",
+      "target": "docs/codex-direct/p1-config-composer.md",
+      "sha256": "d46a6aa2787c2192a8703a5bfeda5597328f1e771be044a2079fbebab628e33f",
+      "disposition": "copied"
+    },
+    {
+      "category": "plans_and_guides",
+      "source": "agent-crew:docs/plans/2026-09-21-codex-operating-model-replan.md",
+      "target": "docs/plans/2026-09-21-codex-operating-model-replan.md",
+      "sha256": "e2b4eb13f9c5ea0dcdebb118eb76a590ddcbac7b8fefda36efeca7d96a76d1d5",
+      "disposition": "copied"
+    },
+    {
+      "category": "plans_and_guides",
+      "source": "agent-crew:docs/plans/2026-09-21-codex-operating-model-reviews.md",
+      "target": "docs/plans/2026-09-21-codex-operating-model-reviews.md",
+      "sha256": "4a5c493a82c27d3ccfc51c8d863052dbeae6f6e3de0a97d232e1cb7f80fd98a0",
+      "disposition": "copied"
+    },
+    {
+      "category": "plans_and_guides",
+      "source": "agent-crew:docs/plans/2026-09-21-migration-handoff-evidence.md",
+      "target": "docs/plans/2026-09-21-migration-handoff-evidence.md",
+      "sha256": "e7e67905645270fae76bdec9a6331b53c6e9781615aa9e3bed29d66c5a746595",
+      "disposition": "copied"
+    },
+    {
+      "category": "plans_and_guides",
+      "source": "agent-crew:docs/plans/2026-09-21-p2-instructions.md",
+      "target": "docs/plans/2026-09-21-p2-instructions.md",
+      "sha256": "2ad66a6a2982adb22aad6ce223fb4695220c0803d44610372deb99cc4ea83003",
+      "disposition": "copied"
+    },
+    {
+      "category": "progress_board",
+      "source": "agent-crew:migration-progress/README.md",
+      "target": "migration-progress/README.md",
+      "sha256": "48d30ccdc161628610cfd687d18c018e707b7faad2afde8529437aab2b8dad4f",
+      "disposition": "copied"
+    },
+    {
+      "category": "progress_board",
+      "source": "agent-crew:migration-progress/progress.py",
+      "target": "migration-progress/progress.py",
+      "sha256": "bfea2ddbf1cc8686ca93383db6803a08288929ce0989c2dd49aa87f1f3505575",
+      "disposition": "copied"
+    },
+    {
+      "category": "progress_board",
+      "source": "agent-crew:migration-progress/state.json",
+      "target": "migration-progress/state.json",
+      "sha256": "1a6cbf94a3bfe75ab9478ef33e848f624b60ae45172edcc657cd52af703f52ec",
+      "disposition": "copied"
+    },
+    {
+      "category": "runtime",
+      "source": "agent-crew:scripts/codex_config_composer.py",
+      "target": "scripts/codex_config_composer.py",
+      "sha256": "df1258094464544fbad31f522db5075c812ca9c1805cf04250ac5415698fddbf",
+      "disposition": "copied"
+    },
+    {
+      "category": "runtime",
+      "source": "agent-crew:scripts/codex_hook_state.py",
+      "target": "scripts/codex_hook_state.py",
+      "sha256": "5d3961c79d884d574c03759fa76be8cb505eb42d1b5117e3770b715b804c2d9e",
+      "disposition": "copied"
+    },
+    {
+      "category": "runtime",
+      "source": "agent-crew:scripts/crew",
+      "target": "scripts/crew",
+      "sha256": "325b5a2d703969c25be4d9181b5b62a24730d18beb2bf5a6cd324beeaf2ac98b",
+      "disposition": "copied"
+    },
+    {
+      "category": "runtime",
+      "source": "agent-crew:scripts/crew_hooks.py",
+      "target": "scripts/crew_hooks.py",
+      "sha256": "9be5d7db348f19f2a575986141276398d9c6b039bba85252bc16a23b42661339",
+      "disposition": "copied"
+    },
+    {
+      "category": "runtime",
+      "source": "agent-crew:scripts/inspect_codex_hooks.py",
+      "target": "scripts/inspect_codex_hooks.py",
+      "sha256": "c36c41204fbdb7391f750776c069f535c5ac90f7fec83325cd91c4d6c0b0be29",
+      "disposition": "copied"
+    },
+    {
+      "category": "runtime",
+      "source": "agent-crew:scripts/install_crew_hooks.py",
+      "target": "scripts/install_crew_hooks.py",
+      "sha256": "49eb0f581e5f10768bf2a46f5deceff7b0db9818f75faf28f28d8a95547251e0",
+      "disposition": "copied"
+    },
+    {
+      "category": "tests",
+      "source": "agent-crew:tests/fixtures/legacy_wealth_install_codex_permissions.py",
+      "target": "tests/fixtures/legacy_wealth_install_codex_permissions.py",
+      "sha256": "9b89101a8f4feec6a9c74cedf3ebb8010ceaebf7040ea1c7863e96ccb42fa3c7",
+      "disposition": "copied"
+    },
+    {
+      "category": "tests",
+      "source": "agent-crew:tests/test_codex_config_composer.py",
+      "target": "tests/test_codex_config_composer.py",
+      "sha256": "2dd8e93fa63028522f8f26c571f555a6584c6d78c93f21ba9c3235cd17cdfb4a",
+      "disposition": "copied"
+    },
+    {
+      "category": "tests",
+      "source": "agent-crew:tests/test_codex_hook_state.py",
+      "target": "tests/test_codex_hook_state.py",
+      "sha256": "7093f79763c3a44b731e4bdbc4ded295b084f8e3a7dcb5c5a3227d59302c3c6d",
+      "disposition": "copied"
+    },
+    {
+      "category": "tests",
+      "source": "agent-crew:tests/test_crew_hooks.py",
+      "target": "tests/test_crew_hooks.py",
+      "sha256": "011e7b1f75c9189901915488e89a5cd861683523210bfa48e95ff16ef555acc1",
+      "disposition": "copied"
+    },
+    {
+      "category": "tests",
+      "source": "agent-crew:tests/test_crew_launcher.py",
+      "target": "tests/test_crew_launcher.py",
+      "sha256": "98295b6adaffea2f589dd4031a25c0a478c0d8f035fd819ce9a6545b613b09fd",
+      "disposition": "copied"
+    },
+    {
+      "category": "tests",
+      "source": "agent-crew:tests/test_install_crew_hooks.py",
+      "target": "tests/test_install_crew_hooks.py",
+      "sha256": "3e9a186dc6845cde5f7290bd60ff15548861c17f7ced7380b453e5685c0a8f28",
+      "disposition": "copied"
+    },
+    {
+      "category": "tests_dependency",
+      "source": "agent-crew:scripts/privacy-check.sh",
+      "target": "scripts/privacy-check.sh",
+      "sha256": "ce9c26bd5b6d860f0e18efa014b953432d9b316c674dd7810f88efaf5b6e05c6",
+      "disposition": "copied",
+      "reason": "P2 common hook summary APIとmacOS Bash 3互換。test_privacy_summary_redacts_values_and_file_namesの必要依存。元repo既存diff全体を確認済み"
+    },
+    {
+      "category": "p2_personal_skills",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/repo-copies/life-plan-review/SKILL.md",
+      "target": "docs/codex-direct/legacy-personal-skills/repo-copies/life-plan-review/SKILL.md",
+      "sha256": "6cbe4a4f3732e8480abb701b0c2bfff95cc8e158a4039affdb2512f88d758cf8",
+      "disposition": "copied",
+      "reason": "P2個人skillの静的二観点APPROVED済み退避成果。runtime discoveryは別途未完"
+    },
+    {
+      "category": "p2_personal_skills",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/repo-copies/life-plan-review/references/review-recipe.md",
+      "target": "docs/codex-direct/legacy-personal-skills/repo-copies/life-plan-review/references/review-recipe.md",
+      "sha256": "fff12046a324012e75fe194b56a1b3e29a26c649f4c1b282d4f301254ec57764",
+      "disposition": "copied",
+      "reason": "P2個人skillの静的二観点APPROVED済み退避成果。runtime discoveryは別途未完"
+    },
+    {
+      "category": "p2_personal_skills",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/repo-copies/life-planner/SKILL.md",
+      "target": "docs/codex-direct/legacy-personal-skills/repo-copies/life-planner/SKILL.md",
+      "sha256": "0bc44f3677f5ec01534ce9c05603d52156ca227952bcd0f4aa6bef3dc3b80a00",
+      "disposition": "copied",
+      "reason": "P2個人skillの静的二観点APPROVED済み退避成果。runtime discoveryは別途未完"
+    },
+    {
+      "category": "p2_personal_skills",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/repo-copies/life-planner/references/jp-money-systems.md",
+      "target": "docs/codex-direct/legacy-personal-skills/repo-copies/life-planner/references/jp-money-systems.md",
+      "sha256": "e429592dd81f25c937c399697c7184dc4904f4f0b71569b20309780cfd66a926",
+      "disposition": "copied",
+      "reason": "P2個人skillの静的二観点APPROVED済み退避成果。runtime discoveryは別途未完"
+    },
+    {
+      "category": "p2_personal_skills",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/repo-copies/life-planner/references/notion-recipe.md",
+      "target": "docs/codex-direct/legacy-personal-skills/repo-copies/life-planner/references/notion-recipe.md",
+      "sha256": "c0b4b9c8edbab60ea40229f1bed039c51b6e538a465b24ed7505dfb90a470b36",
+      "disposition": "copied",
+      "reason": "P2個人skillの静的二観点APPROVED済み退避成果。runtime discoveryは別途未完"
+    },
+    {
+      "category": "p2_personal_skills",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/repo-copies/travel-itinerary-artifact/CHANGELOG.md",
+      "target": "docs/codex-direct/legacy-personal-skills/repo-copies/travel-itinerary-artifact/CHANGELOG.md",
+      "sha256": "434b48b28a32b70555be1e80202c8cb2d2852543969f236c1902f48f912e1669",
+      "disposition": "copied",
+      "reason": "P2個人skillの静的二観点APPROVED済み退避成果。runtime discoveryは別途未完"
+    },
+    {
+      "category": "p2_personal_skills",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/repo-copies/travel-itinerary-artifact/README.md",
+      "target": "docs/codex-direct/legacy-personal-skills/repo-copies/travel-itinerary-artifact/README.md",
+      "sha256": "3f6f2e12fb7e9053024fcb6866783928fdc3ee47819018e15e7bac8015b3f779",
+      "disposition": "copied",
+      "reason": "P2個人skillの静的二観点APPROVED済み退避成果。runtime discoveryは別途未完"
+    },
+    {
+      "category": "p2_personal_skills",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/repo-copies/travel-itinerary-artifact/SKILL.md",
+      "target": "docs/codex-direct/legacy-personal-skills/repo-copies/travel-itinerary-artifact/SKILL.md",
+      "sha256": "f451ff206571b76207ff08a2989f476284d2c1a174f352d69382bbe30c070660",
+      "disposition": "copied",
+      "reason": "P2個人skillの静的二観点APPROVED済み退避成果。runtime discoveryは別途未完"
+    },
+    {
+      "category": "p2_personal_skills",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/repo-copies/travel-plan-review/SKILL.md",
+      "target": "docs/codex-direct/legacy-personal-skills/repo-copies/travel-plan-review/SKILL.md",
+      "sha256": "459bd2bc705869bd0c0b695ef449e451f726b4caf37253c0472efa574c4bfceb",
+      "disposition": "copied",
+      "reason": "P2個人skillの静的二観点APPROVED済み退避成果。runtime discoveryは別途未完"
+    },
+    {
+      "category": "p2_personal_skills",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/manifest.json",
+      "target": "docs/codex-direct/legacy-personal-skills/manifest.json",
+      "sha256": "1541f15b510890084abc9260a03a52a20ec3d631db9129e9ba6e44f2da5f76f8",
+      "disposition": "copied",
+      "reason": "P2個人skillの静的二観点APPROVED済み退避成果。runtime discoveryは別途未完"
+    },
+    {
+      "category": "p2_personal_skills",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/README.md",
+      "target": "docs/codex-direct/legacy-personal-skills/README.md",
+      "sha256": "4c33caae727b222358fb17552cc890715b5ea723ffff28b642af6dad82b95394",
+      "disposition": "copied",
+      "reason": "P2個人skillの静的二観点APPROVED済み退避成果。runtime discoveryは別途未完"
+    },
+    {
+      "category": "p2_personal_skills",
+      "source": "agent-crew:docs/plans/2026-09-21-p2-personal-skills.md",
+      "target": "docs/plans/2026-09-21-p2-personal-skills.md",
+      "sha256": "4df19ee3aa27e8d881b8e666fe1204c43da641b1f65f764e12568d6e2725c611",
+      "disposition": "copied",
+      "reason": "P2個人skillの静的二観点APPROVED済み退避成果。runtime discoveryは別途未完"
+    },
+    {
+      "category": "p2_global_contract",
+      "source": "agent-crew:config/codex/AGENTS.md",
+      "target": "config/codex/AGENTS.md",
+      "sha256": "cf8109b5ff370029ab61e46810a7e7b2d5374f2ce82fcf67e199f644d456958d",
+      "disposition": "copied",
+      "reason": "P2個人global契約の適用候補と手順。cloneへ原本を保存し、global実設定は未適用"
+    },
+    {
+      "category": "p2_global_contract",
+      "source": "agent-crew:docs/plans/2026-09-21-p2-global-contract.md",
+      "target": "docs/plans/2026-09-21-p2-global-contract.md",
+      "sha256": "183823b0b01eb5b068bac335763d4d99716d520ada4d31b7a7a42efcb7cb6a5a",
+      "disposition": "copied",
+      "reason": "P2個人global契約の適用候補と手順。cloneへ原本を保存し、global実設定は未適用"
+    },
+    {
+      "category": "p2_reappeared_archive",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/life-plan-review/SKILL.md",
+      "target": "docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/life-plan-review/SKILL.md",
+      "sha256": "6cbe4a4f3732e8480abb701b0c2bfff95cc8e158a4039affdb2512f88d758cf8",
+      "disposition": "copied",
+      "reason": "再出現した旧4 skillの同一hash別退避"
+    },
+    {
+      "category": "p2_reappeared_archive",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/life-plan-review/references/review-recipe.md",
+      "target": "docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/life-plan-review/references/review-recipe.md",
+      "sha256": "fff12046a324012e75fe194b56a1b3e29a26c649f4c1b282d4f301254ec57764",
+      "disposition": "copied",
+      "reason": "再出現した旧4 skillの同一hash別退避"
+    },
+    {
+      "category": "p2_reappeared_archive",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/life-planner/SKILL.md",
+      "target": "docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/life-planner/SKILL.md",
+      "sha256": "0bc44f3677f5ec01534ce9c05603d52156ca227952bcd0f4aa6bef3dc3b80a00",
+      "disposition": "copied",
+      "reason": "再出現した旧4 skillの同一hash別退避"
+    },
+    {
+      "category": "p2_reappeared_archive",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/life-planner/references/jp-money-systems.md",
+      "target": "docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/life-planner/references/jp-money-systems.md",
+      "sha256": "e429592dd81f25c937c399697c7184dc4904f4f0b71569b20309780cfd66a926",
+      "disposition": "copied",
+      "reason": "再出現した旧4 skillの同一hash別退避"
+    },
+    {
+      "category": "p2_reappeared_archive",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/life-planner/references/notion-recipe.md",
+      "target": "docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/life-planner/references/notion-recipe.md",
+      "sha256": "c0b4b9c8edbab60ea40229f1bed039c51b6e538a465b24ed7505dfb90a470b36",
+      "disposition": "copied",
+      "reason": "再出現した旧4 skillの同一hash別退避"
+    },
+    {
+      "category": "p2_reappeared_archive",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/travel-itinerary-artifact/CHANGELOG.md",
+      "target": "docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/travel-itinerary-artifact/CHANGELOG.md",
+      "sha256": "434b48b28a32b70555be1e80202c8cb2d2852543969f236c1902f48f912e1669",
+      "disposition": "copied",
+      "reason": "再出現した旧4 skillの同一hash別退避"
+    },
+    {
+      "category": "p2_reappeared_archive",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/travel-itinerary-artifact/README.md",
+      "target": "docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/travel-itinerary-artifact/README.md",
+      "sha256": "3f6f2e12fb7e9053024fcb6866783928fdc3ee47819018e15e7bac8015b3f779",
+      "disposition": "copied",
+      "reason": "再出現した旧4 skillの同一hash別退避"
+    },
+    {
+      "category": "p2_reappeared_archive",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/travel-itinerary-artifact/SKILL.md",
+      "target": "docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/travel-itinerary-artifact/SKILL.md",
+      "sha256": "f451ff206571b76207ff08a2989f476284d2c1a174f352d69382bbe30c070660",
+      "disposition": "copied",
+      "reason": "再出現した旧4 skillの同一hash別退避"
+    },
+    {
+      "category": "p2_reappeared_archive",
+      "source": "agent-crew:docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/travel-plan-review/SKILL.md",
+      "target": "docs/codex-direct/legacy-personal-skills/reappeared-20260921-201531/travel-plan-review/SKILL.md",
+      "sha256": "459bd2bc705869bd0c0b695ef449e451f726b4caf37253c0472efa574c4bfceb",
+      "disposition": "copied",
+      "reason": "再出現した旧4 skillの同一hash別退避"
+    },
+    {
+      "category": "p1_canary",
+      "source": "agent-crew:docs/codex-direct/p1-maintenance-canary.md",
+      "target": "docs/codex-direct/p1-maintenance-canary.md",
+      "sha256": "5fc91b64417bc712fd369693f33eb1d6d89fd2b4b2ba797cd4202a2eb955086f",
+      "disposition": "copied",
+      "reason": "P1 maintenance実機canaryの失敗証拠と限定案"
+    },
+    {
+      "category": "p2_runtime_evidence",
+      "source": "agent-crew:docs/codex-direct/p2-skills-app-server-evidence.md",
+      "target": "docs/codex-direct/p2-skills-app-server-evidence.md",
+      "sha256": "8d665f63a82e3a97aaa3c6241b55d172f6a40af28aab994ec45bd23fa302a3e5",
+      "disposition": "copied"
+    },
+    {
+      "category": "p2_agents_handoff",
+      "source": "agent-crew:docs/codex-direct/p2-agents-handoff.md",
+      "target": "docs/codex-direct/p2-agents-handoff.md",
+      "sha256": "dbc77e1ce4e4cdea0b2af42d49b9131a3709409fa0e0041b48bbb9dfbee862cb",
+      "disposition": "copied"
+    },
+    {
+      "category": "p5_formal_report",
+      "source": "agent-crew:docs/codex-direct/migration-benchmark/formal-report.md",
+      "target": "docs/codex-direct/migration-benchmark/formal-report.md",
+      "sha256": "43526472a70a3ff51ef1eaaa729b7872c449aad0c4045565824ff1068b3b63c1",
+      "disposition": "copied",
+      "reason": "P5正式24run結果報告。独立品質レビューAPPROVED版を限定コピー。benchmarkコード・契約・入力はコピーしない"
+    },
+    {
+      "category": "p1_final",
+      "source": "agent-crew:docs/plans/2026-09-21-p1-known-legacy-unmarked-adoption.md",
+      "target": "docs/plans/2026-09-21-p1-known-legacy-unmarked-adoption.md",
+      "sha256": "7b95d78ac8a422d9d4ebf4169f7eaddc8edc576877a4fbd22d04bb71d4ccf4e5",
+      "disposition": "copied",
+      "reason": "P1既知旧無印区画の採用判断"
+    },
+    {
+      "category": "p1_final",
+      "source": "agent-crew:docs/plans/2026-09-22-p1-fixed-roots-decision.md",
+      "target": "docs/plans/2026-09-22-p1-fixed-roots-decision.md",
+      "sha256": "7dc6bfb2176d77725fac451facaf70049643801ee97edfaa0f5b689c2e29bdd7",
+      "disposition": "copied",
+      "reason": "P1固定root・兄弟profile決定"
+    },
+    {
+      "category": "p2_final",
+      "source": "agent-crew:.claude/settings.json",
+      "target": ".claude/settings.json",
+      "sha256": "5e20b105db9f1f98e69be64c170f0a9e312d4ac60248a5fdb48c81318b61720a",
+      "disposition": "copied",
+      "reason": "tracked既存版を置換。旧Claude hook登録をP2共通crew_hooks.pyの4イベントへ統合"
+    }
+  ]
+}

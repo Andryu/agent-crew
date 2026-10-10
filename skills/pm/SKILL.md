@@ -416,7 +416,7 @@ Antigravity（SubagentStop hook 未対応）の場合：
 - **priority**: 4 / sprint: sprint-05
 
 ### agent-crew-sprint-07-process-001
-- **lesson**: Sprint-07 完了後にレトロが実施されないまま Sprint-08 に突入した。Sprint-06 で「みゆきち自動起動を pm.md に明文化した」にもかかわらず Sprint-07 完了時に実行されなかった。振り返りが欠落すると 
+- **lesson**: Sprint-07 完了後にレトロが実施されないまま Sprint-08 に突入した。Sprint-06 で「みゆきち自動起動を pm.md に明文化した」にもかかわらず Sprint-07 完了時に実行されなかった。振り返りが欠落すると
 - **禁止行動**: pm.md または retro.md の完了基準に「スプリント完了時、Yuki は @retro を呼ぶ」を追加し、スプリント完了メッセージのテンプレートに @retro 呼び出しを含める。
 - **priority**: 6 / sprint: sprint-07
 
@@ -441,7 +441,7 @@ Antigravity（SubagentStop hook 未対応）の場合：
 - **priority**: 4 / sprint: sprint-10
 
 ### agent-crew-sprint-11-process-001
-- **lesson**: 
+- **lesson**:
 - **禁止行動**: sora.md に「全タスク DONE 時は完了報告末尾に @retro を含める」を直接記載する。
 - **priority**: 8 / sprint: sprint-11
 

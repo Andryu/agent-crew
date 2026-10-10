@@ -368,12 +368,12 @@ Yuki へは `BLOCKED` ステータスとともにキューの notes へ詳細を
 - **priority**: 4 / sprint: sprint-09
 
 ### agent-crew-sprint-11-reliability-001
-- **lesson**: 
+- **lesson**:
 - **禁止行動**: Yuki は Riku の L タスクを1スプリント1件までに制限する計画ルールを追加。フォールバック手順を pm.md に明記。
 - **priority**: 4 / sprint: sprint-11
 
 ### agent-crew-sprint-11-reliability-002
-- **lesson**: 
+- **lesson**:
 - **禁止行動**: Sora のエージェント定義に「Bash 不可の場合は CHANGES_REQUESTED（REASON: BASH_UNAVAILABLE）を返す」を追加。
 - **priority**: 6 / sprint: sprint-11
 
@@ -384,12 +384,12 @@ Yuki へは `BLOCKED` ステータスとともにキューの notes へ詳細を
 
 ### agent-crew-sprint-15-tooling-001
 - **lesson**: Sprint-15 開始直後、Bash コマンドが絶対パス（/Users/...）で拒否された。settings.json の permissions.allow の Bash パターンは相対パス形式のみ一致し、絶対パスでは権限拒否になる。
-- **禁止行動**: 
+- **禁止行動**:
 - **priority**: 4 / sprint: sprint-15
 
 ### agent-crew-sprint-15-tooling-002
 - **lesson**: Sprint-15 の retro フェーズで scripts/lessons.sh が permissions.allow に未登録であり、lesson 記録（lessons.sh add）が実行できなかった。
-- **禁止行動**: 
+- **禁止行動**:
 - **priority**: 4 / sprint: sprint-15
 
 ### agent-crew-sprint-21-tooling-001

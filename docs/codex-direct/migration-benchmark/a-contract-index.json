@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "source_alias": "wealth_advisor (P0 manifest)",
+  "source_manifest": "../migration-baseline/manifest.json",
+  "source_head": "b63598f3d39944c73602dec76373b63a747b5d41",
+  "source_path": ".agents/skills/wealth-advisor/SKILL.md",
+  "source_blob_oid": "5e3ed48e199e363b461317adddcd18a15a7eec15",
+  "source_sha256": "088fbd816209bc7bf64ce4c50b994f2e791f26692eec7de24942d6d2cc64c75e",
+  "files": {
+    "wealth_advisor/.agents/skills/wealth-advisor/SKILL.md": "088fbd816209bc7bf64ce4c50b994f2e791f26692eec7de24942d6d2cc64c75e"
+  },
+  "dependency_note": "SKILL.mdに同一skill配下のreferences参照なし。記述中の実資産・外部補助scriptはC5静的課題では使用禁止。"
+}

@@ -1,0 +1,407 @@
+{
+  "schema": 1,
+  "captured_at": "2026-09-21T19:21:21+09:00",
+  "scope": "P0開発設定のみ。認証・資産・会話ログ・対象外repoを含まない",
+  "agent_crew": {
+    "root": "~/Workspace/agent-crew",
+    "branch": "main",
+    "head": "875dd67062d7a16fc27017965066a99303e3d0a9",
+    "status_counts": {
+      "tracked_changed": 6,
+      "selected_untracked": 21
+    },
+    "files": [
+      {
+        "path": "~/Workspace/agent-crew/AGENTS.md",
+        "owner": "repo契約",
+        "state": "present",
+        "sha256": "3bb53637cc6b91734163e4149cc825c0638ae061466059db9308359586365d4e",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/config/crew-hooks.json",
+        "owner": "共通hook原本",
+        "state": "present",
+        "sha256": "7ef2af27c4c5313a428df6e8805584e7a58e193ceca3d3f3654010e3f2602bab",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/scripts/crew_hooks.py",
+        "owner": "共通hook core",
+        "state": "present",
+        "sha256": "aecc87c7907aae66c10a173928524a7457d87577e713be90d3660fedec6ee041",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/scripts/install_crew_hooks.py",
+        "owner": "共通hook installer",
+        "state": "present",
+        "sha256": "2583d8ab14f795ed8455343836fe4d04cab7ebe5f2d0cbe2c4f4b93e6c2316c4",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/scripts/codex_hook_state.py",
+        "owner": "機械固有hook設定生成器",
+        "state": "present",
+        "sha256": "ef0eb453737d3ec4ed55f40ef8eac6c4a9a5fe837636154701e8f3ba4532273c",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/scripts/crew",
+        "owner": "agent-crew専用launcher",
+        "state": "present",
+        "sha256": "325b5a2d703969c25be4d9181b5b62a24730d18beb2bf5a6cd324beeaf2ac98b",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/.codex/hooks.json",
+        "owner": "生成hook adapter",
+        "state": "present",
+        "sha256": "a794815a6f8fe0a1d1b71c00190d17ce635f33cffa9c9f6d8c69e42431466bcc",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/.codex/config.toml",
+        "owner": "機械固有hook信頼設定",
+        "state": "present",
+        "sha256": "4f8f3a3124dc62d9005710ff06a7b174eeb708bf1524efd07d599c5c01f96e17",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/docs/codex-direct/local-hook-state.json",
+        "owner": "機械固有hook設定台帳",
+        "state": "present",
+        "sha256": "aa1f5632ac19e23b32762151c21c949c4d2be0331a20f6294ff22f7f652f5fb0",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/.claude/settings.json",
+        "owner": "共通hook適用先",
+        "state": "present",
+        "sha256": "dcd443201cc99aaa16bd22c60b6124b1cb9f91670f279f5e0c1cab5e00a9129a",
+        "git_status": " M",
+        "git_tracked": true
+      },
+      {
+        "path": "~/Workspace/agent-crew/.codex/agents/direct-reviewer.toml",
+        "owner": "repo reviewer定義",
+        "state": "present",
+        "sha256": "dbaa8de7ee5c4c3102522ead57106aad9bcbc57e1fac91428ead2b1eab44df3d",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/.agents/skills/fable-class/SKILL.md",
+        "owner": "repo skill",
+        "state": "present",
+        "sha256": "0beaebacc99d339279becde7d0fac41f62bfa03655981dd9f3a0ea938f845dbd",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/.agents/skills/fable-class/references/planning.md",
+        "owner": "比較Aの指示開始版",
+        "state": "present",
+        "sha256": "c3ff9d1392c1a3cf139c5a954288f92583dbb2300535cb5bf1b32fc83ad9b198",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/.agents/skills/fable-class/references/delegation.md",
+        "owner": "比較Aの指示開始版",
+        "state": "present",
+        "sha256": "5a1a17c42ad029d400ebc617516669d6db956f3ae82b39e733333d92e5f7934d",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/.agents/skills/fable-class/references/verification.md",
+        "owner": "比較Aの指示開始版",
+        "state": "present",
+        "sha256": "534372db5d30ebfa29e119f753fd839fa2c5fa535ba7d0e2309b79c418355400",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/tests/test_crew_launcher.py",
+        "owner": "比較課題fixture",
+        "state": "present",
+        "sha256": "98295b6adaffea2f589dd4031a25c0a478c0d8f035fd819ce9a6545b613b09fd",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/tests/test_install_crew_hooks.py",
+        "owner": "比較課題fixture",
+        "state": "present",
+        "sha256": "ebfbf375fe59da8324c7ac20bbd3420672e90febeb29eff220c7f8ab7bd56a80",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/tests/test_codex_hook_state.py",
+        "owner": "比較課題fixture",
+        "state": "present",
+        "sha256": "104ffefccf7ac950b125eb680ee70a128f1f0868e341c3f3af528162c0924d9a",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/docs/plans/2026-09-21-codex-operating-model-replan.md",
+        "owner": "比較課題文書入力",
+        "state": "present",
+        "sha256": "e2b4eb13f9c5ea0dcdebb118eb76a590ddcbac7b8fefda36efeca7d96a76d1d5",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/docs/plans/2026-09-21-codex-operating-model-reviews.md",
+        "owner": "比較課題文書fixture",
+        "state": "present",
+        "sha256": "4a5c493a82c27d3ccfc51c8d863052dbeae6f6e3de0a97d232e1cb7f80fd98a0",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/migration-progress/progress.py",
+        "owner": "比較課題fixture",
+        "state": "present",
+        "sha256": "bfea2ddbf1cc8686ca93383db6803a08288929ce0989c2dd49aa87f1f3505575",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/agent-crew/migration-progress/README.md",
+        "owner": "比較課題契約",
+        "state": "present",
+        "sha256": "48d30ccdc161628610cfd687d18c018e707b7faad2afde8529437aab2b8dad4f",
+        "git_status": "??",
+        "git_tracked": false
+      }
+    ]
+  },
+  "wealth_advisor": {
+    "root": "~/Workspace/claude-agent-teams/finace/wealth-advisor",
+    "branch": "codex/operations-readiness",
+    "head": "b63598f3d39944c73602dec76373b63a747b5d41",
+    "status_counts": {
+      "tracked_changed": 1,
+      "selected_untracked": 12
+    },
+    "files": [
+      {
+        "path": "~/Workspace/claude-agent-teams/finace/wealth-advisor/AGENTS.md",
+        "owner": "wealth固有契約",
+        "state": "present",
+        "sha256": "b454a3e54154e4caf5c57804c8adb09ec1bca0ca5549012d50a5c0f22c2229c4",
+        "git_status": "clean",
+        "git_tracked": true
+      },
+      {
+        "path": "~/Workspace/claude-agent-teams/finace/wealth-advisor/README.md",
+        "owner": "wealth固有案内",
+        "state": "present",
+        "sha256": "70b3cdfb6625f16c1c0ae5a21cbe6de308a704a8d4a60fee4d31ae0e8c52837a",
+        "git_status": " M",
+        "git_tracked": true
+      },
+      {
+        "path": "~/Workspace/claude-agent-teams/finace/wealth-advisor/config/codex/developer.toml",
+        "owner": "global権限テンプレート原本（現状wealth）",
+        "state": "present",
+        "sha256": "237d94a96d11d499f53f5dd5b1327fb48c24c26ca67cd80214177984920124e6",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/claude-agent-teams/finace/wealth-advisor/config/codex/developer.rules",
+        "owner": "global権限rule原本（現状wealth）",
+        "state": "present",
+        "sha256": "afdf43f48be2f2a780be0c8967e5f0cb9e97b37559c64d71618f31aa06542fd2",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/claude-agent-teams/finace/wealth-advisor/config/codex/project.toml",
+        "owner": "wealth repo権限テンプレート",
+        "state": "present",
+        "sha256": "97d4ae8bd5715a59a83fd6d3244bfcd7efaf4df290d90e7f2e273e00d0215ecd",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/claude-agent-teams/finace/wealth-advisor/scripts/install_codex_permissions.py",
+        "owner": "wealth権限installer",
+        "state": "present",
+        "sha256": "9b89101a8f4feec6a9c74cedf3ebb8010ceaebf7040ea1c7863e96ccb42fa3c7",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/claude-agent-teams/finace/wealth-advisor/scripts/check_codex_permissions.py",
+        "owner": "wealth権限fixture",
+        "state": "present",
+        "sha256": "2aaeb9a4ca839b30828ac4de9eb87f5dc967f754887afa2decf544829e0e1ad0",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/claude-agent-teams/finace/wealth-advisor/scripts/check_codex_permission_context.py",
+        "owner": "wealth実効権限確認",
+        "state": "present",
+        "sha256": "c3da36dd890330fa3f0e29262beafa69fe17136f39dda808e00265defbff6a35",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/claude-agent-teams/finace/wealth-advisor/scripts/check_operational_readiness.py",
+        "owner": "wealth静的準備確認",
+        "state": "present",
+        "sha256": "86f1f68efef40e3768f3a184d0da88497a8319e5af545d61ee25299cfd662bff",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/claude-agent-teams/finace/wealth-advisor/tests/test_operational_readiness.py",
+        "owner": "wealth静的fixture",
+        "state": "present",
+        "sha256": "c722b654fb284f9e36ec9523f69f7625af0e6455b4530cffa8c619a3c16a422c",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/claude-agent-teams/finace/wealth-advisor/.codex/config.toml",
+        "owner": "wealth repo権限適用先",
+        "state": "present",
+        "sha256": "97d4ae8bd5715a59a83fd6d3244bfcd7efaf4df290d90e7f2e273e00d0215ecd",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/claude-agent-teams/finace/wealth-advisor/docs/codex-operations.md",
+        "owner": "wealth運用準備記録",
+        "state": "present",
+        "sha256": "e22eab13c64c3ef51b53652e33553c0bb538b8817fe28ff59a7bd44cc888cd33",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/claude-agent-teams/finace/wealth-advisor/docs/codex-permissions.md",
+        "owner": "wealth権限導入記録",
+        "state": "present",
+        "sha256": "041d16fa9973728b2716a353fee151f81e2ada722f7ed39d96d845bb025fc495",
+        "git_status": "??",
+        "git_tracked": false
+      },
+      {
+        "path": "~/Workspace/claude-agent-teams/finace/wealth-advisor/docs/operations-baseline.json",
+        "owner": "wealth非個人hash基準",
+        "state": "present",
+        "sha256": "7818c50aab049f2929344ec9d079fbe771610a4f5ff80d6cc16dd41d27345d86",
+        "git_status": "??",
+        "git_tracked": false
+      }
+    ]
+  },
+  "global_codex": {
+    "root": "~/.codex",
+    "files": [
+      {
+        "path": "~/.codex/config.toml",
+        "owner": "個人global実設定",
+        "state": "present",
+        "sha256": "36d950677355a7cae4432efdd089c714738fc453963b73d217be31bc5d7fc1a2"
+      },
+      {
+        "path": "~/.codex/AGENTS.md",
+        "owner": "個人global契約",
+        "state": "present",
+        "sha256": "df713f48aa4c17a6b32127c83908db7bd745ca1df67d6d0bf2a7e99d84ce3bfe"
+      },
+      {
+        "path": "~/.codex/rules/default.rules",
+        "owner": "個人global既存rule",
+        "state": "present",
+        "sha256": "fec79c257ce9830c47f1ac514121c8b5c7b4782fa2c5ebb4ae51cf3c24863fef"
+      },
+      {
+        "path": "~/.codex/rules/developer.rules",
+        "owner": "wealth installerの適用先",
+        "state": "present",
+        "sha256": "afdf43f48be2f2a780be0c8967e5f0cb9e97b37559c64d71618f31aa06542fd2"
+      },
+      {
+        "path": "~/.codex/hooks.json",
+        "owner": "個人global hook定義",
+        "state": "present",
+        "sha256": "772d953c75eed01b187e3ff50df1c0107e91588432c47dab8dadd85208bc17f8"
+      },
+      {
+        "path": "~/.codex/hooks/aggregate-learnings.sh",
+        "owner": "個人global hook",
+        "state": "present",
+        "sha256": "11816852d3310588fba63e1a8a1fd9dc94a1703ff2c06877475f15aa6f40643e"
+      },
+      {
+        "path": "~/.codex/hooks/capture-learning.sh",
+        "owner": "個人global hook",
+        "state": "present",
+        "sha256": "950e6f288eef99271f4cf0f232070b57426fc1d65349ccb65933a1b444e9f51d"
+      },
+      {
+        "path": "~/.codex/hooks/cmux-notify.sh",
+        "owner": "個人global hook",
+        "state": "present",
+        "sha256": "3209326fd2e440ef9d9d851c8944bfeaa53b941b962ef6486ba8a0911924204c"
+      },
+      {
+        "path": "~/.codex/hooks/cmux-progress.sh",
+        "owner": "個人global hook",
+        "state": "present",
+        "sha256": "48edba2a20b8c7027557ea0973561eddbdc72c5c91db1d2f86740e7e814ef76e"
+      },
+      {
+        "path": "~/.codex/hooks/herdr-agent-state.sh",
+        "owner": "個人global hook",
+        "state": "present",
+        "sha256": "ffd5a76b7c62f5313040fc1e98fa010ff19a7aa85dd9fe6f325b9729d5f01b46"
+      }
+    ],
+    "allowed_config_values": {
+      "model": "gpt-6-astra",
+      "model_reasoning_effort": "medium",
+      "approval_policy": "on-request",
+      "approvals_reviewer": "user",
+      "default_permissions": "developer"
+    },
+    "skills_directory": {
+      "path": "~/.codex/skills",
+      "entries": [
+        ".system"
+      ],
+      "content": "未読。配布元と意味差はP2で確認"
+    }
+  },
+  "observed_matches": [
+    {
+      "source": "~/Workspace/claude-agent-teams/finace/wealth-advisor/config/codex/developer.rules",
+      "target": "~/.codex/rules/developer.rules",
+      "same_sha256": true
+    },
+    {
+      "source": "~/Workspace/claude-agent-teams/finace/wealth-advisor/config/codex/project.toml",
+      "target": "~/Workspace/claude-agent-teams/finace/wealth-advisor/.codex/config.toml",
+      "same_sha256": true
+    }
+  ],
+  "cli_version": "codex-cli 0.155.1"
+}

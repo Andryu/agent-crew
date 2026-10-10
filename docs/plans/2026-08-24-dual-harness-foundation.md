@@ -1,6 +1,6 @@
 # Dual-harness foundation plan
 
-Date: 2026-08-24  
+Date: 2026-08-24
 Status: implemented
 
 ## Context
