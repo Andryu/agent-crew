@@ -1906,19 +1906,19 @@ def parse_macos_procargs_environment(payload):
 
 
 def process_absence_confirmed(pid):
-    """PIDがsysctl EINVAL後にも存在するか、stderrなしのstrict psで再照合する。"""
-    probe = subprocess.run(["/bin/ps", "-p", str(pid), "-o", "pid=,uid="], text=True,
+    """PID消失またはzombieをstrict psで確認。稼働/PID再利用はunknown。"""
+    probe = subprocess.run(["/bin/ps", "-p", str(pid), "-o", "pid=,uid=,stat="], text=True,
         capture_output=True, timeout=5, env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
     if probe.stderr or probe.returncode not in (0, 1):
         raise BoundaryError("process identity recheck unavailable")
     rows = [line.split() for line in probe.stdout.splitlines() if line.strip()]
     if probe.returncode == 1 and not rows:
         return True
-    if probe.returncode == 0 and len(rows) == 1 and len(rows[0]) == 2:
-        if not all(field.isdigit() for field in rows[0]):
+    if probe.returncode == 0 and len(rows) == 1 and len(rows[0]) == 3:
+        if not rows[0][0].isdigit() or not rows[0][1].isdigit() or int(rows[0][0]) != pid or not rows[0][2]:
             raise BoundaryError("process identity recheck invalid")
-        # 同じPIDまたは再利用されたPIDが残っている場合は、環境を読めないままpassにしない。
-        return False
+        # zombieは実行・環境・open fileを保持しない。PID再利用/稼働中はunknown。
+        return rows[0][2].startswith("Z")
     if not rows and probe.returncode == 0:
         raise BoundaryError("process identity recheck contradictory")
     raise BoundaryError("process identity recheck invalid")

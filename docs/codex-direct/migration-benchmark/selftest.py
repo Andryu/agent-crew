@@ -1434,8 +1434,12 @@ def residual_process_test():
     try:
         runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout="", stderr="")
         assert runner.process_absence_confirmed(905) is True
-        runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="905 501\n", stderr="")
+        runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="905 501 S\n", stderr="")
         assert runner.process_absence_confirmed(905) is False  # 生存PID/PID reuseはunknownのまま
+        runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="905 501 Z\n", stderr="")
+        assert runner.process_absence_confirmed(905) is True  # zombieは環境を保持できない
+        runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="905 502 S\n", stderr="")
+        assert runner.process_absence_confirmed(905) is False  # 別UIDへのPID再利用もunknown
         runner.subprocess.run = lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout="", stderr="permission warning")
         try:
             runner.process_absence_confirmed(905)
