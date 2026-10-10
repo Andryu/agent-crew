@@ -1842,9 +1842,9 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v19_final8.py"
-    config = root / "drivers/p5-driver-v19-final8-config.json"
-    launcher = root / "drivers/p5-v19-final8-normal-shell.sh"
+    copy = root / "drivers/p5_driver_v19_final9.py"
+    config = root / "drivers/p5-driver-v19-final9-config.json"
+    launcher = root / "drivers/p5-v19-final9-normal-shell.sh"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
