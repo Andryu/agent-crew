@@ -54,7 +54,7 @@ def synthetic_canary_output(required, root):
                    "CODEX_SANDBOX": "seatbelt", "CODEX_SANDBOX_NETWORK_DISABLED": "1",
                    "CODEX_SESSION_ID": "abcdefab-cdef-7abc-8def-abcdefabcdef",
                    "CODEX_THREAD_ID": "abcdefab-cdef-7abc-8def-abcdefabcdee",
-                   "CODEX_VERSION": "0.160.0", "COLORTERM": "", "GH_PAGER": "cat", "GIT_PAGER": "cat",
+                   "CODEX_VERSION": "0.162.1", "COLORTERM": "", "GH_PAGER": "cat", "GIT_PAGER": "cat",
                    "LC_CTYPE": "C.UTF-8", "LOGNAME": pwd.getpwuid(os.getuid()).pw_name,
                    "NO_COLOR": "1", "OLDPWD": str(root), "PAGER": "cat", "PWD": str(root),
                    "SHLVL": "0", "TERM": "dumb", "_": harness_run.PYTHON_EXECUTABLE}
