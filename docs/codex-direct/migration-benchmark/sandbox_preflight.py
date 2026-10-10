@@ -340,7 +340,7 @@ def main():
         report = check(spec)
         if args.report_output is not None:
             destination = args.report_output
-            expected_parent = runner.formal_base() / "drivers/logs/v19"
+            expected_parent = runner.formal_base() / "drivers/logs/v19-final"
             if (destination.parent != expected_parent or os.path.lexists(destination)):
                 raise SystemExit("preflight report output pathはprivate v17 logsの新規fileに限定されます")
             runner.private_directory_identity(expected_parent)

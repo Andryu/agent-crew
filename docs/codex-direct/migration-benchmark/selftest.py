@@ -563,6 +563,7 @@ def preflight_test(root):
     original_residual = runner.scan_residual_processes
     original_open_files = runner.scan_run_root_open_files
     original_tool_normalization = runner.actual_tool_environment_evidence
+    original_preflight_runner = preflight.runner
     seen = []
     def fake_case(name, passed_spec, command, expected):
         assert passed_spec is spec
@@ -578,12 +579,14 @@ def preflight_test(root):
     runner.scan_residual_processes = clean_process_evidence
     # The benchmark requires real normal-shell identity; this legacy synthetic
     # preflight test isolates report/binding logic and uses a fixed passing proof.
-    runner.actual_tool_environment_evidence = lambda _env: {
+    synthetic_tool_normalization = lambda _env: {
         "schema": 1, "policy_sha256": runner.canonical_digest(runner.CODEX_TOOL_ENV_NORMALIZATION),
         "source": "normal_shell_preflight_process_environment",
         "checks": {"LANG": True, "LC_ALL": True, "PATH": True},
-        "path_profile": runner.CODEX_TOOL_ENV_NORMALIZATION["keys"]["PATH"]["allowed_profile_sha256"]["normal_shell_login"],
+        "path_profile": "normal_shell_login",
         "passed": True}
+    runner.actual_tool_environment_evidence = synthetic_tool_normalization
+    preflight.runner = runner
     runner.scan_run_root_open_files = lambda _root: {"status": "pass", "passed": True, "scan_pass": True,
         "run_root_open_file_process_count": 0, "complete_detection_claimed": False}
     try:
@@ -606,6 +609,7 @@ def preflight_test(root):
         runner.scan_residual_processes = original_residual
         runner.scan_run_root_open_files = original_open_files
         runner.actual_tool_environment_evidence = original_tool_normalization
+        preflight.runner = original_preflight_runner
     print("preflight: exact binding/tool env/canary cleanup/fail closed OK (sandbox outcomes mocked)", flush=True)
 
 
@@ -1779,9 +1783,9 @@ def driver_identity_test(root):
     source = root / "source/agent-crew-p5-abcdef0-sparse"
     here = source / "docs/codex-direct/migration-benchmark"
     original = here / "driver.py"
-    copy = root / "drivers/p5_driver_v19.py"
-    config = root / "drivers/p5-driver-v19-config.json"
-    launcher = root / "drivers/p5-v19-normal-shell.sh"
+    copy = root / "drivers/p5_driver_v19_final.py"
+    config = root / "drivers/p5-driver-v19-final-config.json"
+    launcher = root / "drivers/p5-v19-final-normal-shell.sh"
     content = (HERE / "driver.py").read_bytes()
     runner._write_private(original, content, 0o644)
     runner._write_private(copy, content, 0o700)
