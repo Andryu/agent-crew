@@ -315,13 +315,13 @@ def privacy_check(log):
 def verification(log, shared):
     directories = source_check(log)
     expected = bindings(shared)
-    for name in ("selftest.py", "analysis_selftest.py", "v16_selftest.py", "v17_selftest.py", "v18_selftest.py", "v19_selftest.py"):
+    for name in ("selftest.py", "analysis_selftest.py", "v16_selftest.py", "v17_selftest.py", "v18_selftest.py", "v19_selftest.py", "v20_selftest.py"):
         command([PYTHON, "-B", HERE / name], log)
     compile_files = ("run.py", "sandbox_preflight.py", "validate_c6.py", "selftest.py",
                      "batch.py", "analyze.py", "analysis_selftest.py", "harness_fingerprint.py",
                      "probe_v16.py", "fixed_test_runner_v16.py", "v16_selftest.py",
                      "probe_v17.py", "fixed_test_runner_v17.py", "v17_selftest.py", "v18_selftest.py",
-                     "probe_v19.py", "v19_selftest.py")
+                     "probe_v19.py", "v19_selftest.py", "v20_diagnostic.py", "v20_selftest.py", "v20_driver.py", "v20_artifacts.py")
     command([PYTHON, "-B", "-X", "pycache_prefix=" + str(LOGS / "pycache"), "-m", "py_compile",
              *[HERE / name for name in compile_files]], log)
     command([GIT, "diff", "--check"], log)
