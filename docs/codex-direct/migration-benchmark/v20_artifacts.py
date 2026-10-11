@@ -90,7 +90,7 @@ def build():
                 "config": hashlib.sha256(config_data).hexdigest(), "launcher_template_sha256": hashlib.sha256(launcher_data).hexdigest(),
                 "remote_ref": REMOTE_REF, "hard_cap": 28,
                 "modes": {"driver.py": 0o500, "v20_driver.py": 0o400, "config.json": 0o400, "launcher.sh": 0o500,
-                          "v20_diagnostic.py": 0o400, "v20_selftest.py": 0o400}}
+                          "v20_diagnostic.py": 0o400, "v20_selftest.py": 0o400, "v20_seed_fixture.json": 0o400}}
     fingerprint = hashlib.sha256(canonical(fp_input)).hexdigest()
     final = root / f"p5-v20-diagnostic-{fingerprint[:20]}"
     if final.exists():
