@@ -79,7 +79,7 @@ def load_manifest():
                         "cli_version", "remote_budget_ref",
                         "model_transport", "allowed_driver_modes", "actual_invocations_enabled", "hard_cap",
                         "prior_consumed", "diagnostic_limit", "final_probe_limit", "formal_run_count", "retry",
-                        "global_ledger_directory", "diagnostic_root", "historical_attempts"}
+                        "global_ledger_directory", "diagnostic_root", "codex_home", "historical_attempts"}
             or type(config["schema"]) is not int or config["schema"] != 1
             or type(config["version"]) is not int or config["version"] != 20
             or config["remote_budget_ref"] != "refs/heads/codex/runtime-migration-p5-ledger"
@@ -97,6 +97,8 @@ def load_manifest():
     expected_cache = Path(pwd.getpwuid(os.getuid()).pw_dir) / "Library/Caches/agent-crew-p5-benchmark"
     expected_artifact = expected_cache / "drivers" / f"p5-v20-diagnostic-{manifest['fingerprint'][:20]}"
     expected_preflight = expected_cache / "logs" / f"p5-v20-diagnostic-{manifest['fingerprint'][:20]}-preflight.json"
+    expected_codex_home = expected_cache / "probe-v20-diagnostic" / "version-home"
+    codex_home_info = Path(config["codex_home"]).lstat()
     if (base != expected_artifact or manifest["preflight_path"] != str(expected_preflight)
             or not re.fullmatch(r"[0-9a-f]{40}", config["source_head"])
             or config["source_hashes"] != {"v20_diagnostic.py": manifest["files"]["v20_diagnostic.py"]["sha256"],
@@ -104,10 +106,14 @@ def load_manifest():
             or config["historical_attempts"] != [x["id"] for x in v20.HISTORICAL]
             or config["global_ledger_directory"] != str(expected_cache / "logs/v20-global-ledger")
             or config["diagnostic_root"] != str(expected_cache / "probe-v20-diagnostic")
-            or any(Path(config[key]).is_relative_to("/private/tmp") for key in ("global_ledger_directory", "diagnostic_root"))):
+            or config["codex_home"] != str(expected_codex_home)
+            or not stat.S_ISDIR(codex_home_info.st_mode) or codex_home_info.st_uid != os.getuid()
+            or stat.S_IMODE(codex_home_info.st_mode) != 0o700
+            or any(Path(config[key]).is_relative_to("/private/tmp") for key in ("global_ledger_directory", "diagnostic_root", "codex_home"))):
         raise ValueError
     version = subprocess.run([config["codex_binding"]["realpath"], "--version"], capture_output=True,
                              timeout=10, env={"HOME": pwd.getpwuid(os.getuid()).pw_dir,
+                                             "CODEX_HOME": config["codex_home"],
                                              "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
                                              "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8"})
     if version.returncode != 0 or version.stderr or version.stdout.decode("utf-8", "strict").strip() != config["cli_version"]:

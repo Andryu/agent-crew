@@ -54,8 +54,13 @@ def build():
     py_binding = bind(Path(py))
     shell_binding = bind(Path("/bin/zsh").resolve(strict=True))
     codex_binding = harness_fingerprint.compute_codex_executable_binding()
+    codex_home = CACHE / "probe-v20-diagnostic" / "version-home"
+    codex_home.mkdir(parents=True, mode=0o700, exist_ok=True)
+    codex_home_stat = codex_home.lstat()
+    if not stat.S_ISDIR(codex_home_stat.st_mode) or codex_home_stat.st_uid != os.getuid() or stat.S_IMODE(codex_home_stat.st_mode) != 0o700:
+        raise RuntimeError("dedicated Codex version-check home identity invalid")
     version_result = subprocess.run([codex_binding["realpath"], "--version"], capture_output=True, text=True,
-                                    timeout=10, env={"HOME": str(CACHE.parents[2]),
+                                    timeout=10, env={"HOME": str(CACHE.parents[2]), "CODEX_HOME": str(codex_home),
                                                     "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
                                                     "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8"})
     cli_version = version_result.stdout.strip()
@@ -75,6 +80,7 @@ def build():
               "formal_run_count": 24, "retry": False,
               "global_ledger_directory": str(CACHE / "logs" / "v20-global-ledger"),
               "diagnostic_root": str(CACHE / "probe-v20-diagnostic"),
+              "codex_home": str(codex_home),
               "historical_attempts": [x["id"] for x in __import__("v20_diagnostic").HISTORICAL]}
     config_data = canonical(config)
     launcher_data = ("#!/bin/zsh\nset -eu\n"
