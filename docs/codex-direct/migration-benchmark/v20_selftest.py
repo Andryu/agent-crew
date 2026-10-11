@@ -36,7 +36,7 @@ class FakeRemote:
             raise OSError("private fake unreachable detail")
         if self.mode == "mismatch":
             return []
-        return self.records
+        return json.loads(json.dumps(self.records))
 
     def push_ff(self, parent, payload):
         if self.mode == "non_ff":
@@ -55,11 +55,20 @@ class FakeRemote:
         return self.head_hash
 
 
-ROOT_ID = {"realpath_sha256": "c" * 64, "device": 1, "inode": 2}
+ROOT_ID = {"realpath": "/private/tmp/p5-v20-fixture-root", "device": 1, "inode": 2}
+TRUSTED_ID = "a" * 32
+TRUSTED_FP = "f" * 64
+PREFLIGHT_SHA = "c" * 64
+MANIFEST_SHA = "d" * 64
+
+
+def _binding(fingerprint=TRUSTED_FP, *, root=ROOT_ID, marker="a"):
+    return {"fingerprint": fingerprint, "root_identity": dict(root), "spec_sha256": marker * 64,
+            "command_sha256": "b" * 64, "preflight_sha256": PREFLIGHT_SHA, "manifest_sha256": MANIFEST_SHA}
 
 
 def _report(**overrides):
-    value = {"schema": 1, "attempt_id": "attempt", "fingerprint": "f" * 64,
+    value = {"schema": 1, "attempt_id": TRUSTED_ID, "fingerprint": TRUSTED_FP,
              "environment_fit": "mismatch",
              "path": {"matched_profile": "normal_shell_login", "component_count": 2,
                       "unapproved_component_count": 0, "order_classification": "exact_profile"},
@@ -74,7 +83,7 @@ PASS_EVIDENCE = {key: True for key in ("env", "runtime", "binding", "event", "sc
 
 
 def schema_tests():
-    expected = {"attempt_id": "attempt", "fingerprint": "f" * 64}
+    expected = {"attempt_id": TRUSTED_ID, "fingerprint": TRUSTED_FP}
     valid = _report()
     assert v20.validate_report(valid, **expected) == valid
     duplicate = b'{"schema":1,"schema":1}'
@@ -109,18 +118,27 @@ def schema_tests():
             pass
         else:
             raise AssertionError("tampered report accepted")
+    p = _report(); p["path"]["component_count"] = 1; p["path"]["unapproved_component_count"] = 2
+    try:
+        v20.report_for_storage(p, attempt_id=TRUSTED_ID, fingerprint=TRUSTED_FP,
+                               binding_sha256=v20.binding_digest(_binding()))
+    except v20.LedgerError as exc:
+        assert str(exc) == "diagnostic_inconclusive"
+    else:
+        raise AssertionError("unapproved PATH count greater than total persisted")
     for item in (_report(environment_fit="unknown", determination="inconclusive"),
                  _report(path={"matched_profile": "none", "component_count": 0,
                                "unapproved_component_count": 0, "order_classification": "malformed"},
                          determination="inconclusive")):
         try:
-            v20.report_for_storage(item, attempt_id="attempt", fingerprint="f" * 64)
+            v20.report_for_storage(item, attempt_id=TRUSTED_ID, fingerprint=TRUSTED_FP,
+                                   binding_sha256=v20.binding_digest(_binding()))
         except v20.LedgerError as exc:
             assert str(exc) == "diagnostic_inconclusive"
         else:
             raise AssertionError("unknown/malformed partial report was saveable")
     assert v20.fixed_error(ValueError("short-secret-42")) == "internal_error"
-    return 15
+    return 16
 
 
 def seed_canonical_tests():
@@ -163,21 +181,53 @@ def privacy_tests():
     secrets = ["qz7", "ordinary-value", "short-secret-42", "PATH:/tmp/private-component", "digest-candidate-0a91"]
     secret_names = ["SECRETISH_NAME", "/private/synthetic/path-entry"]
     cases = 0
+    trusted = {"trusted_attempt_id": TRUSTED_ID, "trusted_fingerprint": TRUSTED_FP,
+               "trusted_binding_sha256": v20.binding_digest(_binding())}
     for secret in secrets:
-        safe = v20.report_for_storage(_report(), attempt_id="attempt", fingerprint="f" * 64)
-        bundles = [v20.artifact_bundle(report_bytes=safe),
-                   v20.artifact_bundle(error=RuntimeError(secret)),
-                   v20.artifact_bundle(error=v20.LedgerError("invocation_timeout"))]
+        safe = v20.report_for_storage(_report(), attempt_id=TRUSTED_ID, fingerprint=TRUSTED_FP,
+                                      binding_sha256=trusted["trusted_binding_sha256"])
+        bundles = [v20.artifact_bundle(report_bytes=safe, **trusted),
+                   v20.artifact_bundle(error=RuntimeError(secret), **trusted),
+                   v20.artifact_bundle(error=v20.LedgerError("invocation_timeout"), **trusted)]
         for index, bundle in enumerate(bundles):
             assert set(bundle) == v20.ARTIFACT_NAMES and bundle["raw.jsonl"] == b"" and bundle["answer.json"] == b""
             with tempfile.TemporaryDirectory() as td:
                 out = Path(td) / f"case-{index}"
-                v20.save_artifact_bundle(out, bundle)
+                v20.save_artifact_bundle(out, bundle, **trusted)
                 saved = b"".join(p.read_bytes() for p in out.iterdir())
                 assert secret.encode() not in saved
                 assert not any(name.encode() in saved for name in secret_names)
                 assert not any(item.encode() in saved for item in secrets)
             cases += 1
+    setters = [lambda x, v: x.__setitem__("attempt_id", v), lambda x, v: x.__setitem__("fingerprint", v),
+               lambda x, v: x.__setitem__("environment_fit", v),
+               lambda x, v: x.__setitem__("determination", v),
+               lambda x, v: x["path"].__setitem__("matched_profile", v),
+               lambda x, v: x["path"].__setitem__("order_classification", v),
+               lambda x, v: x["unknown_keys"].__setitem__("classification", v)]
+    for field_setter in setters:
+        for secret in ("qz7", "ordinary-value", "high-entropy-synthetic-7c4e8a1d"):
+            tampered = _report(); field_setter(tampered, secret)
+            try:
+                v20.artifact_bundle(report_bytes=v20.canonical_bytes(tampered), **trusted)
+            except v20.LedgerError:
+                pass
+            else:
+                raise AssertionError("string field sentinel accepted for persistence")
+            cases += 1
+    for secret in secrets + secret_names:
+        unsafe = v20.artifact_bundle(error=RuntimeError(secret), **trusted)
+        unsafe["stdout.txt"] = secret.encode()
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "unsafe"
+            try:
+                v20.save_artifact_bundle(out, unsafe, **trusted)
+            except v20.LedgerError:
+                pass
+            else:
+                raise AssertionError("save API persisted caller-supplied raw string")
+            assert not out.exists()
+        cases += 1
     return cases
 
 
@@ -219,7 +269,7 @@ def ledger_tests():
             remote.mode = mode
             before = remote.pushes
             try:
-                ledger.reserve(role="diagnostic", fingerprint="f" * 64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
+                ledger.reserve(role="diagnostic", binding=_binding("f" * 64))
             except (v20.LedgerError, OSError):
                 pass
             else:
@@ -231,7 +281,7 @@ def ledger_tests():
             previous_head = remote.head_hash
             remote.mode = mode
             try:
-                ledger.reserve(role="diagnostic", fingerprint="f"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
+                ledger.reserve(role="diagnostic", binding=_binding("f"*64))
             except v20.LedgerError:
                 pass
             else:
@@ -241,34 +291,59 @@ def ledger_tests():
                 remote.head_hash = previous_head
             cases += 1
         # One diagnostic can be reserved and completed; duplicates, failed/inconclusive histories stop progression.
-        record = ledger.reserve(role="diagnostic", fingerprint="f"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
+        record = ledger.reserve(role="diagnostic", binding=_binding("f"*64))
         diagnostic_report = _report(); diagnostic_report["attempt_id"] = record["id"]
-        report_bytes = v20.report_for_storage(diagnostic_report, attempt_id=record["id"], fingerprint="f"*64)
-        ledger.complete(record["id"], "completed_diagnostic", diagnostic_report=report_bytes)
+        report_bytes = v20.report_for_storage(diagnostic_report, attempt_id=record["id"], fingerprint="f"*64,
+                                              binding_sha256=v20.binding_digest(_binding("f"*64)))
+        ledger.complete(record["id"], "completed_diagnostic", binding=_binding("f"*64), diagnostic_report=report_bytes,
+                        next_binding=_binding("e"*64))
         try:
-            ledger.reserve(role="diagnostic", fingerprint="f"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
+            ledger.reserve(role="diagnostic", binding=_binding("f"*64))
         except v20.LedgerError:
             pass
         else:
             raise AssertionError("second diagnostic accepted")
-        final = ledger.reserve(role="final_probe", fingerprint="f"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
-        ledger.complete(final["id"], "final_pass", gate_evidence=PASS_EVIDENCE)
-        assert ledger.formal_gate("f"*64)
-        first = ledger.reserve(role="formal_run", run_id="C1-A-1", fingerprint="f"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
-        ledger.complete(first["id"], "formal_run_pass", run_id="C1-A-1", gate_evidence=PASS_EVIDENCE)
         try:
-            ledger.reserve(role="formal_run", run_id="C1-A-1", fingerprint="f"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
+            ledger.reserve(role="final_probe", binding=_binding("f"*64))
+        except v20.LedgerError as exc:
+            assert str(exc) == "final_probe_gate_not_satisfied"
+        else:
+            raise AssertionError("diagnostic binding reused for final role")
+        final = ledger.reserve(role="final_probe", binding=_binding("e"*64))
+        ledger.complete(final["id"], "final_pass", binding=_binding("e"*64), gate_evidence=PASS_EVIDENCE,
+                        result_artifact_sha256="1"*64, next_binding=_binding("2"*64))
+        assert ledger.formal_gate(_binding("2"*64))
+        first = ledger.reserve(role="formal_run", run_id="C1-A-1", binding=_binding("2"*64))
+        ledger.complete(first["id"], "formal_run_pass", binding=_binding("2"*64), run_id="C1-A-1", gate_evidence=PASS_EVIDENCE, result_artifact_sha256="2"*64)
+        try:
+            ledger.reserve(role="formal_run", run_id="C1-A-1", binding=_binding("2"*64))
         except v20.LedgerError:
             pass
         else:
             raise AssertionError("duplicate formal run accepted")
+        try:
+            ledger.reserve(role="formal_run", run_id="C1-A-2", binding=_binding("3"*64))
+        except v20.LedgerError:
+            pass
+        else:
+            raise AssertionError("formal campaign binding changed")
+        second = ledger.reserve(role="formal_run", run_id="C1-A-2", binding=_binding("2"*64))
+        try:
+            ledger.complete(second["id"], "formal_run_pass", binding=_binding("2"*64),
+                            run_id="C1-A-1", gate_evidence=PASS_EVIDENCE, result_artifact_sha256="3"*64)
+        except v20.LedgerError:
+            pass
+        else:
+            raise AssertionError("formal run id was mutable at completion")
+        ledger.complete(second["id"], "formal_run_pass", binding=_binding("2"*64),
+                        run_id="C1-A-2", gate_evidence=PASS_EVIDENCE, result_artifact_sha256="3"*64)
         # Same-time local ledger+seal rollback and local deletion are detected by remote anchor.
         good_ledger, good_seal = ledger.ledger.read_bytes(), ledger.seal.read_bytes()
         stale = dict(ledger._read_local()); stale["remote_head"] = "9" * 40
         v20._atomic(ledger.ledger, v20.canonical_bytes(stale))
         v20._atomic(ledger.seal, v20.canonical_bytes({"sequence": len(stale["records"]), "chain_sha256": v20.sha256(v20.canonical_bytes(stale["records"])), "remote_head": stale["remote_head"]}))
         try:
-            ledger.reserve(role="formal_run", run_id="C1-A-2", fingerprint="f"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
+            ledger.reserve(role="formal_run", run_id="C1-A-3", binding=_binding("2"*64))
         except v20.LedgerError:
             pass
         else:
@@ -281,15 +356,15 @@ def ledger_tests():
         else:
             raise AssertionError("deleted local ledger allowed rebootstrap")
         assert remote.head_hash is not None
-        cases += 7
+        cases += 10
     # A timeout cannot be masked by another fingerprint or a later PASS role.
     with tempfile.TemporaryDirectory() as td:
         remote = FakeRemote(); ledger = v20.GlobalLedger(Path(td) / "state", remote); _seed_local(ledger, remote)
-        first = ledger.reserve(role="diagnostic", fingerprint="f"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
-        ledger.complete(first["id"], "timeout")
+        first = ledger.reserve(role="diagnostic", binding=_binding("f"*64))
+        ledger.complete(first["id"], "timeout", binding=_binding("f"*64))
         for role in ("diagnostic", "final_probe"):
             try:
-                ledger.reserve(role=role, fingerprint="e"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
+                ledger.reserve(role=role, binding=_binding("e"*64))
             except v20.LedgerError:
                 pass
             else:
@@ -298,13 +373,15 @@ def ledger_tests():
     # A failed final is permanent and cannot be retried under another fingerprint.
     with tempfile.TemporaryDirectory() as td:
         remote = FakeRemote(); ledger = v20.GlobalLedger(Path(td) / "state", remote); _seed_local(ledger, remote)
-        diag = ledger.reserve(role="diagnostic", fingerprint="f"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
+        diag = ledger.reserve(role="diagnostic", binding=_binding("f"*64))
         d = _report(); d["attempt_id"] = diag["id"]
-        ledger.complete(diag["id"], "completed_diagnostic", diagnostic_report=v20.report_for_storage(d, attempt_id=diag["id"], fingerprint="f"*64))
-        final = ledger.reserve(role="final_probe", fingerprint="e"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
-        ledger.complete(final["id"], "final_fail")
+        ledger.complete(diag["id"], "completed_diagnostic", binding=_binding("f"*64),
+                        diagnostic_report=v20.report_for_storage(d, attempt_id=diag["id"], fingerprint="f"*64,
+                            binding_sha256=v20.binding_digest(_binding("f"*64))), next_binding=_binding("e"*64))
+        final = ledger.reserve(role="final_probe", binding=_binding("e"*64))
+        ledger.complete(final["id"], "final_fail", binding=_binding("e"*64))
         try:
-            ledger.reserve(role="final_probe", fingerprint="d"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
+            ledger.reserve(role="final_probe", binding=_binding("d"*64))
         except v20.LedgerError:
             pass
         else:
@@ -351,14 +428,14 @@ def ledger_tests():
         remote = FakeRemote(); ledger = v20.GlobalLedger(Path(td) / "state", remote); _seed_local(ledger, remote)
         with patch.object(ledger, "_write_local", side_effect=OSError("simulated crash")):
             try:
-                ledger.reserve(role="diagnostic", fingerprint="f"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
+                ledger.reserve(role="diagnostic", binding=_binding("f"*64))
             except OSError:
                 pass
             else:
                 raise AssertionError("crash injection missed")
         assert len(remote.records) == 3 and remote.records[-1]["state"] == "reserved"
         try:
-            ledger.reserve(role="diagnostic", fingerprint="f"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
+            ledger.reserve(role="diagnostic", binding=_binding("f"*64))
         except v20.LedgerError:
             pass
         else:
@@ -368,17 +445,42 @@ def ledger_tests():
     with tempfile.TemporaryDirectory() as td:
         remote = FakeRemote(); ledger = v20.GlobalLedger(Path(td) / "state", remote); _seed_local(ledger, remote)
         filler = [dict(x) for x in remote.records]
+        run_ids = [f"C{c}-{side}-{n}" for c in range(1, 7) for side in ("A", "B") for n in (1, 2)]
+        formal_binding = _binding("2"*64)
         for i in range(26):
-            start = 1000 + i
-            filler.append({"sequence": len(filler) + 1, "id": f"{i:032x}", "role": "final_probe", "state": "final_pass",
-                           "fingerprint": "f"*64, "root_identity": ROOT_ID, "spec_sha256": "a"*64,
-                           "command_sha256": "b"*64, "pid": os.getpid(), "pgid": os.getpgrp(), "owner_uid": os.getuid(),
-                           "started_epoch": start, "deadline_epoch": start + 600, "ended_epoch": start + 1,
-                           "gate_evidence_sha256": "d"*64})
+            role = "diagnostic" if i == 0 else "final_probe" if i == 1 else "formal_run"
+            fp = "f"*64 if i == 0 else "e"*64 if i == 1 else "2"*64
+            binding = _binding(fp); digest = v20.binding_digest(binding); attempt_id = f"{i+1:032x}"
+            record = {"sequence": len(filler) + 1, "id": attempt_id, "role": role,
+                      "state": "completed_diagnostic" if i == 0 else "final_pass" if i == 1 else "formal_run_pass",
+                      "fingerprint": fp, "root_identity": ROOT_ID, "spec_sha256": binding["spec_sha256"],
+                      "command_sha256": binding["command_sha256"], "preflight_sha256": binding["preflight_sha256"],
+                      "manifest_sha256": binding["manifest_sha256"], "binding": binding, "binding_sha256": digest,
+                      "pid": os.getpid(), "pgid": os.getpgrp(), "owner_uid": os.getuid(),
+                      "started_epoch": 1000+i, "deadline_epoch": 1600+i if role != "formal_run" else 1240+i,
+                      "ended_epoch": 1001+i}
+            result_hash = f"{i+1:064x}"
+            if role == "diagnostic":
+                record.update({"determination": "resolved", "report_sha256": "a"*64, "result_artifact_sha256": "a"*64})
+                next_binding = _binding("e"*64)
+                record.update({"expected_next_role": "final_probe", "expected_next_binding": next_binding,
+                               "expected_next_binding_sha256": v20.binding_digest(next_binding)})
+            if role in {"final_probe", "formal_run"}:
+                run_id = run_ids[i-2] if role == "formal_run" else None
+                if run_id: record["run_id"] = run_id
+                record.update({"result_artifact_sha256": result_hash, "gate_schema": 1, "gate_evidence": PASS_EVIDENCE,
+                               "gate_evidence_sha256": v20.gate_evidence_digest(attempt_id=attempt_id,
+                                  binding_sha256=digest, result_artifact_sha256=result_hash, evidence=PASS_EVIDENCE, run_id=run_id)})
+            if role == "formal_run": record["run_set_sha256"] = v20.sha256(v20.canonical_bytes(run_ids))
+            if role == "final_probe":
+                record.update({"expected_next_role": "formal_run", "expected_next_binding": formal_binding,
+                               "expected_next_binding_sha256": v20.binding_digest(formal_binding),
+                               "expected_next_run_set_sha256": v20.sha256(v20.canonical_bytes(run_ids))})
+            filler.append(record)
         remote.records = filler
         ledger._write_local(filler, remote.head_hash)
         try:
-            ledger.reserve(role="formal_run", run_id="C1-A-1", fingerprint="f"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
+            ledger.reserve(role="formal_run", run_id="C1-A-1", binding=_binding("2"*64))
         except v20.LedgerError as exc:
             assert str(exc) == "global_budget_exhausted"
         else:
@@ -390,7 +492,7 @@ def ledger_tests():
         outcomes = []
         def contender():
             try:
-                ledger.reserve(role="diagnostic", fingerprint="f"*64, root_identity=ROOT_ID, spec_sha256="a"*64, command_sha256="b"*64)
+                ledger.reserve(role="diagnostic", binding=_binding("f"*64))
                 outcomes.append("ok")
             except v20.LedgerError:
                 outcomes.append("refused")
@@ -401,18 +503,102 @@ def ledger_tests():
     return cases
 
 
+def phase_binding_tests():
+    with tempfile.TemporaryDirectory() as td:
+        remote = FakeRemote(); ledger = v20.GlobalLedger(Path(td) / "state", remote); _seed_local(ledger, remote)
+        db = _binding("f"*64); diag = ledger.reserve(role="diagnostic", binding=db)
+        altered = dict(db, preflight_sha256="e"*64)
+        before = remote.pushes
+        try:
+            ledger.complete(diag["id"], "timeout", binding=altered)
+        except v20.LedgerError:
+            pass
+        else:
+            raise AssertionError("completion accepted a different preflight binding")
+        assert remote.pushes == before and ledger._read_local()["records"][-1]["state"] == "reserved"
+        report = _report(); report["attempt_id"] = diag["id"]
+        safe = v20.report_for_storage(report, attempt_id=diag["id"], fingerprint=db["fingerprint"],
+                                      binding_sha256=v20.binding_digest(db))
+        ledger.complete(diag["id"], "completed_diagnostic", binding=db, diagnostic_report=safe,
+                        next_binding=_binding("e"*64))
+        try:
+            ledger.reserve(role="final_probe", binding=db)
+        except v20.LedgerError:
+            pass
+        else:
+            raise AssertionError("final role reused diagnostic binding")
+        fb = _binding("e"*64); final = ledger.reserve(role="final_probe", binding=fb)
+        result_hash = "1"*64
+        ledger.complete(final["id"], "final_pass", binding=fb, gate_evidence=PASS_EVIDENCE,
+                        result_artifact_sha256=result_hash, next_binding=_binding("2"*64))
+        assert ledger.formal_gate(_binding("2"*64))
+        formal = _binding("2"*64); run = ledger.reserve(role="formal_run", run_id="C1-A-1", binding=formal)
+        expected_digest = v20.gate_evidence_digest(attempt_id=run["id"], binding_sha256=v20.binding_digest(formal),
+                    result_artifact_sha256="2"*64, evidence=PASS_EVIDENCE, run_id="C1-A-1")
+        assert expected_digest != v20.gate_evidence_digest(attempt_id=final["id"], binding_sha256=v20.binding_digest(formal),
+                    result_artifact_sha256="2"*64, evidence=PASS_EVIDENCE, run_id="C1-A-1")
+        try:
+            ledger.complete(run["id"], "formal_run_pass", binding=formal, run_id="C1-A-2",
+                            gate_evidence=PASS_EVIDENCE, result_artifact_sha256="2"*64)
+        except v20.LedgerError:
+            pass
+        else:
+            raise AssertionError("formal run_id changed after reservation")
+        ledger.complete(run["id"], "formal_run_pass", binding=formal, run_id="C1-A-1",
+                        gate_evidence=PASS_EVIDENCE, result_artifact_sha256="2"*64)
+        chain = ledger._read_local()["records"]
+        tampered = [dict(x) for x in chain]; tampered[-1] = dict(tampered[-1]); tampered[-1]["gate_evidence_sha256"] = "f"*64
+        try:
+            v20.validate_record_chain(tampered)
+        except v20.LedgerError:
+            pass
+        else:
+            raise AssertionError("attempt-bound PASS evidence hash tamper accepted")
+    return 7
+
+
 def gate_tests():
     hist = [dict(x, type="historical_attempt") for x in v20.HISTORICAL]
-    diag = {"id": "a"*32, "role": "diagnostic", "state": "completed_diagnostic", "determination": "resolved", "report_sha256": "a"*64}
-    final = {"id": "b"*32, "role": "final_probe", "state": "final_pass", "gate_evidence_sha256": "b"*64}
-    assert v20.formal_start_eligible(hist + [diag, final])
+    diag_binding, final_binding, formal_binding = _binding("f"*64), _binding("e"*64), _binding("2"*64)
+    run_ids = [f"C{c}-{side}-{repeat}" for c in range(1, 7) for side in ("A", "B") for repeat in (1, 2)]
+    run_set = v20.sha256(v20.canonical_bytes(run_ids))
+    def base_record(i, role, state, binding, run_id=None):
+        record = {"sequence": i + 3, "id": f"{i+1:032x}", "role": role, "state": state,
+                  "fingerprint": binding["fingerprint"], "root_identity": binding["root_identity"],
+                  "spec_sha256": binding["spec_sha256"], "command_sha256": binding["command_sha256"],
+                  "preflight_sha256": binding["preflight_sha256"], "manifest_sha256": binding["manifest_sha256"],
+                  "binding": binding, "binding_sha256": v20.binding_digest(binding),
+                  "pid": os.getpid(), "pgid": os.getpgrp(), "owner_uid": os.getuid(),
+                  "started_epoch": 1000+i, "deadline_epoch": 1600+i if role != "formal_run" else 1240+i,
+                  "ended_epoch": 1001+i}
+        if run_id is not None: record["run_id"] = run_id
+        return record
+    diag = base_record(0, "diagnostic", "completed_diagnostic", diag_binding)
+    diag.update({"determination": "resolved", "report_sha256": "a"*64, "result_artifact_sha256": "a"*64,
+                 "expected_next_role": "final_probe", "expected_next_binding": final_binding,
+                 "expected_next_binding_sha256": v20.binding_digest(final_binding)})
+    final = base_record(1, "final_probe", "final_pass", final_binding)
+    final_result = "b"*64
+    final.update({"result_artifact_sha256": final_result, "gate_schema": 1, "gate_evidence": PASS_EVIDENCE,
+                  "gate_evidence_sha256": v20.gate_evidence_digest(attempt_id=final["id"],
+                      binding_sha256=final["binding_sha256"], result_artifact_sha256=final_result, evidence=PASS_EVIDENCE),
+                  "expected_next_role": "formal_run", "expected_next_binding": formal_binding,
+                  "expected_next_binding_sha256": v20.binding_digest(formal_binding),
+                  "expected_next_run_set_sha256": run_set})
+    prefix = hist + [diag, final]
+    assert v20.formal_start_eligible(prefix)
     assert not v20.formal_start_eligible(hist + [{**diag, "determination": "inconclusive"}, final])
     assert not v20.formal_start_eligible(hist + [diag, {**final, "state": "final_fail"}])
     assert not v20.formal_start_eligible(hist + [diag, final, {"role": "unknown"}])
     runs = []
-    for i, run_id in enumerate(f"C{c}-{side}-{repeat}" for c in range(1, 7) for side in ("A", "B") for repeat in (1, 2)):
-        runs.append({"id": f"{i + 1:032x}", "role": "formal_run", "run_id": run_id,
-                     "state": "formal_run_pass", "gate_evidence_sha256": "c"*64})
+    for i, run_id in enumerate(run_ids):
+        record = base_record(i+2, "formal_run", "formal_run_pass", formal_binding, run_id)
+        result_hash = f"{i+3:064x}"
+        record.update({"result_artifact_sha256": result_hash, "gate_schema": 1, "gate_evidence": PASS_EVIDENCE,
+                       "gate_evidence_sha256": v20.gate_evidence_digest(attempt_id=record["id"],
+                           binding_sha256=record["binding_sha256"], result_artifact_sha256=result_hash,
+                           evidence=PASS_EVIDENCE, run_id=run_id), "run_set_sha256": run_set})
+        runs.append(record)
     assert v20.formal_complete(hist + [diag, final] + runs)
     assert not v20.formal_complete(hist + [diag, final] + runs[:-1])
     import contextlib
@@ -446,22 +632,143 @@ def git_remote_fixture_tests():
             first = adapter.push_ff(None, seed)
             adapter.seed_commit_pin = first
             assert adapter.ls_remote() == first and adapter.chain(first) == history
-        second = adapter.push_ff(first, v20.canonical_bytes({"schema": 1, "version": 20, "records": history}))
-        assert adapter.ls_remote() == second and adapter.chain(second) == history
+        ledger = v20.GlobalLedger(root / "state", adapter)
+        ledger._write_local(history, first)
+        reservation = ledger.reserve(role="diagnostic", binding=_binding())
+        current = adapter.ls_remote(); current_records = adapter.chain(current)
+        assert current_records[-1]["id"] == reservation["id"]
+        attacks = []
+        attacks.append(history)  # drop the consumed reservation / rollback to old snapshot
+        altered = [dict(x) for x in current_records]; altered[-1]["binding"] = _binding("e"*64); attacks.append(altered)
+        reordered = [*current_records[:2], *reversed(current_records[2:])]; attacks.append(reordered)
+        for candidate in attacks:
+            try:
+                adapter.push_ff(current, v20.canonical_bytes({"schema": 1, "version": 20, "records": candidate}))
+            except v20.LedgerError:
+                pass
+            else:
+                raise AssertionError("fixture remote accepted deletion/rollback/binding tamper")
+        ledger.mark_running(reservation["id"], binding=_binding())
+        running_head = adapter.ls_remote(); running_records = adapter.chain(running_head)
+        reverse = [dict(x) for x in running_records]; reverse[-1]["state"] = "reserved"
         try:
-            adapter.push_ff(first, v20.canonical_bytes({"schema": 1, "version": 20, "records": history}))
-        except v20.LedgerError as exc:
-            assert str(exc) == "remote_head_changed"
+            adapter.push_ff(running_head, v20.canonical_bytes({"schema": 1, "version": 20, "records": reverse}))
+        except v20.LedgerError:
+            pass
         else:
-            raise AssertionError("fixture remote accepted stale non-FF parent")
-        assert adapter.ls_remote() == second
-    return 3
+            raise AssertionError("fixture remote accepted state reversal")
+        diag_report = _report(); diag_report["attempt_id"] = reservation["id"]
+        safe = v20.report_for_storage(diag_report, attempt_id=reservation["id"], fingerprint="f"*64,
+                                      binding_sha256=v20.binding_digest(_binding()))
+        ledger.complete(reservation["id"], "completed_diagnostic", binding=_binding(), diagnostic_report=safe,
+                        next_binding=_binding("e"*64))
+        completed_head = adapter.ls_remote()
+        assert completed_head != running_head and adapter.chain(completed_head)[-1]["state"] == "completed_diagnostic"
+    return 8
+
+
+def diagnostic_lifecycle_tests():
+    marker = "synthetic-cli-secret-7c4e8a1d"
+
+    class FakeCLI:
+        def __init__(self, ledger, mode="success"):
+            self.ledger, self.mode, self.calls = ledger, mode, 0
+            self.child_reaped = mode != "reap-fail"; self.residual_verified = mode != "residual-fail"
+
+        def invoke(self, deadline_epoch, *, attempt_id, binding, sandbox_directory):
+            self.calls += 1
+            current = self.ledger._read_local()["records"][-1]
+            assert current["id"] == attempt_id and current["state"] == "running"
+            assert self.ledger.remote.pushes >= 2  # reserve + running confirmation precede launch
+            if self.mode == "crash":
+                raise RuntimeError(marker)
+            if self.mode == "direct-file":
+                (sandbox_directory / "unexpected.raw").write_bytes(marker.encode())
+            report = _report()
+            report.update({"attempt_id": attempt_id, "fingerprint": binding["fingerprint"]})
+            if self.mode == "path-inconsistent":
+                report["path"]["component_count"] = 1; report["path"]["unapproved_component_count"] = 2
+                report["determination"] = "inconclusive"
+            return {"returncode": 0, "stdout": (b"not-json" if self.mode == "parse-fail" else v20.canonical_bytes(report)),
+                    "stderr": marker.encode(), "answer": marker.encode(), "raw": marker.encode(),
+                    "timed_out": self.mode == "timeout", "child_reaped": self.child_reaped,
+                    "residual_verified": self.residual_verified}
+
+    # Remote reservation failure must happen before adapter invocation.
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td); remote = FakeRemote(); ledger = v20.GlobalLedger(root / "ledger", remote); _seed_local(ledger, remote)
+        remote.mode = "non_ff"; cli = FakeCLI(ledger)
+        try:
+                v20.run_diagnostic_once(ledger, binding=_binding(), adapter=cli, artifact_directory=root / "out",
+                                        next_binding_factory=lambda report: _binding("e"*64))
+        except v20.LedgerError:
+            pass
+        else:
+            raise AssertionError("failed remote reservation launched diagnostic adapter")
+        assert cli.calls == 0 and not (root / "out").exists()
+    cases = 1
+
+    for mode, expected_state in (("success", "completed_diagnostic"), ("crash", "unknown"),
+                                 ("timeout", "timeout"), ("parse-fail", "unknown"),
+                                 ("reap-fail", "unknown"), ("residual-fail", "unknown"),
+                                 ("path-inconsistent", "diagnostic_inconclusive"), ("direct-file", "unknown")):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td); remote = FakeRemote(); ledger = v20.GlobalLedger(root / "ledger", remote); _seed_local(ledger, remote)
+            cli = FakeCLI(ledger, mode)
+            try:
+                record = v20.run_diagnostic_once(ledger, binding=_binding(), adapter=cli, artifact_directory=root / "out",
+                    next_binding_factory=lambda report: _binding("e"*64))
+                assert mode == "success" and record["state"] == "reserved"
+            except v20.LedgerError:
+                assert mode != "success"
+            final = ledger._read_local()["records"][-1]
+            assert final["state"] == expected_state and cli.calls == 1
+            if mode not in {"reap-fail", "residual-fail"}:
+                assert cli.child_reaped and cli.residual_verified
+            saved = b"".join(path.read_bytes() for path in (root / "out").rglob("*") if path.is_file())
+            assert marker.encode() not in saved
+            assert all(path.name in v20.ARTIFACT_NAMES for path in (root / "out").iterdir())
+            if mode == "success":
+                assert v20.strict_json((root / "out/result.json").read_bytes())["attempt_id"] == final["id"]
+            else:
+                assert v20.strict_json((root / "out/error.json").read_bytes())["error"] in {"internal_error", "invocation_timeout", "invalid_json", "diagnostic_inconclusive"}
+        cases += 1
+
+    # Exercise real process-group timeout/reap with a local synthetic child, never Codex.
+    timed = v20.run_process_group(("/bin/sh", "-c", "printf synthetic-output; sleep 5"),
+                                  deadline_epoch=__import__("time").time() + 0.05,
+                                  residual_scanner=lambda pid, pgid: True)
+    assert timed["timed_out"] and timed["child_reaped"] and timed["residual_verified"]
+    assert b"synthetic-output" in timed["stdout"]
+    argv = ("/opt/homebrew/Caskroom/codex/0.162.1/bin/codex", "exec", "--json")
+    production_binding = _binding()
+    production_binding["command_sha256"] = v20.sha256(v20.canonical_bytes(list(argv)))
+    production = v20.FixedOpenAIDirectCodexAdapter(argv, command_sha256=production_binding["command_sha256"],
+                                                   binding=production_binding, residual_scanner=lambda *_: True)
+    try:
+        production.invoke(__import__("time").time()+30, attempt_id=TRUSTED_ID, binding=production_binding,
+                          sandbox_directory=Path("/private/tmp"))
+    except v20.LedgerError as exc:
+        assert str(exc) == "actual_invocation_disabled"
+    else:
+        raise AssertionError("production Codex adapter invoked while disabled")
+    for forbidden_argv in (("/usr/bin/env", "vercel"), ("/opt/homebrew/Caskroom/codex/0.162.1/bin/codex", "exec", "--json", "--retry")):
+        try:
+            v20.FixedOpenAIDirectCodexAdapter(forbidden_argv,
+                command_sha256=v20.sha256(v20.canonical_bytes(list(forbidden_argv))),
+                binding=dict(production_binding, command_sha256=v20.sha256(v20.canonical_bytes(list(forbidden_argv)))),
+                residual_scanner=lambda *_: True)
+        except v20.LedgerError:
+            pass
+        else:
+            raise AssertionError("alternate route/retry command accepted")
+    return cases + 4
 
 
 def run_all():
     counts = {"schema": schema_tests(), "privacy": privacy_tests(), "path_unknown": path_and_unknown_tests(),
-              "ledger": ledger_tests(), "formal_gate": gate_tests(), "remote_fixture": git_remote_fixture_tests(),
-              "seed_canonical": seed_canonical_tests()}
+              "ledger": ledger_tests(), "phase_binding": phase_binding_tests(), "formal_gate": gate_tests(), "remote_fixture": git_remote_fixture_tests(),
+              "seed_canonical": seed_canonical_tests(), "diagnostic_lifecycle": diagnostic_lifecycle_tests()}
     return counts
 
 

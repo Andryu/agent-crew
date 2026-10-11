@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import stat
 import subprocess
 import tempfile
@@ -148,7 +149,10 @@ def validate_report(report: dict, *, attempt_id: str, fingerprint: str) -> dict:
         raise LedgerError("diagnostic_schema_invalid")
     if type(report["schema"]) is not int or report["schema"] != 1:
         raise LedgerError("diagnostic_schema_invalid")
-    if (type(report["attempt_id"]) is not str or type(report["fingerprint"]) is not str
+    if (type(report["attempt_id"]) is not str or not re.fullmatch(r"[0-9a-f]{32}", report["attempt_id"])
+            or type(report["fingerprint"]) is not str or not re.fullmatch(r"[0-9a-f]{64}", report["fingerprint"])
+            or type(attempt_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", attempt_id)
+            or type(fingerprint) is not str or not re.fullmatch(r"[0-9a-f]{64}", fingerprint)
             or report["attempt_id"] != attempt_id or report["fingerprint"] != fingerprint):
         raise LedgerError("diagnostic_binding_mismatch")
     if (type(report["environment_fit"]) is not str or report["environment_fit"] not in FIT
@@ -161,6 +165,8 @@ def validate_report(report: dict, *, attempt_id: str, fingerprint: str) -> dict:
             or type(p["order_classification"]) is not str or p["order_classification"] not in PATH_CLASSES
             or any(type(p[k]) is not int or not 0 <= p[k] <= 128 for k in ("component_count", "unapproved_component_count"))):
         raise LedgerError("diagnostic_path_value_invalid")
+    if p["unapproved_component_count"] > p["component_count"]:
+        raise LedgerError("diagnostic_inconclusive")
     if report["environment_fit"] == "unknown" or p["order_classification"] == "malformed":
         raise LedgerError("diagnostic_inconclusive")
     if type(u) is not dict or set(u) != {"codex_home_present", "classification", "unknown_count", "other_unknown_count"}:
@@ -191,8 +197,10 @@ def validate_report(report: dict, *, attempt_id: str, fingerprint: str) -> dict:
     return report
 
 
-def report_for_storage(report: dict, *, attempt_id: str, fingerprint: str) -> bytes:
+def report_for_storage(report: dict, *, attempt_id: str, fingerprint: str, binding_sha256: str) -> bytes:
     """Rebuild from schema allowlist; input maps/raw exceptions never reach storage."""
+    if type(binding_sha256) is not str or not re.fullmatch(r"[0-9a-f]{64}", binding_sha256):
+        raise LedgerError("diagnostic_binding_mismatch")
     validated = validate_report(report, attempt_id=attempt_id, fingerprint=fingerprint)
     return canonical_bytes({key: validated[key] for key in
                             ("schema", "attempt_id", "fingerprint", "environment_fit", "path", "unknown_keys", "determination")})
@@ -202,14 +210,20 @@ ARTIFACT_NAMES = frozenset({"stdout.txt", "stderr.txt", "answer.json", "raw.json
                             "result.json", "summary.json", "audit.json", "diagnostic.json", "public.md", "error.json"})
 
 
-def artifact_bundle(*, report_bytes: bytes | None = None, error: Exception | None = None) -> dict[str, bytes]:
+def artifact_bundle(*, trusted_attempt_id: str, trusted_fingerprint: str, trusted_binding_sha256: str,
+                    report_bytes: bytes | None = None, error: Exception | None = None) -> dict[str, bytes]:
     """Construct complete output set solely from fixed schema or stable error enum."""
     if (report_bytes is None) == (error is None):
         raise LedgerError("artifact_bundle_input_invalid")
+    if (type(trusted_attempt_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", trusted_attempt_id)
+            or type(trusted_fingerprint) is not str or not re.fullmatch(r"[0-9a-f]{64}", trusted_fingerprint)
+            or type(trusted_binding_sha256) is not str or not re.fullmatch(r"[0-9a-f]{64}", trusted_binding_sha256)):
+        raise LedgerError("artifact_trusted_binding_invalid")
     bundle = {name: b"" for name in ARTIFACT_NAMES}
     if report_bytes is not None:
         report = strict_json(report_bytes)
-        safe = report_for_storage(report, attempt_id=report.get("attempt_id"), fingerprint=report.get("fingerprint"))
+        safe = report_for_storage(report, attempt_id=trusted_attempt_id, fingerprint=trusted_fingerprint,
+                                  binding_sha256=trusted_binding_sha256)
         bundle["result.json"] = safe
         bundle["summary.json"] = safe
         bundle["audit.json"] = safe
@@ -227,14 +241,30 @@ def artifact_bundle(*, report_bytes: bytes | None = None, error: Exception | Non
     return bundle
 
 
-def save_artifact_bundle(directory: Path, bundle: dict[str, bytes]):
+def save_artifact_bundle(directory: Path, bundle: dict[str, bytes], *, trusted_attempt_id: str,
+                         trusted_fingerprint: str, trusted_binding_sha256: str):
     directory = Path(directory)
+    if type(bundle) is not dict or set(bundle) != ARTIFACT_NAMES or any(type(v) is not bytes for v in bundle.values()):
+        raise LedgerError("artifact_bundle_schema_invalid")
+    if bundle["result.json"]:
+        expected = artifact_bundle(report_bytes=bundle["result.json"], trusted_attempt_id=trusted_attempt_id,
+                                   trusted_fingerprint=trusted_fingerprint, trusted_binding_sha256=trusted_binding_sha256)
+        if expected != bundle:
+            raise LedgerError("artifact_bundle_schema_invalid")
+    elif bundle["error.json"]:
+        error_obj = strict_json(bundle["error.json"])
+        if type(error_obj) is not dict or set(error_obj) != {"error"} or type(error_obj["error"]) is not str:
+            raise LedgerError("artifact_bundle_schema_invalid")
+        expected = artifact_bundle(error=LedgerError(error_obj["error"]), trusted_attempt_id=trusted_attempt_id,
+                                   trusted_fingerprint=trusted_fingerprint, trusted_binding_sha256=trusted_binding_sha256)
+        if expected != bundle:
+            raise LedgerError("artifact_bundle_schema_invalid")
+    else:
+        raise LedgerError("artifact_bundle_schema_invalid")
     directory.mkdir(parents=True, mode=0o700, exist_ok=False)
     info = directory.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
         raise LedgerError("artifact_directory_identity_invalid")
-    if type(bundle) is not dict or set(bundle) != ARTIFACT_NAMES or any(type(v) is not bytes for v in bundle.values()):
-        raise LedgerError("artifact_bundle_schema_invalid")
     for name, data in bundle.items():
         fd = os.open(directory / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         try:
@@ -256,13 +286,32 @@ def formal_start_eligible(records: list[dict]) -> bool:
     """Gate formal start on fixed history, exactly one resolved diagnostic and one PASS final."""
     if type(records) is not list or len(records) != 4 or any(type(r) is not dict for r in records):
         return False
+    try:
+        validate_record_chain(records)
+    except LedgerError:
+        return False
     expected_history = [dict(x, type="historical_attempt") for x in HISTORICAL]
     if records[:2] != expected_history:
         return False
     diagnostic = [r for r in records[2:] if r.get("role") == "diagnostic"]
     final = [r for r in records[2:] if r.get("role") == "final_probe"]
-    return (len(diagnostic) == 1 and diagnostic[0].get("state") == "completed_diagnostic"
-            and diagnostic[0].get("determination") == "resolved" and len(final) == 1
+    if len(diagnostic) != 1 or len(final) != 1:
+        return False
+    try:
+        diagnostic_next = validate_binding(diagnostic[0].get("expected_next_binding"))
+        final_next = validate_binding(final[0].get("expected_next_binding"))
+    except LedgerError:
+        return False
+    expected_run_set = sha256(canonical_bytes([f"C{c}-{side}-{n}" for c in range(1, 7)
+                                                for side in ("A", "B") for n in (1, 2)]))
+    return (diagnostic[0].get("expected_next_role") == "final_probe"
+            and diagnostic[0].get("expected_next_binding_sha256") == binding_digest(diagnostic_next)
+            and diagnostic_next == final[0].get("binding")
+            and final[0].get("expected_next_role") == "formal_run"
+            and final[0].get("expected_next_binding_sha256") == binding_digest(final_next)
+            and final[0].get("expected_next_run_set_sha256") == expected_run_set
+            and diagnostic[0].get("state") == "completed_diagnostic"
+            and diagnostic[0].get("determination") == "resolved"
             and re.fullmatch(r"[0-9a-f]{64}", diagnostic[0].get("report_sha256", ""))
             and final[0].get("state") == "final_pass"
             and re.fullmatch(r"[0-9a-f]{64}", final[0].get("gate_evidence_sha256", ""))
@@ -273,12 +322,51 @@ def formal_complete(records: list[dict]) -> bool:
     if (type(records) is not list or len(records) != HARD_CAP or any(type(r) is not dict for r in records)
             or not formal_start_eligible(records[:4])):
         return False
+    try:
+        validate_record_chain(records)
+    except LedgerError:
+        return False
     formal = records[4:]
     expected_runs = [f"C{case}-{side}-{repeat}" for case in range(1, 7) for side in ("A", "B") for repeat in (1, 2)]
     return (len(formal) == 24 and [r.get("run_id") for r in formal] == expected_runs
             and len({r.get("id") for r in records[2:]}) == 26
             and all(r.get("role") == "formal_run" and r.get("state") == "formal_run_pass"
                     and re.fullmatch(r"[0-9a-f]{64}", r.get("gate_evidence_sha256", "")) for r in formal))
+
+
+def validate_binding(binding):
+    fields = {"fingerprint", "root_identity", "spec_sha256", "command_sha256", "preflight_sha256", "manifest_sha256"}
+    if type(binding) is not dict or set(binding) != fields:
+        raise LedgerError("reservation_binding_invalid")
+    if (type(binding["fingerprint"]) is not str or not re.fullmatch(r"[0-9a-f]{64}", binding["fingerprint"])
+            or any(type(binding[k]) is not str or not re.fullmatch(r"[0-9a-f]{64}", binding[k])
+                   for k in ("spec_sha256", "command_sha256", "preflight_sha256", "manifest_sha256"))):
+        raise LedgerError("reservation_binding_invalid")
+    root = binding["root_identity"]
+    if (type(root) is not dict or set(root) != {"realpath", "device", "inode"}
+            or type(root["realpath"]) is not str or not os.path.isabs(root["realpath"])
+            or os.path.realpath(root["realpath"]) != root["realpath"]
+            or type(root["device"]) is not int or root["device"] < 0
+            or type(root["inode"]) is not int or root["inode"] <= 0):
+        raise LedgerError("reservation_binding_invalid")
+    return binding
+
+
+def binding_digest(binding):
+    return sha256(canonical_bytes(validate_binding(binding)))
+
+
+def gate_evidence_digest(*, attempt_id, binding_sha256, result_artifact_sha256, evidence, run_id=None):
+    if (type(attempt_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", attempt_id)
+            or type(binding_sha256) is not str or not re.fullmatch(r"[0-9a-f]{64}", binding_sha256)
+            or type(result_artifact_sha256) is not str or not re.fullmatch(r"[0-9a-f]{64}", result_artifact_sha256)
+            or type(evidence) is not dict):
+        raise LedgerError("pass_gate_evidence_invalid")
+    payload = {"attempt_id": attempt_id, "binding_sha256": binding_sha256,
+               "result_artifact_sha256": result_artifact_sha256, "gate_schema": 1, "evidence": evidence}
+    if run_id is not None:
+        payload["run_id"] = run_id
+    return sha256(canonical_bytes(payload))
 
 
 def validate_record_chain(records):
@@ -288,8 +376,12 @@ def validate_record_chain(records):
     seen = set()
     for index, record in enumerate(records[2:], 3):
         required = {"sequence", "id", "role", "fingerprint", "root_identity", "spec_sha256", "command_sha256",
+                    "preflight_sha256", "manifest_sha256", "binding", "binding_sha256",
                     "pid", "pgid", "owner_uid", "started_epoch", "deadline_epoch", "state"}
-        optional = {"run_id", "determination", "report_sha256", "gate_evidence_sha256", "ended_epoch"}
+        optional = {"run_id", "determination", "report_sha256", "gate_evidence_sha256", "ended_epoch",
+                    "result_artifact_sha256", "gate_schema", "run_set_sha256", "gate_evidence",
+                    "expected_next_role", "expected_next_binding", "expected_next_binding_sha256",
+                    "expected_next_run_set_sha256"}
         if type(record) is not dict or not required <= set(record) or not set(record) <= required | optional:
             raise LedgerError("ledger_record_schema_invalid")
         if (type(record["sequence"]) is not int or record["sequence"] != index
@@ -301,10 +393,14 @@ def validate_record_chain(records):
             raise LedgerError("ledger_record_value_invalid")
         seen.add(record["id"])
         root = record["root_identity"]
-        if (type(root) is not dict or set(root) != {"realpath_sha256", "device", "inode"}
-                or type(root["realpath_sha256"]) is not str or not re.fullmatch(r"[0-9a-f]{64}", root["realpath_sha256"])
-                or type(root["device"]) is not int or root["device"] < 0
-                or type(root["inode"]) is not int or root["inode"] <= 0):
+        binding = validate_binding(record["binding"])
+        digest = binding_digest(binding)
+        if (binding["fingerprint"] != record["fingerprint"] or root != binding["root_identity"]
+                or record["spec_sha256"] != binding["spec_sha256"]
+                or record["command_sha256"] != binding["command_sha256"]
+                or record["preflight_sha256"] != binding["preflight_sha256"]
+                or record["manifest_sha256"] != binding["manifest_sha256"]
+                or record["binding_sha256"] != digest):
             raise LedgerError("ledger_record_value_invalid")
         for key in ("pid", "pgid"):
             if type(record[key]) is not int or record[key] <= 0:
@@ -330,7 +426,8 @@ def validate_record_chain(records):
             raise LedgerError("ledger_record_value_invalid")
         if record["role"] == "diagnostic":
             if "run_id" in record or (record["state"] == "completed_diagnostic" and
-                    (record.get("determination") != "resolved" or not re.fullmatch(r"[0-9a-f]{64}", record.get("report_sha256", "")))):
+                    (record.get("determination") != "resolved" or not re.fullmatch(r"[0-9a-f]{64}", record.get("report_sha256", ""))
+                     or record.get("report_sha256") != record.get("result_artifact_sha256"))):
                 raise LedgerError("ledger_record_value_invalid")
             if record["state"] == "diagnostic_inconclusive" and record.get("determination") != "inconclusive":
                 raise LedgerError("ledger_record_value_invalid")
@@ -341,10 +438,80 @@ def validate_record_chain(records):
             if type(record.get("run_id")) is not str or record.get("run_id") not in {f"C{c}-{s}-{n}" for c in range(1, 7) for s in ("A", "B") for n in (1, 2)}:
                 raise LedgerError("ledger_record_value_invalid")
         if record["state"] in {"final_pass", "formal_run_pass"}:
-            if not re.fullmatch(r"[0-9a-f]{64}", record.get("gate_evidence_sha256", "")):
+            evidence = record.get("gate_evidence")
+            expected_gate_fields = {"env", "runtime", "binding", "event", "scope", "residual", "cli"}
+            if (not re.fullmatch(r"[0-9a-f]{64}", record.get("gate_evidence_sha256", ""))
+                    or not re.fullmatch(r"[0-9a-f]{64}", record.get("result_artifact_sha256", ""))
+                    or type(record.get("gate_schema")) is not int or record["gate_schema"] != 1
+                    or type(evidence) is not dict or set(evidence) != expected_gate_fields
+                    or any(type(v) is not bool or v is not True for v in evidence.values())
+                    or record["gate_evidence_sha256"] != gate_evidence_digest(
+                        attempt_id=record["id"], binding_sha256=record["binding_sha256"],
+                        result_artifact_sha256=record["result_artifact_sha256"], evidence=evidence,
+                        run_id=record.get("run_id"))):
                 raise LedgerError("ledger_record_value_invalid")
-        elif "gate_evidence_sha256" in record:
+        elif any(k in record for k in ("gate_evidence_sha256", "gate_schema", "gate_evidence")) or (
+                "result_artifact_sha256" in record and not (record["role"] == "diagnostic"
+                and record["state"] == "completed_diagnostic" and record.get("report_sha256") == record["result_artifact_sha256"])):
             raise LedgerError("ledger_record_value_invalid")
+        if record["role"] == "formal_run" and (type(record.get("run_set_sha256")) is not str
+                or not re.fullmatch(r"[0-9a-f]{64}", record["run_set_sha256"])):
+            raise LedgerError("ledger_record_value_invalid")
+        if record["role"] != "formal_run" and "run_set_sha256" in record:
+            raise LedgerError("ledger_record_value_invalid")
+        expected_next = any(k in record for k in ("expected_next_role", "expected_next_binding",
+                                                    "expected_next_binding_sha256", "expected_next_run_set_sha256"))
+        if record["role"] == "diagnostic" and record["state"] == "completed_diagnostic":
+            next_binding = validate_binding(record.get("expected_next_binding"))
+            if (record.get("expected_next_role") != "final_probe"
+                    or record.get("expected_next_binding_sha256") != binding_digest(next_binding)
+                    or next_binding["fingerprint"] == record["fingerprint"]):
+                raise LedgerError("ledger_expected_binding_invalid")
+        elif record["role"] == "final_probe" and record["state"] == "final_pass":
+            next_binding = validate_binding(record.get("expected_next_binding"))
+            expected_runs = [f"C{c}-{side}-{n}" for c in range(1, 7) for side in ("A", "B") for n in (1, 2)]
+            if (record.get("expected_next_role") != "formal_run"
+                    or record.get("expected_next_binding_sha256") != binding_digest(next_binding)
+                    or record.get("expected_next_run_set_sha256") != sha256(canonical_bytes(expected_runs))
+                    or next_binding["fingerprint"] == record["fingerprint"]):
+                raise LedgerError("ledger_expected_binding_invalid")
+        elif expected_next:
+            raise LedgerError("ledger_expected_binding_invalid")
+    phases = records[2:]
+    diagnostics = [r for r in phases if r["role"] == "diagnostic"]
+    finals = [r for r in phases if r["role"] == "final_probe"]
+    formals = [r for r in phases if r["role"] == "formal_run"]
+    if len(diagnostics) > 1 or len(finals) > 1:
+        raise LedgerError("ledger_role_binding_duplicate")
+    if phases:
+        if phases[0]["role"] != "diagnostic":
+            raise LedgerError("ledger_phase_order_invalid")
+        if finals and (len(phases) < 2 or phases[1]["role"] != "final_probe"
+                       or phases[0]["state"] != "completed_diagnostic"):
+            raise LedgerError("ledger_phase_order_invalid")
+        formal_offset = 2 if finals else len(phases)
+        if any(r["role"] != "formal_run" for r in phases[formal_offset:]):
+            raise LedgerError("ledger_phase_order_invalid")
+        if phases[0]["state"] not in {"completed_diagnostic"} and len(phases) > 1:
+            raise LedgerError("ledger_phase_order_invalid")
+        if finals and phases[1]["state"] != "final_pass" and len(phases) > 2:
+            raise LedgerError("ledger_phase_order_invalid")
+        expected_run_ids = [f"C{c}-{side}-{n}" for c in range(1, 7) for side in ("A", "B") for n in (1, 2)]
+        if finals and [r["run_id"] for r in phases[2:]] != expected_run_ids[:len(phases[2:])]:
+            raise LedgerError("ledger_phase_order_invalid")
+        formal_records = phases[2:] if finals else []
+        if any(r["state"] != "formal_run_pass" for r in formal_records[:-1]):
+            raise LedgerError("ledger_phase_order_invalid")
+    if diagnostics and finals and (diagnostics[0]["binding_sha256"] == finals[0]["binding_sha256"]
+            or diagnostics[0].get("expected_next_binding") != finals[0]["binding"]):
+        raise LedgerError("ledger_phase_binding_reused")
+    if formals:
+        if (not finals or len({r["binding_sha256"] for r in formals}) != 1
+                or len({r["run_set_sha256"] for r in formals}) != 1
+                or any(r["binding_sha256"] == finals[0]["binding_sha256"] for r in formals)
+                or finals[0].get("expected_next_binding") != formals[0]["binding"]
+                or finals[0].get("expected_next_run_set_sha256") != formals[0]["run_set_sha256"]):
+            raise LedgerError("ledger_formal_binding_changed")
     return records
 
 
@@ -460,16 +627,15 @@ class GlobalLedger:
         _atomic(self.ledger, canonical_bytes(ledger))
         _atomic(self.seal, canonical_bytes({"sequence": len(records), "chain_sha256": sha256(canonical_bytes(records)), "remote_head": head}))
 
-    def reserve(self, *, role: str, fingerprint: str, root_identity: dict, spec_sha256: str, command_sha256: str, run_id: str | None = None):
-        if (role not in {"diagnostic", "final_probe", "formal_run"} or type(fingerprint) is not str
-                or not re.fullmatch(r"[0-9a-f]{64}", fingerprint)
-                or type(spec_sha256) is not str or not re.fullmatch(r"[0-9a-f]{64}", spec_sha256)
-                or type(command_sha256) is not str or not re.fullmatch(r"[0-9a-f]{64}", command_sha256)
-                or type(root_identity) is not dict or set(root_identity) != {"realpath_sha256", "device", "inode"}
-                or type(root_identity["realpath_sha256"]) is not str or not re.fullmatch(r"[0-9a-f]{64}", root_identity["realpath_sha256"])
-                or type(root_identity["device"]) is not int or root_identity["device"] < 0
-                or type(root_identity["inode"]) is not int or root_identity["inode"] <= 0):
+    def reserve(self, *, role: str, binding: dict, run_id: str | None = None):
+        if role not in {"diagnostic", "final_probe", "formal_run"}:
             raise LedgerError("reservation_binding_invalid")
+        binding = validate_binding(binding)
+        fingerprint = binding["fingerprint"]
+        root_identity = binding["root_identity"]
+        spec_sha256 = binding["spec_sha256"]
+        command_sha256 = binding["command_sha256"]
+        digest = binding_digest(binding)
         fd = self._lock()
         try:
             ledger = self._read_local()
@@ -485,7 +651,10 @@ class GlobalLedger:
                 raise LedgerError("duplicate_diagnostic_role")
             if role == "final_probe" and (not any(r.get("role") == "diagnostic" and r.get("state") == "completed_diagnostic"
                                                    and r.get("determination") == "resolved" for r in phase_records)
-                                           or any(r.get("role") == "final_probe" for r in phase_records)):
+                                           or any(r.get("role") == "final_probe" for r in phase_records)
+                                           or any(r.get("role") == "diagnostic" and
+                                                  (r.get("binding_sha256") == digest or r.get("expected_next_binding") != binding)
+                                                  for r in phase_records)):
                 raise LedgerError("final_probe_gate_not_satisfied")
             if role == "formal_run":
                 valid_ids = {f"C{c}-{s}-{n}" for c in range(1, 7) for s in ("A", "B") for n in (1, 2)}
@@ -493,6 +662,12 @@ class GlobalLedger:
                 run_order = [f"C{c}-{s}-{n}" for c in range(1, 7) for s in ("A", "B") for n in (1, 2)]
                 prior_formal = [r for r in phase_records if r.get("role") == "formal_run"]
                 if (run_id not in valid_ids or not formal_start_eligible(records[:4])
+                        or any(r.get("role") == "final_probe" and r.get("binding_sha256") == digest for r in phase_records)
+                        or not any(r.get("role") == "final_probe" and r.get("state") == "final_pass"
+                                   and r.get("expected_next_binding") == binding
+                                   and r.get("expected_next_run_set_sha256") == sha256(canonical_bytes(run_order))
+                                   for r in phase_records)
+                        or any(r.get("binding_sha256") != digest for r in prior_formal)
                         or any(r.get("role") == "formal_run" and r.get("state") != "formal_run_pass" for r in phase_records)
                         or run_id in existing_runs or len(prior_formal) != run_order.index(run_id)):
                     raise LedgerError("formal_gate_not_satisfied")
@@ -505,11 +680,15 @@ class GlobalLedger:
             record = {"sequence": len(records) + 1, "id": uuid.uuid4().hex, "role": role,
                       "fingerprint": fingerprint, "root_identity": root_identity,
                       "spec_sha256": spec_sha256, "command_sha256": command_sha256,
+                      "preflight_sha256": binding["preflight_sha256"], "manifest_sha256": binding["manifest_sha256"],
+                      "binding": binding, "binding_sha256": digest,
                       "pid": os.getpid(), "pgid": os.getpgrp(), "owner_uid": os.getuid(),
                       "started_epoch": now, "deadline_epoch": now + (600 if role in {"diagnostic", "final_probe"} else 240),
                       "state": "reserved"}
             if run_id is not None:
                 record["run_id"] = run_id
+            if role == "formal_run":
+                record["run_set_sha256"] = sha256(canonical_bytes(run_order))
             commit = self.remote.push_ff(head, canonical_bytes({"schema": 1, "version": VERSION, "records": records + [record]}))
             if self.remote.ls_remote() != commit:
                 raise LedgerError("remote_reservation_confirmation_failed")
@@ -520,11 +699,33 @@ class GlobalLedger:
             fcntl.flock(fd, fcntl.LOCK_UN)
             os.close(fd)
 
-    def complete(self, attempt_id: str, state: str, *, determination: str | None = None,
+    def mark_running(self, attempt_id: str, *, binding: dict):
+        binding = validate_binding(binding)
+        fd = self._lock()
+        try:
+            ledger = self._read_local(); head, records = self._verify_remote(ledger)
+            matches = [r for r in records[2:] if r.get("id") == attempt_id]
+            if len(matches) != 1 or matches[0].get("state") != "reserved" or matches[0].get("binding") != binding:
+                raise LedgerError("attempt_transition_invalid")
+            matches[0]["state"] = "running"
+            commit = self.remote.push_ff(head, canonical_bytes({"schema": 1, "version": VERSION, "records": records}))
+            if self.remote.ls_remote() != commit:
+                raise LedgerError("remote_reservation_confirmation_failed")
+            self._write_local(records, commit)
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN); os.close(fd)
+
+    def complete(self, attempt_id: str, state: str, *, binding: dict, determination: str | None = None,
                  run_id: str | None = None, diagnostic_report: bytes | None = None,
-                 gate_evidence: dict | None = None):
+                 gate_evidence: dict | None = None, result_artifact_sha256: str | None = None,
+                 next_binding: dict | None = None):
         if state not in STATES - {"reserved", "running"}:
             raise LedgerError("attempt_state_invalid")
+        binding = validate_binding(binding)
+        if next_binding is not None:
+            next_binding = validate_binding(next_binding)
+        if result_artifact_sha256 is not None and (type(result_artifact_sha256) is not str or not re.fullmatch(r"[0-9a-f]{64}", result_artifact_sha256)):
+            raise LedgerError("attempt_transition_invalid")
         fd = self._lock()
         try:
             ledger = self._read_local()
@@ -533,19 +734,24 @@ class GlobalLedger:
             if len(matches) != 1 or matches[0].get("state") not in {"reserved", "running"}:
                 raise LedgerError("attempt_transition_invalid")
             record = matches[0]
+            if record["binding"] != binding or record["binding_sha256"] != binding_digest(binding):
+                raise LedgerError("attempt_transition_invalid")
             role_state = {"diagnostic": {"completed_diagnostic", "diagnostic_inconclusive", "unknown", "timeout", "crash"},
                           "final_probe": {"final_pass", "final_fail", "unknown", "timeout", "crash"},
                           "formal_run": {"formal_run_pass", "formal_run_fail", "unknown", "timeout", "crash"}}
             if state not in role_state.get(record.get("role"), set()):
                 raise LedgerError("attempt_transition_invalid")
             if record["role"] == "diagnostic" and state == "completed_diagnostic":
-                if type(diagnostic_report) is not bytes:
+                if type(diagnostic_report) is not bytes or next_binding is None or next_binding["fingerprint"] == binding["fingerprint"]:
                     raise LedgerError("diagnostic_report_required")
                 parsed = strict_json(diagnostic_report)
-                validate_report(parsed, attempt_id=attempt_id, fingerprint=record["fingerprint"])
+                validate_report(parsed, attempt_id=record["id"], fingerprint=record["fingerprint"])
                 if parsed["determination"] != "resolved":
                     raise LedgerError("attempt_transition_invalid")
                 record["report_sha256"] = sha256(diagnostic_report)
+                record["result_artifact_sha256"] = sha256(diagnostic_report)
+                record.update({"expected_next_role": "final_probe", "expected_next_binding": next_binding,
+                               "expected_next_binding_sha256": binding_digest(next_binding)})
                 determination = parsed["determination"]
             elif diagnostic_report is not None:
                 raise LedgerError("attempt_transition_invalid")
@@ -554,20 +760,40 @@ class GlobalLedger:
             if state in {"final_pass", "formal_run_pass"}:
                 expected_gates = {"env", "runtime", "binding", "event", "scope", "residual", "cli"}
                 if (type(gate_evidence) is not dict or set(gate_evidence) != expected_gates
-                        or any(type(value) is not bool or value is not True for value in gate_evidence.values())):
+                        or any(type(value) is not bool or value is not True for value in gate_evidence.values())
+                        or result_artifact_sha256 is None):
                     raise LedgerError("pass_gate_evidence_invalid")
-                record["gate_evidence_sha256"] = sha256(canonical_bytes(gate_evidence))
+                record["result_artifact_sha256"] = result_artifact_sha256
+                record["gate_schema"] = 1
+                record["gate_evidence"] = dict(gate_evidence)
+                record["gate_evidence_sha256"] = gate_evidence_digest(
+                    attempt_id=record["id"], binding_sha256=record["binding_sha256"],
+                    result_artifact_sha256=result_artifact_sha256, evidence=gate_evidence,
+                    run_id=record.get("run_id"))
+                if state == "final_pass":
+                    if next_binding is None or next_binding["fingerprint"] == binding["fingerprint"]:
+                        raise LedgerError("ledger_expected_binding_invalid")
+                    expected_runs = [f"C{c}-{side}-{n}" for c in range(1, 7) for side in ("A", "B") for n in (1, 2)]
+                    record.update({"expected_next_role": "formal_run", "expected_next_binding": next_binding,
+                                   "expected_next_binding_sha256": binding_digest(next_binding),
+                                   "expected_next_run_set_sha256": sha256(canonical_bytes(expected_runs))})
             elif gate_evidence is not None:
+                raise LedgerError("attempt_transition_invalid")
+            elif result_artifact_sha256 is not None and record["role"] != "diagnostic":
+                raise LedgerError("attempt_transition_invalid")
+            if next_binding is not None and not (record["role"] == "diagnostic" and state == "completed_diagnostic"
+                    or record["role"] == "final_probe" and state == "final_pass"):
                 raise LedgerError("attempt_transition_invalid")
             record["state"] = state
             if determination is not None:
                 if determination not in DETERMINATIONS or record.get("role") != "diagnostic":
                     raise LedgerError("attempt_transition_invalid")
                 record["determination"] = determination
-            if run_id is not None:
-                if record.get("role") != "formal_run" or run_id not in {f"C{c}-{s}-{n}" for c in range(1, 7) for s in ("A", "B") for n in (1, 2)}:
+            if record.get("role") == "formal_run":
+                if run_id != record.get("run_id"):
                     raise LedgerError("attempt_transition_invalid")
-                record["run_id"] = run_id
+            elif run_id is not None:
+                raise LedgerError("attempt_transition_invalid")
             ended = self.clock()
             if ended > record["deadline_epoch"]:
                 state = "timeout"
@@ -582,12 +808,165 @@ class GlobalLedger:
             fcntl.flock(fd, fcntl.LOCK_UN)
             os.close(fd)
 
-    def formal_gate(self, expected_fingerprint: str):
+    def formal_gate(self, expected_binding: dict):
+        expected_binding = validate_binding(expected_binding)
         ledger = self._read_local()
         self._verify_remote(ledger)
-        if not formal_start_eligible(ledger["records"]) or ledger["records"][3].get("fingerprint") != expected_fingerprint:
+        if (not formal_start_eligible(ledger["records"])
+                or ledger["records"][3].get("expected_next_binding") != expected_binding
+                or ledger["records"][3].get("expected_next_binding_sha256") != binding_digest(expected_binding)):
             raise LedgerError("formal_gate_not_satisfied")
         return True
+
+
+class FixedOpenAIDirectCodexAdapter:
+    """Production adapter shell. It accepts only its immutable bound CLI spec and stays disabled here."""
+    actual_enabled = False
+    transport = "OpenAI direct"
+    fixed_arguments = ("exec", "--json")
+
+    def __init__(self, argv, *, command_sha256, binding, residual_scanner):
+        self.binding = validate_binding(binding)
+        self.argv = tuple(argv)
+        self.residual_scanner = residual_scanner
+        if (self.transport != "OpenAI direct" or not self.argv or not os.path.isabs(self.argv[0])
+                or os.path.realpath(self.argv[0]) != self.argv[0] or not callable(residual_scanner)
+                or Path(self.argv[0]).name != "codex"
+                or self.argv[1:] != self.fixed_arguments
+                or sha256(canonical_bytes(list(self.argv))) != command_sha256
+                or command_sha256 != self.binding["command_sha256"]):
+            raise LedgerError("fixed_cli_binding_invalid")
+
+    def invoke(self, deadline_epoch, *, attempt_id, binding, sandbox_directory):
+        if (binding != self.binding or type(attempt_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", attempt_id)):
+            raise LedgerError("fixed_cli_binding_invalid")
+        if not self.actual_enabled:
+            raise LedgerError("actual_invocation_disabled")
+        result = run_process_group(self.argv, deadline_epoch=deadline_epoch, residual_scanner=self.residual_scanner,
+                                   cwd=sandbox_directory)
+        return {**result, "answer": b"", "raw": b""}
+
+
+def run_process_group(argv, *, deadline_epoch, residual_scanner, cwd=None):
+    """Run one fixed command in a new process group; keep all child output in memory."""
+    if type(argv) not in (tuple, list) or not argv or any(type(x) is not str for x in argv):
+        raise LedgerError("fixed_cli_binding_invalid")
+    remaining = deadline_epoch - time.time()
+    if remaining <= 0:
+        return {"returncode": -1, "stdout": b"", "stderr": b"", "timed_out": True,
+                "child_reaped": True, "residual_verified": False}
+    try:
+        child = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                start_new_session=True, close_fds=True, cwd=cwd)
+    except OSError:
+        raise LedgerError("diagnostic_cli_spawn_failed") from None
+    timed_out = False
+    try:
+        stdout, stderr = child.communicate(timeout=remaining)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        try:
+            os.killpg(child.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            stdout, stderr = child.communicate(timeout=1.0)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            stdout, stderr = child.communicate()
+    except BaseException:
+        try:
+            os.killpg(child.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            stdout, stderr = child.communicate(timeout=1.0)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            child.communicate()
+        if child.poll() is None:
+            raise LedgerError("diagnostic_residual_unverified") from None
+        try:
+            if residual_scanner(child.pid, child.pid) is not True:
+                raise LedgerError("diagnostic_residual_unverified") from None
+        except LedgerError:
+            raise
+        except Exception:
+            raise LedgerError("diagnostic_residual_unverified") from None
+        raise LedgerError("diagnostic_cli_failed") from None
+    reaped = child.poll() is not None
+    try:
+        residual = residual_scanner(child.pid, child.pid)
+    except Exception:
+        residual = False
+    return {"returncode": child.returncode if reaped else -1, "stdout": stdout, "stderr": stderr,
+            "timed_out": timed_out, "child_reaped": reaped, "residual_verified": residual is True}
+
+
+def run_diagnostic_once(ledger: GlobalLedger, *, binding: dict, adapter, artifact_directory: Path,
+                       next_binding_factory):
+    """One diagnostic lifecycle. Adapter outputs remain in memory and are never copied verbatim."""
+    binding = validate_binding(binding)
+    parent = Path(artifact_directory).parent
+    parent_info = parent.lstat()
+    if (not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_uid != os.getuid()
+            or stat.S_IMODE(parent_info.st_mode) != 0o700):
+        raise LedgerError("artifact_directory_identity_invalid")
+    record = ledger.reserve(role="diagnostic", binding=binding)
+    attempt_id = record["id"]
+    try:
+        # reserve() returns only after remote FF push and ls-remote confirmation.
+        ledger.mark_running(attempt_id, binding=binding)
+        with tempfile.TemporaryDirectory(prefix="p5-v20-diagnostic-", dir=Path(artifact_directory).parent) as sandbox:
+            outcome = adapter.invoke(record["deadline_epoch"], attempt_id=attempt_id, binding=binding,
+                                     sandbox_directory=Path(sandbox))
+            direct_outputs = [p for p in Path(sandbox).rglob("*") if p.is_file() or p.is_symlink()]
+            if direct_outputs:
+                raise LedgerError("diagnostic_direct_artifact_present")
+        required = {"returncode", "stdout", "stderr", "answer", "raw", "timed_out", "child_reaped", "residual_verified"}
+        if (type(outcome) is not dict or set(outcome) != required
+                or any(type(outcome[k]) is not bytes for k in ("stdout", "stderr", "answer", "raw"))
+                or type(outcome["returncode"]) is not int
+                or any(type(outcome[k]) is not bool for k in ("timed_out", "child_reaped", "residual_verified"))):
+            raise LedgerError("diagnostic_adapter_result_invalid")
+        if not outcome["child_reaped"] or not outcome["residual_verified"]:
+            raise LedgerError("diagnostic_residual_unverified")
+        if outcome["timed_out"]:
+            raise LedgerError("invocation_timeout")
+        if outcome["returncode"] != 0:
+            raise LedgerError("diagnostic_cli_failed")
+        parsed = strict_json(outcome["stdout"])
+        safe = report_for_storage(parsed, attempt_id=attempt_id, fingerprint=binding["fingerprint"],
+                                  binding_sha256=binding_digest(binding))
+        if not callable(next_binding_factory):
+            raise LedgerError("ledger_expected_binding_invalid")
+        next_binding = validate_binding(next_binding_factory(strict_json(safe)))
+        bundle = artifact_bundle(trusted_attempt_id=attempt_id, trusted_fingerprint=binding["fingerprint"],
+                                 trusted_binding_sha256=binding_digest(binding), report_bytes=safe)
+        save_artifact_bundle(artifact_directory, bundle, trusted_attempt_id=attempt_id,
+                             trusted_fingerprint=binding["fingerprint"], trusted_binding_sha256=binding_digest(binding))
+        ledger.complete(attempt_id, "completed_diagnostic", binding=binding, diagnostic_report=safe,
+                        next_binding=next_binding)
+        return record
+    except Exception as exc:
+        code = fixed_error(exc)
+        terminal = ("timeout" if code == "invocation_timeout" else
+                    "diagnostic_inconclusive" if code == "diagnostic_inconclusive" else "unknown")
+        try:
+            bundle = artifact_bundle(trusted_attempt_id=attempt_id, trusted_fingerprint=binding["fingerprint"],
+                                     trusted_binding_sha256=binding_digest(binding), error=LedgerError(code))
+            save_artifact_bundle(artifact_directory, bundle, trusted_attempt_id=attempt_id,
+                                 trusted_fingerprint=binding["fingerprint"], trusted_binding_sha256=binding_digest(binding))
+        finally:
+            ledger.complete(attempt_id, terminal, binding=binding,
+                            determination="inconclusive" if terminal == "diagnostic_inconclusive" else None)
+        raise LedgerError(code) from None
 
 
 class GitRemote:
@@ -653,6 +1032,9 @@ class GitRemote:
             raise LedgerError("remote_head_changed")
         if parent is not None:
             self._git(["merge-base", "--is-ancestor", self.seed_commit_pin, parent])
+            parent_records = self.chain(parent)
+        else:
+            parent_records = []
         parsed = strict_json(payload)
         valid_seed = False
         if parent is None:
@@ -664,6 +1046,35 @@ class GitRemote:
         if not (valid_seed or valid_next) or (valid_next and type(parsed.get("records")) is not list):
             raise LedgerError("remote_chain_schema_invalid")
         validate_record_chain(parsed["records"])
+        child_records = parsed["records"]
+        if parent is None and valid_seed:
+            pass
+        elif len(child_records) == len(parent_records) + 1:
+            if child_records[:-1] != parent_records or child_records[-1].get("state") != "reserved":
+                raise LedgerError("remote_chain_non_monotonic")
+        elif len(child_records) == len(parent_records) and parent_records:
+            changed = [i for i, (old, new) in enumerate(zip(parent_records, child_records)) if old != new]
+            if len(changed) != 1:
+                raise LedgerError("remote_chain_non_monotonic")
+            index = changed[0]; old = parent_records[index]; new = child_records[index]
+            mutable = {"state", "ended_epoch", "determination", "report_sha256", "result_artifact_sha256",
+                       "gate_evidence_sha256", "gate_evidence", "gate_schema", "expected_next_role",
+                       "expected_next_binding", "expected_next_binding_sha256", "expected_next_run_set_sha256"}
+            if ({k: v for k, v in old.items() if k not in mutable} !=
+                    {k: v for k, v in new.items() if k not in mutable}
+                    or (old["state"], new["state"]) not in {
+                        ("reserved", "running"), ("reserved", "completed_diagnostic"),
+                        ("reserved", "diagnostic_inconclusive"), ("reserved", "final_pass"),
+                        ("reserved", "final_fail"), ("reserved", "formal_run_pass"),
+                        ("reserved", "formal_run_fail"), ("reserved", "unknown"),
+                        ("reserved", "timeout"), ("reserved", "crash"),
+                        ("running", "completed_diagnostic"), ("running", "diagnostic_inconclusive"),
+                        ("running", "final_pass"), ("running", "final_fail"),
+                        ("running", "formal_run_pass"), ("running", "formal_run_fail"),
+                        ("running", "unknown"), ("running", "timeout"), ("running", "crash")}):
+                raise LedgerError("remote_chain_non_monotonic")
+        else:
+            raise LedgerError("remote_chain_non_monotonic")
         blob = self._git(["hash-object", "-w", "--stdin"], data=canonical_bytes(parsed)).stdout.decode("ascii").strip()
         tree_in = f"100644 blob {blob}\tledger.json\n".encode("ascii")
         tree = self._git(["mktree"], data=tree_in).stdout.decode("ascii").strip()
