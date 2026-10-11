@@ -101,7 +101,6 @@ def build():
             p = stage / name
             p.write_bytes(data); p.chmod(0o400)
         p = stage / "driver.py"; p.write_bytes(driver_data); p.chmod(0o500)
-        p = stage / "v20_driver.py"; p.write_bytes(driver_data); p.chmod(0o400)
         p = stage / "config.json"; p.write_bytes(config_data); p.chmod(0o400)
         p = stage / "launcher.sh"; p.write_bytes(launcher_data); p.chmod(0o500)
         preflight_path = str(CACHE / "logs" / f"p5-v20-diagnostic-{fingerprint[:20]}-preflight.json")
