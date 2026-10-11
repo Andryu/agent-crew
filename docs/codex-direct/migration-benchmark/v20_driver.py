@@ -63,13 +63,13 @@ def load_manifest():
             or type(manifest["fingerprint"]) is not str or len(manifest["fingerprint"]) != 64
             or type(manifest["preflight_path"]) is not str):
         raise ValueError
-    if type(manifest["files"]) is not dict or set(manifest["files"]) != {"driver.py", "config.json", "launcher.sh", "v20_diagnostic.py", "v20_selftest.py"}:
+    if type(manifest["files"]) is not dict or set(manifest["files"]) != {"driver.py", "v20_driver.py", "config.json", "launcher.sh", "v20_diagnostic.py", "v20_selftest.py"}:
         raise ValueError
     for name, expected in manifest["files"].items():
         actual = file_binding(base / name)
         if actual != expected:
             raise ValueError
-    expected_modes = {"driver.py": 0o500, "config.json": 0o400, "launcher.sh": 0o500,
+    expected_modes = {"driver.py": 0o500, "v20_driver.py": 0o400, "config.json": 0o400, "launcher.sh": 0o500,
                       "v20_diagnostic.py": 0o400, "v20_selftest.py": 0o400}
     if {name: binding["mode"] for name, binding in manifest["files"].items()} != expected_modes:
         raise ValueError
@@ -138,7 +138,7 @@ def run_tests(base):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     counts = module.run_all()
-    for name in ("v20_diagnostic.py", "v20_selftest.py", "driver.py"):
+    for name in ("v20_diagnostic.py", "v20_selftest.py", "v20_driver.py", "driver.py"):
         compile((base / name).read_bytes(), name, "exec")
     if sum(counts.values()) < 1:
         raise ValueError

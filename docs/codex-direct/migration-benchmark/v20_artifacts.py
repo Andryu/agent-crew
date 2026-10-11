@@ -47,7 +47,7 @@ def build():
     root_stat = root.lstat()
     if not stat.S_ISDIR(root_stat.st_mode) or root_stat.st_uid != os.getuid() or stat.S_IMODE(root_stat.st_mode) != 0o700:
         raise RuntimeError("driver root identity invalid")
-    names = ("v20_diagnostic.py", "v20_selftest.py")
+    names = ("v20_diagnostic.py", "v20_selftest.py", "v20_driver.py")
     source_data = {name: (HERE / name).read_bytes() for name in names}
     driver_data = (HERE / "v20_driver.py").read_bytes()
     py = str(Path(sys.executable).resolve(strict=True))
@@ -89,7 +89,7 @@ def build():
     fp_input = {"source": config["source_hashes"], "driver": config["driver_sha256"],
                 "config": hashlib.sha256(config_data).hexdigest(), "launcher_template_sha256": hashlib.sha256(launcher_data).hexdigest(),
                 "remote_ref": REMOTE_REF, "hard_cap": 28,
-                "modes": {"driver.py": 0o500, "config.json": 0o400, "launcher.sh": 0o500,
+                "modes": {"driver.py": 0o500, "v20_driver.py": 0o400, "config.json": 0o400, "launcher.sh": 0o500,
                           "v20_diagnostic.py": 0o400, "v20_selftest.py": 0o400}}
     fingerprint = hashlib.sha256(canonical(fp_input)).hexdigest()
     final = root / f"p5-v20-diagnostic-{fingerprint[:20]}"
@@ -101,6 +101,7 @@ def build():
             p = stage / name
             p.write_bytes(data); p.chmod(0o400)
         p = stage / "driver.py"; p.write_bytes(driver_data); p.chmod(0o500)
+        p = stage / "v20_driver.py"; p.write_bytes(driver_data); p.chmod(0o400)
         p = stage / "config.json"; p.write_bytes(config_data); p.chmod(0o400)
         p = stage / "launcher.sh"; p.write_bytes(launcher_data); p.chmod(0o500)
         preflight_path = str(CACHE / "logs" / f"p5-v20-diagnostic-{fingerprint[:20]}-preflight.json")
