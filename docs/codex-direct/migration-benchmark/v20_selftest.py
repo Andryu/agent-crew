@@ -405,9 +405,11 @@ def git_remote_fixture_tests():
         adapter = v20.GitRemote(repo)
         history = [dict(x, type="historical_attempt") for x in v20.HISTORICAL]
         seed = v20.canonical_bytes({"schema": 1, "records": history})
-        first = adapter.push_ff(None, seed)
-        adapter.seed_commit_pin = first
-        assert adapter.ls_remote() == first and adapter.chain(first) == history
+        normalized = {"schema": 1, "records": history}
+        with patch.object(v20, "validate_seed_payload", return_value=(normalized, v20.sha256(seed))):
+            first = adapter.push_ff(None, seed)
+            adapter.seed_commit_pin = first
+            assert adapter.ls_remote() == first and adapter.chain(first) == history
         second = adapter.push_ff(first, v20.canonical_bytes({"schema": 1, "version": 20, "records": history}))
         assert adapter.ls_remote() == second and adapter.chain(second) == history
         try:

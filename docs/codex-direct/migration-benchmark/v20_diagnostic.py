@@ -85,16 +85,18 @@ def validate_seed_payload(payload: bytes) -> tuple[dict, str]:
     if digest != SEED_SHA256:
         raise LedgerError("seed_digest_mismatch")
     parsed = strict_json(payload)
-    if type(parsed) is not dict or set(parsed) != {"schema", "records"} or type(parsed["schema"]) is not int or parsed["schema"] != 1:
+    if (type(parsed) is not dict or "schema" not in parsed or type(parsed["schema"]) is not int
+            or parsed["schema"] != 1 or len(set(parsed) - {"schema"}) != 1):
         raise LedgerError("seed_schema_invalid")
     expected = []
     for record in HISTORICAL:
         expected.append({"elapsed_seconds": record["elapsed_seconds"], "fingerprint": record["fingerprint"],
                          "id": record["id"], "result_sha256": record["result_sha256"],
                          "state": record["state"], "type": "historical_attempt", "version": record["version"]})
-    if parsed["records"] != expected or payload != canonical_bytes(parsed):
+    records_key = next(iter(set(parsed) - {"schema"}))
+    if type(records_key) is not str or type(parsed[records_key]) is not list or parsed[records_key] != expected or payload != canonical_bytes(parsed):
         raise LedgerError("seed_history_mismatch")
-    return parsed, digest
+    return {"schema": 1, "records": expected}, digest
 
 
 def classify_path(path_value, profile_hashes: dict[str, str], known_component_hashes: frozenset[str]) -> dict:
@@ -626,6 +628,9 @@ class GitRemote:
             raise LedgerError("remote_head_changed")
         self._git(["fetch", "--no-tags", self.remote, self.ref])
         result = self._git(["show", f"{head}:ledger.json"])
+        if head == self.seed_commit_pin:
+            normalized, _ = validate_seed_payload(result.stdout)
+            return normalized["records"]
         parsed = strict_json(result.stdout)
         if type(parsed) is not dict or set(parsed) not in ({"schema", "records"}, {"schema", "version", "records"}):
             raise LedgerError("remote_chain_schema_invalid")
@@ -645,12 +650,14 @@ class GitRemote:
         if parent is not None:
             self._git(["merge-base", "--is-ancestor", self.seed_commit_pin, parent])
         parsed = strict_json(payload)
-        valid_seed = (parent is None and type(parsed) is dict and set(parsed) == {"schema", "records"}
-                      and type(parsed.get("schema")) is int and parsed.get("schema") == 1)
+        valid_seed = False
+        if parent is None:
+            validate_seed_payload(payload)
+            valid_seed = True
         valid_next = (type(parsed) is dict and set(parsed) == {"schema", "version", "records"}
                       and type(parsed.get("schema")) is int and parsed.get("schema") == 1
                       and type(parsed.get("version")) is int and parsed.get("version") == VERSION)
-        if not (valid_seed or valid_next) or type(parsed.get("records")) is not list:
+        if not (valid_seed or valid_next) or (valid_next and type(parsed.get("records")) is not list):
             raise LedgerError("remote_chain_schema_invalid")
         validate_record_chain(parsed["records"])
         blob = self._git(["hash-object", "-w", "--stdin"], data=canonical_bytes(parsed)).stdout.decode("ascii").strip()
