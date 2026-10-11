@@ -54,7 +54,7 @@ def build():
     py_binding = bind(Path(py))
     shell_binding = bind(Path("/bin/zsh").resolve(strict=True))
     codex_binding = harness_fingerprint.compute_codex_executable_binding()
-    version_result = subprocess.run([codex_binding["path"], "--version"], capture_output=True, text=True,
+    version_result = subprocess.run([codex_binding["realpath"], "--version"], capture_output=True, text=True,
                                     timeout=10, env={"HOME": str(CACHE.parents[2]),
                                                     "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
                                                     "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8"})
@@ -65,7 +65,7 @@ def build():
               "source_hashes": {n: hashlib.sha256(source_data[n]).hexdigest() for n in names},
               "driver_sha256": hashlib.sha256(driver_data).hexdigest(),
               "python_executable": py, "python_version": list(sys.version_info[:3]), "python_binding": py_binding,
-              "shell_binding": shell_binding, "codex_binding": {"realpath": codex_binding["path"],
+              "shell_binding": shell_binding, "codex_binding": {"realpath": codex_binding["realpath"],
                   "sha256": codex_binding["sha256"], "device": codex_binding["device"], "inode": codex_binding["inode"],
                   "size": codex_binding["size"], "mtime_ns": codex_binding["mtime_ns"], "ctime_ns": codex_binding["ctime_ns"],
                   "owner": codex_binding["owner"], "mode": codex_binding["mode"]}, "cli_version": cli_version,
