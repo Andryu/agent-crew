@@ -47,7 +47,7 @@ def build():
     root_stat = root.lstat()
     if not stat.S_ISDIR(root_stat.st_mode) or root_stat.st_uid != os.getuid() or stat.S_IMODE(root_stat.st_mode) != 0o700:
         raise RuntimeError("driver root identity invalid")
-    names = ("v20_diagnostic.py", "v20_selftest.py", "v20_driver.py")
+    names = ("v20_diagnostic.py", "v20_selftest.py", "v20_driver.py", "v20_seed_fixture.json")
     source_data = {name: (HERE / name).read_bytes() for name in names}
     driver_data = (HERE / "v20_driver.py").read_bytes()
     py = str(Path(sys.executable).resolve(strict=True))

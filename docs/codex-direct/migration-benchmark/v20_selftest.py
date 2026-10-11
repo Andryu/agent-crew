@@ -123,6 +123,42 @@ def schema_tests():
     return 15
 
 
+def seed_canonical_tests():
+    # Derive the approved bytes independently from the production serializer.
+    history = [{"elapsed_seconds": item["elapsed_seconds"], "fingerprint": item["fingerprint"],
+                "id": item["id"], "result_sha256": item["result_sha256"], "state": item["state"],
+                "type": "historical_attempt", "version": item["version"]} for item in v20.HISTORICAL]
+    root = {"schema": 1, "records": history}
+    expected = (json.dumps(root, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")
+    fixture = Path(__file__).with_name("v20_seed_fixture.json").read_bytes()
+    assert expected == fixture
+    digest = "f5cb2275c0b4c397e76dea473809c8e56da7a3f0f7aceb1c0cdfe277cdd979c8"
+    assert hashlib.sha256(expected).hexdigest() == digest == v20.SEED_SHA256
+    assert v20.validate_seed_payload(expected) == (root, digest)
+
+    mutations = [
+        expected.replace(b'{"records":', b'{"extra":0,"records":', 1),
+        v20.canonical_bytes({"schema": 1}),
+        b'{"schema":1,"schema":1,"records":' + expected.split(b'"records":', 1)[1],
+        v20.canonical_bytes({"schema": 1, "records": list(reversed(history))}),
+        v20.canonical_bytes({"schema": 1, "records": [dict(history[0], extra=0), history[1]]}),
+        v20.canonical_bytes({"schema": 1, "records": [dict(history[0], version=True), history[1]]}),
+        expected.replace(repr(history[0]["elapsed_seconds"]).encode("ascii"),
+                         bytes([49, 46, 49, 49, 54, 53, 48, 52, 51, 49, 49, 53, 54, 49, 53, 56, 52, 53, 101, 49]), 1),
+        expected[:-1], expected + b"\n",
+        b'{"schema":1,"records":' + expected.split(b'"records":', 1)[1].rsplit(b',"schema":1}', 1)[0] + b'}\n',
+        json.dumps(root, ensure_ascii=False, sort_keys=False, separators=(",", ":")).encode("utf-8") + b"\n",
+    ]
+    for payload in mutations:
+        try:
+            with patch.object(v20, "SEED_SHA256", hashlib.sha256(payload).hexdigest()):
+                v20.validate_seed_payload(payload)
+        except v20.LedgerError:
+            continue
+        raise AssertionError("noncanonical or altered historical seed accepted")
+    return 1 + len(mutations)
+
+
 def privacy_tests():
     secrets = ["qz7", "ordinary-value", "short-secret-42", "PATH:/tmp/private-component", "digest-candidate-0a91"]
     secret_names = ["SECRETISH_NAME", "/private/synthetic/path-entry"]
@@ -424,7 +460,8 @@ def git_remote_fixture_tests():
 
 def run_all():
     counts = {"schema": schema_tests(), "privacy": privacy_tests(), "path_unknown": path_and_unknown_tests(),
-              "ledger": ledger_tests(), "formal_gate": gate_tests(), "remote_fixture": git_remote_fixture_tests()}
+              "ledger": ledger_tests(), "formal_gate": gate_tests(), "remote_fixture": git_remote_fixture_tests(),
+              "seed_canonical": seed_canonical_tests()}
     return counts
 
 

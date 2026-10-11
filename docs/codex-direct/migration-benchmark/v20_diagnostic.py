@@ -35,7 +35,7 @@ HISTORICAL = (
      "result_sha256": _hex("2eec", "ef40", "bb3b", "3e7f", "d5f1", "d1f6", "a8e9", "cc9a", "2c8f", "2e2c", "6e94", "3ec3", "32ea", "df17", "ae37", "089b"),
      "state": "fail", "elapsed_seconds": float.fromhex("0x1.8a4a" + "6200" + "0000p+3")},
 )
-SEED_SHA256 = _hex("65c0", "9467", "91cf", "ac1e", "f0ad", "63ad", "9c5b", "a08d", "e833", "0f64", "21f7", "9b69", "caa3", "cff1", "5b40", "ef90")
+SEED_SHA256 = _hex("f5cb", "2275", "c0b4", "c397", "e76d", "ea47", "3809", "c8e5", "6da7", "a3f0", "f7ac", "eb1c", "0cdf", "e277", "cdd9", "79c8")
 REMOTE_REF = "refs/heads/codex/runtime-migration-p5-ledger"
 PATH_PROFILES = frozenset({"normal_shell_login", "normal_shell_codex_host_projection", "codex_host"})
 PATH_CLASSES = frozenset({"exact_profile", "known_components_reordered", "unapproved_component_present", "empty", "malformed"})
@@ -85,16 +85,20 @@ def validate_seed_payload(payload: bytes) -> tuple[dict, str]:
     if digest != SEED_SHA256:
         raise LedgerError("seed_digest_mismatch")
     parsed = strict_json(payload)
-    if (type(parsed) is not dict or "schema" not in parsed or type(parsed["schema"]) is not int
-            or parsed["schema"] != 1 or len(set(parsed) - {"schema"}) != 1):
+    if type(parsed) is not dict or set(parsed) != {"schema", "records"} or type(parsed["schema"]) is not int or parsed["schema"] != 1:
         raise LedgerError("seed_schema_invalid")
     expected = []
     for record in HISTORICAL:
         expected.append({"elapsed_seconds": record["elapsed_seconds"], "fingerprint": record["fingerprint"],
                          "id": record["id"], "result_sha256": record["result_sha256"],
                          "state": record["state"], "type": "historical_attempt", "version": record["version"]})
-    records_key = next(iter(set(parsed) - {"schema"}))
-    if type(records_key) is not str or type(parsed[records_key]) is not list or parsed[records_key] != expected or payload != canonical_bytes(parsed):
+    records = parsed["records"]
+    record_fields = {"elapsed_seconds", "fingerprint", "id", "result_sha256", "state", "type", "version"}
+    if (type(records) is not list or len(records) != 2
+            or any(type(record) is not dict or set(record) != record_fields for record in records)
+            or any(type(record["elapsed_seconds"]) is not float or type(record["version"]) is not int for record in records)
+            or records != expected or [record["id"] for record in records] != sorted(record["id"] for record in records)
+            or payload != canonical_bytes(parsed)):
         raise LedgerError("seed_history_mismatch")
     return {"schema": 1, "records": expected}, digest
 
