@@ -103,7 +103,8 @@ def load_manifest():
             or not re.fullmatch(r"[0-9a-f]{40}", config["source_head"])
             or config["source_hashes"] != {"v20_diagnostic.py": manifest["files"]["v20_diagnostic.py"]["sha256"],
                                             "v20_selftest.py": manifest["files"]["v20_selftest.py"]["sha256"],
-                                            "v20_driver.py": manifest["files"]["v20_driver.py"]["sha256"]}
+                                            "v20_driver.py": manifest["files"]["v20_driver.py"]["sha256"],
+                                            "v20_seed_fixture.json": manifest["files"]["v20_seed_fixture.json"]["sha256"]}
             or config["historical_attempts"] != [x["id"] for x in v20.HISTORICAL]
             or config["global_ledger_directory"] != str(expected_cache / "logs/v20-global-ledger")
             or config["diagnostic_root"] != str(expected_cache / "probe-v20-diagnostic")
