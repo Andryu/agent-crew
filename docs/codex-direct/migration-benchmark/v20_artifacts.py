@@ -11,10 +11,12 @@ import subprocess
 import sys
 import tempfile
 import pwd
+import re
 
 HERE = Path(__file__).resolve().parent
 CACHE = Path(pwd.getpwuid(os.getuid()).pw_dir) / "Library/Caches/agent-crew-p5-benchmark"
 REMOTE_REF = "refs/heads/codex/runtime-migration-p5-ledger"
+PLAN_PATH = HERE.parents[2] / "docs/plans/2026-09-22-p5-rerun.md"
 sys.path.insert(0, str(HERE))
 import harness_fingerprint
 import v20_diagnostic as v20
@@ -51,8 +53,8 @@ def build():
     root_stat = root.lstat()
     if not stat.S_ISDIR(root_stat.st_mode) or root_stat.st_uid != os.getuid() or stat.S_IMODE(root_stat.st_mode) != 0o700:
         raise RuntimeError("driver root identity invalid")
-    names = ("v20_diagnostic.py", "v20_selftest.py", "v20_driver.py", "v20_seed_fixture.json")
-    source_data = {name: (HERE / name).read_bytes() for name in names}
+    names = ("v20_diagnostic.py", "v20_selftest.py", "v20_driver.py", "v20_seed_fixture.json", "p5-v20-plan.md")
+    source_data = {name: ((PLAN_PATH if name == "p5-v20-plan.md" else HERE / name).read_bytes()) for name in names}
     driver_data = (HERE / "v20_driver.py").read_bytes()
     py = str(Path(sys.executable).resolve(strict=True))
     py_binding = bind(Path(py))
@@ -72,6 +74,12 @@ def build():
     cli_version = version_result.stdout.strip()
     if version_result.returncode != 0 or version_result.stderr or cli_version != "codex-cli 0.162.1":
         raise RuntimeError("fixed Codex CLI version verification failed")
+    plan_bytes = PLAN_PATH.read_bytes()
+    plan_text = plan_bytes.decode("utf-8", "strict")
+    pins = re.findall(r"^\s*- Remote seed commit pin: (UNPINNED|[0-9a-f]{40,64})\s*$", plan_text, re.M)
+    if len(pins) != 1:
+        raise RuntimeError("seed commit pin plan field invalid")
+    seed_commit_pin = None if pins[0] == "UNPINNED" else pins[0]
     config = {"schema": 1, "version": 20, "source_head": head,
               "source_hashes": {n: hashlib.sha256(source_data[n]).hexdigest() for n in names},
               "driver_sha256": hashlib.sha256(driver_data).hexdigest(),
@@ -81,9 +89,13 @@ def build():
                   "size": codex_binding["size"], "mtime_ns": codex_binding["mtime_ns"], "ctime_ns": codex_binding["ctime_ns"],
                   "owner": codex_binding["owner"], "mode": codex_binding["mode"]}, "cli_version": cli_version,
               "binding_spec_sha256": v20.BINDING_SPEC_SHA256, "command_sha256": command_sha256,
+              "repository_path": str((Path(pwd.getpwuid(os.getuid()).pw_dir) / "Workspace/agent-crew").resolve(strict=True)),
+              "plan_sha256": hashlib.sha256(plan_bytes).hexdigest(),
+              "seed_payload_sha256": v20.SEED_SHA256, "seed_commit_pin": seed_commit_pin,
               "sandbox_binding": sandbox_binding, "sandbox_profile_sha256": v20.SANDBOX_PROFILE_SHA256,
               "remote_budget_ref": REMOTE_REF, "model_transport": "OpenAI direct",
-              "allowed_driver_modes": ["verify", "preflight", "sandbox-preflight"], "actual_invocations_enabled": False,
+              "allowed_driver_modes": ["verify", "preflight", "sandbox-preflight", "bootstrap-seed", "diagnostic-once"],
+              "actual_invocations_enabled": True,
               "hard_cap": 28, "prior_consumed": 2, "diagnostic_limit": 1, "final_probe_limit": 1,
               "formal_run_count": 24, "retry": False,
               "global_ledger_directory": str(CACHE / "logs" / "v20-global-ledger"),
@@ -92,13 +104,14 @@ def build():
               "historical_attempts": [x["id"] for x in __import__("v20_diagnostic").HISTORICAL]}
     config_data = canonical(config)
     launcher_data = ("#!/bin/zsh\nset -eu\n"
-                     "if [[ $# -ne 1 || ( $1 != verify && $1 != preflight && $1 != sandbox-preflight ) ]]; then print -u2 v20_fixed_artifact_invalid; exit 2; fi\n"
+                     "if [[ $# -ne 1 || ( $1 != verify && $1 != preflight && $1 != sandbox-preflight && $1 != bootstrap-seed && $1 != diagnostic-once ) ]]; then print -u2 v20_fixed_artifact_invalid; exit 2; fi\n"
                      f"base=${{0:A:h}}\nexec {py} -B \"$base/driver.py\" \"$1\"\n").encode()
     fp_input = {"source": config["source_hashes"], "driver": config["driver_sha256"],
                 "config": hashlib.sha256(config_data).hexdigest(), "launcher_template_sha256": hashlib.sha256(launcher_data).hexdigest(),
                 "remote_ref": REMOTE_REF, "hard_cap": 28,
                 "modes": {"driver.py": 0o500, "v20_driver.py": 0o400, "config.json": 0o400, "launcher.sh": 0o500,
-                          "v20_diagnostic.py": 0o400, "v20_selftest.py": 0o400, "v20_seed_fixture.json": 0o400}}
+                          "v20_diagnostic.py": 0o400, "v20_selftest.py": 0o400, "v20_seed_fixture.json": 0o400,
+                          "p5-v20-plan.md": 0o400}}
     fingerprint = hashlib.sha256(canonical(fp_input)).hexdigest()
     final = root / f"p5-v20-diagnostic-{fingerprint[:20]}"
     if final.exists():

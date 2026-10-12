@@ -825,7 +825,7 @@ def diagnostic_lifecycle_tests():
         else:
             assert outcome["timed_out"] and outcome["child_reaped"] and outcome["residual_verified"]
         cases += 1
-    argv = ("/opt/homebrew/Caskroom/codex/0.162.1/bin/codex", "exec", "--ephemeral", "--sandbox", "read-only", "--json")
+    argv = ("/opt/homebrew/Caskroom/codex/0.162.1/bin/codex", *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments)
     production_binding = _binding()
     production_binding["command_sha256"] = v20.sha256(v20.canonical_bytes(list(argv)))
     production = v20.FixedOpenAIDirectCodexAdapter(argv, command_sha256=production_binding["command_sha256"],
@@ -860,7 +860,7 @@ def diagnostic_lifecycle_tests():
             before_head = remote.ls_remote()
             try:
                 v20.run_diagnostic_once(ledger, binding=binding, adapter=candidate,
-                    artifact_directory=root / "out", next_binding_factory=lambda _: _binding("e"*64))
+                    artifact_directory=root / "out", next_binding_factory=lambda _: _binding("e"*64), actual_enabled=True)
             except v20.LedgerError:
                 pass
             else:
@@ -994,11 +994,78 @@ def diagnostic_lifecycle_tests():
     return cases
 
 
+def production_runner_tests():
+    cases = 0
+    base = Path(v20.__file__).resolve().parent
+    config = v20_driver.strict_json(base / "config.json")
+    # Missing plan-pinned remote seed hash stops before remote/local setup or CLI invocation.
+    with tempfile.TemporaryDirectory(prefix="p5-v20-unpinned-gate-") as td:
+        denied = dict(config, seed_commit_pin=None, global_ledger_directory=str(Path(td) / "ledger"),
+                      diagnostic_root=str(Path(td) / "diagnostic"))
+        try:
+            v20_driver.run_diagnostic_once(base, v20_driver.strict_json(base / "manifest.json"), denied)
+        except v20.LedgerError as exc:
+            assert str(exc) == "seed_commit_pin_missing"
+        else:
+            raise AssertionError("unpinned diagnostic runner accepted")
+        assert not Path(denied["global_ledger_directory"]).exists()
+        assert not Path(denied["diagnostic_root"]).exists()
+    cases += 1
+
+    class EmptyRemote:
+        seed_commit_pin = None
+        def __init__(self): self.head_hash=None; self.records=[]; self.pushes=0
+        def head(self): return self.head_hash
+        def ls_remote(self): return self.head_hash
+        def push_ff(self, parent, payload):
+            assert parent is None and self.head_hash is None
+            self.records=v20.strict_json(payload)["records"]
+            self.head_hash=hashlib.sha1(payload).hexdigest(); self.pushes+=1
+            return self.head_hash
+    cache=Path(__import__("pwd").getpwuid(os.getuid()).pw_dir)/"Library/Caches/agent-crew-p5-benchmark"
+    with tempfile.TemporaryDirectory(prefix="p5-v20-seed-input-") as td:
+        temp=Path(td); copies=[]
+        for i,(rel,*_) in enumerate(v20_driver.HISTORICAL_RESULT_FILES):
+            dst=temp/f"historic-{i}.json"; dst.write_bytes((cache/rel).read_bytes()); dst.chmod(0o600); copies.append(dst)
+        remote=EmptyRemote()
+        result=v20_driver.bootstrap_seed(base,dict(config,seed_commit_pin=None),remote_factory=lambda _:remote,
+            result_paths=copies,ledger_root=temp/"ledger")
+        assert result["seed_payload_sha256"]==v20.SEED_SHA256 and result["seed_commit_sha"]==remote.head_hash
+        assert remote.pushes==1 and len(remote.records)==2
+        bad=temp/"tampered.json"; bad.write_bytes(copies[0].read_bytes()+b" "); bad.chmod(0o600)
+        calls={"remote":0}
+        try:
+            v20_driver.bootstrap_seed(base,dict(config,seed_commit_pin=None),
+                remote_factory=lambda _:calls.__setitem__("remote",1),result_paths=(bad,copies[1]),ledger_root=temp/"bad-ledger")
+        except Exception:
+            pass
+        else: raise AssertionError("tampered historical result accepted")
+        assert calls["remote"]==0
+    cases += 2
+
+    report=_report(); command="/bin/zsh -lc /fixed/canary"
+    events=[{"type":"thread.started","thread_id":"synthetic"},{"type":"turn.started"},
+        {"type":"item.started","item":{"id":"tool-1","type":"command_execution","command":command,"status":"in_progress"}},
+        {"type":"item.completed","item":{"id":"tool-1","type":"command_execution","command":command,"status":"completed","exit_code":0,"aggregated_output":v20.canonical_bytes(report).decode()}},
+        {"type":"turn.completed"}]
+    encoded=b"\n".join(v20.canonical_bytes(item).rstrip(b"\n") for item in events)
+    assert v20._audit_diagnostic_events(encoded,canary_command=command,attempt_id=TRUSTED_ID,fingerprint=TRUSTED_FP)==report
+    extra=events[:3]+[{"type":"item.started","item":{"id":"tool-2","type":"command_execution","command":"curl https://invalid","status":"in_progress"}}]+events[3:]
+    try:
+        v20._audit_diagnostic_events(b"\n".join(v20.canonical_bytes(item).rstrip(b"\n") for item in extra),
+            canary_command=command,attempt_id=TRUSTED_ID,fingerprint=TRUSTED_FP)
+    except v20.LedgerError: pass
+    else: raise AssertionError("additional tool event accepted")
+    cases += 2
+    return cases
+
+
 def run_all():
     counts = {"schema": schema_tests(), "privacy": privacy_tests(), "path_unknown": path_and_unknown_tests(),
               "ledger": ledger_tests(), "phase_binding": phase_binding_tests(), "artifact_attribution": artifact_attribution_tests(),
               "formal_gate": gate_tests(), "remote_fixture": git_remote_fixture_tests(),
-              "seed_canonical": seed_canonical_tests(), "diagnostic_lifecycle": diagnostic_lifecycle_tests()}
+              "seed_canonical": seed_canonical_tests(), "diagnostic_lifecycle": diagnostic_lifecycle_tests(),
+              "production_runner": production_runner_tests()}
     return counts
 
 
