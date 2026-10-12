@@ -1145,15 +1145,21 @@ type.__setattr__(FixedOpenAIDirectCodexAdapter, "_class_sealed", True)
 
 def _verify_adapter_seal(adapter, binding):
     """Verify all adapter invariants outside the callback boundary and before reservation."""
-    if type(adapter) is not FixedOpenAIDirectCodexAdapter or hasattr(adapter, "__dict__"):
+    if type(adapter) is not FixedOpenAIDirectCodexAdapter:
         raise LedgerError("fixed_cli_binding_invalid")
     cls = type(adapter)
-    raw_invoke = cls.__dict__.get("invoke")
+    # Inspect the class dictionary without resolving any instance attribute. A descriptor
+    # replacement must be rejected before property/getattribute code can execute.
+    raw_invoke = type.__getattribute__(cls, "__dict__").get("invoke")
+    if raw_invoke is not _FIXED_ADAPTER_INVOKE:
+        raise LedgerError("fixed_cli_binding_invalid")
+    if type.__getattribute__(cls, "__dictoffset__") != 0:
+        raise LedgerError("fixed_cli_binding_invalid")
     try:
-        bound = adapter.invoke
+        bound = object.__getattribute__(adapter, "invoke")
     except Exception:
         raise LedgerError("fixed_cli_binding_invalid") from None
-    if (raw_invoke is not _FIXED_ADAPTER_INVOKE or getattr(bound, "__func__", None) is not _FIXED_ADAPTER_INVOKE
+    if (getattr(bound, "__func__", None) is not _FIXED_ADAPTER_INVOKE
             or cls.actual_enabled is not _ADAPTER_READY or adapter.actual_enabled is not _ADAPTER_READY
             or cls.fixed_arguments != _FIXED_ARGUMENTS or cls.transport != _FIXED_TRANSPORT
             or adapter.transport != _FIXED_TRANSPORT

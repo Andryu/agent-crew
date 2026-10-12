@@ -906,6 +906,17 @@ def diagnostic_lifecycle_tests():
         sealed_rejection("class invoke replacement", class_invoke_factory); cases += 1
     finally:
         type.__setattr__(v20.FixedOpenAIDirectCodexAdapter, "invoke", v20._FIXED_ADAPTER_INVOKE)
+    def invoke_descriptor_factory(binding, counter):
+        obj = adapter_for(binding, counter)
+        def property_callback(_instance):
+            counter["calls"] += 1
+            return v20._FIXED_ADAPTER_INVOKE
+        type.__setattr__(v20.FixedOpenAIDirectCodexAdapter, "invoke", property(property_callback))
+        return obj
+    try:
+        sealed_rejection("invoke property descriptor replacement", invoke_descriptor_factory); cases += 1
+    finally:
+        type.__setattr__(v20.FixedOpenAIDirectCodexAdapter, "invoke", v20._FIXED_ADAPTER_INVOKE)
     def actual_false_factory(binding, counter):
         obj = adapter_for(binding, counter)
         # Bypass Python's metaclass guard to model hostile in-process tampering; outer check must catch it.
