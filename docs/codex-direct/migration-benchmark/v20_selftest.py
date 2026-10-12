@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import threading
+import time
 from unittest.mock import patch
 
 import v20_diagnostic as v20
@@ -55,16 +56,70 @@ class FakeRemote:
         return self.head_hash
 
 
-ROOT_ID = {"realpath": "/private/tmp/p5-v20-fixture-root", "device": 1, "inode": 2}
+_BINDING_TMP = tempfile.TemporaryDirectory(prefix="p5-v20-binding-fixture-")
+_BINDING_ROOT = Path(_BINDING_TMP.name).resolve(strict=True)
+ROOT_ID = None
 TRUSTED_ID = "a" * 32
 TRUSTED_FP = "f" * 64
 PREFLIGHT_SHA = "c" * 64
 MANIFEST_SHA = "d" * 64
 
 
-def _binding(fingerprint=TRUSTED_FP, *, root=ROOT_ID, marker="a"):
-    return {"fingerprint": fingerprint, "root_identity": dict(root), "spec_sha256": marker * 64,
-            "command_sha256": "b" * 64, "preflight_sha256": PREFLIGHT_SHA, "manifest_sha256": MANIFEST_SHA}
+_BINDINGS = {}
+
+
+def _binding(label=TRUSTED_FP, *, root=None, marker="a"):
+    key = (label, marker)
+    if key in _BINDINGS:
+        return json.loads(json.dumps(_BINDINGS[key]))
+    artifact_root = Path(v20.__file__).resolve().parent
+    manifest_bytes = (artifact_root / "manifest.json").read_bytes()
+    manifest_path = artifact_root / "manifest.json"
+    manifest_info = manifest_path.lstat()
+    config = v20.strict_json((artifact_root / "config.json").read_bytes())
+    run_root = _BINDING_ROOT / f"run-{len(_BINDINGS):03d}"
+    run_root.mkdir(mode=0o700)
+    preflight_path = run_root / "preflight.json"
+    preflight_bytes = v20.canonical_bytes({"schema": 1, "version": 20,
+        "fingerprint": v20.strict_json(manifest_bytes)["fingerprint"],
+        "manifest_sha256": v20.sha256(manifest_bytes),
+        "files": v20.strict_json(manifest_bytes)["files"], "runtime_bindings": {},
+        "selftest_counts": {"fixture": 1}, "model_calls": 0, "probe_attempts": 0,
+        "formal_runs": 0, "result": "pass"})
+    preflight_path.write_bytes(preflight_bytes); preflight_path.chmod(0o400)
+    info = run_root.lstat()
+    identity = {"realpath": str(run_root.resolve(strict=True)), "device": info.st_dev, "inode": info.st_ino}
+    spec = config["binding_spec_sha256"]
+    command = config["command_sha256"]
+    preflight_hash = v20.sha256(preflight_bytes)
+    phase_fp = v20.sha256(v20.canonical_bytes({"artifact_fingerprint": v20.strict_json(manifest_bytes)["fingerprint"],
+        "root_identity": identity, "spec_sha256": spec, "command_sha256": command,
+        "preflight_sha256": preflight_hash}))
+    result = {"fingerprint": phase_fp, "root_identity": identity, "artifact_root": str(artifact_root),
+        "preflight_path": str(preflight_path), "spec_sha256": spec, "command_sha256": command,
+        "preflight_sha256": preflight_hash, "manifest_sha256": v20.sha256(manifest_bytes),
+        "manifest_identity": {"absolute_path": str(manifest_path.absolute()),
+            "realpath": str(manifest_path.resolve(strict=True)), "device": manifest_info.st_dev,
+            "inode": manifest_info.st_ino, "owner": manifest_info.st_uid,
+            "mode": __import__("stat").S_IMODE(manifest_info.st_mode)}}
+    _BINDINGS[key] = result
+    return json.loads(json.dumps(result))
+
+
+def _complete_from_saved(ledger, record, state, binding, *, next_binding=None, run_id=None):
+    """Tests use the same trusted saver and path-based verifier as production."""
+    with tempfile.TemporaryDirectory() as td:
+        directory = Path(td) / "evidence"
+        if state == "completed_diagnostic":
+            report = _report(); report["attempt_id"] = record["id"]; report["fingerprint"] = binding["fingerprint"]
+            payload = v20.canonical_bytes(report)
+        else:
+            payload = v20.canonical_bytes({"schema": 1, "attempt_id": record["id"], "role": record["role"],
+                "run_id": record.get("run_id"), "fingerprint": binding["fingerprint"], "gates": PASS_EVIDENCE})
+        result_path, sidecar_path = v20.save_verified_result(directory, attempt_id=record["id"],
+            role=record["role"], run_id=record.get("run_id"), binding=binding, result_bytes=payload)
+        return ledger.complete(record["id"], state, binding=binding, result_artifact_path=result_path,
+            evidence_sidecar_path=sidecar_path, next_binding=next_binding, run_id=run_id)
 
 
 def _report(**overrides):
@@ -292,11 +347,7 @@ def ledger_tests():
             cases += 1
         # One diagnostic can be reserved and completed; duplicates, failed/inconclusive histories stop progression.
         record = ledger.reserve(role="diagnostic", binding=_binding("f"*64))
-        diagnostic_report = _report(); diagnostic_report["attempt_id"] = record["id"]
-        report_bytes = v20.report_for_storage(diagnostic_report, attempt_id=record["id"], fingerprint="f"*64,
-                                              binding_sha256=v20.binding_digest(_binding("f"*64)))
-        ledger.complete(record["id"], "completed_diagnostic", binding=_binding("f"*64), diagnostic_report=report_bytes,
-                        next_binding=_binding("e"*64))
+        _complete_from_saved(ledger, record, "completed_diagnostic", _binding("f"*64), next_binding=_binding("e"*64))
         try:
             ledger.reserve(role="diagnostic", binding=_binding("f"*64))
         except v20.LedgerError:
@@ -310,11 +361,10 @@ def ledger_tests():
         else:
             raise AssertionError("diagnostic binding reused for final role")
         final = ledger.reserve(role="final_probe", binding=_binding("e"*64))
-        ledger.complete(final["id"], "final_pass", binding=_binding("e"*64), gate_evidence=PASS_EVIDENCE,
-                        result_artifact_sha256="1"*64, next_binding=_binding("2"*64))
+        _complete_from_saved(ledger, final, "final_pass", _binding("e"*64), next_binding=_binding("2"*64))
         assert ledger.formal_gate(_binding("2"*64))
         first = ledger.reserve(role="formal_run", run_id="C1-A-1", binding=_binding("2"*64))
-        ledger.complete(first["id"], "formal_run_pass", binding=_binding("2"*64), run_id="C1-A-1", gate_evidence=PASS_EVIDENCE, result_artifact_sha256="2"*64)
+        _complete_from_saved(ledger, first, "formal_run_pass", _binding("2"*64), run_id="C1-A-1")
         try:
             ledger.reserve(role="formal_run", run_id="C1-A-1", binding=_binding("2"*64))
         except v20.LedgerError:
@@ -329,14 +379,12 @@ def ledger_tests():
             raise AssertionError("formal campaign binding changed")
         second = ledger.reserve(role="formal_run", run_id="C1-A-2", binding=_binding("2"*64))
         try:
-            ledger.complete(second["id"], "formal_run_pass", binding=_binding("2"*64),
-                            run_id="C1-A-1", gate_evidence=PASS_EVIDENCE, result_artifact_sha256="3"*64)
+            _complete_from_saved(ledger, second, "formal_run_pass", _binding("2"*64), run_id="C1-A-1")
         except v20.LedgerError:
             pass
         else:
             raise AssertionError("formal run id was mutable at completion")
-        ledger.complete(second["id"], "formal_run_pass", binding=_binding("2"*64),
-                        run_id="C1-A-2", gate_evidence=PASS_EVIDENCE, result_artifact_sha256="3"*64)
+        _complete_from_saved(ledger, second, "formal_run_pass", _binding("2"*64), run_id="C1-A-2")
         # Same-time local ledger+seal rollback and local deletion are detected by remote anchor.
         good_ledger, good_seal = ledger.ledger.read_bytes(), ledger.seal.read_bytes()
         stale = dict(ledger._read_local()); stale["remote_head"] = "9" * 40
@@ -374,10 +422,7 @@ def ledger_tests():
     with tempfile.TemporaryDirectory() as td:
         remote = FakeRemote(); ledger = v20.GlobalLedger(Path(td) / "state", remote); _seed_local(ledger, remote)
         diag = ledger.reserve(role="diagnostic", binding=_binding("f"*64))
-        d = _report(); d["attempt_id"] = diag["id"]
-        ledger.complete(diag["id"], "completed_diagnostic", binding=_binding("f"*64),
-                        diagnostic_report=v20.report_for_storage(d, attempt_id=diag["id"], fingerprint="f"*64,
-                            binding_sha256=v20.binding_digest(_binding("f"*64))), next_binding=_binding("e"*64))
+        _complete_from_saved(ledger, diag, "completed_diagnostic", _binding("f"*64), next_binding=_binding("e"*64))
         final = ledger.reserve(role="final_probe", binding=_binding("e"*64))
         ledger.complete(final["id"], "final_fail", binding=_binding("e"*64))
         try:
@@ -453,7 +498,7 @@ def ledger_tests():
             binding = _binding(fp); digest = v20.binding_digest(binding); attempt_id = f"{i+1:032x}"
             record = {"sequence": len(filler) + 1, "id": attempt_id, "role": role,
                       "state": "completed_diagnostic" if i == 0 else "final_pass" if i == 1 else "formal_run_pass",
-                      "fingerprint": fp, "root_identity": ROOT_ID, "spec_sha256": binding["spec_sha256"],
+                      "fingerprint": binding["fingerprint"], "root_identity": binding["root_identity"], "spec_sha256": binding["spec_sha256"],
                       "command_sha256": binding["command_sha256"], "preflight_sha256": binding["preflight_sha256"],
                       "manifest_sha256": binding["manifest_sha256"], "binding": binding, "binding_sha256": digest,
                       "pid": os.getpid(), "pgid": os.getpgrp(), "owner_uid": os.getuid(),
@@ -516,11 +561,7 @@ def phase_binding_tests():
         else:
             raise AssertionError("completion accepted a different preflight binding")
         assert remote.pushes == before and ledger._read_local()["records"][-1]["state"] == "reserved"
-        report = _report(); report["attempt_id"] = diag["id"]
-        safe = v20.report_for_storage(report, attempt_id=diag["id"], fingerprint=db["fingerprint"],
-                                      binding_sha256=v20.binding_digest(db))
-        ledger.complete(diag["id"], "completed_diagnostic", binding=db, diagnostic_report=safe,
-                        next_binding=_binding("e"*64))
+        _complete_from_saved(ledger, diag, "completed_diagnostic", db, next_binding=_binding("e"*64))
         try:
             ledger.reserve(role="final_probe", binding=db)
         except v20.LedgerError:
@@ -529,8 +570,7 @@ def phase_binding_tests():
             raise AssertionError("final role reused diagnostic binding")
         fb = _binding("e"*64); final = ledger.reserve(role="final_probe", binding=fb)
         result_hash = "1"*64
-        ledger.complete(final["id"], "final_pass", binding=fb, gate_evidence=PASS_EVIDENCE,
-                        result_artifact_sha256=result_hash, next_binding=_binding("2"*64))
+        _complete_from_saved(ledger, final, "final_pass", fb, next_binding=_binding("2"*64))
         assert ledger.formal_gate(_binding("2"*64))
         formal = _binding("2"*64); run = ledger.reserve(role="formal_run", run_id="C1-A-1", binding=formal)
         expected_digest = v20.gate_evidence_digest(attempt_id=run["id"], binding_sha256=v20.binding_digest(formal),
@@ -544,8 +584,7 @@ def phase_binding_tests():
             pass
         else:
             raise AssertionError("formal run_id changed after reservation")
-        ledger.complete(run["id"], "formal_run_pass", binding=formal, run_id="C1-A-1",
-                        gate_evidence=PASS_EVIDENCE, result_artifact_sha256="2"*64)
+        _complete_from_saved(ledger, run, "formal_run_pass", formal, run_id="C1-A-1")
         chain = ledger._read_local()["records"]
         tampered = [dict(x) for x in chain]; tampered[-1] = dict(tampered[-1]); tampered[-1]["gate_evidence_sha256"] = "f"*64
         try:
@@ -555,6 +594,69 @@ def phase_binding_tests():
         else:
             raise AssertionError("attempt-bound PASS evidence hash tamper accepted")
     return 7
+
+
+def artifact_attribution_tests():
+    """Persisted result/sidecar provenance cannot cross attempt, role or phase."""
+    def persist(parent, record, binding):
+        if record["role"] == "diagnostic":
+            report = _report(); report.update(attempt_id=record["id"], fingerprint=binding["fingerprint"])
+            payload = v20.canonical_bytes(report)
+        else:
+            payload = v20.canonical_bytes({"schema": 1, "attempt_id": record["id"], "role": record["role"],
+                "run_id": record.get("run_id"), "fingerprint": binding["fingerprint"], "gates": PASS_EVIDENCE})
+        return v20.save_verified_result(parent / f"result-{record['id']}", attempt_id=record["id"],
+            role=record["role"], run_id=record.get("run_id"), binding=binding, result_bytes=payload)
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td); remote = FakeRemote(); ledger = v20.GlobalLedger(root / "ledger", remote); _seed_local(ledger, remote)
+        db = _binding("binding-diagnostic"); diag = ledger.reserve(role="diagnostic", binding=db)
+        diag_paths = persist(root, diag, db)
+        copied_attempt = dict(diag, id="b" * 32)
+        try:
+            v20.verify_saved_result(diag_paths[0], diag_paths[1], record=copied_attempt, binding=db)
+        except v20.LedgerError:
+            pass
+        else:
+            raise AssertionError("sidecar/result reused for a different attempt")
+        _complete_from_saved(ledger, diag, "completed_diagnostic", db, next_binding=_binding("binding-final"))
+        final_binding = _binding("binding-final")
+        before = remote.pushes
+        fingerprint_only = dict(final_binding, fingerprint="0" * 64)
+        try:
+            ledger.reserve(role="final_probe", binding=fingerprint_only)
+        except v20.LedgerError:
+            pass
+        else:
+            raise AssertionError("fingerprint-only changed phase binding accepted")
+        assert remote.pushes == before
+        final = ledger.reserve(role="final_probe", binding=final_binding)
+        before = remote.pushes
+        try:
+            ledger.complete(final["id"], "final_pass", binding=final_binding,
+                result_artifact_path=diag_paths[0], evidence_sidecar_path=diag_paths[1],
+                next_binding=_binding("binding-formal"))
+        except v20.LedgerError:
+            pass
+        else:
+            raise AssertionError("diagnostic artifact reused for final role")
+        assert remote.pushes == before
+        final_paths = persist(root, final, final_binding)
+        ledger.complete(final["id"], "final_pass", binding=final_binding,
+            result_artifact_path=final_paths[0], evidence_sidecar_path=final_paths[1],
+            next_binding=_binding("binding-formal"))
+        formal_binding = _binding("binding-formal")
+        formal = ledger.reserve(role="formal_run", run_id="C1-A-1", binding=formal_binding)
+        before = remote.pushes
+        try:
+            ledger.complete(formal["id"], "formal_run_pass", binding=formal_binding, run_id="C1-A-1",
+                result_artifact_path=final_paths[0], evidence_sidecar_path=final_paths[1])
+        except v20.LedgerError:
+            pass
+        else:
+            raise AssertionError("final evidence/result reused for formal role")
+        assert remote.pushes == before
+    return 3
 
 
 def gate_tests():
@@ -657,117 +759,151 @@ def git_remote_fixture_tests():
             pass
         else:
             raise AssertionError("fixture remote accepted state reversal")
-        diag_report = _report(); diag_report["attempt_id"] = reservation["id"]
-        safe = v20.report_for_storage(diag_report, attempt_id=reservation["id"], fingerprint="f"*64,
-                                      binding_sha256=v20.binding_digest(_binding()))
-        ledger.complete(reservation["id"], "completed_diagnostic", binding=_binding(), diagnostic_report=safe,
-                        next_binding=_binding("e"*64))
+        _complete_from_saved(ledger, reservation, "completed_diagnostic", _binding(), next_binding=_binding("e"*64))
         completed_head = adapter.ls_remote()
         assert completed_head != running_head and adapter.chain(completed_head)[-1]["state"] == "completed_diagnostic"
     return 8
 
 
 def diagnostic_lifecycle_tests():
-    marker = "synthetic-cli-secret-7c4e8a1d"
-
-    class FakeCLI:
-        def __init__(self, ledger, mode="success"):
-            self.ledger, self.mode, self.calls = ledger, mode, 0
-            self.child_reaped = mode != "reap-fail"; self.residual_verified = mode != "residual-fail"
-
-        def invoke(self, deadline_epoch, *, attempt_id, binding, sandbox_directory):
+    # Arbitrary Python callbacks are rejected before reservation or invocation.
+    class Callback:
+        calls = 0
+        def invoke(self, *args, **kwargs):
             self.calls += 1
-            current = self.ledger._read_local()["records"][-1]
-            assert current["id"] == attempt_id and current["state"] == "running"
-            assert self.ledger.remote.pushes >= 2  # reserve + running confirmation precede launch
-            if self.mode == "crash":
-                raise RuntimeError(marker)
-            if self.mode == "direct-file":
-                (sandbox_directory / "unexpected.raw").write_bytes(marker.encode())
-            report = _report()
-            report.update({"attempt_id": attempt_id, "fingerprint": binding["fingerprint"]})
-            if self.mode == "path-inconsistent":
-                report["path"]["component_count"] = 1; report["path"]["unapproved_component_count"] = 2
-                report["determination"] = "inconclusive"
-            return {"returncode": 0, "stdout": (b"not-json" if self.mode == "parse-fail" else v20.canonical_bytes(report)),
-                    "stderr": marker.encode(), "answer": marker.encode(), "raw": marker.encode(),
-                    "timed_out": self.mode == "timeout", "child_reaped": self.child_reaped,
-                    "residual_verified": self.residual_verified}
-
-    # Remote reservation failure must happen before adapter invocation.
+            raise AssertionError("callback executed")
+    cases = 0
     with tempfile.TemporaryDirectory() as td:
         root = Path(td); remote = FakeRemote(); ledger = v20.GlobalLedger(root / "ledger", remote); _seed_local(ledger, remote)
-        remote.mode = "non_ff"; cli = FakeCLI(ledger)
+        cb = Callback()
         try:
-                v20.run_diagnostic_once(ledger, binding=_binding(), adapter=cli, artifact_directory=root / "out",
-                                        next_binding_factory=lambda report: _binding("e"*64))
-        except v20.LedgerError:
-            pass
+            v20.run_diagnostic_once(ledger, binding=_binding(), adapter=cb,
+                artifact_directory=root / "out", next_binding_factory=lambda _: _binding("e"*64))
+        except v20.LedgerError as exc:
+            assert str(exc) == "fixed_cli_binding_invalid"
         else:
-            raise AssertionError("failed remote reservation launched diagnostic adapter")
-        assert cli.calls == 0 and not (root / "out").exists()
-    cases = 1
+            raise AssertionError("arbitrary callback adapter accepted")
+        assert cb.calls == 0 and len(ledger._read_local()["records"]) == 2
+    cases += 1
 
-    for mode, expected_state in (("success", "completed_diagnostic"), ("crash", "unknown"),
-                                 ("timeout", "timeout"), ("parse-fail", "unknown"),
-                                 ("reap-fail", "unknown"), ("residual-fail", "unknown"),
-                                 ("path-inconsistent", "diagnostic_inconclusive"), ("direct-file", "unknown")):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td); remote = FakeRemote(); ledger = v20.GlobalLedger(root / "ledger", remote); _seed_local(ledger, remote)
-            cli = FakeCLI(ledger, mode)
+    # If the host disables sandbox-exec (as this managed runtime does), fail
+    # before launching any fake subprocess. Never fall back to uncontained exec.
+    with tempfile.TemporaryDirectory() as td:
+        fixture = Path(td); sandbox = fixture / "sandbox"; sandbox.mkdir(mode=0o700)
+        sibling = fixture / "sibling.raw"; escaped = sandbox.parent / "escaped.raw"
+        containment_available = True
+        for target in (sibling, escaped, Path(td) / "absolute.raw"):
+            code = "import pathlib,sys; pathlib.Path(sys.argv[1]).write_text('sentinel')"
             try:
-                record = v20.run_diagnostic_once(ledger, binding=_binding(), adapter=cli, artifact_directory=root / "out",
-                    next_binding_factory=lambda report: _binding("e"*64))
-                assert mode == "success" and record["state"] == "reserved"
-            except v20.LedgerError:
-                assert mode != "success"
-            final = ledger._read_local()["records"][-1]
-            assert final["state"] == expected_state and cli.calls == 1
-            if mode not in {"reap-fail", "residual-fail"}:
-                assert cli.child_reaped and cli.residual_verified
-            saved = b"".join(path.read_bytes() for path in (root / "out").rglob("*") if path.is_file())
-            assert marker.encode() not in saved
-            assert all(path.name in v20.ARTIFACT_NAMES for path in (root / "out").iterdir())
-            if mode == "success":
-                assert v20.strict_json((root / "out/result.json").read_bytes())["attempt_id"] == final["id"]
+                outcome = v20.run_process_group((__import__("sys").executable, "-I", "-B", "-c", code, str(target)),
+                    deadline_epoch=time.time()+10, residual_scanner=lambda *_: True, cwd=sandbox, sandbox_directory=sandbox)
+            except v20.LedgerError as exc:
+                assert str(exc) == "host_containment_unavailable"
+                containment_available = False
             else:
-                assert v20.strict_json((root / "out/error.json").read_bytes())["error"] in {"internal_error", "invocation_timeout", "invalid_json", "diagnostic_inconclusive"}
+                assert outcome["child_reaped"] and outcome["residual_verified"] and outcome["returncode"] != 0
+            assert not target.exists()
+            cases += 1
+        # Even an allowed in-sandbox write does not justify bypassing an unavailable OS boundary.
+        allowed = sandbox / "inside.txt"
+        try:
+            outcome = v20.run_process_group((__import__("sys").executable, "-I", "-B", "-c",
+                "import pathlib; pathlib.Path('inside.txt').write_text('ok')"), deadline_epoch=time.time()+10,
+                residual_scanner=lambda *_: True, cwd=sandbox, sandbox_directory=sandbox)
+        except v20.LedgerError as exc:
+            assert str(exc) == "host_containment_unavailable"
+            containment_available = False
+        else:
+            assert outcome["returncode"] == 0 and allowed.read_text() == "ok"
+        assert allowed.exists() == containment_available
         cases += 1
-
-    # Exercise real process-group timeout/reap with a local synthetic child, never Codex.
-    timed = v20.run_process_group(("/bin/sh", "-c", "printf synthetic-output; sleep 5"),
-                                  deadline_epoch=__import__("time").time() + 0.05,
-                                  residual_scanner=lambda pid, pgid: True)
-    assert timed["timed_out"] and timed["child_reaped"] and timed["residual_verified"]
-    assert b"synthetic-output" in timed["stdout"]
-    argv = ("/opt/homebrew/Caskroom/codex/0.162.1/bin/codex", "exec", "--json")
+        try:
+            outcome = v20.run_process_group((__import__("sys").executable, "-I", "-B", "-c", "import time; time.sleep(5)"),
+                deadline_epoch=time.time()+0.1, residual_scanner=lambda *_: True, cwd=sandbox, sandbox_directory=sandbox)
+        except v20.LedgerError as exc:
+            assert str(exc) == "host_containment_unavailable"
+        else:
+            assert outcome["timed_out"] and outcome["child_reaped"] and outcome["residual_verified"]
+        cases += 1
+    argv = ("/opt/homebrew/Caskroom/codex/0.162.1/bin/codex", "exec", "--ephemeral", "--sandbox", "read-only", "--json")
     production_binding = _binding()
     production_binding["command_sha256"] = v20.sha256(v20.canonical_bytes(list(argv)))
     production = v20.FixedOpenAIDirectCodexAdapter(argv, command_sha256=production_binding["command_sha256"],
-                                                   binding=production_binding, residual_scanner=lambda *_: True)
+        binding=production_binding, residual_scanner=lambda *_: True)
     try:
-        production.invoke(__import__("time").time()+30, attempt_id=TRUSTED_ID, binding=production_binding,
+        production.invoke(time.time()+30, attempt_id=TRUSTED_ID, binding=production_binding,
                           sandbox_directory=Path("/private/tmp"))
     except v20.LedgerError as exc:
         assert str(exc) == "actual_invocation_disabled"
     else:
         raise AssertionError("production Codex adapter invoked while disabled")
-    for forbidden_argv in (("/usr/bin/env", "vercel"), ("/opt/homebrew/Caskroom/codex/0.162.1/bin/codex", "exec", "--json", "--retry")):
+    for forbidden in (("/usr/bin/env", "vercel"),
+        ("/opt/homebrew/Caskroom/codex/0.162.1/bin/codex", "exec", "--json", "--retry")):
         try:
-            v20.FixedOpenAIDirectCodexAdapter(forbidden_argv,
-                command_sha256=v20.sha256(v20.canonical_bytes(list(forbidden_argv))),
-                binding=dict(production_binding, command_sha256=v20.sha256(v20.canonical_bytes(list(forbidden_argv)))),
+            v20.FixedOpenAIDirectCodexAdapter(forbidden,
+                command_sha256=v20.sha256(v20.canonical_bytes(list(forbidden))),
+                binding=dict(production_binding, command_sha256=v20.sha256(v20.canonical_bytes(list(forbidden)))),
                 residual_scanner=lambda *_: True)
         except v20.LedgerError:
             pass
         else:
             raise AssertionError("alternate route/retry command accepted")
-    return cases + 4
+        cases += 1
+
+    # End-to-end synthetic reservations consume their slot on escape denial and timeout.
+    for mode in ("escape", "timeout"):
+        with tempfile.TemporaryDirectory(prefix="p5-v20-synthetic-attempt-") as td:
+            root = Path(td); remote = FakeRemote(); ledger = v20.GlobalLedger(root / "ledger", remote); _seed_local(ledger, remote)
+            binding = _binding("synthetic-" + mode)
+            reservation = ledger.reserve(role="diagnostic", binding=binding)
+            ledger.mark_running(reservation["id"], binding=binding)
+            sandbox = root / "sandbox"; sandbox.mkdir(mode=0o700)
+            escaped = root / "escaped.raw"
+            if mode == "escape":
+                argv = (__import__("sys").executable, "-I", "-B", "-c",
+                        "import pathlib,sys; pathlib.Path(sys.argv[1]).write_text('sentinel')", str(escaped))
+                expected_state = "unknown"
+            else:
+                timeout_code = ("import pathlib,sys,time\ntry: pathlib.Path(sys.argv[1]).write_text('sentinel')\n"
+                                "except OSError: pass\ntime.sleep(5)")
+                argv = (__import__("sys").executable, "-I", "-B", "-c", timeout_code, str(escaped))
+                expected_state = "timeout"
+            try:
+                outcome = v20.run_process_group(argv, deadline_epoch=time.time()+(0.1 if mode == "timeout" else 10),
+                    residual_scanner=lambda *_: True, cwd=sandbox, sandbox_directory=sandbox)
+                if mode == "escape":
+                    assert outcome["returncode"] != 0 and not escaped.exists()
+                else:
+                    assert outcome["timed_out"] and outcome["child_reaped"] and outcome["residual_verified"]
+            except v20.LedgerError as exc:
+                # The Codex outer sandbox cannot invoke sandbox-exec; the attempt still stops consumed.
+                assert str(exc) == "host_containment_unavailable"
+                expected_state = "unknown"
+            ledger.complete(reservation["id"], expected_state, binding=binding)
+            assert ledger._read_local()["records"][-1]["state"] == expected_state and not escaped.exists()
+            cases += 1
+
+    # Reservation failure is before any child process. A marker file would prove launch.
+    with tempfile.TemporaryDirectory(prefix="p5-v20-no-reserve-") as td:
+        root = Path(td); remote = FakeRemote(); ledger = v20.GlobalLedger(root / "ledger", remote); _seed_local(ledger, remote)
+        remote.mode = "non_ff"; marker = root / "launched"
+        try:
+            reservation = ledger.reserve(role="diagnostic", binding=_binding("reservation-failure"))
+            v20.run_process_group(("/usr/bin/touch", str(marker)), deadline_epoch=time.time()+5,
+                residual_scanner=lambda *_: True, cwd=root, sandbox_directory=root)
+        except v20.LedgerError:
+            pass
+        else:
+            raise AssertionError("non-FF reservation continued to a fake child")
+        assert not marker.exists() and remote.pushes == 0
+        cases += 1
+    return cases
 
 
 def run_all():
     counts = {"schema": schema_tests(), "privacy": privacy_tests(), "path_unknown": path_and_unknown_tests(),
-              "ledger": ledger_tests(), "phase_binding": phase_binding_tests(), "formal_gate": gate_tests(), "remote_fixture": git_remote_fixture_tests(),
+              "ledger": ledger_tests(), "phase_binding": phase_binding_tests(), "artifact_attribution": artifact_attribution_tests(),
+              "formal_gate": gate_tests(), "remote_fixture": git_remote_fixture_tests(),
               "seed_canonical": seed_canonical_tests(), "diagnostic_lifecycle": diagnostic_lifecycle_tests()}
     return counts
 

@@ -19,6 +19,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+import shutil
 
 VERSION = 20
 HARD_CAP = 28
@@ -78,6 +79,59 @@ def canonical_bytes(value) -> bytes:
 
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+# The profile grants broad reads/process execution, but file writes only below the
+# per-attempt private directory. Network access is intentionally absent here;
+# model execution remains disabled until a reviewed direct-OpenAI profile exists.
+SANDBOX_EXEC = "/usr/bin/sandbox-exec"
+SANDBOX_PROFILE_TEMPLATE = '(version 1)\n(deny default)\n(allow process*)\n(allow file-read*)\n(allow sysctl-read)\n(allow file-write* (subpath "{directory}"))\n'
+SANDBOX_PROFILE_SHA256 = sha256(SANDBOX_PROFILE_TEMPLATE.encode("utf-8"))
+BINDING_SPEC_SHA256 = sha256(b"P5-v20-phase-binding-v1:manifest-config-source-command-preflight-root")
+_BINDING_VERIFIED_ARTIFACT = None
+
+
+def sandboxed_argv(argv, sandbox_directory: Path):
+    """Build an OS-enforced command; absence/profile drift is a pre-launch failure."""
+    executable = Path(SANDBOX_EXEC)
+    try:
+        info = executable.lstat()
+        if (not stat.S_ISREG(info.st_mode) or not info.st_mode & 0o111
+                or executable.resolve(strict=True) != executable):
+            raise LedgerError("host_containment_unavailable")
+        sandbox = Path(sandbox_directory).resolve(strict=True)
+        if not sandbox.is_dir() or sandbox.stat().st_uid != os.getuid():
+            raise LedgerError("host_containment_unavailable")
+        if '"' in str(sandbox):
+            raise LedgerError("host_containment_profile_mismatch")
+        rendered = SANDBOX_PROFILE_TEMPLATE.format(directory=str(sandbox))
+        # Refuse profile drift and non-absolute child commands before creating a process.
+        if sha256(SANDBOX_PROFILE_TEMPLATE.encode("utf-8")) != SANDBOX_PROFILE_SHA256:
+            raise LedgerError("host_containment_profile_mismatch")
+        if type(argv) not in (tuple, list) or not argv or not os.path.isabs(argv[0]):
+            raise LedgerError("fixed_cli_binding_invalid")
+        # sandbox-exec can exist yet be disabled by the host's outer sandbox.
+        # Verify enforcement with a harmless fixed utility before any target starts.
+        fd, profile_name = tempfile.mkstemp(prefix=".p5-v20-profile-", suffix=".sb", dir=sandbox)
+        os.fchmod(fd, 0o400)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(rendered.encode("utf-8")); stream.flush(); os.fsync(stream.fileno())
+        profile_path = Path(profile_name)
+        try:
+            probe = subprocess.run([SANDBOX_EXEC, "-f", str(profile_path), "/usr/bin/true"],
+                                   stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE, timeout=5, close_fds=True)
+        except Exception:
+            profile_path.unlink(missing_ok=True)
+            raise
+        if probe.returncode != 0 or probe.stdout or probe.stderr:
+            profile_path.unlink(missing_ok=True)
+            raise LedgerError("host_containment_unavailable")
+        return [SANDBOX_EXEC, "-f", str(profile_path), *argv]
+    except LedgerError:
+        raise
+    except Exception:
+        raise LedgerError("host_containment_unavailable") from None
 
 
 def validate_seed_payload(payload: bytes) -> tuple[dict, str]:
@@ -282,6 +336,99 @@ def save_artifact_bundle(directory: Path, bundle: dict[str, bytes], *, trusted_a
         os.close(dfd)
 
 
+EVIDENCE_SCHEMA = 1
+GATE_NAMES = frozenset({"env", "runtime", "binding", "event", "scope", "residual", "cli"})
+
+
+def _private_file_identity(path: Path):
+    path = Path(path)
+    before = path.lstat()
+    if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or before.st_uid != os.getuid()
+            or stat.S_IMODE(before.st_mode) != 0o600):
+        raise LedgerError("artifact_identity_invalid")
+    data = path.read_bytes(); after = path.lstat()
+    attrs = ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns", "st_mode", "st_uid")
+    if len(data) != before.st_size or any(getattr(before, x) != getattr(after, x) for x in attrs):
+        raise LedgerError("artifact_identity_invalid")
+    return {"absolute_path": str(path.absolute()), "realpath": str(path.resolve(strict=True)),
+            "device": before.st_dev, "inode": before.st_ino, "owner": before.st_uid,
+            "mode": stat.S_IMODE(before.st_mode), "size": before.st_size, "sha256": sha256(data)}, data
+
+
+def save_verified_result(directory: Path, *, attempt_id: str, role: str, run_id: str | None,
+                         binding: dict, result_bytes: bytes):
+    """Persist only strict allowlisted result bytes and trusted reservation metadata."""
+    binding = validate_binding(binding)
+    if (type(attempt_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", attempt_id)
+            or role not in {"diagnostic", "final_probe", "formal_run"}
+            or (role == "formal_run") != (run_id is not None)):
+        raise LedgerError("artifact_trusted_binding_invalid")
+    parsed = strict_json(result_bytes)
+    if role == "diagnostic":
+        validate_report(parsed, attempt_id=attempt_id, fingerprint=binding["fingerprint"])
+        safe = report_for_storage(parsed, attempt_id=attempt_id, fingerprint=binding["fingerprint"],
+                                  binding_sha256=binding_digest(binding))
+        gates = {}
+    else:
+        fields = {"schema", "attempt_id", "role", "run_id", "fingerprint", "gates"}
+        if (type(parsed) is not dict or set(parsed) != fields or type(parsed["schema"]) is not int
+                or parsed["schema"] != EVIDENCE_SCHEMA or parsed["attempt_id"] != attempt_id
+                or parsed["role"] != role or parsed["run_id"] != run_id
+                or parsed["fingerprint"] != binding["fingerprint"] or type(parsed["gates"]) is not dict
+                or set(parsed["gates"]) != GATE_NAMES or any(type(x) is not bool for x in parsed["gates"].values())):
+            raise LedgerError("pass_gate_evidence_invalid")
+        safe, gates = canonical_bytes(parsed), parsed["gates"]
+    directory = Path(directory); directory.mkdir(parents=True, mode=0o700, exist_ok=False)
+    info = directory.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+        raise LedgerError("artifact_directory_identity_invalid")
+    result_path = directory / "result.json"
+    fd = os.open(result_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "wb") as stream:
+        stream.write(safe); stream.flush(); os.fsync(stream.fileno())
+    artifact_identity, _ = _private_file_identity(result_path)
+    evidence = {"schema": EVIDENCE_SCHEMA, "attempt_id": attempt_id, "role": role, "run_id": run_id,
+                "binding_sha256": binding_digest(binding), "fingerprint": binding["fingerprint"],
+                "artifact": artifact_identity, "gate_schema": EVIDENCE_SCHEMA, "gate_results": gates}
+    sidecar_path = directory / "evidence.json"
+    fd = os.open(sidecar_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "wb") as stream:
+        stream.write(canonical_bytes(evidence)); stream.flush(); os.fsync(stream.fileno())
+    dfd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try: os.fsync(dfd)
+    finally: os.close(dfd)
+    return result_path, sidecar_path
+
+
+def verify_saved_result(result_path: Path, sidecar_path: Path, *, record: dict, binding: dict):
+    artifact, data = _private_file_identity(result_path)
+    _, sidebytes = _private_file_identity(sidecar_path)
+    side = strict_json(sidebytes)
+    fields = {"schema", "attempt_id", "role", "run_id", "binding_sha256", "fingerprint",
+              "artifact", "gate_schema", "gate_results"}
+    if (type(side) is not dict or set(side) != fields or type(side["schema"]) is not int
+            or side["schema"] != EVIDENCE_SCHEMA or type(side["gate_schema"]) is not int
+            or side["gate_schema"] != EVIDENCE_SCHEMA or side["artifact"] != artifact
+            or side["attempt_id"] != record["id"] or side["role"] != record["role"]
+            or side["run_id"] != record.get("run_id") or side["fingerprint"] != record["fingerprint"]
+            or side["binding_sha256"] != record["binding_sha256"]
+            or side["binding_sha256"] != binding_digest(binding)):
+        raise LedgerError("pass_gate_evidence_invalid")
+    result = strict_json(data)
+    if record["role"] == "diagnostic":
+        validate_report(result, attempt_id=record["id"], fingerprint=record["fingerprint"])
+        return sha256(data), result["determination"], {}
+    if (type(result) is not dict or set(result) != {"schema", "attempt_id", "role", "run_id", "fingerprint", "gates"}
+            or type(result["schema"]) is not int or result["schema"] != EVIDENCE_SCHEMA
+            or result["attempt_id"] != record["id"] or result["role"] != record["role"]
+            or result["run_id"] != record.get("run_id") or result["fingerprint"] != record["fingerprint"]
+            or type(result["gates"]) is not dict or set(result["gates"]) != GATE_NAMES
+            or side["gate_results"] != result["gates"]
+            or any(type(x) is not bool for x in result["gates"].values())):
+        raise LedgerError("pass_gate_evidence_invalid")
+    return sha256(data), None, result["gates"]
+
+
 def formal_start_eligible(records: list[dict]) -> bool:
     """Gate formal start on fixed history, exactly one resolved diagnostic and one PASS final."""
     if type(records) is not list or len(records) != 4 or any(type(r) is not dict for r in records):
@@ -335,10 +482,15 @@ def formal_complete(records: list[dict]) -> bool:
 
 
 def validate_binding(binding):
-    fields = {"fingerprint", "root_identity", "spec_sha256", "command_sha256", "preflight_sha256", "manifest_sha256"}
+    fields = {"fingerprint", "root_identity", "artifact_root", "preflight_path", "manifest_identity",
+              "spec_sha256", "command_sha256", "preflight_sha256", "manifest_sha256"}
     if type(binding) is not dict or set(binding) != fields:
         raise LedgerError("reservation_binding_invalid")
     if (type(binding["fingerprint"]) is not str or not re.fullmatch(r"[0-9a-f]{64}", binding["fingerprint"])
+            or type(binding["artifact_root"]) is not str or not os.path.isabs(binding["artifact_root"])
+            or os.path.realpath(binding["artifact_root"]) != binding["artifact_root"]
+            or type(binding["preflight_path"]) is not str or not os.path.isabs(binding["preflight_path"])
+            or os.path.realpath(binding["preflight_path"]) != binding["preflight_path"]
             or any(type(binding[k]) is not str or not re.fullmatch(r"[0-9a-f]{64}", binding[k])
                    for k in ("spec_sha256", "command_sha256", "preflight_sha256", "manifest_sha256"))):
         raise LedgerError("reservation_binding_invalid")
@@ -349,6 +501,90 @@ def validate_binding(binding):
             or type(root["device"]) is not int or root["device"] < 0
             or type(root["inode"]) is not int or root["inode"] <= 0):
         raise LedgerError("reservation_binding_invalid")
+    try:
+        run_root = Path(root["realpath"])
+        run_info = run_root.lstat()
+        if (not stat.S_ISDIR(run_info.st_mode) or run_info.st_uid != os.getuid()
+                or run_info.st_dev != root["device"] or run_info.st_ino != root["inode"]
+                or run_root.resolve(strict=True) != run_root):
+            raise LedgerError("reservation_binding_invalid")
+        preflight_path = Path(binding["preflight_path"])
+        if preflight_path.parent != run_root:
+            raise LedgerError("reservation_binding_invalid")
+        preflight_info = preflight_path.lstat(); preflight_bytes = preflight_path.read_bytes()
+        if (not stat.S_ISREG(preflight_info.st_mode) or preflight_info.st_uid != os.getuid()
+                or stat.S_IMODE(preflight_info.st_mode) != 0o400
+                or sha256(preflight_bytes) != binding["preflight_sha256"]):
+            raise LedgerError("reservation_binding_invalid")
+        artifact_root = Path(binding["artifact_root"])
+        artifact_info = artifact_root.lstat()
+        if (not stat.S_ISDIR(artifact_info.st_mode) or artifact_info.st_uid != os.getuid()
+                or stat.S_IMODE(artifact_info.st_mode) != 0o500 or artifact_root.resolve(strict=True) != artifact_root):
+            raise LedgerError("reservation_binding_invalid")
+        # This path is the immutable source currently executing. Its driver validates
+        # all nested identities, source/config hashes and the bundle fingerprint.
+        if artifact_root != Path(__file__).resolve(strict=True).parent:
+            raise LedgerError("reservation_binding_invalid")
+        if str(artifact_root) not in __import__("sys").path:
+            __import__("sys").path.insert(0, str(artifact_root))
+        import v20_driver
+        global _BINDING_VERIFIED_ARTIFACT
+        if _BINDING_VERIFIED_ARTIFACT is None:
+            _BINDING_VERIFIED_ARTIFACT = v20_driver.load_manifest()
+        verified_root, verified_manifest = _BINDING_VERIFIED_ARTIFACT
+        if verified_root != artifact_root:
+            raise LedgerError("reservation_binding_invalid")
+        for name, expected in verified_manifest["files"].items():
+            if v20_driver.file_binding(artifact_root / name) != expected:
+                raise LedgerError("reservation_binding_invalid")
+        manifest_path = artifact_root / "manifest.json"
+        manifest_before = manifest_path.lstat()
+        manifest_bytes = manifest_path.read_bytes()
+        manifest_info = manifest_path.lstat()
+        stable_attrs = ("st_dev", "st_ino", "st_uid", "st_mode", "st_size", "st_mtime_ns", "st_ctime_ns")
+        if (len(manifest_bytes) != manifest_before.st_size
+                or any(getattr(manifest_before, name) != getattr(manifest_info, name) for name in stable_attrs)):
+            raise LedgerError("reservation_binding_invalid")
+        expected_manifest_identity = {"absolute_path": str(manifest_path.absolute()),
+            "realpath": str(manifest_path.resolve(strict=True)), "device": manifest_info.st_dev,
+            "inode": manifest_info.st_ino, "owner": manifest_info.st_uid,
+            "mode": stat.S_IMODE(manifest_info.st_mode)}
+        expected_keys = set(expected_manifest_identity)
+        if (type(binding["manifest_identity"]) is not dict or set(binding["manifest_identity"]) != expected_keys
+                or binding["manifest_identity"] != expected_manifest_identity
+                or not stat.S_ISREG(manifest_info.st_mode) or manifest_info.st_nlink != 1
+                or manifest_info.st_uid != os.getuid() or stat.S_IMODE(manifest_info.st_mode) != 0o400):
+            raise LedgerError("reservation_binding_invalid")
+        if sha256(manifest_bytes) != binding["manifest_sha256"]:
+            raise LedgerError("reservation_binding_invalid")
+        manifest = strict_json(manifest_bytes)
+        config = strict_json((artifact_root / "config.json").read_bytes())
+        if (type(config) is not dict or config.get("binding_spec_sha256") != binding["spec_sha256"]
+                or config.get("command_sha256") != binding["command_sha256"]):
+            raise LedgerError("reservation_binding_invalid")
+        preflight = strict_json(preflight_bytes)
+        preflight_fields = {"schema", "version", "fingerprint", "manifest_sha256", "files", "runtime_bindings",
+                            "selftest_counts", "model_calls", "probe_attempts", "formal_runs", "result"}
+        if (type(preflight) is not dict or set(preflight) != preflight_fields
+                or type(preflight["schema"]) is not int or preflight["schema"] != 1
+                or type(preflight["version"]) is not int or preflight["version"] != VERSION
+                or preflight["fingerprint"] != manifest["fingerprint"]
+                or preflight["manifest_sha256"] != binding["manifest_sha256"]
+                or preflight["files"] != manifest["files"]
+                or type(preflight["runtime_bindings"]) is not dict
+                or type(preflight["selftest_counts"]) is not dict
+                or any(type(preflight[k]) is not int or preflight[k] != 0 for k in ("model_calls", "probe_attempts", "formal_runs"))
+                or preflight["result"] != "pass"):
+            raise LedgerError("reservation_binding_invalid")
+        phase_fp = sha256(canonical_bytes({"artifact_fingerprint": manifest["fingerprint"],
+            "root_identity": root, "spec_sha256": binding["spec_sha256"],
+            "command_sha256": binding["command_sha256"], "preflight_sha256": binding["preflight_sha256"]}))
+        if binding["fingerprint"] != phase_fp:
+            raise LedgerError("reservation_binding_invalid")
+    except LedgerError:
+        raise
+    except Exception:
+        raise LedgerError("reservation_binding_invalid") from None
     return binding
 
 
@@ -716,16 +952,20 @@ class GlobalLedger:
             fcntl.flock(fd, fcntl.LOCK_UN); os.close(fd)
 
     def complete(self, attempt_id: str, state: str, *, binding: dict, determination: str | None = None,
-                 run_id: str | None = None, diagnostic_report: bytes | None = None,
-                 gate_evidence: dict | None = None, result_artifact_sha256: str | None = None,
-                 next_binding: dict | None = None):
+                 run_id: str | None = None, result_artifact_path: Path | None = None,
+                 evidence_sidecar_path: Path | None = None, next_binding: dict | None = None,
+                 diagnostic_report: bytes | None = None, gate_evidence: dict | None = None,
+                 result_artifact_sha256: str | None = None):
         if state not in STATES - {"reserved", "running"}:
             raise LedgerError("attempt_state_invalid")
         binding = validate_binding(binding)
         if next_binding is not None:
             next_binding = validate_binding(next_binding)
-        if result_artifact_sha256 is not None and (type(result_artifact_sha256) is not str or not re.fullmatch(r"[0-9a-f]{64}", result_artifact_sha256)):
+        # Legacy caller-asserted evidence inputs are intentionally rejected.
+        if diagnostic_report is not None or gate_evidence is not None or result_artifact_sha256 is not None:
             raise LedgerError("attempt_transition_invalid")
+        if (result_artifact_path is None) != (evidence_sidecar_path is None):
+            raise LedgerError("pass_gate_evidence_invalid")
         fd = self._lock()
         try:
             ledger = self._read_local()
@@ -742,33 +982,36 @@ class GlobalLedger:
             if state not in role_state.get(record.get("role"), set()):
                 raise LedgerError("attempt_transition_invalid")
             if record["role"] == "diagnostic" and state == "completed_diagnostic":
-                if type(diagnostic_report) is not bytes or next_binding is None or next_binding["fingerprint"] == binding["fingerprint"]:
+                if result_artifact_path is None or next_binding is None or next_binding["fingerprint"] == binding["fingerprint"]:
                     raise LedgerError("diagnostic_report_required")
-                parsed = strict_json(diagnostic_report)
-                validate_report(parsed, attempt_id=record["id"], fingerprint=record["fingerprint"])
-                if parsed["determination"] != "resolved":
+                artifact_hash, artifact_determination, _ = verify_saved_result(
+                    result_artifact_path, evidence_sidecar_path, record=record, binding=binding)
+                if artifact_determination != "resolved":
                     raise LedgerError("attempt_transition_invalid")
-                record["report_sha256"] = sha256(diagnostic_report)
-                record["result_artifact_sha256"] = sha256(diagnostic_report)
+                record["report_sha256"] = artifact_hash
+                record["result_artifact_sha256"] = artifact_hash
                 record.update({"expected_next_role": "final_probe", "expected_next_binding": next_binding,
                                "expected_next_binding_sha256": binding_digest(next_binding)})
-                determination = parsed["determination"]
-            elif diagnostic_report is not None:
+                determination = artifact_determination
+            elif record["role"] == "diagnostic" and result_artifact_path is not None:
                 raise LedgerError("attempt_transition_invalid")
             if state == "diagnostic_inconclusive" and determination != "inconclusive":
                 raise LedgerError("attempt_transition_invalid")
             if state in {"final_pass", "formal_run_pass"}:
                 expected_gates = {"env", "runtime", "binding", "event", "scope", "residual", "cli"}
-                if (type(gate_evidence) is not dict or set(gate_evidence) != expected_gates
-                        or any(type(value) is not bool or value is not True for value in gate_evidence.values())
-                        or result_artifact_sha256 is None):
+                if result_artifact_path is None:
                     raise LedgerError("pass_gate_evidence_invalid")
-                record["result_artifact_sha256"] = result_artifact_sha256
+                artifact_hash, _, gate_evidence = verify_saved_result(
+                    result_artifact_path, evidence_sidecar_path, record=record, binding=binding)
+                if (set(gate_evidence) != expected_gates
+                        or any(value is not True for value in gate_evidence.values())):
+                    raise LedgerError("pass_gate_evidence_invalid")
+                record["result_artifact_sha256"] = artifact_hash
                 record["gate_schema"] = 1
                 record["gate_evidence"] = dict(gate_evidence)
                 record["gate_evidence_sha256"] = gate_evidence_digest(
                     attempt_id=record["id"], binding_sha256=record["binding_sha256"],
-                    result_artifact_sha256=result_artifact_sha256, evidence=gate_evidence,
+                    result_artifact_sha256=artifact_hash, evidence=gate_evidence,
                     run_id=record.get("run_id"))
                 if state == "final_pass":
                     if next_binding is None or next_binding["fingerprint"] == binding["fingerprint"]:
@@ -777,9 +1020,7 @@ class GlobalLedger:
                     record.update({"expected_next_role": "formal_run", "expected_next_binding": next_binding,
                                    "expected_next_binding_sha256": binding_digest(next_binding),
                                    "expected_next_run_set_sha256": sha256(canonical_bytes(expected_runs))})
-            elif gate_evidence is not None:
-                raise LedgerError("attempt_transition_invalid")
-            elif result_artifact_sha256 is not None and record["role"] != "diagnostic":
+            elif result_artifact_path is not None and record["role"] != "diagnostic":
                 raise LedgerError("attempt_transition_invalid")
             if next_binding is not None and not (record["role"] == "diagnostic" and state == "completed_diagnostic"
                     or record["role"] == "final_probe" and state == "final_pass"):
@@ -823,7 +1064,7 @@ class FixedOpenAIDirectCodexAdapter:
     """Production adapter shell. It accepts only its immutable bound CLI spec and stays disabled here."""
     actual_enabled = False
     transport = "OpenAI direct"
-    fixed_arguments = ("exec", "--json")
+    fixed_arguments = ("exec", "--ephemeral", "--sandbox", "read-only", "--json")
 
     def __init__(self, argv, *, command_sha256, binding, residual_scanner):
         self.binding = validate_binding(binding)
@@ -843,22 +1084,27 @@ class FixedOpenAIDirectCodexAdapter:
         if not self.actual_enabled:
             raise LedgerError("actual_invocation_disabled")
         result = run_process_group(self.argv, deadline_epoch=deadline_epoch, residual_scanner=self.residual_scanner,
-                                   cwd=sandbox_directory)
+                                   cwd=sandbox_directory, sandbox_directory=sandbox_directory)
         return {**result, "answer": b"", "raw": b""}
 
 
-def run_process_group(argv, *, deadline_epoch, residual_scanner, cwd=None):
+def run_process_group(argv, *, deadline_epoch, residual_scanner, cwd=None, sandbox_directory=None):
     """Run one fixed command in a new process group; keep all child output in memory."""
     if type(argv) not in (tuple, list) or not argv or any(type(x) is not str for x in argv):
         raise LedgerError("fixed_cli_binding_invalid")
+    if sandbox_directory is None:
+        raise LedgerError("host_containment_unavailable")
+    contained_argv = sandboxed_argv(argv, Path(sandbox_directory))
+    profile_path = Path(contained_argv[2])
     remaining = deadline_epoch - time.time()
     if remaining <= 0:
         return {"returncode": -1, "stdout": b"", "stderr": b"", "timed_out": True,
                 "child_reaped": True, "residual_verified": False}
     try:
-        child = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        child = subprocess.Popen(contained_argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 start_new_session=True, close_fds=True, cwd=cwd)
     except OSError:
+        profile_path.unlink(missing_ok=True)
         raise LedgerError("diagnostic_cli_spawn_failed") from None
     timed_out = False
     try:
@@ -891,6 +1137,7 @@ def run_process_group(argv, *, deadline_epoch, residual_scanner, cwd=None):
                 pass
             child.communicate()
         if child.poll() is None:
+            profile_path.unlink(missing_ok=True)
             raise LedgerError("diagnostic_residual_unverified") from None
         try:
             if residual_scanner(child.pid, child.pid) is not True:
@@ -898,21 +1145,80 @@ def run_process_group(argv, *, deadline_epoch, residual_scanner, cwd=None):
         except LedgerError:
             raise
         except Exception:
+            profile_path.unlink(missing_ok=True)
             raise LedgerError("diagnostic_residual_unverified") from None
+        profile_path.unlink(missing_ok=True)
         raise LedgerError("diagnostic_cli_failed") from None
     reaped = child.poll() is not None
     try:
         residual = residual_scanner(child.pid, child.pid)
     except Exception:
         residual = False
+    profile_path.unlink(missing_ok=True)
     return {"returncode": child.returncode if reaped else -1, "stdout": stdout, "stderr": stderr,
             "timed_out": timed_out, "child_reaped": reaped, "residual_verified": residual is True}
+
+
+def sandbox_boundary_preflight():
+    """Model-free host check. Must run in the ordinary shell, outside an outer sandbox."""
+    with tempfile.TemporaryDirectory(prefix="p5-v20-host-boundary-") as td:
+        fixture = Path(td); sandbox = fixture / "sandbox"; sandbox.mkdir(mode=0o700)
+        external_root = Path(tempfile.mkdtemp(prefix="p5-v20-absolute-escape-", dir="/private/tmp"))
+        try:
+            forbidden = (fixture.parent / f"{fixture.name}-escaped.raw", fixture / "sibling.raw",
+                         external_root / "absolute.raw")
+            code = "import pathlib,sys; pathlib.Path(sys.argv[1]).write_text('synthetic-write-sentinel')"
+            for target in forbidden:
+                outcome = run_process_group((os.path.realpath(os.sys.executable), "-I", "-B", "-c", code, str(target)),
+                    deadline_epoch=time.time()+10, residual_scanner=lambda *_: True,
+                    cwd=sandbox, sandbox_directory=sandbox)
+                if (outcome["returncode"] == 0 or not outcome["child_reaped"] or not outcome["residual_verified"]
+                        or target.exists()):
+                    raise LedgerError("host_containment_escape_detected")
+                error_code = "import pathlib,sys; pathlib.Path(sys.argv[1]).write_text('sentinel'); raise RuntimeError('fixture')"
+                error_outcome = run_process_group((os.path.realpath(os.sys.executable), "-I", "-B", "-c", error_code, str(target)),
+                    deadline_epoch=time.time()+10, residual_scanner=lambda *_: True,
+                    cwd=sandbox, sandbox_directory=sandbox)
+                if error_outcome["returncode"] == 0 or not error_outcome["child_reaped"] or target.exists():
+                    raise LedgerError("host_containment_escape_detected")
+                timeout_code = ("import pathlib,sys,time\ntry: pathlib.Path(sys.argv[1]).write_text('sentinel')\n"
+                                "except OSError: pass\ntime.sleep(5)")
+                timeout_outcome = run_process_group((os.path.realpath(os.sys.executable), "-I", "-B", "-c", timeout_code, str(target)),
+                    deadline_epoch=time.time()+0.1, residual_scanner=lambda *_: True,
+                    cwd=sandbox, sandbox_directory=sandbox)
+                if (not timeout_outcome["timed_out"] or not timeout_outcome["child_reaped"]
+                        or not timeout_outcome["residual_verified"] or target.exists()):
+                    raise LedgerError("host_containment_timeout_cleanup_failed")
+            allowed = sandbox / "allowed.raw"
+            inside = run_process_group((os.path.realpath(os.sys.executable), "-I", "-B", "-c",
+                "import pathlib; pathlib.Path('allowed.raw').write_text('ok')"), deadline_epoch=time.time()+10,
+                residual_scanner=lambda *_: True, cwd=sandbox, sandbox_directory=sandbox)
+            if inside["returncode"] != 0 or not allowed.is_file() or allowed.read_text() != "ok":
+                raise LedgerError("host_containment_profile_mismatch")
+            allowed.unlink()
+            timed = run_process_group((os.path.realpath(os.sys.executable), "-I", "-B", "-c",
+                "import time; time.sleep(5)"), deadline_epoch=time.time()+0.1,
+                residual_scanner=lambda *_: True, cwd=sandbox, sandbox_directory=sandbox)
+            if not timed["timed_out"] or not timed["child_reaped"] or not timed["residual_verified"]:
+                raise LedgerError("host_containment_timeout_cleanup_failed")
+            if any(p.name != "sandbox" for p in fixture.iterdir()) or any(sandbox.iterdir()):
+                raise LedgerError("host_containment_external_write_detected")
+            return {"available": True, "profile_sha256": SANDBOX_PROFILE_SHA256,
+                    "escape_cases": len(forbidden) * 3, "allowed_write": True, "timeout_reaped": True}
+        finally:
+            (fixture.parent / f"{fixture.name}-escaped.raw").unlink(missing_ok=True)
+            (fixture / "sibling.raw").unlink(missing_ok=True)
+            (external_root / "absolute.raw").unlink(missing_ok=True)
+            if external_root.exists():
+                shutil.rmtree(external_root, ignore_errors=True)
 
 
 def run_diagnostic_once(ledger: GlobalLedger, *, binding: dict, adapter, artifact_directory: Path,
                        next_binding_factory):
     """One diagnostic lifecycle. Adapter outputs remain in memory and are never copied verbatim."""
     binding = validate_binding(binding)
+    if not isinstance(adapter, FixedOpenAIDirectCodexAdapter):
+        raise LedgerError("fixed_cli_binding_invalid")
     parent = Path(artifact_directory).parent
     parent_info = parent.lstat()
     if (not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_uid != os.getuid()
@@ -923,12 +1229,15 @@ def run_diagnostic_once(ledger: GlobalLedger, *, binding: dict, adapter, artifac
     try:
         # reserve() returns only after remote FF push and ls-remote confirmation.
         ledger.mark_running(attempt_id, binding=binding)
+        before_tree = _tree_fingerprint(parent)
         with tempfile.TemporaryDirectory(prefix="p5-v20-diagnostic-", dir=Path(artifact_directory).parent) as sandbox:
             outcome = adapter.invoke(record["deadline_epoch"], attempt_id=attempt_id, binding=binding,
                                      sandbox_directory=Path(sandbox))
             direct_outputs = [p for p in Path(sandbox).rglob("*") if p.is_file() or p.is_symlink()]
             if direct_outputs:
                 raise LedgerError("diagnostic_direct_artifact_present")
+        if _tree_fingerprint(parent) != before_tree:
+            raise LedgerError("host_containment_external_write_detected")
         required = {"returncode", "stdout", "stderr", "answer", "raw", "timed_out", "child_reaped", "residual_verified"}
         if (type(outcome) is not dict or set(outcome) != required
                 or any(type(outcome[k]) is not bytes for k in ("stdout", "stderr", "answer", "raw"))
@@ -947,26 +1256,39 @@ def run_diagnostic_once(ledger: GlobalLedger, *, binding: dict, adapter, artifac
         if not callable(next_binding_factory):
             raise LedgerError("ledger_expected_binding_invalid")
         next_binding = validate_binding(next_binding_factory(strict_json(safe)))
-        bundle = artifact_bundle(trusted_attempt_id=attempt_id, trusted_fingerprint=binding["fingerprint"],
-                                 trusted_binding_sha256=binding_digest(binding), report_bytes=safe)
-        save_artifact_bundle(artifact_directory, bundle, trusted_attempt_id=attempt_id,
-                             trusted_fingerprint=binding["fingerprint"], trusted_binding_sha256=binding_digest(binding))
-        ledger.complete(attempt_id, "completed_diagnostic", binding=binding, diagnostic_report=safe,
+        result_path, sidecar_path = save_verified_result(artifact_directory, attempt_id=attempt_id,
+            role="diagnostic", run_id=None, binding=binding, result_bytes=safe)
+        ledger.complete(attempt_id, "completed_diagnostic", binding=binding,
+                        result_artifact_path=result_path, evidence_sidecar_path=sidecar_path,
                         next_binding=next_binding)
         return record
     except Exception as exc:
         code = fixed_error(exc)
         terminal = ("timeout" if code == "invocation_timeout" else
                     "diagnostic_inconclusive" if code == "diagnostic_inconclusive" else "unknown")
-        try:
-            bundle = artifact_bundle(trusted_attempt_id=attempt_id, trusted_fingerprint=binding["fingerprint"],
-                                     trusted_binding_sha256=binding_digest(binding), error=LedgerError(code))
-            save_artifact_bundle(artifact_directory, bundle, trusted_attempt_id=attempt_id,
-                                 trusted_fingerprint=binding["fingerprint"], trusted_binding_sha256=binding_digest(binding))
-        finally:
-            ledger.complete(attempt_id, terminal, binding=binding,
-                            determination="inconclusive" if terminal == "diagnostic_inconclusive" else None)
+        ledger.complete(attempt_id, terminal, binding=binding,
+                        determination="inconclusive" if terminal == "diagnostic_inconclusive" else None)
         raise LedgerError(code) from None
+
+
+def _tree_fingerprint(root: Path):
+    """In-memory inventory of a dedicated fixture root; filenames and values are never persisted."""
+    root = Path(root).resolve(strict=True)
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*"), key=lambda p: str(p.relative_to(root))):
+        info = path.lstat()
+        rel = str(path.relative_to(root)).encode("utf-8", "strict")
+        if stat.S_ISDIR(info.st_mode):
+            kind, payload = b"d", b""
+        elif stat.S_ISREG(info.st_mode) and info.st_nlink == 1:
+            kind, payload = b"f", path.read_bytes()
+        else:
+            raise LedgerError("host_containment_inventory_unknown")
+        digest.update(len(rel).to_bytes(4, "big") + rel + kind)
+        digest.update(canonical_bytes([info.st_dev, info.st_ino, info.st_uid, stat.S_IMODE(info.st_mode), info.st_size,
+                                       info.st_mtime_ns, info.st_ctime_ns]))
+        digest.update(hashlib.sha256(payload).digest())
+    return digest.hexdigest()
 
 
 class GitRemote:

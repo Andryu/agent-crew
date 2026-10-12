@@ -76,14 +76,15 @@ def load_manifest():
     config = strict_json(base / "config.json")
     if (set(config) != {"schema", "version", "source_head", "source_hashes", "driver_sha256",
                         "python_executable", "python_version", "python_binding", "shell_binding", "codex_binding",
-                        "cli_version", "remote_budget_ref",
+                        "cli_version", "remote_budget_ref", "binding_spec_sha256", "command_sha256",
+                        "sandbox_binding", "sandbox_profile_sha256",
                         "model_transport", "allowed_driver_modes", "actual_invocations_enabled", "hard_cap",
                         "prior_consumed", "diagnostic_limit", "final_probe_limit", "formal_run_count", "retry",
                         "global_ledger_directory", "diagnostic_root", "codex_home", "historical_attempts"}
             or type(config["schema"]) is not int or config["schema"] != 1
             or type(config["version"]) is not int or config["version"] != 20
             or config["remote_budget_ref"] != "refs/heads/codex/runtime-migration-p5-ledger"
-            or config["model_transport"] != "OpenAI direct" or config["allowed_driver_modes"] != ["verify", "preflight"]
+            or config["model_transport"] != "OpenAI direct" or config["allowed_driver_modes"] != ["verify", "preflight", "sandbox-preflight"]
             or config["cli_version"] != "codex-cli 0.162.1"
             or config["actual_invocations_enabled"] is not False or config["hard_cap"] != 28
             or config["prior_consumed"] != 2 or config["diagnostic_limit"] != 1 or config["final_probe_limit"] != 1
@@ -92,7 +93,11 @@ def load_manifest():
             or config["python_version"] != list(sys.version_info[:3])
             or file_binding(Path(config["python_executable"])) != config["python_binding"]
             or file_binding(Path(config["shell_binding"]["realpath"]), trusted_system=True) != config["shell_binding"]
-            or file_binding(Path(config["codex_binding"]["realpath"]), trusted_system=True) != config["codex_binding"]):
+            or file_binding(Path(config["codex_binding"]["realpath"]), trusted_system=True) != config["codex_binding"]
+            or config["sandbox_binding"] != file_binding(Path("/usr/bin/sandbox-exec"), trusted_system=True)
+            or config["sandbox_profile_sha256"] != v20.SANDBOX_PROFILE_SHA256
+            or config["binding_spec_sha256"] != v20.BINDING_SPEC_SHA256
+            or config["command_sha256"] != v20.sha256(v20.canonical_bytes([config["codex_binding"]["realpath"], *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments]))):
         raise ValueError
     expected_cache = Path(pwd.getpwuid(os.getuid()).pw_dir) / "Library/Caches/agent-crew-p5-benchmark"
     expected_artifact = expected_cache / "drivers" / f"p5-v20-diagnostic-{manifest['fingerprint'][:20]}"
@@ -162,7 +167,9 @@ def write_preflight(base, manifest, counts):
               "manifest_sha256": hashlib.sha256((base / "manifest.json").read_bytes()).hexdigest(),
               "files": manifest["files"],
               "runtime_bindings": {"python": config["python_binding"], "shell": config["shell_binding"],
-                                   "codex": config["codex_binding"], "cli_version": config["cli_version"]},
+                                   "codex": config["codex_binding"], "sandbox_exec": config["sandbox_binding"],
+                                   "sandbox_profile_sha256": config["sandbox_profile_sha256"],
+                                   "cli_version": config["cli_version"]},
               "selftest_counts": counts, "model_calls": 0, "probe_attempts": 0, "formal_runs": 0,
               "result": "pass"}
     payload = (json.dumps(report, sort_keys=True, separators=(",", ":")) + "\n").encode()
@@ -192,12 +199,18 @@ def write_preflight(base, manifest, counts):
 def main(argv=None):
     args = sys.argv[1:] if argv is None else argv
     # This immutable artifact cannot initiate any invocation or contact a model.
-    if len(args) != 1 or args[0] not in {"verify", "preflight"}:
+    if len(args) != 1 or args[0] not in {"verify", "preflight", "sandbox-preflight"}:
         fail()
     try:
         base, manifest = load_manifest()
         counts = run_tests(base)
-        if args[0] == "preflight":
+        if args[0] == "sandbox-preflight":
+            module_path = base / "v20_diagnostic.py"
+            sys.path.insert(0, str(base))
+            import v20_diagnostic as v20
+            outcome = v20.sandbox_boundary_preflight()
+            print(f"v20 sandbox model-free preflight PASS: {outcome['profile_sha256']}")
+        elif args[0] == "preflight":
             report = write_preflight(base, manifest, counts)
             print(f"v20 model-free preflight PASS: {report}")
         else:

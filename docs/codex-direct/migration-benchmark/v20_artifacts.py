@@ -17,14 +17,18 @@ CACHE = Path(pwd.getpwuid(os.getuid()).pw_dir) / "Library/Caches/agent-crew-p5-b
 REMOTE_REF = "refs/heads/codex/runtime-migration-p5-ledger"
 sys.path.insert(0, str(HERE))
 import harness_fingerprint
+import v20_diagnostic as v20
 
 
 def canonical(obj):
     return (json.dumps(obj, sort_keys=True, separators=(",", ":")) + "\n").encode()
 
 
-def bind(path, *, realpath=None):
+def bind(path, *, realpath=None, trusted_system=False):
     info = path.lstat()
+    owners = {0, os.getuid()} if trusted_system else {os.getuid()}
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_uid not in owners or (trusted_system and info.st_mode & 0o022):
+        raise RuntimeError("file identity invalid")
     data = path.read_bytes()
     return {"realpath": str(path.resolve(strict=True)) if realpath is None else realpath, "sha256": hashlib.sha256(data).hexdigest(),
             "device": info.st_dev, "inode": info.st_ino, "size": info.st_size,
@@ -52,8 +56,10 @@ def build():
     driver_data = (HERE / "v20_driver.py").read_bytes()
     py = str(Path(sys.executable).resolve(strict=True))
     py_binding = bind(Path(py))
-    shell_binding = bind(Path("/bin/zsh").resolve(strict=True))
+    shell_binding = bind(Path("/bin/zsh").resolve(strict=True), trusted_system=True)
     codex_binding = harness_fingerprint.compute_codex_executable_binding()
+    command_sha256 = hashlib.sha256(v20.canonical_bytes([codex_binding["realpath"], *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments])).hexdigest()
+    sandbox_binding = bind(Path(v20.SANDBOX_EXEC).resolve(strict=True), trusted_system=True)
     codex_home = CACHE / "probe-v20-diagnostic" / "version-home"
     codex_home.mkdir(parents=True, mode=0o700, exist_ok=True)
     codex_home_stat = codex_home.lstat()
@@ -74,8 +80,10 @@ def build():
                   "sha256": codex_binding["sha256"], "device": codex_binding["device"], "inode": codex_binding["inode"],
                   "size": codex_binding["size"], "mtime_ns": codex_binding["mtime_ns"], "ctime_ns": codex_binding["ctime_ns"],
                   "owner": codex_binding["owner"], "mode": codex_binding["mode"]}, "cli_version": cli_version,
+              "binding_spec_sha256": v20.BINDING_SPEC_SHA256, "command_sha256": command_sha256,
+              "sandbox_binding": sandbox_binding, "sandbox_profile_sha256": v20.SANDBOX_PROFILE_SHA256,
               "remote_budget_ref": REMOTE_REF, "model_transport": "OpenAI direct",
-              "allowed_driver_modes": ["verify", "preflight"], "actual_invocations_enabled": False,
+              "allowed_driver_modes": ["verify", "preflight", "sandbox-preflight"], "actual_invocations_enabled": False,
               "hard_cap": 28, "prior_consumed": 2, "diagnostic_limit": 1, "final_probe_limit": 1,
               "formal_run_count": 24, "retry": False,
               "global_ledger_directory": str(CACHE / "logs" / "v20-global-ledger"),
@@ -84,7 +92,7 @@ def build():
               "historical_attempts": [x["id"] for x in __import__("v20_diagnostic").HISTORICAL]}
     config_data = canonical(config)
     launcher_data = ("#!/bin/zsh\nset -eu\n"
-                     "if [[ $# -ne 1 || ( $1 != verify && $1 != preflight ) ]]; then print -u2 v20_fixed_artifact_invalid; exit 2; fi\n"
+                     "if [[ $# -ne 1 || ( $1 != verify && $1 != preflight && $1 != sandbox-preflight ) ]]; then print -u2 v20_fixed_artifact_invalid; exit 2; fi\n"
                      f"base=${{0:A:h}}\nexec {py} -B \"$base/driver.py\" \"$1\"\n").encode()
     fp_input = {"source": config["source_hashes"], "driver": config["driver_sha256"],
                 "config": hashlib.sha256(config_data).hexdigest(), "launcher_template_sha256": hashlib.sha256(launcher_data).hexdigest(),
