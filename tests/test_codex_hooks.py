@@ -1,43 +1,67 @@
-"""Codex用hook設定の回帰テスト。"""
+"""共通原本から生成するCodex hookのイベントと実行入口を検証する。"""
 
 from __future__ import annotations
 
-import json
+import importlib.util
 import os
 import subprocess
+import tempfile
+import unittest
 from pathlib import Path
 
-REPO_DIR = Path(__file__).parent.parent
-HOOKS_PATH = REPO_DIR / ".codex" / "hooks.json"
+REPO_DIR = Path(__file__).resolve().parent.parent
+SPEC = importlib.util.spec_from_file_location(
+    "codex_hook_installer", REPO_DIR / "scripts/install_crew_hooks.py"
+)
+installer = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(installer)
 
 
 def load_commands() -> list[str]:
-    hooks = json.loads(HOOKS_PATH.read_text())
-    return [handler["command"] for groups in hooks["hooks"].values() for group in groups for handler in group["hooks"]]
+    hooks = installer.generated_hooks(REPO_DIR, "codex")
+    return [handler["command"] for groups in hooks.values() for group in groups for handler in group["hooks"]]
 
 
-def test_hooks_use_supported_events_and_command_handlers():
-    hooks = json.loads(HOOKS_PATH.read_text())
-    assert set(hooks["hooks"]) == {"SessionStart", "UserPromptSubmit", "Stop"}
-    assert all(handler["type"] == "command" for groups in hooks["hooks"].values() for group in groups for handler in group["hooks"])
+class CodexHooksTests(unittest.TestCase):
+    def test_hooks_use_supported_events_and_command_handlers(self):
+        hooks = installer.generated_hooks(REPO_DIR, "codex")
+        self.assertEqual(set(hooks), {"SessionStart", "Stop", "SubagentStop"})
+        self.assertTrue(all(handler["type"] == "command" for groups in hooks.values()
+                            for group in groups for handler in group["hooks"]))
+
+    def test_commands_resolve_from_git_root_without_claude_project_dir(self):
+        for command in load_commands():
+            self.assertIn("git rev-parse --show-toplevel", command)
+            self.assertNotIn("CLAUDE_PROJECT_DIR", command)
+
+    def test_commands_run_from_subdirectory_without_claude_project_dir(self):
+        with tempfile.TemporaryDirectory(prefix="codex-hook-entry-") as directory:
+            root = Path(directory).resolve()
+            script = root / "scripts/crew_hooks.py"
+            script.parent.mkdir()
+            # 実hookを起動せず、生成commandが渡すruntime/event/rootをfixtureで検査する。
+            script.write_text(
+                "import argparse\nfrom pathlib import Path\n"
+                "parser = argparse.ArgumentParser()\n"
+                "parser.add_argument('--runtime')\nparser.add_argument('--event')\n"
+                "parser.add_argument('--root')\nargs = parser.parse_args()\n"
+                "assert args.runtime == 'codex'\n"
+                "assert Path(args.root) == Path(__file__).resolve().parents[1]\n"
+                "print(args.event)\n"
+            )
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            nested = root / "docs/nested"
+            nested.mkdir(parents=True)
+            environment = {key: value for key, value in os.environ.items()
+                           if key not in {"CLAUDE_PROJECT_DIR", "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"}}
+            events = []
+            for command in load_commands():
+                result = subprocess.run(["bash", "-c", command], cwd=nested, env=environment,
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                events.append(result.stdout.strip())
+            self.assertEqual(events, ["SessionStart", "Stop", "SubagentStop"])
 
 
-def test_commands_resolve_from_git_root_without_claude_project_dir():
-    for command in load_commands():
-        assert "git rev-parse --show-toplevel" in command
-        assert "CLAUDE_PROJECT_DIR" not in command
-
-
-def test_commands_run_from_subdirectory_without_claude_project_dir(tmp_path: Path):
-    for relative_path in [".claude/hooks/session_start.sh", "scripts/model-mode.sh", "scripts/propose-lesson-rules.sh", "scripts/privacy-check.sh", "scripts/enforce-retro-stop.sh"]:
-        script = tmp_path / relative_path
-        script.parent.mkdir(parents=True, exist_ok=True)
-        script.write_text("#!/usr/bin/env bash\nexit 0\n")
-        script.chmod(0o755)
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    nested_dir = tmp_path / "docs" / "nested"
-    nested_dir.mkdir(parents=True)
-    environment = {key: value for key, value in os.environ.items() if key != "CLAUDE_PROJECT_DIR"}
-    for command in load_commands():
-        result = subprocess.run(["bash", "-c", command], cwd=nested_dir, env=environment, capture_output=True, text=True)
-        assert result.returncode == 0, result.stderr
+if __name__ == "__main__":
+    unittest.main()

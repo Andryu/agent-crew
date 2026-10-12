@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "start_manifest": "manifest.json",
+  "status": "調査・検証課題と採点基準を固定。修正力測定と24run比較は未実施",
+  "snapshot_index": "snapshot-index.json",
+  "A_instruction_snapshot": ["snapshot/agent_crew/AGENTS.md", "snapshot/agent_crew/.agents/skills/fable-class/SKILL.md", "snapshot/agent_crew/.agents/skills/fable-class/references/planning.md", "snapshot/agent_crew/.agents/skills/fable-class/references/delegation.md", "snapshot/agent_crew/.agents/skills/fable-class/references/verification.md"],
+  "B_instruction_snapshot": "P2で短い共通契約を確定してから別版を固定。AはP0 snapshotで維持",
+  "conditions": {
+    "A": "現行の開発指示",
+    "B": "短い共通契約と必要時skill",
+    "fixed_model": "gpt-6-astra",
+    "fixed_reasoning": "medium",
+    "fixed_provider": "openai（各runで明示override。現行globalの暗黙値と混同しない）",
+    "fixed_cli_version": "codex-cli 0.155.1",
+    "run_isolation": "同じfixture snapshotを独立worktreeへ復元し、各条件2回、順序を入れ替える。前runの回答を渡さない",
+    "safety": "両条件で同じsandbox・approval・hook・レビュー・外部送信境界。資産本文と合成資産例を使わない"
+  },
+  "scoring": {
+    "gates": ["指定fixtureの検証成功", "課題固有の受入条件達成", "範囲外変更・権限違反なし", "再開情報を再現可能"],
+    "pass": "4項目すべて合格。安全違反は即不合格。品質を犠牲にした高速化は不採用",
+    "measurement_fields": ["wall_seconds", "approval_count", "approval_wait_seconds", "llm_seconds", "tool_seconds", "input_tokens", "output_tokens", "cost_usd", "rework_count", "review_findings", "scope_violations", "handoff_success", "validation_results"],
+    "unknown_rule": "取得できないモデル利用量・費用はunknown。推測換算しない"
+  },
+  "tasks": [
+    {
+      "id": "C1", "kind": "局所調査/境界確認", "repo": "agent_crew",
+      "input": ["scripts/crew"], "fixture": ["tests/test_crew_launcher.py"],
+      "start": "manifest.agent_crew.headとsnapshot-index.jsonの対応hash",
+      "work": "task slugが不正・未指定のときに旧CREW_TASK_*を持ち越さないことを既存fixtureで調査・検証する",
+      "validate": "python3.12 -B -m unittest discover -s tests -p test_crew_launcher.py -v",
+      "accept": "誤ったtask scopeで起動せず、既存のlauncher fixtureが成功"
+    },
+    {
+      "id": "C2", "kind": "複数ファイルの共通hook", "repo": "agent_crew",
+      "input": ["scripts/install_crew_hooks.py"],
+      "fixture": ["tests/test_install_crew_hooks.py"],
+      "start": "manifest.agent_crew.headとsnapshot-index.jsonの対応hash。実設定本文はsnapshotに含めない",
+      "work": "既存テストの合成hook fixtureで生成対象と未知handlerの保持を調査・検証する",
+      "validate": "python3.12 -B -m unittest discover -s tests -p test_install_crew_hooks.py -v",
+      "accept": "生成内容が一致し、未知handlerと他者変更を失わない"
+    },
+    {
+      "id": "C3", "kind": "hook異常系", "repo": "agent_crew",
+      "input": ["scripts/codex_hook_state.py"],
+      "fixture": ["tests/test_codex_hook_state.py"],
+      "start": "manifest.agent_crew.headとsnapshot-index.jsonの対応hash。実設定本文はsnapshotに含めない",
+      "work": "既存テストの合成hook fixtureでsnapshot/生成hash不一致の無変更停止を調査・検証する",
+      "validate": "python3.12 -B -m unittest discover -s tests -p test_codex_hook_state.py -v",
+      "accept": "不一致で設定を書き換えず、正常系のfixtureも成功"
+    },
+    {
+      "id": "C4", "kind": "文書整合", "repo": "agent_crew",
+      "input": ["AGENTS.md"],
+      "fixture": ["migration-progress/README.md"],
+      "start": "manifest.agent_crew.headとsnapshot-index.jsonの対応hash",
+      "work": "queue正本と表示専用台帳の分担を契約・READMEで照合する",
+      "validate": "git diff --check",
+      "accept": "queueの所有範囲が一貫し、表示台帳を正本と誤記しない"
+    },
+    {
+      "id": "C5", "kind": "wealth静的準備", "repo": "wealth_advisor",
+      "input": ["scripts/check_operational_readiness.py", "AGENTS.md"],
+      "fixture": ["tests/test_operational_readiness.py"],
+      "start": "manifest.wealth_advisor.headとsnapshot-index.jsonの対応hash。資産本文はsnapshotに含めない",
+      "work": "既存テストの合成fixtureで基準不一致の固定診断コードを調査・検証する",
+      "validate": "python3.12 -B -m unittest discover -s tests -p test_operational_readiness.py -v",
+      "accept": "資産本文・合成資産例・接続を使わず、基準不一致を運用可と誤判定しない"
+    },
+    {
+      "id": "C6", "kind": "引継ぎ/進捗", "repo": "agent_crew",
+      "input": ["migration-progress/progress.py"], "fixture": ["migration-progress/README.md"],
+      "extra_fixture": "fixtures/board-state.json",
+      "start": "manifest.agent_crew.headとsnapshot-index.jsonの対応hash",
+      "work": "合成した表示台帳fixtureでP0を検証中へ更新し、--onceで読取り、実台帳は変更しない",
+      "validate": "python3.12 -B docs/codex-direct/migration-baseline/smoke.py",
+      "accept": "CLI更新と再読込が成功し、実state.jsonのhashが不変。queueを変更しない"
+    }
+  ]
+}
