@@ -6,8 +6,10 @@ that layout inside a private temporary home with the normal artifact builder, th
 checks against it. Nothing is written to the source directory, the real benchmark cache, or any
 remote; no model client, seed bootstrap, probe, or formal run is reachable from here.
 
-Usage (a user-owned Python, e.g. the interpreter recorded in the artifact config):
-    python3 docs/codex-direct/migration-benchmark/v20_source_selftest.py
+Usage (the user-owned Python 3.11+ that the artifact config records as python_executable, e.g.
+~/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/bin/python3.12; the system/shim python3
+is root-owned or too old and exits 2 with a fixed message):
+    <that python> -B docs/codex-direct/migration-benchmark/v20_source_selftest.py
 """
 
 import json
@@ -53,7 +55,23 @@ def _make_removable(root):
             pass
 
 
+REQUIREMENT_MESSAGE = "v20_source_selftest_requires_user_owned_python_with_tomllib"
+
+
+def _interpreter_ok():
+    try:
+        if os.stat(os.path.realpath(sys.executable)).st_uid != os.getuid():
+            return False
+        import tomllib  # noqa: F401
+    except (OSError, ImportError):
+        return False
+    return True
+
+
 def main():
+    if not _interpreter_ok():
+        print(REQUIREMENT_MESSAGE, file=sys.stderr)
+        return 2
     if len(sys.argv) == 4 and sys.argv[1] == "--child":
         _child(sys.argv[2], sys.argv[3])
         return 0

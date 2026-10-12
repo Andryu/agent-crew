@@ -1217,12 +1217,12 @@ def spawn_boundary_tests():
         cases += 1
         # A real reservation exists, but the invoked ID is invented.
         config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "invented")
-        record = ledger.reserve(role="diagnostic", binding=binding); ledger.mark_running(record["id"], binding=binding)
+        record = ledger.reserve(role="diagnostic", binding=binding)
         _spawn_denied(config, ledger, adapter, binding, record["deadline_epoch"], fake_id, sandbox, "spawn_reservation_invalid")
         cases += 1
-        # Reserved but not yet running: lifecycle order (reserve -> mark_running -> invoke) is enforced here too.
-        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "reserved-only")
-        record = ledger.reserve(role="diagnostic", binding=binding)
+        # N-1: a reservation already marked running ("spawned") is never spawn-authorized again.
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "already-running")
+        record = ledger.reserve(role="diagnostic", binding=binding); ledger.mark_running(record["id"], binding=binding)
         _spawn_denied(config, ledger, adapter, binding, record["deadline_epoch"], record["id"], sandbox, "spawn_reservation_invalid")
         cases += 1
         # Consumed IDs (terminal states) cannot be re-invoked.
@@ -1236,22 +1236,22 @@ def spawn_boundary_tests():
         # Reservation bound to another binding / deadline mismatch / expired deadline.
         config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "other-binding")
         other = _binding("spawn-other-binding-record")
-        record = ledger.reserve(role="diagnostic", binding=other); ledger.mark_running(record["id"], binding=other)
+        record = ledger.reserve(role="diagnostic", binding=other)
         _spawn_denied(config, ledger, adapter, binding, record["deadline_epoch"], record["id"], sandbox, "spawn_reservation_invalid")
         cases += 1
         config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "deadline")
-        record = ledger.reserve(role="diagnostic", binding=binding); ledger.mark_running(record["id"], binding=binding)
+        record = ledger.reserve(role="diagnostic", binding=binding)
         _spawn_denied(config, ledger, adapter, binding, record["deadline_epoch"] + 1, record["id"], sandbox, "spawn_reservation_invalid")
         cases += 1
         config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "expired",
             clock=lambda: time.time() - 3600)
-        record = ledger.reserve(role="diagnostic", binding=binding); ledger.mark_running(record["id"], binding=binding)
+        record = ledger.reserve(role="diagnostic", binding=binding)
         _spawn_denied(config, ledger, adapter, binding, record["deadline_epoch"], record["id"], sandbox, "spawn_reservation_invalid")
         cases += 1
 
         # Missing / wrong sandbox directory (with an otherwise valid running reservation): fixed error, no spawn.
         config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "sandbox-missing")
-        record = ledger.reserve(role="diagnostic", binding=binding); ledger.mark_running(record["id"], binding=binding)
+        record = ledger.reserve(role="diagnostic", binding=binding)
         for bad_sandbox in (None, root / "does-not-exist", root / "plain-file"):
             if bad_sandbox == root / "plain-file":
                 bad_sandbox.write_text("x")
@@ -1262,7 +1262,7 @@ def spawn_boundary_tests():
         # Helper-level bypass: the fixed Codex argv cannot be started through run_process_group directly,
         # nor with extra arguments, nor via _invoke_diagnostic_cli with a different executable/profile argv.
         config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "helper-bypass")
-        record = ledger.reserve(role="diagnostic", binding=binding); ledger.mark_running(record["id"], binding=binding)
+        record = ledger.reserve(role="diagnostic", binding=binding)
         with patch.object(v20, "_fixed_config", lambda _binding: config), \
                 patch.object(v20, "_fixed_ledger", lambda _config: ledger), \
                 patch("v20_diagnostic.subprocess.Popen") as popen, patch("v20_diagnostic.subprocess.run") as run:
@@ -1324,6 +1324,216 @@ def spawn_boundary_tests():
         # The reservation was consumed (fixed terminal state), never released for another attempt.
         assert ledger._read_local()["records"][-1]["state"] == "unknown" and remote.pushes == 3
         cases += 1
+    return cases
+
+
+def spawn_once_and_wiring_tests():
+    """N-1 (at most one spawn per reservation), M-1 (real _fixed_config/_fixed_ledger wiring),
+    m-1 (pre-reserve remote check) and m-2 (codex identity)."""
+    from unittest.mock import MagicMock
+    cases = 0
+    real_run = subprocess.run
+    real_popen = subprocess.Popen
+    def selective_popen(args, *a, **kw):
+        # Only the sandboxed Codex spawn is faked (and fails); git on the local bare remote stays real.
+        if args and args[0] == v20.SANDBOX_EXEC:
+            raise OSError("mock spawn")
+        return real_popen(args, *a, **kw)
+    def sandbox_spawns(mock):
+        return [c for c in mock.call_args_list if c.args and c.args[0] and c.args[0][0] == v20.SANDBOX_EXEC]
+    def fake_probe(args, **kwargs):
+        # Only the sandbox-exec availability probe is faked; git (local bare remote) stays real.
+        if args and args[0] == v20.SANDBOX_EXEC:
+            return subprocess.CompletedProcess(args, 0, b"", b"")
+        return real_run(args, **kwargs)
+    with tempfile.TemporaryDirectory(prefix="p5-v20-spawn-once-") as td:
+        root = Path(td)
+        counter = {"n": 0}
+        def sandbox_dir():
+            counter["n"] += 1
+            path = root / f"sandbox-{counter['n']}"; path.mkdir(mode=0o700)
+            return path
+        def invoke(adapter, record, binding, sandbox):
+            return adapter.invoke(record["deadline_epoch"], attempt_id=record["id"], binding=binding,
+                                  sandbox_directory=sandbox, actual_enabled=True)
+
+        # N-1: one reservation spawns at most once, whether or not the first spawn succeeded.
+        for label in ("spawn-failed", "spawn-ok"):
+            config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "once-" + label)
+            record = ledger.reserve(role="diagnostic", binding=binding)
+            child = MagicMock(); child.communicate.return_value = (b"", b""); child.poll.return_value = 0
+            child.returncode = 0; child.pid = 4242
+            popen_patch = (patch("v20_diagnostic.subprocess.Popen", side_effect=OSError("mock spawn"))
+                           if label == "spawn-failed" else patch("v20_diagnostic.subprocess.Popen", return_value=child))
+            with patch.object(v20, "_fixed_config", lambda _b: config), \
+                    patch.object(v20, "_fixed_ledger", lambda _c: ledger), \
+                    patch.object(v20, "_production_residual_scanner", lambda *_: True), \
+                    popen_patch as popen, patch("v20_diagnostic.subprocess.run", side_effect=fake_probe):
+                try:
+                    invoke(adapter, record, binding, sandbox_dir())
+                except v20.LedgerError:
+                    pass
+                else:
+                    raise AssertionError("first invocation produced a report from a mock")
+                assert popen.call_count == 1
+                assert ledger._read_local()["records"][-1]["state"] == "running"
+                pushes = remote.pushes
+                for _ in range(2):
+                    try:
+                        invoke(adapter, record, binding, sandbox_dir())
+                    except v20.LedgerError as exc:
+                        assert str(exc) == "spawn_reservation_invalid", str(exc)
+                    else:
+                        raise AssertionError("second spawn of one reservation accepted")
+                assert popen.call_count == 1 and remote.pushes == pushes
+            cases += 1
+
+        # M-1(3): local and remote disagree although the local ledger holds a spawn-authorized reservation.
+        for label, tamper, code in (
+                ("remote-head-moved", lambda r: setattr(r, "head_hash", "c" * 40), "remote_local_head_mismatch"),
+                ("remote-record-lost", lambda r: setattr(r, "records", r.records[:2]), "remote_local_chain_mismatch")):
+            config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "mismatch-" + label)
+            record = ledger.reserve(role="diagnostic", binding=binding)
+            tamper(remote)
+            _spawn_denied(config, ledger, adapter, binding, record["deadline_epoch"], record["id"], sandbox_dir(), code)
+            cases += 1
+
+        # m-2: the executable identity bound in config (dev/ino/size/mode/ctime) is re-checked at the boundary.
+        for field, value in (("ctime_ns", None), ("mode", 0o755 if Path(argv[0]).stat().st_mode & 0o777 != 0o755 else 0o700),
+                             ("inode", None), ("size", None)):
+            def mutate(c, field=field, value=value):
+                binding_copy = dict(c["codex_binding"])
+                binding_copy[field] = (binding_copy[field] + 1) if value is None else value
+                return dict(c, codex_binding=binding_copy)
+            config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "identity-" + field, mutate_config=mutate)
+            record = ledger.reserve(role="diagnostic", binding=binding)
+            _spawn_denied(config, ledger, adapter, binding, record["deadline_epoch"], record["id"], sandbox_dir(),
+                          "fixed_cli_binding_invalid")
+            assert ledger._read_local()["records"][-1]["state"] == "reserved"
+            cases += 1
+
+        # m-1: an unreachable/inconsistent remote stops before reserve(): nothing is consumed.
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "preflight")
+        out = root / "preflight-out"; out.mkdir(mode=0o700)
+        remote.mode = "unreachable"
+        with patch.object(v20, "_fixed_config", lambda _b: config), patch.object(v20, "_fixed_ledger", lambda _c: ledger), \
+                patch("v20_diagnostic.subprocess.Popen") as popen, patch("v20_diagnostic.subprocess.run") as run:
+            try:
+                v20.run_diagnostic_once(ledger, binding=binding, adapter=adapter, artifact_directory=out / "result",
+                    next_binding_factory=lambda _: _binding("e" * 64), actual_enabled=True)
+            except v20.LedgerError as exc:
+                assert str(exc) == "spawn_reservation_invalid"
+            else:
+                raise AssertionError("lifecycle continued with an unreachable remote")
+            assert popen.call_count == 0 and run.call_count == 0
+        remote.mode = None
+        assert remote.pushes == 0 and len(ledger._read_local()["records"]) == 2
+        cases += 1
+
+        # M-1(1): real _fixed_config (no mock).
+        art = root / "cfg-artifact"; art.mkdir()
+        (art / "config.json").write_bytes(v20.canonical_bytes({"seed_commit_pin": None, "k": 1}))
+        assert v20._fixed_config({"artifact_root": str(art)}) == {"seed_commit_pin": None, "k": 1}
+        cases += 1
+        bad_cases = {"invalid-json": b"{", "not-dict": b"[]\n", "duplicate-key": b'{"a":1,"a":2}'}
+        for label, payload in bad_cases.items():
+            d = root / f"cfg-{label}"; d.mkdir(); (d / "config.json").write_bytes(payload)
+            for binding_arg in ({"artifact_root": str(d)},):
+                try:
+                    v20._fixed_config(binding_arg)
+                except v20.LedgerError as exc:
+                    assert str(exc) == "fixed_cli_binding_invalid", (label, str(exc))
+                else:
+                    raise AssertionError(f"bad config accepted: {label}")
+            cases += 1
+        (root / "cfg-empty").mkdir()
+        for label, binding_arg in (("missing-file", {"artifact_root": str(root / "cfg-empty")}),
+                                   ("missing-key", {}), ("wrong-type", {"artifact_root": None})):
+            try:
+                v20._fixed_config(binding_arg)
+            except v20.LedgerError as exc:
+                assert str(exc) == "fixed_cli_binding_invalid", (label, str(exc))
+            else:
+                raise AssertionError(f"unreadable config accepted: {label}")
+            cases += 1
+
+        # M-1(2): real _fixed_ledger passes the config values (pin, repository, ledger directory) through.
+        seen = {}
+        class StubRemote:
+            def __init__(self, repo, **kwargs):
+                seen["remote"] = (repo, kwargs)
+        class StubLedger:
+            def __init__(self, directory, remote):
+                seen["ledger"] = (directory, remote)
+        with patch.object(v20, "GitRemote", StubRemote), patch.object(v20, "GlobalLedger", StubLedger):
+            produced = v20._fixed_ledger({"repository_path": "/fixture/repo", "seed_commit_pin": "b" * 40,
+                                          "global_ledger_directory": "/fixture/ledger"})
+        assert isinstance(produced, StubLedger)
+        assert seen["remote"] == (Path("/fixture/repo"), {"seed_commit_pin": "b" * 40})
+        assert seen["ledger"][0] == Path("/fixture/ledger") and isinstance(seen["ledger"][1], StubRemote)
+        cases += 1
+
+        # M-1: end to end through the real _fixed_config + _fixed_ledger + GitRemote on a local bare remote.
+        bare = root / "wired-remote.git"; repo = root / "wired-client"
+        subprocess.run(["git", "init", "--bare", "--initial-branch=main", str(bare)], check=True, capture_output=True)
+        repo.mkdir()
+        for args in (["init", "--initial-branch=main"], ["config", "user.name", "P5 Fixture"],
+                     ["config", "user.email", "p5-fixture-local"], ["remote", "add", "origin", str(bare)]):
+            subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+        history = [dict(x, type="historical_attempt") for x in v20.HISTORICAL]
+        seed = v20.canonical_bytes({"schema": 1, "records": history})
+        first = v20.GitRemote(repo).push_ff(None, seed)
+        artifact_config = v20.strict_json((Path(v20.__file__).resolve().parent / "config.json").read_bytes())
+        codex = artifact_config["codex_binding"]["realpath"]
+        argv = (codex, *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments)
+        def wired(label, *, pin):
+            art_dir = root / f"wired-art-{label}"; art_dir.mkdir()
+            wired_config = dict(artifact_config, seed_commit_pin=pin, repository_path=str(repo),
+                                global_ledger_directory=str(root / f"wired-state-{label}"))
+            (art_dir / "config.json").write_bytes(v20.canonical_bytes(wired_config))
+            binding = dict(_binding("wired-" + label), artifact_root=str(art_dir))
+            return wired_config, binding
+        with patch.object(v20, "validate_binding", lambda b: b), \
+                patch("v20_diagnostic.subprocess.run", side_effect=fake_probe):
+            # unpinned config read from disk by the real _fixed_config
+            wired_config, binding = wired("unpinned", pin=None)
+            adapter = v20.FixedOpenAIDirectCodexAdapter(argv, command_sha256=binding["command_sha256"],
+                binding=binding, residual_scanner=v20._production_residual_scanner)
+            with patch("v20_diagnostic.subprocess.Popen") as popen:
+                try:
+                    adapter.invoke(time.time() + 60, attempt_id="0123456789abcdef0123456789abcdef", binding=binding,
+                                   sandbox_directory=sandbox_dir(), actual_enabled=True)
+                except v20.LedgerError as exc:
+                    assert str(exc) == "seed_commit_pin_missing"
+                else:
+                    raise AssertionError("unpinned config accepted")
+                assert popen.call_count == 0
+            cases += 1
+            # pinned: reserve in the real fixed ledger, spawn once, then refuse a second spawn.
+            wired_config, binding = wired("pinned", pin=first)
+            fixed = v20._fixed_ledger(wired_config)
+            fixed._write_local(history, first)
+            record = fixed.reserve(role="diagnostic", binding=binding)
+            adapter = v20.FixedOpenAIDirectCodexAdapter(argv, command_sha256=binding["command_sha256"],
+                binding=binding, residual_scanner=v20._production_residual_scanner)
+            with patch("v20_diagnostic.subprocess.Popen", side_effect=selective_popen) as popen:
+                try:
+                    invoke(adapter, record, binding, sandbox_dir())
+                except v20.LedgerError as exc:
+                    assert str(exc) == "diagnostic_cli_spawn_failed"
+                else:
+                    raise AssertionError("mock spawn unexpectedly succeeded")
+                assert len(sandbox_spawns(popen)) == 1
+                remote_view = v20.GitRemote(repo, seed_commit_pin=first)
+                assert remote_view.chain(remote_view.ls_remote())[-1]["state"] == "running"
+                try:
+                    invoke(adapter, record, binding, sandbox_dir())
+                except v20.LedgerError as exc:
+                    assert str(exc) == "spawn_reservation_invalid"
+                else:
+                    raise AssertionError("second spawn through the real fixed ledger accepted")
+                assert len(sandbox_spawns(popen)) == 1
+            cases += 1
     return cases
 
 
@@ -1533,6 +1743,7 @@ def canary_classification_tests():
         def inconclusive_cli(*args, **kwargs):
             raise v20.LedgerError("diagnostic_inconclusive")
         with patch.object(v20, "_invoke_diagnostic_cli", inconclusive_cli), \
+                patch.object(v20, "_fixed_config", lambda _b: config), patch.object(v20, "_fixed_ledger", lambda _c: ledger), \
                 patch("v20_diagnostic.subprocess.Popen") as popen:
             try:
                 v20.run_diagnostic_once(ledger, binding=binding, adapter=adapter,
@@ -1555,7 +1766,7 @@ def run_all():
               "formal_gate": gate_tests(), "remote_fixture": git_remote_fixture_tests(),
               "seed_canonical": seed_canonical_tests(), "diagnostic_lifecycle": diagnostic_lifecycle_tests(),
               "production_runner": production_runner_tests(), "spawn_boundary": spawn_boundary_tests(),
-              "profile_negative": profile_negative_tests(), "canary_classification": canary_classification_tests()}
+              "spawn_once_wiring": spawn_once_and_wiring_tests(), "profile_negative": profile_negative_tests(), "canary_classification": canary_classification_tests()}
     return counts
 
 

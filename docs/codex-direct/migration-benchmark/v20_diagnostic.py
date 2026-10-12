@@ -1211,7 +1211,10 @@ _SPAWN_TOKEN = object()
 
 def _fixed_config(binding):
     """Immutable generated config of the verified artifact root bound to this reservation."""
-    config = strict_json((Path(binding["artifact_root"]) / "config.json").read_bytes())
+    try:
+        config = strict_json((Path(binding["artifact_root"]) / "config.json").read_bytes())
+    except (OSError, KeyError, TypeError, LedgerError):
+        raise LedgerError("fixed_cli_binding_invalid") from None
     if type(config) is not dict:
         raise LedgerError("fixed_cli_binding_invalid")
     return config
@@ -1223,12 +1226,9 @@ def _fixed_ledger(config):
     return GlobalLedger(Path(config["global_ledger_directory"]), remote)
 
 
-def _authorize_spawn(argv, *, deadline_epoch, attempt_id, binding):
-    """Process-boundary check: caller booleans and ID syntax are never launch authority.
-
-    Re-reads the immutable config (seed pin + enable) and matches the attempt against a
-    remote-verified `running` diagnostic reservation of the fixed global ledger.
-    """
+def _spawn_context(argv, binding):
+    """Immutable-config + fixed-ledger/remote verification shared by the pre-reserve check and the
+    process boundary. Returns (binding, fixed ledger, remote-verified records)."""
     try:
         binding = validate_binding(binding)
         config = _fixed_config(binding)
@@ -1244,15 +1244,47 @@ def _authorize_spawn(argv, *, deadline_epoch, attempt_id, binding):
                 or config.get("command_sha256") != binding["command_sha256"]
                 or runner_command_sha256(argv[0]) != binding["command_sha256"]):
             raise LedgerError("fixed_cli_binding_invalid")
-        if type(attempt_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", attempt_id):
-            raise LedgerError("spawn_reservation_invalid")
+        # The executable that will be exec'd must still be the one bound at artifact build/verify time.
+        try:
+            info = os.lstat(argv[0])
+            identity = (info.st_dev, info.st_ino, info.st_size, stat.S_IMODE(info.st_mode), info.st_ctime_ns)
+            bound = (codex["device"], codex["inode"], codex["size"], codex["mode"], codex["ctime_ns"])
+        except (OSError, KeyError):
+            raise LedgerError("fixed_cli_binding_invalid") from None
+        if not stat.S_ISREG(info.st_mode) or identity != bound:
+            raise LedgerError("fixed_cli_binding_invalid")
         ledger = _fixed_ledger(config)
         _, records = ledger._verify_remote(ledger._read_local())
+        return binding, ledger, records
+    except LedgerError:
+        raise
+    except Exception:
+        raise LedgerError("spawn_reservation_invalid") from None
+
+
+def _preflight_spawn_authority(argv, binding):
+    """Same remote check as the boundary, run before reserve(): an unreachable or inconsistent
+    ledger/remote stops here without consuming the only diagnostic slot."""
+    _spawn_context(argv, binding)
+
+
+def _authorize_spawn(argv, *, deadline_epoch, attempt_id, binding):
+    """Process-boundary check: caller booleans and ID syntax are never launch authority.
+
+    Matches the attempt against a remote-verified `reserved` diagnostic reservation of the fixed
+    global ledger and returns the one-shot "spawned" transition. The caller invokes it immediately
+    before Popen: it makes reserved -> running by remote FF push + ls-remote, so a second
+    invocation of the same reservation (even after a failed spawn) is refused as not `reserved`.
+    """
+    try:
+        binding, ledger, records = _spawn_context(argv, binding)
+        if type(attempt_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", attempt_id):
+            raise LedgerError("spawn_reservation_invalid")
         matches = [r for r in records[2:] if r.get("id") == attempt_id]
         if len(matches) != 1 or len(records) != 3:
             raise LedgerError("spawn_reservation_invalid")
         record, now = matches[0], time.time()
-        if (record.get("role") != "diagnostic" or record.get("state") != "running" or "ended_epoch" in record
+        if (record.get("role") != "diagnostic" or record.get("state") != "reserved" or "ended_epoch" in record
                 or record.get("binding") != binding or record.get("binding_sha256") != binding_digest(binding)
                 or record.get("fingerprint") != binding["fingerprint"]
                 or type(deadline_epoch) not in (int, float) or record.get("deadline_epoch") != deadline_epoch
@@ -1262,6 +1294,10 @@ def _authorize_spawn(argv, *, deadline_epoch, attempt_id, binding):
         raise
     except Exception:
         raise LedgerError("spawn_reservation_invalid") from None
+
+    def mark_spawned():
+        ledger.mark_running(attempt_id, binding=binding)
+    return mark_spawned
 
 
 def _write_private_new(path: Path, data: bytes, mode=0o600):
@@ -1273,7 +1309,7 @@ def _write_private_new(path: Path, data: bytes, mode=0o600):
 def _invoke_diagnostic_cli(argv, *, deadline_epoch, attempt_id, binding, sandbox_directory):
     if type(argv) is not tuple or argv[1:] != _FIXED_ARGUMENTS:
         raise LedgerError("fixed_cli_binding_invalid")
-    _authorize_spawn(argv, deadline_epoch=deadline_epoch, attempt_id=attempt_id, binding=binding)
+    mark_spawned = _authorize_spawn(argv, deadline_epoch=deadline_epoch, attempt_id=attempt_id, binding=binding)
     try:
         sandbox_info = Path(sandbox_directory).lstat()
         sandbox_ok = stat.S_ISDIR(sandbox_info.st_mode) and sandbox_info.st_uid == os.getuid()
@@ -1317,7 +1353,7 @@ def _invoke_diagnostic_cli(argv, *, deadline_epoch, attempt_id, binding, sandbox
         residual_scanner=_production_residual_scanner, cwd=sandbox_directory,
         sandbox_directory=sandbox_directory,
         stdin_data=(_DIAGNOSTIC_PROMPT + canary_command + "\n").encode("utf-8"), env=process_env,
-        _spawn_token=_SPAWN_TOKEN)
+        _spawn_token=_SPAWN_TOKEN, _pre_spawn=mark_spawned)
     if (result["timed_out"] or not result["child_reaped"] or not result["residual_verified"]
             or result["returncode"] != 0 or result["stderr"] or _tree_fingerprint(sandbox_directory) != before_tree):
         raise LedgerError("diagnostic_cli_failed")
@@ -1437,7 +1473,7 @@ def _verify_adapter_seal(adapter, binding):
 
 
 def run_process_group(argv, *, deadline_epoch, residual_scanner, cwd=None, sandbox_directory=None,
-                      stdin_data=None, env=None, _spawn_token=None):
+                      stdin_data=None, env=None, _spawn_token=None, _pre_spawn=None):
     """Run one fixed command in a new process group; keep all child output in memory."""
     if type(argv) not in (tuple, list) or not argv or any(type(x) is not str for x in argv):
         raise LedgerError("fixed_cli_binding_invalid")
@@ -1456,6 +1492,10 @@ def run_process_group(argv, *, deadline_epoch, residual_scanner, cwd=None, sandb
     if remaining <= 0:
         return {"returncode": -1, "stdout": b"", "stderr": b"", "timed_out": True,
                 "child_reaped": True, "residual_verified": False}
+    if _pre_spawn is not None and _spawn_token is _SPAWN_TOKEN:
+        # Once-per-reservation "spawned" mark (remote FF push + ls-remote) immediately before Popen.
+        # Whatever happens next (spawn failure, timeout) the reservation can never spawn again.
+        _pre_spawn()
     try:
         child = subprocess.Popen(contained_argv, stdin=subprocess.PIPE if stdin_data is not None else subprocess.DEVNULL,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -1577,11 +1617,14 @@ def run_diagnostic_once(ledger: GlobalLedger, *, binding: dict, adapter, artifac
     if (not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_uid != os.getuid()
             or stat.S_IMODE(parent_info.st_mode) != 0o700):
         raise LedgerError("artifact_directory_identity_invalid")
+    # Same remote/config check as the spawn boundary, before anything is consumed: a transient or
+    # inconsistent remote stops here and leaves the only diagnostic slot unreserved.
+    _preflight_spawn_authority(adapter.argv, binding)
     record = ledger.reserve(role="diagnostic", binding=binding)
     attempt_id = record["id"]
     try:
-        # reserve() returns only after remote FF push and ls-remote confirmation.
-        ledger.mark_running(attempt_id, binding=binding)
+        # reserve() returns only after remote FF push and ls-remote confirmation. The reserved ->
+        # running ("spawned") transition is made once, inside the spawn boundary right before Popen.
         before_tree = _tree_fingerprint(parent)
         with tempfile.TemporaryDirectory(prefix="p5-v20-diagnostic-", dir=Path(artifact_directory).parent) as sandbox:
             outcome = adapter.invoke(record["deadline_epoch"], attempt_id=attempt_id, binding=binding,
@@ -1790,5 +1833,6 @@ def fixed_error(error: Exception) -> str:
                "diagnostic_path_value_invalid", "diagnostic_unknown_value_invalid", "diagnostic_report_required",
                "invocation_timeout", "artifact_bundle_input_invalid", "artifact_bundle_schema_invalid",
                "artifact_directory_identity_invalid", "ledger_record_schema_invalid", "ledger_record_value_invalid",
-               "diagnostic_environment_fit_inconsistent"}
+               "diagnostic_environment_fit_inconsistent", "spawn_reservation_invalid",
+               "fixed_cli_binding_invalid", "host_containment_unavailable"}
     return code if code in allowed else "internal_error"
