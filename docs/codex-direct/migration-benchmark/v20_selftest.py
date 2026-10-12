@@ -829,7 +829,7 @@ def diagnostic_lifecycle_tests():
     production_binding = _binding()
     production_binding["command_sha256"] = v20.sha256(v20.canonical_bytes(list(argv)))
     production = v20.FixedOpenAIDirectCodexAdapter(argv, command_sha256=production_binding["command_sha256"],
-        binding=production_binding, residual_scanner=lambda *_: True)
+        binding=production_binding, residual_scanner=v20._production_residual_scanner)
     try:
         production.invoke(time.time()+30, attempt_id=TRUSTED_ID, binding=production_binding,
                           sandbox_directory=Path("/private/tmp"))
@@ -843,12 +843,95 @@ def diagnostic_lifecycle_tests():
             v20.FixedOpenAIDirectCodexAdapter(forbidden,
                 command_sha256=v20.sha256(v20.canonical_bytes(list(forbidden))),
                 binding=dict(production_binding, command_sha256=v20.sha256(v20.canonical_bytes(list(forbidden)))),
-                residual_scanner=lambda *_: True)
+                residual_scanner=v20._production_residual_scanner)
         except v20.LedgerError:
             pass
         else:
             raise AssertionError("alternate route/retry command accepted")
         cases += 1
+
+    # Adapter sealing attacks must fail before any remote reservation or callback.
+    def sealed_rejection(label, factory):
+        with tempfile.TemporaryDirectory(prefix="p5-v20-adapter-seal-") as td:
+            root = Path(td); remote = FakeRemote(); ledger = v20.GlobalLedger(root / "ledger", remote); _seed_local(ledger, remote)
+            binding = dict(production_binding)
+            counter = {"calls": 0}
+            candidate = factory(binding, counter)
+            before_head = remote.ls_remote()
+            try:
+                v20.run_diagnostic_once(ledger, binding=binding, adapter=candidate,
+                    artifact_directory=root / "out", next_binding_factory=lambda _: _binding("e"*64))
+            except v20.LedgerError:
+                pass
+            else:
+                raise AssertionError(f"adapter seal attack accepted: {label}")
+            assert counter["calls"] == 0
+            assert len(ledger._read_local()["records"]) == 2
+            assert remote.ls_remote() == before_head
+            assert not list(root.rglob("*sentinel*"))
+    def adapter_for(binding, counter):
+        command = ("/opt/homebrew/Caskroom/codex/0.162.1/bin/codex", *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments)
+        cmdhash = v20.sha256(v20.canonical_bytes(list(command)))
+        binding["command_sha256"] = cmdhash
+        obj = v20.FixedOpenAIDirectCodexAdapter(command, command_sha256=cmdhash, binding=binding,
+                                                residual_scanner=v20._production_residual_scanner)
+        return obj
+    class OverrideAdapter(v20.FixedOpenAIDirectCodexAdapter):
+        def invoke(self, *args, **kwargs):
+            raise AssertionError("subclass callback executed")
+    def subclass_factory(binding, counter):
+        base = adapter_for(binding, counter)
+        obj = object.__new__(OverrideAdapter)
+        for field in ("_argv", "_binding_bytes", "_command_sha256", "_profile_sha256", "_root_bytes"):
+            object.__setattr__(obj, field, getattr(base, field))
+        return obj
+    sealed_rejection("subclass override", subclass_factory); cases += 1
+    def instance_invoke_factory(binding, counter):
+        obj = adapter_for(binding, counter)
+        try:
+            object.__setattr__(obj, "invoke", lambda *a, **k: counter.__setitem__("calls", counter["calls"] + 1))
+        except (AttributeError, TypeError, v20.LedgerError):
+            pass
+        else:
+            raise AssertionError("instance invoke monkeypatch accepted")
+        object.__setattr__(obj, "_command_sha256", "0"*64)
+        return obj
+    sealed_rejection("instance invoke replacement", instance_invoke_factory); cases += 1
+    def class_invoke_factory(binding, counter):
+        obj = adapter_for(binding, counter)
+        type.__setattr__(v20.FixedOpenAIDirectCodexAdapter, "invoke",
+                         lambda *a, **k: counter.__setitem__("calls", counter["calls"] + 1))
+        return obj
+    try:
+        sealed_rejection("class invoke replacement", class_invoke_factory); cases += 1
+    finally:
+        type.__setattr__(v20.FixedOpenAIDirectCodexAdapter, "invoke", v20._FIXED_ADAPTER_INVOKE)
+    def actual_false_factory(binding, counter):
+        obj = adapter_for(binding, counter)
+        # Bypass Python's metaclass guard to model hostile in-process tampering; outer check must catch it.
+        type.__setattr__(v20.FixedOpenAIDirectCodexAdapter, "actual_enabled", False)
+        return obj
+    try:
+        sealed_rejection("class actual_enabled spoof", actual_false_factory); cases += 1
+    finally:
+        type.__setattr__(v20.FixedOpenAIDirectCodexAdapter, "actual_enabled", True)
+    def instance_actual_factory(binding, counter):
+        obj = adapter_for(binding, counter)
+        try: object.__setattr__(obj, "actual_enabled", False)
+        except (AttributeError, TypeError, v20.LedgerError): pass
+        else: raise AssertionError("instance actual_enabled spoof accepted")
+        object.__setattr__(obj, "_command_sha256", "0"*64)
+        return obj
+    sealed_rejection("instance actual_enabled spoof", instance_actual_factory); cases += 1
+    def argv_tamper_factory(binding, counter):
+        obj = adapter_for(binding, counter); object.__setattr__(obj, "_argv", ("/usr/bin/env", "vercel")); return obj
+    sealed_rejection("argv replacement", argv_tamper_factory); cases += 1
+    def profile_tamper_factory(binding, counter):
+        obj = adapter_for(binding, counter); object.__setattr__(obj, "_profile_sha256", "0"*64); return obj
+    sealed_rejection("profile replacement", profile_tamper_factory); cases += 1
+    def root_tamper_factory(binding, counter):
+        obj = adapter_for(binding, counter); object.__setattr__(obj, "_root_bytes", v20.canonical_bytes({"realpath": "/private/tmp/changed", "device": 1, "inode": 2})); return obj
+    sealed_rejection("root identity replacement", root_tamper_factory); cases += 1
 
     # End-to-end synthetic reservations consume their slot on escape denial and timeout.
     for mode in ("escape", "timeout"):

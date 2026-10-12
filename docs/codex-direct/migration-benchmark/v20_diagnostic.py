@@ -1060,32 +1060,111 @@ class GlobalLedger:
         return True
 
 
-class FixedOpenAIDirectCodexAdapter:
-    """Production adapter shell. It accepts only its immutable bound CLI spec and stays disabled here."""
-    actual_enabled = False
+class _AdapterSealMeta(type):
+    def __setattr__(cls, name, value):
+        if getattr(cls, "_class_sealed", False):
+            raise LedgerError("fixed_cli_binding_invalid")
+        super().__setattr__(name, value)
+
+
+class FixedOpenAIDirectCodexAdapter(metaclass=_AdapterSealMeta):
+    """A sealed route descriptor; readiness is separate from the global disabled-call gate."""
+    __slots__ = ("_argv", "_binding_bytes", "_command_sha256", "_profile_sha256", "_root_bytes")
+    actual_enabled = True
     transport = "OpenAI direct"
     fixed_arguments = ("exec", "--ephemeral", "--sandbox", "read-only", "--json")
+    _class_sealed = False
 
     def __init__(self, argv, *, command_sha256, binding, residual_scanner):
-        self.binding = validate_binding(binding)
-        self.argv = tuple(argv)
-        self.residual_scanner = residual_scanner
-        if (self.transport != "OpenAI direct" or not self.argv or not os.path.isabs(self.argv[0])
-                or os.path.realpath(self.argv[0]) != self.argv[0] or not callable(residual_scanner)
-                or Path(self.argv[0]).name != "codex"
-                or self.argv[1:] != self.fixed_arguments
-                or sha256(canonical_bytes(list(self.argv))) != command_sha256
-                or command_sha256 != self.binding["command_sha256"]):
+        validated = validate_binding(binding)
+        args = tuple(argv)
+        if (not args or not os.path.isabs(args[0]) or os.path.realpath(args[0]) != args[0]
+                or Path(args[0]).name != "codex" or args[1:] != self.fixed_arguments
+                or command_sha256 != validated["command_sha256"]
+                or sha256(canonical_bytes(list(args))) != command_sha256
+                or residual_scanner is not _production_residual_scanner):
             raise LedgerError("fixed_cli_binding_invalid")
+        object.__setattr__(self, "_argv", args)
+        object.__setattr__(self, "_binding_bytes", canonical_bytes(validated))
+        object.__setattr__(self, "_command_sha256", command_sha256)
+        object.__setattr__(self, "_profile_sha256", SANDBOX_PROFILE_SHA256)
+        object.__setattr__(self, "_root_bytes", canonical_bytes(validated["root_identity"]))
+
+    def __setattr__(self, name, value):
+        raise LedgerError("fixed_cli_binding_invalid")
+
+    @property
+    def argv(self):
+        return self._argv
+
+    @property
+    def binding(self):
+        return strict_json(self._binding_bytes)
+
+    @property
+    def profile_sha256(self):
+        return self._profile_sha256
 
     def invoke(self, deadline_epoch, *, attempt_id, binding, sandbox_directory):
         if (binding != self.binding or type(attempt_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", attempt_id)):
             raise LedgerError("fixed_cli_binding_invalid")
-        if not self.actual_enabled:
+        # The adapter can be structurally ready while actual model execution is globally disabled.
+        if not ACTUAL_INVOCATIONS_ENABLED:
             raise LedgerError("actual_invocation_disabled")
-        result = run_process_group(self.argv, deadline_epoch=deadline_epoch, residual_scanner=self.residual_scanner,
+        result = run_process_group(self.argv, deadline_epoch=deadline_epoch,
+                                   residual_scanner=_production_residual_scanner,
                                    cwd=sandbox_directory, sandbox_directory=sandbox_directory)
         return {**result, "answer": b"", "raw": b""}
+
+
+def _production_residual_scanner(pid, pgid):
+    """Fail closed unless a complete process inventory confirms both identifiers absent."""
+    try:
+        result = subprocess.run(("/bin/ps", "-axo", "pid=,pgid="), stdin=subprocess.DEVNULL,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3.0, check=False)
+        if result.returncode != 0 or result.stderr or not result.stdout.strip():
+            return False
+        for row in result.stdout.decode("ascii", "strict").splitlines():
+            fields = row.split()
+            if len(fields) != 2 or not all(value.isdigit() for value in fields):
+                return False
+            if int(fields[0]) == pid or int(fields[1]) == pgid:
+                return False
+        return True
+    except (OSError, UnicodeError, subprocess.TimeoutExpired, ValueError):
+        return False
+
+
+ACTUAL_INVOCATIONS_ENABLED = False
+_FIXED_ADAPTER_INVOKE = FixedOpenAIDirectCodexAdapter.invoke
+_ADAPTER_READY = True
+_FIXED_ARGUMENTS = ("exec", "--ephemeral", "--sandbox", "read-only", "--json")
+_FIXED_TRANSPORT = "OpenAI direct"
+type.__setattr__(FixedOpenAIDirectCodexAdapter, "_class_sealed", True)
+
+
+def _verify_adapter_seal(adapter, binding):
+    """Verify all adapter invariants outside the callback boundary and before reservation."""
+    if type(adapter) is not FixedOpenAIDirectCodexAdapter or hasattr(adapter, "__dict__"):
+        raise LedgerError("fixed_cli_binding_invalid")
+    cls = type(adapter)
+    raw_invoke = cls.__dict__.get("invoke")
+    try:
+        bound = adapter.invoke
+    except Exception:
+        raise LedgerError("fixed_cli_binding_invalid") from None
+    if (raw_invoke is not _FIXED_ADAPTER_INVOKE or getattr(bound, "__func__", None) is not _FIXED_ADAPTER_INVOKE
+            or cls.actual_enabled is not _ADAPTER_READY or adapter.actual_enabled is not _ADAPTER_READY
+            or cls.fixed_arguments != _FIXED_ARGUMENTS or cls.transport != _FIXED_TRANSPORT
+            or adapter.transport != _FIXED_TRANSPORT
+            or adapter.argv[1:] != _FIXED_ARGUMENTS
+            or Path(adapter.argv[0]).name != "codex"
+            or adapter._command_sha256 != binding["command_sha256"]
+            or sha256(canonical_bytes(list(adapter.argv))) != adapter._command_sha256
+            or adapter._profile_sha256 != SANDBOX_PROFILE_SHA256
+            or adapter._root_bytes != canonical_bytes(binding["root_identity"])
+            or adapter.binding != binding):
+        raise LedgerError("fixed_cli_binding_invalid")
 
 
 def run_process_group(argv, *, deadline_epoch, residual_scanner, cwd=None, sandbox_directory=None):
@@ -1217,8 +1296,7 @@ def run_diagnostic_once(ledger: GlobalLedger, *, binding: dict, adapter, artifac
                        next_binding_factory):
     """One diagnostic lifecycle. Adapter outputs remain in memory and are never copied verbatim."""
     binding = validate_binding(binding)
-    if not isinstance(adapter, FixedOpenAIDirectCodexAdapter):
-        raise LedgerError("fixed_cli_binding_invalid")
+    _verify_adapter_seal(adapter, binding)
     parent = Path(artifact_directory).parent
     parent_info = parent.lstat()
     if (not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_uid != os.getuid()
