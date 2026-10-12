@@ -60,7 +60,7 @@ def build():
     py_binding = bind(Path(py))
     shell_binding = bind(Path("/bin/zsh").resolve(strict=True), trusted_system=True)
     codex_binding = harness_fingerprint.compute_codex_executable_binding()
-    command_sha256 = hashlib.sha256(v20.canonical_bytes([codex_binding["realpath"], *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments])).hexdigest()
+    command_sha256 = v20.runner_command_sha256(codex_binding["realpath"])
     sandbox_binding = bind(Path(v20.SANDBOX_EXEC).resolve(strict=True), trusted_system=True)
     codex_home = CACHE / "probe-v20-diagnostic" / "version-home"
     codex_home.mkdir(parents=True, mode=0o700, exist_ok=True)

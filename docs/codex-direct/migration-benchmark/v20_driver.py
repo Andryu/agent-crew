@@ -99,7 +99,7 @@ def load_manifest(*, verify_cli=True):
             or config["sandbox_binding"] != file_binding(Path("/usr/bin/sandbox-exec"), trusted_system=True)
             or config["sandbox_profile_sha256"] != v20.SANDBOX_PROFILE_SHA256
             or config["binding_spec_sha256"] != v20.BINDING_SPEC_SHA256
-            or config["command_sha256"] != v20.sha256(v20.canonical_bytes([config["codex_binding"]["realpath"], *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments]))):
+            or config["command_sha256"] != v20.runner_command_sha256(config["codex_binding"]["realpath"])):
         raise ValueError
     expected_cache = Path(pwd.getpwuid(os.getuid()).pw_dir) / "Library/Caches/agent-crew-p5-benchmark"
     repository = Path(config["repository_path"])

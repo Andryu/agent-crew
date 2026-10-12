@@ -827,7 +827,7 @@ def diagnostic_lifecycle_tests():
         cases += 1
     argv = ("/opt/homebrew/Caskroom/codex/0.162.1/bin/codex", *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments)
     production_binding = _binding()
-    production_binding["command_sha256"] = v20.sha256(v20.canonical_bytes(list(argv)))
+    production_binding["command_sha256"] = v20.runner_command_sha256(argv[0])
     production = v20.FixedOpenAIDirectCodexAdapter(argv, command_sha256=production_binding["command_sha256"],
         binding=production_binding, residual_scanner=v20._production_residual_scanner)
     try:
@@ -871,7 +871,7 @@ def diagnostic_lifecycle_tests():
             assert not list(root.rglob("*sentinel*"))
     def adapter_for(binding, counter):
         command = ("/opt/homebrew/Caskroom/codex/0.162.1/bin/codex", *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments)
-        cmdhash = v20.sha256(v20.canonical_bytes(list(command)))
+        cmdhash = v20.runner_command_sha256(command[0])
         binding["command_sha256"] = cmdhash
         obj = v20.FixedOpenAIDirectCodexAdapter(command, command_sha256=cmdhash, binding=binding,
                                                 residual_scanner=v20._production_residual_scanner)
@@ -1057,6 +1057,30 @@ def production_runner_tests():
     except v20.LedgerError: pass
     else: raise AssertionError("additional tool event accepted")
     cases += 2
+
+    # The sandbox profile itself is a fixed runner argv value and is included in
+    # the command binding, alongside Codex's independent read-only sandbox flag.
+    with tempfile.TemporaryDirectory(prefix="p5-v20-fixed-profile-argv-") as td:
+        sandbox = Path(td) / "sandbox"; sandbox.mkdir(mode=0o700)
+        codex = "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex"
+        profile = v20.SANDBOX_PROFILE_TEMPLATE.format(directory=str(sandbox.resolve(strict=True)))
+        expected = [v20.SANDBOX_EXEC, "-p", profile, "/usr/bin/true"]
+        with patch("v20_diagnostic.subprocess.run", return_value=subprocess.CompletedProcess(expected, 0, b"", b"")) as probe:
+            actual = v20.sandboxed_argv(("/usr/bin/true",), sandbox)
+        assert actual == expected
+        assert probe.call_args.args[0] == expected
+        bound_sandbox = str(sandbox.resolve(strict=True))
+        write_rule = '(allow file-write* (subpath "' + bound_sandbox + '"))'
+        assert "(deny default)" in profile and write_rule in profile
+        assert "(allow network-outbound)" in profile and "(allow file-write*)" not in profile.replace(write_rule, "")
+        spec = v20.runner_argv_spec(codex)
+        assert spec == (v20.SANDBOX_EXEC, "-p", v20.SANDBOX_PROFILE_TEMPLATE,
+                        codex, *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments)
+        assert spec[1:3] == ("-p", v20.SANDBOX_PROFILE_TEMPLATE)
+        assert "--sandbox" in spec and spec[spec.index("--sandbox") + 1] == "read-only"
+        assert v20.runner_command_sha256(codex) == v20.sha256(v20.canonical_bytes(list(spec)))
+        assert v20.runner_command_sha256(codex) != v20.sha256(v20.canonical_bytes(list(spec[3:])))
+    cases += 1
     return cases
 
 

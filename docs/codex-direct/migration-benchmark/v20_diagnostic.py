@@ -114,23 +114,14 @@ def sandboxed_argv(argv, sandbox_directory: Path):
         if type(argv) not in (tuple, list) or not argv or not os.path.isabs(argv[0]):
             raise LedgerError("fixed_cli_binding_invalid")
         # sandbox-exec can exist yet be disabled by the host's outer sandbox.
-        # Verify enforcement with a harmless fixed utility before any target starts.
-        fd, profile_name = tempfile.mkstemp(prefix=".p5-v20-profile-", suffix=".sb", dir=sandbox)
-        os.fchmod(fd, 0o400)
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(rendered.encode("utf-8")); stream.flush(); os.fsync(stream.fileno())
-        profile_path = Path(profile_name)
-        try:
-            probe = subprocess.run([SANDBOX_EXEC, "-f", str(profile_path), "/usr/bin/true"],
-                                   stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE, timeout=5, close_fds=True)
-        except Exception:
-            profile_path.unlink(missing_ok=True)
-            raise
+        # The exact profile is an argv value (-p), not an unbound temporary file.
+        # Check the profile with a harmless fixed utility before any target starts.
+        probe = subprocess.run([SANDBOX_EXEC, "-p", rendered, "/usr/bin/true"],
+                               stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, timeout=5, close_fds=True)
         if probe.returncode != 0 or probe.stdout or probe.stderr:
-            profile_path.unlink(missing_ok=True)
             raise LedgerError("host_containment_unavailable")
-        return [SANDBOX_EXEC, "-f", str(profile_path), *argv]
+        return [SANDBOX_EXEC, "-p", rendered, *argv]
     except LedgerError:
         raise
     except Exception:
@@ -1088,7 +1079,7 @@ class FixedOpenAIDirectCodexAdapter(metaclass=_AdapterSealMeta):
         if (not args or not os.path.isabs(args[0]) or os.path.realpath(args[0]) != args[0]
                 or Path(args[0]).name != "codex" or args[1:] != self.fixed_arguments
                 or command_sha256 != validated["command_sha256"]
-                or sha256(canonical_bytes(list(args))) != command_sha256
+                or command_sha256 != runner_command_sha256(args[0])
                 or residual_scanner is not _production_residual_scanner):
             raise LedgerError("fixed_cli_binding_invalid")
         object.__setattr__(self, "_argv", args)
@@ -1121,6 +1112,18 @@ class FixedOpenAIDirectCodexAdapter(metaclass=_AdapterSealMeta):
         result, report = _invoke_diagnostic_cli(self.argv, deadline_epoch=deadline_epoch,
             attempt_id=attempt_id, binding=binding, sandbox_directory=Path(sandbox_directory))
         return {**result, "stdout": canonical_bytes(report), "answer": b"", "raw": b""}
+
+
+def runner_argv_spec(codex_executable):
+    """Canonical fixed argv: sandbox profile setting, then fixed Codex direct route."""
+    if type(codex_executable) is not str or not os.path.isabs(codex_executable):
+        raise LedgerError("fixed_cli_binding_invalid")
+    return (SANDBOX_EXEC, "-p", SANDBOX_PROFILE_TEMPLATE, codex_executable,
+            *FixedOpenAIDirectCodexAdapter.fixed_arguments)
+
+
+def runner_command_sha256(codex_executable):
+    return sha256(canonical_bytes(list(runner_argv_spec(codex_executable))))
 
 
 def _production_residual_scanner(pid, pgid):
@@ -1343,7 +1346,7 @@ def _verify_adapter_seal(adapter, binding):
             or adapter.argv[1:] != _FIXED_ARGUMENTS
             or Path(adapter.argv[0]).name != "codex"
             or adapter._command_sha256 != binding["command_sha256"]
-            or sha256(canonical_bytes(list(adapter.argv))) != adapter._command_sha256
+            or runner_command_sha256(adapter.argv[0]) != adapter._command_sha256
             or adapter._profile_sha256 != SANDBOX_PROFILE_SHA256
             or adapter._root_bytes != canonical_bytes(binding["root_identity"])
             or adapter.binding != binding):
@@ -1362,7 +1365,6 @@ def run_process_group(argv, *, deadline_epoch, residual_scanner, cwd=None, sandb
     if env is not None and (type(env) is not dict or any(type(k) is not str or type(v) is not str for k, v in env.items())):
         raise LedgerError("fixed_cli_binding_invalid")
     contained_argv = sandboxed_argv(argv, Path(sandbox_directory))
-    profile_path = Path(contained_argv[2])
     remaining = deadline_epoch - time.time()
     if remaining <= 0:
         return {"returncode": -1, "stdout": b"", "stderr": b"", "timed_out": True,
@@ -1372,7 +1374,6 @@ def run_process_group(argv, *, deadline_epoch, residual_scanner, cwd=None, sandb
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 start_new_session=True, close_fds=True, cwd=cwd, env=env)
     except OSError:
-        profile_path.unlink(missing_ok=True)
         raise LedgerError("diagnostic_cli_spawn_failed") from None
     timed_out = False
     try:
@@ -1405,7 +1406,6 @@ def run_process_group(argv, *, deadline_epoch, residual_scanner, cwd=None, sandb
                 pass
             child.communicate()
         if child.poll() is None:
-            profile_path.unlink(missing_ok=True)
             raise LedgerError("diagnostic_residual_unverified") from None
         try:
             if residual_scanner(child.pid, child.pid) is not True:
@@ -1413,16 +1413,13 @@ def run_process_group(argv, *, deadline_epoch, residual_scanner, cwd=None, sandb
         except LedgerError:
             raise
         except Exception:
-            profile_path.unlink(missing_ok=True)
             raise LedgerError("diagnostic_residual_unverified") from None
-        profile_path.unlink(missing_ok=True)
         raise LedgerError("diagnostic_cli_failed") from None
     reaped = child.poll() is not None
     try:
         residual = residual_scanner(child.pid, child.pid)
     except Exception:
         residual = False
-    profile_path.unlink(missing_ok=True)
     return {"returncode": child.returncode if reaped else -1, "stdout": stdout, "stderr": stderr,
             "timed_out": timed_out, "child_reaped": reaped, "residual_verified": residual is True}
 
