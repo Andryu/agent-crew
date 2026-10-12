@@ -222,27 +222,81 @@ HISTORICAL_RESULT_FILES = (
      "2eecef40bb3b3e7fd5f1d1f6a8e9cc9a2c8f2e2c6e943ec332eadf17ae37089b"))
 
 
-def validate_historical_seed_inputs(base, *, result_paths=None):
+# Original v18/v19 probe ledgers (read-only evidence). Paths are relative to the private
+# benchmark cache `drivers/logs`; the exact bytes are pinned by SHA-256.
+HISTORICAL_LEDGER_FILES = (
+    ("drivers/logs/v18/probe-ledger.json", 18,
+     "6509be19c2ff134ceea57ca9791031cac8e5b9a141bf32a664ecfa69ad47c827"),
+    ("drivers/logs/v19-final12/probe-ledger.json", 19,
+     "e2e3f974bf42db9409ffc5a67bc3b5aff24090f038b99d4e9e435038aaabda87"))
+
+
+def _read_pinned_private_file(path, expected_sha256):
+    """Read one private regular file once, with identity and exact-hash checks. Never writes."""
+    path = Path(path)
+    before = path.lstat()
+    data = path.read_bytes()
+    after = path.lstat()
+    attrs = ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns", "st_mode", "st_uid", "st_nlink")
+    if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or before.st_uid != os.getuid()
+            or stat.S_IMODE(before.st_mode) != 0o600
+            or any(getattr(before, name) != getattr(after, name) for name in attrs)
+            or len(data) != before.st_size or hashlib.sha256(data).hexdigest() != expected_sha256):
+        raise ValueError
+    return data, (before.st_dev, before.st_ino)
+
+
+def validate_historical_ledger_bytes(data, index):
+    """Match one original probe ledger to the fixed historical reference (identity, state, elapsed)."""
+    import v20_diagnostic as v20
+    ref = v20.HISTORICAL[index]
+    parsed = v20.strict_json(data)
+    if (type(parsed) is not dict or parsed.get("schema") != 2 or type(parsed.get("schema")) is not int
+            or type(parsed.get("version")) is not int or parsed["version"] != ref["version"]
+            or type(parsed.get("attempts")) is not list or len(parsed["attempts"]) != 1):
+        raise ValueError
+    attempt = parsed["attempts"][0]
+    if (type(attempt) is not dict or attempt.get("id") != ref["id"] or attempt.get("fingerprint") != ref["fingerprint"]
+            or attempt.get("state") != ref["state"] or attempt.get("detail") != "probe_gate_fail"
+            or type(attempt.get("elapsed_seconds")) is not float or attempt["elapsed_seconds"] != ref["elapsed_seconds"]
+            or attempt.get("child_reaped") is not True or attempt.get("residual_verified") is not True):
+        raise ValueError
+    return attempt
+
+
+def validate_historical_seed_inputs(base, *, result_paths=None, ledger_paths=None):
     import v20_diagnostic as v20
     cache = Path(pwd.getpwuid(os.getuid()).pw_dir) / "Library/Caches/agent-crew-p5-benchmark"
     paths = tuple(Path(x) for x in result_paths) if result_paths is not None else tuple(cache / x[0] for x in HISTORICAL_RESULT_FILES)
-    if len(paths) != 2:
+    ledgers = (tuple(Path(x) for x in ledger_paths) if ledger_paths is not None
+               else tuple(cache / x[0] for x in HISTORICAL_LEDGER_FILES))
+    if len(paths) != 2 or len(ledgers) != 2 or len(v20.HISTORICAL) != 2:
         raise ValueError
-    for path, (_, version, fingerprint, result_sha) in zip(paths, HISTORICAL_RESULT_FILES):
-        before = path.lstat()
-        data = path.read_bytes()
-        after = path.lstat()
-        parsed = v20.strict_json(data)
-        identity_before = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns,
-                           before.st_ctime_ns, before.st_mode, before.st_uid, before.st_nlink)
-        identity_after = (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns,
-                          after.st_ctime_ns, after.st_mode, after.st_uid, after.st_nlink)
-        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or before.st_uid != os.getuid()
-                or stat.S_IMODE(before.st_mode) != 0o600 or identity_before != identity_after
-                or len(data) != before.st_size or hashlib.sha256(data).hexdigest() != result_sha
-                or type(parsed) is not dict or parsed.get("schema") != 2 or parsed.get("fingerprint") != fingerprint
-                or parsed.get("passed") is not False or parsed.get("code") != "probe_gate_fail"):
+    # The three fixed tables must describe the same two attempts; result/ledger files are one-to-one.
+    for ref, (rel, version, fingerprint, result_sha), (_, ledger_version, _) in zip(
+            v20.HISTORICAL, HISTORICAL_RESULT_FILES, HISTORICAL_LEDGER_FILES):
+        if (version != ref["version"] or ledger_version != ref["version"] or fingerprint != ref["fingerprint"]
+                or result_sha != ref["result_sha256"] or Path(rel).name != f"probe-{ref['id']}.result.json"):
             raise ValueError
+    identities = set()
+    for index, (path, (_, version, fingerprint, result_sha)) in enumerate(zip(paths, HISTORICAL_RESULT_FILES)):
+        data, identity = _read_pinned_private_file(path, result_sha)
+        parsed = v20.strict_json(data)
+        if (identity in identities or type(parsed) is not dict or parsed.get("schema") != 2
+                or parsed.get("fingerprint") != fingerprint or parsed.get("passed") is not False
+                or parsed.get("code") != "probe_gate_fail"):
+            raise ValueError
+        identities.add(identity)
+    # Original ledgers are verified before any remote/ledger object exists. The ledger attempt must
+    # cross-reference the already pinned result artifact (fingerprint, failure code).
+    for index, (path, (_, _, ledger_sha)) in enumerate(zip(ledgers, HISTORICAL_LEDGER_FILES)):
+        data, identity = _read_pinned_private_file(path, ledger_sha)
+        attempt = validate_historical_ledger_bytes(data, index)
+        result = v20.strict_json(_read_pinned_private_file(paths[index], HISTORICAL_RESULT_FILES[index][3])[0])
+        if (identity in identities or attempt["fingerprint"] != result["fingerprint"]
+                or attempt["detail"] != result["code"]):
+            raise ValueError
+        identities.add(identity)
     fixture = (base / "v20_seed_fixture.json").read_bytes()
     if hashlib.sha256(fixture).hexdigest() != v20.SEED_SHA256:
         raise ValueError
@@ -250,11 +304,11 @@ def validate_historical_seed_inputs(base, *, result_paths=None):
     return fixture
 
 
-def bootstrap_seed(base, config, *, remote_factory=None, result_paths=None, ledger_root=None):
+def bootstrap_seed(base, config, *, remote_factory=None, result_paths=None, ledger_paths=None, ledger_root=None):
     import v20_diagnostic as v20
     if config["seed_commit_pin"] is not None:
         raise v20.LedgerError("seed_already_pinned")
-    seed_payload = validate_historical_seed_inputs(base, result_paths=result_paths)
+    seed_payload = validate_historical_seed_inputs(base, result_paths=result_paths, ledger_paths=ledger_paths)
     remote = (remote_factory(config) if remote_factory is not None else
               v20.GitRemote(Path(config["repository_path"]), seed_commit_pin=None))
     root = Path(ledger_root) if ledger_root is not None else Path(config["global_ledger_directory"])

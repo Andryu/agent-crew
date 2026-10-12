@@ -113,6 +113,9 @@ def sandboxed_argv(argv, sandbox_directory: Path):
             raise LedgerError("host_containment_profile_mismatch")
         if type(argv) not in (tuple, list) or not argv or not os.path.isabs(argv[0]):
             raise LedgerError("fixed_cli_binding_invalid")
+        # The only profile is the fixed template above; a caller-supplied sandbox-exec/profile is refused.
+        if Path(argv[0]).name == "sandbox-exec":
+            raise LedgerError("host_containment_profile_mismatch")
         # sandbox-exec can exist yet be disabled by the host's outer sandbox.
         # The exact profile is an argv value (-p), not an unbound temporary file.
         # Check the profile with a harmless fixed utility before any target starts.
@@ -1106,6 +1109,8 @@ class FixedOpenAIDirectCodexAdapter(metaclass=_AdapterSealMeta):
     def invoke(self, deadline_epoch, *, attempt_id, binding, sandbox_directory, actual_enabled=False):
         if (binding != self.binding or type(attempt_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", attempt_id)):
             raise LedgerError("fixed_cli_binding_invalid")
+        if not isinstance(sandbox_directory, (str, os.PathLike)):
+            raise LedgerError("host_containment_unavailable")
         # The adapter can be structurally ready while actual model execution is globally disabled.
         if actual_enabled is not True or not ACTUAL_INVOCATIONS_ENABLED:
             raise LedgerError("actual_invocation_disabled")
@@ -1190,13 +1195,73 @@ for k in ("LANG","LC_ALL"):
  if k in env: required_checks[k]=hashlib.sha256(env[k].encode()).hexdigest()==expected["locale_sha256"]
 if "PATH" in env: required_checks["PATH"]=matched!="none"
 runtime={"CODEX_CI":env.get("CODEX_CI")=="1","CODEX_PERMISSION_PROFILE":env.get("CODEX_PERMISSION_PROFILE")=="p5_fixture","CODEX_SANDBOX":env.get("CODEX_SANDBOX")=="seatbelt","CODEX_SANDBOX_NETWORK_DISABLED":env.get("CODEX_SANDBOX_NETWORK_DISABLED")=="1","CODEX_SESSION_ID":re.fullmatch(expected["uuid7_pattern"],env.get("CODEX_SESSION_ID", "")) is not None,"CODEX_THREAD_ID":re.fullmatch(expected["uuid7_pattern"],env.get("CODEX_THREAD_ID", "")) is not None,"CODEX_VERSION":env.get("CODEX_VERSION")==expected["cli_version"],"COLORTERM":env.get("COLORTERM")=="","GH_PAGER":env.get("GH_PAGER")=="cat","GIT_PAGER":env.get("GIT_PAGER")=="cat","LC_CTYPE":env.get("LC_CTYPE")=="C.UTF-8","LOGNAME":env.get("LOGNAME")==pwd.getpwuid(os.getuid()).pw_name,"NO_COLOR":env.get("NO_COLOR")=="1","OLDPWD":env.get("OLDPWD")==expected["cwd"],"PAGER":env.get("PAGER")=="cat","PWD":env.get("PWD")==expected["cwd"],"SHLVL":env.get("SHLVL")=="0","TERM":env.get("TERM")=="dumb","_":env.get("_")==expected["python_executable"]}
-if any(not x for x in required_checks.values()) or not all(runtime.values()) or os.getcwd()!=expected["cwd"]: fit="mismatch"
-else: fit="pass" if not unknown and order=="exact_profile" else "mismatch"
-if fit=="unknown" or order=="malformed" or other>0 or unapproved>1: raise SystemExit(2)
+# Only the PATH profile is classifiable. Any other required/runtime/cwd mismatch has no cause in the fixed schema.
+if (any(not v for k,v in required_checks.items() if k!="PATH") or not all(runtime.values())
+    or os.getcwd()!=expected["cwd"]): raise SystemExit(2)
+fit="pass" if matched!="none" and not unknown and order=="exact_profile" else "mismatch"
+if order=="malformed" or other>0 or unapproved>1: raise SystemExit(2)
 unknown_class="none" if not unknown else "codex_home_only"
 report={"schema":1,"attempt_id":expected["attempt_id"],"fingerprint":expected["fingerprint"],"environment_fit":fit,"path":{"matched_profile":matched,"component_count":len(parts),"unapproved_component_count":unapproved,"order_classification":order},"unknown_keys":{"codex_home_present":codex_home,"classification":unknown_class,"unknown_count":len(unknown),"other_unknown_count":other},"determination":"resolved"}
 print(json.dumps(report,sort_keys=True,separators=(",",":")))
 '''
+
+
+_SPAWN_TOKEN = object()
+
+
+def _fixed_config(binding):
+    """Immutable generated config of the verified artifact root bound to this reservation."""
+    config = strict_json((Path(binding["artifact_root"]) / "config.json").read_bytes())
+    if type(config) is not dict:
+        raise LedgerError("fixed_cli_binding_invalid")
+    return config
+
+
+def _fixed_ledger(config):
+    """The fixed global ledger/remote named by the immutable config, never a caller-supplied object."""
+    remote = GitRemote(Path(config["repository_path"]), seed_commit_pin=config["seed_commit_pin"])
+    return GlobalLedger(Path(config["global_ledger_directory"]), remote)
+
+
+def _authorize_spawn(argv, *, deadline_epoch, attempt_id, binding):
+    """Process-boundary check: caller booleans and ID syntax are never launch authority.
+
+    Re-reads the immutable config (seed pin + enable) and matches the attempt against a
+    remote-verified `running` diagnostic reservation of the fixed global ledger.
+    """
+    try:
+        binding = validate_binding(binding)
+        config = _fixed_config(binding)
+        if ACTUAL_INVOCATIONS_ENABLED is not True or config.get("actual_invocations_enabled") is not True:
+            raise LedgerError("actual_invocation_disabled")
+        pin = config.get("seed_commit_pin")
+        if type(pin) is not str or not re.fullmatch(r"[0-9a-f]{40,64}", pin):
+            raise LedgerError("seed_commit_pin_missing")
+        codex = config.get("codex_binding")
+        if (config.get("remote_budget_ref") != REMOTE_REF or type(codex) is not dict
+                or type(argv) is not tuple or not argv or argv[0] != codex.get("realpath")
+                or argv[1:] != _FIXED_ARGUMENTS
+                or config.get("command_sha256") != binding["command_sha256"]
+                or runner_command_sha256(argv[0]) != binding["command_sha256"]):
+            raise LedgerError("fixed_cli_binding_invalid")
+        if type(attempt_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", attempt_id):
+            raise LedgerError("spawn_reservation_invalid")
+        ledger = _fixed_ledger(config)
+        _, records = ledger._verify_remote(ledger._read_local())
+        matches = [r for r in records[2:] if r.get("id") == attempt_id]
+        if len(matches) != 1 or len(records) != 3:
+            raise LedgerError("spawn_reservation_invalid")
+        record, now = matches[0], time.time()
+        if (record.get("role") != "diagnostic" or record.get("state") != "running" or "ended_epoch" in record
+                or record.get("binding") != binding or record.get("binding_sha256") != binding_digest(binding)
+                or record.get("fingerprint") != binding["fingerprint"]
+                or type(deadline_epoch) not in (int, float) or record.get("deadline_epoch") != deadline_epoch
+                or not record["started_epoch"] <= now < record["deadline_epoch"]):
+            raise LedgerError("spawn_reservation_invalid")
+    except LedgerError:
+        raise
+    except Exception:
+        raise LedgerError("spawn_reservation_invalid") from None
 
 
 def _write_private_new(path: Path, data: bytes, mode=0o600):
@@ -1208,6 +1273,14 @@ def _write_private_new(path: Path, data: bytes, mode=0o600):
 def _invoke_diagnostic_cli(argv, *, deadline_epoch, attempt_id, binding, sandbox_directory):
     if type(argv) is not tuple or argv[1:] != _FIXED_ARGUMENTS:
         raise LedgerError("fixed_cli_binding_invalid")
+    _authorize_spawn(argv, deadline_epoch=deadline_epoch, attempt_id=attempt_id, binding=binding)
+    try:
+        sandbox_info = Path(sandbox_directory).lstat()
+        sandbox_ok = stat.S_ISDIR(sandbox_info.st_mode) and sandbox_info.st_uid == os.getuid()
+    except OSError:
+        sandbox_ok = False
+    if not sandbox_ok:
+        raise LedgerError("host_containment_unavailable")
     if any(sandbox_directory.iterdir()):
         raise LedgerError("diagnostic_fixture_not_empty")
     home = pwd.getpwuid(os.getuid()).pw_dir
@@ -1243,7 +1316,8 @@ def _invoke_diagnostic_cli(argv, *, deadline_epoch, attempt_id, binding, sandbox
     result = run_process_group(argv, deadline_epoch=deadline_epoch,
         residual_scanner=_production_residual_scanner, cwd=sandbox_directory,
         sandbox_directory=sandbox_directory,
-        stdin_data=(_DIAGNOSTIC_PROMPT + canary_command + "\n").encode("utf-8"), env=process_env)
+        stdin_data=(_DIAGNOSTIC_PROMPT + canary_command + "\n").encode("utf-8"), env=process_env,
+        _spawn_token=_SPAWN_TOKEN)
     if (result["timed_out"] or not result["child_reaped"] or not result["residual_verified"]
             or result["returncode"] != 0 or result["stderr"] or _tree_fingerprint(sandbox_directory) != before_tree):
         raise LedgerError("diagnostic_cli_failed")
@@ -1266,7 +1340,7 @@ def _audit_diagnostic_events(raw: bytes, *, canary_command: str, attempt_id: str
         events.append(event)
     if len(events) > 128:
         raise LedgerError("diagnostic_event_audit_failed")
-    thread=turn=ended=False; tool=[]; report_bytes=None; non_tool_ids=set()
+    thread=turn=ended=False; tool=[]; report_bytes=None; non_tool_ids=set(); unresolved=False
     for event in events:
         kind=event["type"]
         if kind == "thread.started":
@@ -1298,6 +1372,11 @@ def _audit_diagnostic_events(raw: bytes, *, canary_command: str, attempt_id: str
             if kind == "item.started":
                 if item.get("status") != "in_progress" or tool: raise LedgerError("diagnostic_event_audit_failed")
                 tool.append(("started", item.get("id")))
+            elif (len(tool)==1 and tool[0][1] == item.get("id") and type(item.get("exit_code")) is int
+                    and item["exit_code"] == 2 and item.get("status") in {"completed", "failed"}):
+                # Fixed canary exit 2: required/runtime/cwd mismatch or unclassifiable cause. No report exists.
+                tool.append(("completed", item.get("id")))
+                unresolved=True
             else:
                 if (len(tool)!=1 or tool[0][1] != item.get("id") or item.get("status") != "completed"
                         or type(item.get("exit_code")) is not int or item["exit_code"] != 0
@@ -1309,6 +1388,10 @@ def _audit_diagnostic_events(raw: bytes, *, canary_command: str, attempt_id: str
             raise LedgerError("diagnostic_event_audit_failed")
         elif kind not in {"reasoning", "agent_message", "todo_list"}:
             raise LedgerError("diagnostic_event_audit_failed")
+    if unresolved:
+        if not (thread and turn and ended and len(tool)==2 and tool[0][0]=="started" and tool[1][0]=="completed"):
+            raise LedgerError("diagnostic_event_audit_failed")
+        raise LedgerError("diagnostic_inconclusive")
     if not (thread and turn and ended and len(tool)==2 and tool[0][0]=="started" and tool[1][0]=="completed" and report_bytes):
         raise LedgerError("diagnostic_event_audit_failed")
     parsed=strict_json(report_bytes)
@@ -1354,9 +1437,13 @@ def _verify_adapter_seal(adapter, binding):
 
 
 def run_process_group(argv, *, deadline_epoch, residual_scanner, cwd=None, sandbox_directory=None,
-                      stdin_data=None, env=None):
+                      stdin_data=None, env=None, _spawn_token=None):
     """Run one fixed command in a new process group; keep all child output in memory."""
     if type(argv) not in (tuple, list) or not argv or any(type(x) is not str for x in argv):
+        raise LedgerError("fixed_cli_binding_invalid")
+    # The model CLI is never startable from this helper without the reservation-checked boundary.
+    if ((Path(argv[0]).name == "codex" or tuple(argv[1:]) == _FIXED_ARGUMENTS)
+            and _spawn_token is not _SPAWN_TOKEN):
         raise LedgerError("fixed_cli_binding_invalid")
     if sandbox_directory is None:
         raise LedgerError("host_containment_unavailable")

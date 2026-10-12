@@ -1023,25 +1023,100 @@ def production_runner_tests():
             self.head_hash=hashlib.sha1(payload).hexdigest(); self.pushes+=1
             return self.head_hash
     cache=Path(__import__("pwd").getpwuid(os.getuid()).pw_dir)/"Library/Caches/agent-crew-p5-benchmark"
+    original_ledgers = [cache / rel for rel, *_ in v20_driver.HISTORICAL_LEDGER_FILES]
+    ledger_hashes_before = [hashlib.sha256(p.read_bytes()).hexdigest() for p in original_ledgers]
+    assert ledger_hashes_before == [x[2] for x in v20_driver.HISTORICAL_LEDGER_FILES]
     with tempfile.TemporaryDirectory(prefix="p5-v20-seed-input-") as td:
-        temp=Path(td); copies=[]
+        temp=Path(td); copies=[]; ledger_copies=[]
         for i,(rel,*_) in enumerate(v20_driver.HISTORICAL_RESULT_FILES):
             dst=temp/f"historic-{i}.json"; dst.write_bytes((cache/rel).read_bytes()); dst.chmod(0o600); copies.append(dst)
+        for i,(rel,*_) in enumerate(v20_driver.HISTORICAL_LEDGER_FILES):
+            dst=temp/f"historic-ledger-{i}.json"; dst.write_bytes((cache/rel).read_bytes()); dst.chmod(0o600); ledger_copies.append(dst)
         remote=EmptyRemote()
         result=v20_driver.bootstrap_seed(base,dict(config,seed_commit_pin=None),remote_factory=lambda _:remote,
-            result_paths=copies,ledger_root=temp/"ledger")
+            result_paths=copies,ledger_paths=ledger_copies,ledger_root=temp/"ledger")
         assert result["seed_payload_sha256"]==v20.SEED_SHA256 and result["seed_commit_sha"]==remote.head_hash
         assert remote.pushes==1 and len(remote.records)==2
         bad=temp/"tampered.json"; bad.write_bytes(copies[0].read_bytes()+b" "); bad.chmod(0o600)
         calls={"remote":0}
         try:
             v20_driver.bootstrap_seed(base,dict(config,seed_commit_pin=None),
-                remote_factory=lambda _:calls.__setitem__("remote",1),result_paths=(bad,copies[1]),ledger_root=temp/"bad-ledger")
+                remote_factory=lambda _:calls.__setitem__("remote",1),result_paths=(bad,copies[1]),
+                ledger_paths=ledger_copies,ledger_root=temp/"bad-ledger")
         except Exception:
             pass
         else: raise AssertionError("tampered historical result accepted")
         assert calls["remote"]==0
-    cases += 2
+        cases += 2
+
+        # F-2: the original v18/v19 ledgers must match the fixed references before any remote object exists.
+        # Every rejection below must happen with remote factory/callback == 0 and no local ledger created.
+        def seed_rejected(label, ledger_paths, *, pins=None):
+            calls = {"remote": 0}
+            root = temp / f"reject-{label}"
+            def factory(_config):
+                calls["remote"] += 1
+                raise AssertionError("remote factory reached")
+            patcher = (patch.object(v20_driver, "HISTORICAL_LEDGER_FILES", pins) if pins is not None
+                       else patch.object(v20_driver, "HISTORICAL_LEDGER_FILES", v20_driver.HISTORICAL_LEDGER_FILES))
+            with patcher:
+                try:
+                    v20_driver.bootstrap_seed(base, dict(config, seed_commit_pin=None), remote_factory=factory,
+                        result_paths=copies, ledger_paths=ledger_paths, ledger_root=root)
+                except AssertionError:
+                    raise
+                except Exception:
+                    pass
+                else:
+                    raise AssertionError(f"historical ledger fault accepted: {label}")
+            assert calls["remote"] == 0 and not root.exists(), label
+        # missing, hash mismatch (whitespace), swapped order, same ledger twice
+        seed_rejected("missing", (temp / "no-such-ledger.json", ledger_copies[1]))
+        trailing = temp / "ledger-trailing.json"; trailing.write_bytes(ledger_copies[0].read_bytes() + b"\n"); trailing.chmod(0o600)
+        seed_rejected("hash-mismatch", (trailing, ledger_copies[1]))
+        seed_rejected("swapped", (ledger_copies[1], ledger_copies[0]))
+        seed_rejected("same-ledger-twice", (ledger_copies[0], ledger_copies[0]))
+        cases += 4
+        # Value changes keep the (re-pinned) hash valid, so only the semantic cross-check can reject them.
+        original = [json.loads(p.read_bytes()) for p in ledger_copies]
+        def mutate(index, change):
+            value = json.loads(json.dumps(original[index]))
+            change(value)
+            return json.dumps(value, sort_keys=True, separators=(",", ":")).encode() + b"\n"
+        mutations = {
+            "elapsed-changed": (0, lambda v: v["attempts"][0].__setitem__("elapsed_seconds", 11.0)),
+            "elapsed-int": (0, lambda v: v["attempts"][0].__setitem__("elapsed_seconds", 11)),
+            "state-changed": (1, lambda v: v["attempts"][0].__setitem__("state", "pass")),
+            "fingerprint-changed": (0, lambda v: v["attempts"][0].__setitem__("fingerprint", "0" * 64)),
+            "id-changed": (1, lambda v: v["attempts"][0].__setitem__("id", "0" * 32)),
+            "result-ref-detail": (1, lambda v: v["attempts"][0].__setitem__("detail", "other_failure")),
+            "not-reaped": (0, lambda v: v["attempts"][0].__setitem__("child_reaped", False)),
+            "residual-unverified": (1, lambda v: v["attempts"][0].__setitem__("residual_verified", False)),
+            "duplicate-attempt": (0, lambda v: v["attempts"].append(json.loads(json.dumps(v["attempts"][0])))),
+            "no-attempt": (1, lambda v: v.__setitem__("attempts", [])),
+            "version-changed": (0, lambda v: v.__setitem__("version", 19)),
+        }
+        for label, (index, change) in mutations.items():
+            data = mutate(index, change)
+            path = temp / f"mutated-{label}.json"; path.write_bytes(data); path.chmod(0o600)
+            paths = list(ledger_copies); paths[index] = path
+            pins = list(v20_driver.HISTORICAL_LEDGER_FILES)
+            pins[index] = (pins[index][0], pins[index][1], hashlib.sha256(data).hexdigest())
+            seed_rejected(label, tuple(paths), pins=tuple(pins))
+            # The semantic check alone must also reject it (hash independent).
+            try:
+                v20_driver.validate_historical_ledger_bytes(data, index)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError(f"semantic ledger check accepted: {label}")
+            cases += 1
+        # A hard-linked ledger (nlink != 1) is not an independent private original.
+        os.link(ledger_copies[0], temp / "ledger-link.json")
+        seed_rejected("hardlink", tuple(ledger_copies))
+        cases += 1
+    ledger_hashes_after = [hashlib.sha256(p.read_bytes()).hexdigest() for p in original_ledgers]
+    assert ledger_hashes_after == ledger_hashes_before  # original ledgers are read-only evidence
 
     report=_report(); command="/bin/zsh -lc /fixed/canary"
     events=[{"type":"thread.started","thread_id":"synthetic"},{"type":"turn.started"},
@@ -1084,12 +1159,403 @@ def production_runner_tests():
     return cases
 
 
+def _spawn_context(root, label, *, mutate_config=None, clock=None):
+    """Seeded fixture ledger + sealed production adapter. No real remote, CLI or model client."""
+    base = Path(v20.__file__).resolve().parent
+    artifact_config = v20.strict_json((base / "config.json").read_bytes())
+    config = dict(artifact_config, seed_commit_pin="a" * 40)
+    if mutate_config:
+        config = mutate_config(config)
+    codex = artifact_config["codex_binding"]["realpath"]
+    binding = _binding("spawn-" + label)
+    argv = (codex, *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments)
+    assert binding["command_sha256"] == v20.runner_command_sha256(codex)
+    adapter = v20.FixedOpenAIDirectCodexAdapter(argv, command_sha256=binding["command_sha256"],
+        binding=binding, residual_scanner=v20._production_residual_scanner)
+    remote = FakeRemote()
+    ledger = v20.GlobalLedger(Path(root) / f"ledger-{label}", remote, **({"clock": clock} if clock else {}))
+    _seed_local(ledger, remote)
+    return config, codex, argv, binding, adapter, remote, ledger
+
+
+def _spawn_denied(config, ledger, adapter, binding, deadline, attempt_id, sandbox, expected_code):
+    """Direct adapter.invoke with actual_enabled=True must stop before the CLI process boundary."""
+    with patch.object(v20, "_fixed_config", lambda _binding: config), \
+            patch.object(v20, "_fixed_ledger", lambda _config: ledger), \
+            patch("v20_diagnostic.subprocess.Popen") as popen, patch("v20_diagnostic.subprocess.run") as run:
+        try:
+            adapter.invoke(deadline, attempt_id=attempt_id, binding=binding, sandbox_directory=sandbox,
+                           actual_enabled=True)
+        except v20.LedgerError as exc:
+            assert str(exc) == expected_code, (str(exc), expected_code)
+        else:
+            raise AssertionError("spawn boundary accepted an unauthorized invocation")
+        assert popen.call_count == 0 and run.call_count == 0
+
+
+def spawn_boundary_tests():
+    cases = 0
+    with tempfile.TemporaryDirectory(prefix="p5-v20-spawn-boundary-") as td:
+        root = Path(td); sandbox = root / "sandbox"; sandbox.mkdir(mode=0o700)
+        fake_id = "0123456789abcdef0123456789abcdef"
+
+        # F-1: UNPINNED immutable config, even for a structurally valid binding/ID and actual_enabled=True.
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "unpinned",
+            mutate_config=lambda c: dict(c, seed_commit_pin=None))
+        _spawn_denied(config, ledger, adapter, binding, time.time() + 60, fake_id, sandbox, "seed_commit_pin_missing")
+        assert remote.pushes == 0 and len(ledger._read_local()["records"]) == 2
+        cases += 1
+        # Config enable flag false.
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "disabled",
+            mutate_config=lambda c: dict(c, actual_invocations_enabled=False))
+        _spawn_denied(config, ledger, adapter, binding, time.time() + 60, fake_id, sandbox, "actual_invocation_disabled")
+        cases += 1
+        # Pinned and enabled, but no reservation exists: an arbitrary well-formed ID is not authority.
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "unreserved")
+        _spawn_denied(config, ledger, adapter, binding, time.time() + 60, fake_id, sandbox, "spawn_reservation_invalid")
+        assert remote.pushes == 0 and len(ledger._read_local()["records"]) == 2
+        cases += 1
+        # A real reservation exists, but the invoked ID is invented.
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "invented")
+        record = ledger.reserve(role="diagnostic", binding=binding); ledger.mark_running(record["id"], binding=binding)
+        _spawn_denied(config, ledger, adapter, binding, record["deadline_epoch"], fake_id, sandbox, "spawn_reservation_invalid")
+        cases += 1
+        # Reserved but not yet running: lifecycle order (reserve -> mark_running -> invoke) is enforced here too.
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "reserved-only")
+        record = ledger.reserve(role="diagnostic", binding=binding)
+        _spawn_denied(config, ledger, adapter, binding, record["deadline_epoch"], record["id"], sandbox, "spawn_reservation_invalid")
+        cases += 1
+        # Consumed IDs (terminal states) cannot be re-invoked.
+        for terminal in ("unknown", "timeout", "diagnostic_inconclusive"):
+            config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "consumed-" + terminal)
+            record = ledger.reserve(role="diagnostic", binding=binding); ledger.mark_running(record["id"], binding=binding)
+            ledger.complete(record["id"], terminal, binding=binding,
+                            determination="inconclusive" if terminal == "diagnostic_inconclusive" else None)
+            _spawn_denied(config, ledger, adapter, binding, record["deadline_epoch"], record["id"], sandbox, "spawn_reservation_invalid")
+            cases += 1
+        # Reservation bound to another binding / deadline mismatch / expired deadline.
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "other-binding")
+        other = _binding("spawn-other-binding-record")
+        record = ledger.reserve(role="diagnostic", binding=other); ledger.mark_running(record["id"], binding=other)
+        _spawn_denied(config, ledger, adapter, binding, record["deadline_epoch"], record["id"], sandbox, "spawn_reservation_invalid")
+        cases += 1
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "deadline")
+        record = ledger.reserve(role="diagnostic", binding=binding); ledger.mark_running(record["id"], binding=binding)
+        _spawn_denied(config, ledger, adapter, binding, record["deadline_epoch"] + 1, record["id"], sandbox, "spawn_reservation_invalid")
+        cases += 1
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "expired",
+            clock=lambda: time.time() - 3600)
+        record = ledger.reserve(role="diagnostic", binding=binding); ledger.mark_running(record["id"], binding=binding)
+        _spawn_denied(config, ledger, adapter, binding, record["deadline_epoch"], record["id"], sandbox, "spawn_reservation_invalid")
+        cases += 1
+
+        # Missing / wrong sandbox directory (with an otherwise valid running reservation): fixed error, no spawn.
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "sandbox-missing")
+        record = ledger.reserve(role="diagnostic", binding=binding); ledger.mark_running(record["id"], binding=binding)
+        for bad_sandbox in (None, root / "does-not-exist", root / "plain-file"):
+            if bad_sandbox == root / "plain-file":
+                bad_sandbox.write_text("x")
+            _spawn_denied(config, ledger, adapter, binding, record["deadline_epoch"], record["id"], bad_sandbox,
+                          "host_containment_unavailable")
+            cases += 1
+
+        # Helper-level bypass: the fixed Codex argv cannot be started through run_process_group directly,
+        # nor with extra arguments, nor via _invoke_diagnostic_cli with a different executable/profile argv.
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "helper-bypass")
+        record = ledger.reserve(role="diagnostic", binding=binding); ledger.mark_running(record["id"], binding=binding)
+        with patch.object(v20, "_fixed_config", lambda _binding: config), \
+                patch.object(v20, "_fixed_ledger", lambda _config: ledger), \
+                patch("v20_diagnostic.subprocess.Popen") as popen, patch("v20_diagnostic.subprocess.run") as run:
+            for label, call in {
+                "run_process_group fixed argv": lambda: v20.run_process_group(argv, deadline_epoch=time.time() + 30,
+                    residual_scanner=lambda *_: True, cwd=sandbox, sandbox_directory=sandbox),
+                "run_process_group extra arg": lambda: v20.run_process_group((*argv, "--extra"),
+                    deadline_epoch=time.time() + 30, residual_scanner=lambda *_: True, cwd=sandbox, sandbox_directory=sandbox),
+                "run_process_group other codex": lambda: v20.run_process_group(("/tmp/codex", "exec"),
+                    deadline_epoch=time.time() + 30, residual_scanner=lambda *_: True, cwd=sandbox, sandbox_directory=sandbox),
+                "invoke extra arg": lambda: v20._invoke_diagnostic_cli((*argv, "--extra"),
+                    deadline_epoch=record["deadline_epoch"], attempt_id=record["id"], binding=binding, sandbox_directory=sandbox),
+                "invoke other executable": lambda: v20._invoke_diagnostic_cli(("/usr/bin/env", *argv[1:]),
+                    deadline_epoch=record["deadline_epoch"], attempt_id=record["id"], binding=binding, sandbox_directory=sandbox),
+                "invoke nested sandbox profile": lambda: v20._invoke_diagnostic_cli(
+                    (v20.SANDBOX_EXEC, "-p", "(version 1)(allow default)", *argv),
+                    deadline_epoch=record["deadline_epoch"], attempt_id=record["id"], binding=binding, sandbox_directory=sandbox),
+            }.items():
+                try:
+                    call()
+                except v20.LedgerError as exc:
+                    assert str(exc) == "fixed_cli_binding_invalid", (label, str(exc))
+                else:
+                    raise AssertionError(f"helper bypass accepted: {label}")
+                cases += 1
+            assert popen.call_count == 0 and run.call_count == 0
+
+        # Positive control through the real lifecycle: reserve -> running -> authorized spawn. The only
+        # process creation is a mocked Popen; its argv must be the complete fixed sandbox-exec command.
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "positive")
+        out_parent = root / "positive-out"; out_parent.mkdir(mode=0o700)
+        class Spawned(Exception):
+            pass
+        with patch.object(v20, "_fixed_config", lambda _binding: config), \
+                patch.object(v20, "_fixed_ledger", lambda _config: ledger), \
+                patch("v20_diagnostic.subprocess.Popen", side_effect=OSError("mock spawn")) as popen, \
+                patch("v20_diagnostic.subprocess.run") as run:
+            def fake_probe(args, **kwargs):
+                return subprocess.CompletedProcess(args, 0, b"", b"")
+            run.side_effect = fake_probe
+            try:
+                v20.run_diagnostic_once(ledger, binding=binding, adapter=adapter,
+                    artifact_directory=out_parent / "result", next_binding_factory=lambda _: _binding("e" * 64),
+                    actual_enabled=True)
+            except v20.LedgerError:
+                pass
+            else:
+                raise AssertionError("mocked spawn failure unexpectedly succeeded")
+            assert popen.call_count == 1 and run.call_count == 1
+            final_argv = popen.call_args.args[0]
+            probe_argv = run.call_args.args[0]
+            assert final_argv[0] == v20.SANDBOX_EXEC and final_argv[1] == "-p" and probe_argv[:2] == [v20.SANDBOX_EXEC, "-p"]
+            profile = final_argv[2]
+            assert probe_argv == [v20.SANDBOX_EXEC, "-p", profile, "/usr/bin/true"]
+            assert final_argv == [v20.SANDBOX_EXEC, "-p", profile, codex, *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments]
+            assert profile.startswith("(version 1)\n(deny default)\n") and "(allow network-outbound)" in profile
+            assert profile == v20.SANDBOX_PROFILE_TEMPLATE.format(directory=str(Path(popen.call_args.kwargs["cwd"]).resolve()))
+            assert popen.call_args.kwargs["start_new_session"] is True
+        # The reservation was consumed (fixed terminal state), never released for another attempt.
+        assert ledger._read_local()["records"][-1]["state"] == "unknown" and remote.pushes == 3
+        cases += 1
+    return cases
+
+
+def profile_negative_tests():
+    """Profile body / sandbox directory / extra-argv faults: fixed error, no process, no reservation."""
+    cases = 0
+    with tempfile.TemporaryDirectory(prefix="p5-v20-profile-negative-") as td:
+        root = Path(td); sandbox = root / "sandbox"; sandbox.mkdir(mode=0o700)
+        python = os.path.realpath(__import__("sys").executable)
+        tampered = v20.SANDBOX_PROFILE_TEMPLATE.replace("(allow network-outbound)\n", "(allow network*)\n")
+        assert tampered != v20.SANDBOX_PROFILE_TEMPLATE
+        # (a) template body changed while the pinned hash constant is kept.
+        with patch.object(v20, "SANDBOX_PROFILE_TEMPLATE", tampered), \
+                patch("v20_diagnostic.subprocess.Popen") as popen, patch("v20_diagnostic.subprocess.run") as run:
+            assert v20.sha256(v20.SANDBOX_PROFILE_TEMPLATE.encode()) != v20.SANDBOX_PROFILE_SHA256
+            for call in (lambda: v20.sandboxed_argv((python,), sandbox),
+                         lambda: v20.run_process_group((python, "-c", "pass"), deadline_epoch=time.time() + 5,
+                             residual_scanner=lambda *_: True, cwd=sandbox, sandbox_directory=sandbox)):
+                try:
+                    call()
+                except v20.LedgerError as exc:
+                    assert str(exc) == "host_containment_profile_mismatch"
+                else:
+                    raise AssertionError("profile body drift accepted")
+                cases += 1
+            assert popen.call_count == 0 and run.call_count == 0
+        # (b) sandbox_directory missing/not a directory.
+        with patch("v20_diagnostic.subprocess.Popen") as popen, patch("v20_diagnostic.subprocess.run") as run:
+            for bad in (None, root / "absent", root / "file-not-dir"):
+                if bad == root / "file-not-dir":
+                    bad.write_text("x")
+                for call in (lambda: v20.sandboxed_argv((python,), bad),
+                             lambda: v20.run_process_group((python, "-c", "pass"), deadline_epoch=time.time() + 5,
+                                 residual_scanner=lambda *_: True, cwd=root, sandbox_directory=bad)):
+                    try:
+                        call()
+                    except v20.LedgerError as exc:
+                        assert str(exc) == "host_containment_unavailable"
+                    else:
+                        raise AssertionError("missing sandbox directory accepted")
+                    cases += 1
+            assert popen.call_count == 0 and run.call_count == 0
+        # (c) another profile / extra argv supplied as the child command.
+        with patch("v20_diagnostic.subprocess.Popen") as popen, patch("v20_diagnostic.subprocess.run") as run:
+            for argv in ((v20.SANDBOX_EXEC, "-p", "(version 1)(allow default)", "/usr/bin/true"),
+                         (v20.SANDBOX_EXEC, "-f", "/private/tmp/other.sb", "/usr/bin/true")):
+                try:
+                    v20.run_process_group(argv, deadline_epoch=time.time() + 5, residual_scanner=lambda *_: True,
+                                          cwd=sandbox, sandbox_directory=sandbox)
+                except v20.LedgerError as exc:
+                    assert str(exc) == "host_containment_profile_mismatch"
+                else:
+                    raise AssertionError("caller-supplied sandbox profile accepted")
+                cases += 1
+            assert popen.call_count == 0 and run.call_count == 0
+
+        # Adapter-level: profile drift/replacement/extra argv stops before reservation and callback.
+        base_cfg, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "profile-adapter")
+        def lifecycle_rejected(label, candidate, *, patches=()):
+            calls_before = remote.pushes
+            from contextlib import ExitStack
+            with ExitStack() as stack, patch("v20_diagnostic.subprocess.Popen") as popen, \
+                    patch("v20_diagnostic.subprocess.run") as run:
+                for item in patches:
+                    stack.enter_context(item)
+                try:
+                    v20.run_diagnostic_once(ledger, binding=binding, adapter=candidate,
+                        artifact_directory=root / "out", next_binding_factory=lambda _: _binding("e" * 64),
+                        actual_enabled=True)
+                except v20.LedgerError as exc:
+                    assert str(exc) == "fixed_cli_binding_invalid", (label, str(exc))
+                else:
+                    raise AssertionError(f"profile fault accepted: {label}")
+                assert popen.call_count == 0 and run.call_count == 0
+            assert remote.pushes == calls_before and len(ledger._read_local()["records"]) == 2, label
+        # template body replaced (hash constant kept): command hash no longer matches the binding.
+        lifecycle_rejected("template body", adapter, patches=(patch.object(v20, "SANDBOX_PROFILE_TEMPLATE", tampered),))
+        # template and its hash replaced together: the adapter's sealed profile hash differs.
+        lifecycle_rejected("template and hash", adapter, patches=(
+            patch.object(v20, "SANDBOX_PROFILE_TEMPLATE", tampered),
+            patch.object(v20, "SANDBOX_PROFILE_SHA256", v20.sha256(tampered.encode()))))
+        # sealed argv replaced by an explicit other-profile sandbox-exec command / extra argument.
+        for label, replacement in (("other profile argv", (v20.SANDBOX_EXEC, "-p", "(version 1)(allow default)", codex,
+                                                           *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments)),
+                                   ("extra argv", (*argv, "--dangerously-bypass-approvals-and-sandbox"))):
+            _, _, _, _, victim, _, _ = _spawn_context(root, "victim-" + label.replace(" ", "-"))
+            object.__setattr__(victim, "_argv", replacement)
+            lifecycle_rejected(label, victim)
+        cases += 4
+    return cases
+
+
+def canary_classification_tests():
+    """Run the production canary in a fixture subprocess (no Codex, no model): only PATH is classifiable."""
+    import sys as _sys
+    cases = 0
+    uid_name = __import__("pwd").getpwuid(os.getuid()).pw_name
+    with tempfile.TemporaryDirectory(prefix="p5-v20-canary-fixture-") as td:
+        def run_case(label, *, env_changes=None, expected_changes=None, other_cwd=False, drop_env=()):
+            case_root = Path(td) / label
+            work = case_root / "work"; work.mkdir(parents=True, mode=0o700)
+            work = work.resolve(strict=True)
+            home = str(case_root / "home")
+            expected_cwd = str(work)
+            if other_cwd:
+                other = case_root / "other"; other.mkdir(); expected_cwd = str(other.resolve(strict=True))
+            parts = ["/usr/bin", "/bin"]
+            path_hash = hashlib.sha256(json.dumps(parts, separators=(",", ":")).encode()).hexdigest()
+            required = {"PATH": os.pathsep.join(parts), "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "HOME": home,
+                        "TMPDIR": str(work / "tmp"), "TMP": str(work / "tmp"), "TEMP": str(work / "tmp"),
+                        "PYTHONDONTWRITEBYTECODE": "1", "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
+                        "GIT_OPTIONAL_LOCKS": "0", "P5_RUN_TOKEN": "ab" * 16}
+            if _sys.platform == "darwin":
+                required["__CF_USER_TEXT_ENCODING"] = f"0x{os.getuid():X}:0x0:0x0"
+            uuid7 = "01234567-89ab-7cde-8f01-23456789abcd"
+            runtime = {"CODEX_CI": "1", "CODEX_PERMISSION_PROFILE": "p5_fixture", "CODEX_SANDBOX": "seatbelt",
+                       "CODEX_SANDBOX_NETWORK_DISABLED": "1", "CODEX_SESSION_ID": uuid7, "CODEX_THREAD_ID": uuid7,
+                       "CODEX_VERSION": "0.162.1", "COLORTERM": "", "GH_PAGER": "cat", "GIT_PAGER": "cat",
+                       "LC_CTYPE": "C.UTF-8", "LOGNAME": uid_name, "NO_COLOR": "1", "OLDPWD": expected_cwd,
+                       "PAGER": "cat", "PWD": expected_cwd, "SHLVL": "0", "TERM": "dumb", "_": _sys.executable}
+            expected = {"attempt_id": TRUSTED_ID.replace("a", "b"), "fingerprint": TRUSTED_FP,
+                        "env": dict(required), "required_keys": list(v20._DIAGNOSTIC_REQUIRED_KEYS),
+                        "runtime_keys": sorted(v20._DIAGNOSTIC_RUNTIME_KEYS),
+                        "path_profiles": {"normal_shell_login": path_hash}, "home": home,
+                        "locale_sha256": v20.sha256(b"C.UTF-8"), "cli_version": "0.162.1",
+                        "uuid7_pattern": r"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
+                        "python_executable": _sys.executable, "cwd": expected_cwd, "known_path_components": []}
+            expected.update(expected_changes or {})
+            env = {**required, **runtime, **(env_changes or {})}
+            for key in drop_env:
+                env.pop(key, None)
+            (work / ".p5-v20-expected.json").write_bytes(v20.canonical_bytes(expected))
+            (work / ".p5-v20-env-canary.py").write_text(v20._diagnostic_canary_source(), encoding="utf-8")
+            outcome = subprocess.run([_sys.executable, "-I", "-B", ".p5-v20-env-canary.py"], cwd=work, env=env,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
+            return outcome, expected
+        # Baseline and PATH-only mismatch stay classifiable (resolved diagnostic, never final eligibility).
+        outcome, expected = run_case("baseline")
+        assert outcome.returncode == 0, outcome.stderr
+        report = v20.validate_report(v20.strict_json(outcome.stdout), attempt_id=expected["attempt_id"],
+                                     fingerprint=expected["fingerprint"])
+        assert report["environment_fit"] == "pass" and report["determination"] == "resolved"
+        cases += 1
+        outcome, expected = run_case("path-only", env_changes={"PATH": "/usr/bin:/bin:/opt/not-approved"})
+        assert outcome.returncode == 0, outcome.stderr
+        report = v20.validate_report(v20.strict_json(outcome.stdout), attempt_id=expected["attempt_id"],
+                                     fingerprint=expected["fingerprint"])
+        assert report["environment_fit"] == "mismatch" and report["determination"] == "resolved"
+        assert report["path"]["order_classification"] == "unapproved_component_present"
+        cases += 1
+        # Any non-PATH required/runtime/cwd mismatch (or several) has no schema cause: no report at all.
+        unresolved = {
+            "required-value": dict(env_changes={"HOME": "/unexpected/home"}),
+            "required-token": dict(env_changes={"P5_RUN_TOKEN": "cd" * 16}),
+            "required-missing": dict(drop_env=("GIT_OPTIONAL_LOCKS",)),
+            "runtime-value": dict(env_changes={"TERM": "xterm-256color"}),
+            "runtime-sandbox": dict(env_changes={"CODEX_SANDBOX": "none"}),
+            "runtime-version": dict(env_changes={"CODEX_VERSION": "9.9.9"}),
+            "cwd-only": dict(other_cwd=True),
+            "multiple": dict(env_changes={"HOME": "/unexpected/home", "TERM": "xterm", "NO_COLOR": "0"}, other_cwd=True),
+            "path-and-runtime": dict(env_changes={"PATH": "/usr/bin:/bin:/opt/not-approved", "TERM": "xterm"}),
+        }
+        for label, kwargs in unresolved.items():
+            outcome, _ = run_case(label, **kwargs)
+            assert outcome.returncode == 2 and outcome.stdout == b"", (label, outcome.returncode, outcome.stdout[:80])
+            cases += 1
+
+    # The fixed exit code is audited as a fixed inconclusive stop (not completed/resolved, not a raw failure).
+    command = "/bin/zsh -lc /fixed/canary"
+    events = [{"type": "thread.started", "thread_id": "synthetic"}, {"type": "turn.started"},
+              {"type": "item.started", "item": {"id": "tool-1", "type": "command_execution", "command": command,
+                                                 "status": "in_progress"}},
+              {"type": "item.completed", "item": {"id": "tool-1", "type": "command_execution", "command": command,
+                                                   "status": "failed", "exit_code": 2, "aggregated_output": ""}},
+              {"type": "turn.completed"}]
+    def encode(items):
+        return b"\n".join(v20.canonical_bytes(item).rstrip(b"\n") for item in items)
+    try:
+        v20._audit_diagnostic_events(encode(events), canary_command=command, attempt_id=TRUSTED_ID, fingerprint=TRUSTED_FP)
+    except v20.LedgerError as exc:
+        assert str(exc) == "diagnostic_inconclusive"
+    else:
+        raise AssertionError("canary exit 2 produced a report")
+    cases += 1
+    for code in (1, 3, 127):
+        changed = json.loads(json.dumps(events)); changed[3]["item"]["exit_code"] = code
+        try:
+            v20._audit_diagnostic_events(encode(changed), canary_command=command, attempt_id=TRUSTED_ID, fingerprint=TRUSTED_FP)
+        except v20.LedgerError as exc:
+            assert str(exc) == "diagnostic_event_audit_failed"
+        else:
+            raise AssertionError("non-fixed canary failure accepted")
+        cases += 1
+    # exit 2 without a complete event lifecycle remains an audit failure.
+    try:
+        v20._audit_diagnostic_events(encode(events[:4]), canary_command=command, attempt_id=TRUSTED_ID, fingerprint=TRUSTED_FP)
+    except v20.LedgerError as exc:
+        assert str(exc) == "diagnostic_event_audit_failed"
+    else:
+        raise AssertionError("incomplete lifecycle accepted")
+    cases += 1
+
+    # End to end: the inconclusive stop consumes the reservation and is recorded as diagnostic_inconclusive.
+    with tempfile.TemporaryDirectory(prefix="p5-v20-canary-lifecycle-") as td:
+        root = Path(td); (root / "out").mkdir(mode=0o700)
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "canary-inconclusive")
+        def inconclusive_cli(*args, **kwargs):
+            raise v20.LedgerError("diagnostic_inconclusive")
+        with patch.object(v20, "_invoke_diagnostic_cli", inconclusive_cli), \
+                patch("v20_diagnostic.subprocess.Popen") as popen:
+            try:
+                v20.run_diagnostic_once(ledger, binding=binding, adapter=adapter,
+                    artifact_directory=root / "out" / "result", next_binding_factory=lambda _: _binding("e" * 64),
+                    actual_enabled=True)
+            except v20.LedgerError as exc:
+                assert str(exc) == "diagnostic_inconclusive"
+            else:
+                raise AssertionError("inconclusive diagnostic completed")
+            assert popen.call_count == 0
+        last = ledger._read_local()["records"][-1]
+        assert last["state"] == "diagnostic_inconclusive" and last["determination"] == "inconclusive"
+        cases += 1
+    return cases
+
+
 def run_all():
     counts = {"schema": schema_tests(), "privacy": privacy_tests(), "path_unknown": path_and_unknown_tests(),
               "ledger": ledger_tests(), "phase_binding": phase_binding_tests(), "artifact_attribution": artifact_attribution_tests(),
               "formal_gate": gate_tests(), "remote_fixture": git_remote_fixture_tests(),
               "seed_canonical": seed_canonical_tests(), "diagnostic_lifecycle": diagnostic_lifecycle_tests(),
-              "production_runner": production_runner_tests()}
+              "production_runner": production_runner_tests(), "spawn_boundary": spawn_boundary_tests(),
+              "profile_negative": profile_negative_tests(), "canary_classification": canary_classification_tests()}
     return counts
 
 
