@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "scope": "公開clone専用の匿名化派生。P0原本・copy時点台帳は変更しない",
+  "copy_manifest_sha256": "755fa8f6e3b06bd2ba094fc788e29c33c4adba16d37b386b0f08172bff7ec275",
+  "p5_input": {
+    "official": "元P0 snapshotと元index",
+    "published": "公開cloneの派生snapshotと派生index",
+    "official_snapshot_index_sha256": "273b627b173605014a4061e964d744fd53bc4567b70c78811993fa575a8d9e3f",
+    "published_snapshot_index_sha256": "37f4ae81a3f808236c46b636040e88b757cd8bee797170258f1e2705ebfa4026",
+    "note": "入力hashが異なるため公開側の再実行は別fingerprint。正式24runの結果と同一扱いしない"
+  },
+  "transforms": [
+    {
+      "path": "docs/codex-direct/README.md",
+      "original_sha256": "f77a04d61c982661471a3f03f23a9ed59b40d7bec477555d4941f7f9f42b509e",
+      "published_sha256": "b493f9ceda3d28c650e26e5f235a5b49177c729734c0478d2d218afb222da745",
+      "reason": "非公開の旧計画リンクを説明文へ変更し、起動コマンドをrepo相対化"
+    },
+    {
+      "path": "migration-progress/README.md",
+      "original_sha256": "48d30ccdc161628610cfd687d18c018e707b7faad2afde8529437aab2b8dad4f",
+      "published_sha256": "f852a334418e7113c9dbafa1aa0215bb7f300e4642256a3ae4030848c0128b46",
+      "reason": "進捗ボードの実行例をrepo相対化"
+    },
+    {
+      "path": "docs/plans/2026-09-21-codex-operating-model-replan.md",
+      "original_sha256": "e2b4eb13f9c5ea0dcdebb118eb76a590ddcbac7b8fefda36efeca7d96a76d1d5",
+      "published_sha256": "2cb7acbd0a9ba04d7eadb4b32df13113938ce9490426b673fe5a219b4d33300f",
+      "reason": "個人Vaultと非公開wealth資料の絶対pathを論理名へ変更し、公開cloneにない旧hook計画リンクを除去"
+    },
+    {
+      "path": "docs/plans/2026-09-21-migration-handoff-evidence.md",
+      "original_sha256": "e7e67905645270fae76bdec9a6331b53c6e9781615aa9e3bed29d66c5a746595",
+      "published_sha256": "5673a9b6153ccad687fb8d7041ba7bbde3141671c30f9ca9e1206c639d91ab1d",
+      "reason": "個人環境と非公開cloneの絶対pathを論理名へ変更し、公開派生入力のhash差を記録"
+    },
+    {
+      "path": "docs/codex-direct/migration-baseline/snapshot/agent_crew/migration-progress/README.md",
+      "original_sha256": "48d30ccdc161628610cfd687d18c018e707b7faad2afde8529437aab2b8dad4f",
+      "published_sha256": "f852a334418e7113c9dbafa1aa0215bb7f300e4642256a3ae4030848c0128b46",
+      "reason": "P0 snapshot READMEの個人環境パスをrepo相対化"
+    },
+    {
+      "path": "docs/codex-direct/migration-baseline/README.md",
+      "original_sha256": "7d82fcadc30b4f6e9fee2e7d377af4d15312a6b753abe173ee086b47a3fa75c3",
+      "published_sha256": "0ff58b550ef61565a78ea743c1116bcbe2ab881a56e411ffcb13d9dae0e13366",
+      "reason": "P0原本と公開用派生の区別、正式P5入力のfingerprint差を説明"
+    },
+    {
+      "path": "docs/codex-direct/migration-baseline/snapshot-index.json",
+      "original_sha256": "273b627b173605014a4061e964d744fd53bc4567b70c78811993fa575a8d9e3f",
+      "published_sha256": "37f4ae81a3f808236c46b636040e88b757cd8bee797170258f1e2705ebfa4026",
+      "reason": "公開snapshot READMEのhashへ更新し、元index hashを明記"
+    },
+    {
+      "path": "docs/codex-direct/migration-baseline/smoke.py",
+      "original_sha256": "0e894472893153f22f0cc8390f5749e2bb01367a836182ad04ff69f0b892977f",
+      "published_sha256": "9f412ed3ea946362ed7390e51f02e636c8cc641a1c730510cd929002b2a9e61f",
+      "reason": "公開変換台帳の元hashと公開hashを厳密照合し、clone内stateを検証"
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "files": [
+    {
+      "path": "docs/codex-direct/legacy-personal-skills/README.md",
+      "original_copy_sha256": "4c33caae727b222358fb17552cc890715b5ea723ffff28b642af6dad82b95394",
+      "source_sha256": "ca78e2ca2e363ef8da2b90c0801ed4e76f59a39585b85b8782ae739153e0d53a",
+      "clone_sha256": "ca78e2ca2e363ef8da2b90c0801ed4e76f59a39585b85b8782ae739153e0d53a",
+      "reason": "App UI正式tool拒否とユーザー本人の新規チャット4件表示確認をAPI結果と区別して追記。原copy hashは保持"
+    },
+    {
+      "path": "docs/plans/2026-09-21-p2-personal-skills.md",
+      "original_copy_sha256": "4df19ee3aa27e8d881b8e666fe1204c43da641b1f65f764e12568d6e2725c611",
+      "source_sha256": "2aff1285874779d609eaf8ff460144d77ebdf9f653c1f81bfac0cbcd548972a5",
+      "clone_sha256": "2aff1285874779d609eaf8ff460144d77ebdf9f653c1f81bfac0cbcd548972a5",
+      "reason": "App UI正式tool拒否とユーザー本人の新規チャット4件表示確認をAPI結果と区別して追記。原copy hashは保持"
+    },
+    {
+      "path": "scripts/codex_config_composer.py",
+      "original_copy_sha256": "df1258094464544fbad31f522db5075c812ca9c1805cf04250ac5415698fddbf",
+      "source_sha256": "18cb9e3aa3c057ebff07c0fcf6c08c9b36fb89437df4fee796c45a99fda987c7",
+      "clone_sha256": "18cb9e3aa3c057ebff07c0fcf6c08c9b36fb89437df4fee796c45a99fda987c7",
+      "reason": "P1最終（固定root決定・既知旧無印区画の採用）へ限定同期。原copy hashは保持"
+    },
+    {
+      "path": "tests/test_codex_config_composer.py",
+      "original_copy_sha256": "2dd8e93fa63028522f8f26c571f555a6584c6d78c93f21ba9c3235cd17cdfb4a",
+      "source_sha256": "41772af679c3f8c7c834efc6b19f24218d64e1ad5311aba06f4ba24552dd73f2",
+      "clone_sha256": "41772af679c3f8c7c834efc6b19f24218d64e1ad5311aba06f4ba24552dd73f2",
+      "reason": "P1最終（固定root決定・既知旧無印区画の採用）へ限定同期。原copy hashは保持"
+    },
+    {
+      "path": "docs/codex-direct/p1-config-composer.md",
+      "original_copy_sha256": "d46a6aa2787c2192a8703a5bfeda5597328f1e771be044a2079fbebab628e33f",
+      "source_sha256": "bcb02af9d09b38df2e3b63f51c79c70a0995a00d363a2e09e2e7a94f75adb9c3",
+      "clone_sha256": "bcb02af9d09b38df2e3b63f51c79c70a0995a00d363a2e09e2e7a94f75adb9c3",
+      "reason": "P1最終（固定root決定・既知旧無印区画の採用）へ限定同期。原copy hashは保持"
+    },
+    {
+      "path": "docs/codex-direct/p2-skills-app-server-evidence.md",
+      "original_copy_sha256": "8d665f63a82e3a97aaa3c6241b55d172f6a40af28aab994ec45bd23fa302a3e5",
+      "source_sha256": "8cdf2faeed475c15aa4833ba488fe34b61fcd80507bc540fcd7f7e77828db2c3",
+      "clone_sha256": "8cdf2faeed475c15aa4833ba488fe34b61fcd80507bc540fcd7f7e77828db2c3",
+      "reason": "APIとユーザー本人のApp表示確認を分離し、旧17agentの別セッション質問への「わからない」を反映。原copy hashは保持"
+    },
+    {
+      "path": "docs/codex-direct/p1-maintenance-canary.md",
+      "original_copy_sha256": "5fc91b64417bc712fd369693f33eb1d6d89fd2b4b2ba797cd4202a2eb955086f",
+      "source_sha256": "5e1ae3eef9c4ed921691810a6728f7093b49eac8853da115ff910a2629f6fb79",
+      "clone_sha256": "5e1ae3eef9c4ed921691810a6728f7093b49eac8853da115ff910a2629f6fb79",
+      "reason": "実機canary成功とpreview停止、read-only権限差分、独立反証4条件を追記。原copy hashは保持"
+    },
+    {
+      "path": "docs/codex-direct/p2-agents-handoff.md",
+      "original_copy_sha256": "dbc77e1ce4e4cdea0b2af42d49b9131a3709409fa0e0041b48bbb9dfbee862cb",
+      "source_sha256": "74c9933cb1d6ad9f99f549d87967e307ec45dc96ee4a11a985d6ae287c1474ec",
+      "clone_sha256": "74c9933cb1d6ad9f99f549d87967e307ec45dc96ee4a11a985d6ae287c1474ec",
+      "reason": "公開clone用に機械固有の作業clone絶対pathを論理名へ変更。原copy hashは保持"
+    },
+    {
+      "path": "config/codex/permissions.toml",
+      "original_copy_sha256": "b6778934a2e620a4a2b1b7871b9a33f56202f418677894ffd83c0212badcf945",
+      "source_sha256": "7675f876d4097e7a04787d9d889ba7eab92a7888bfba923422e76b61981df76d",
+      "clone_sha256": "7675f876d4097e7a04787d9d889ba7eab92a7888bfba923422e76b61981df76d",
+      "reason": "P1最終（固定root決定・既知旧無印区画の採用）へ限定同期。原copy hashは保持"
+    },
+    {
+      "path": "scripts/crew",
+      "original_copy_sha256": "325b5a2d703969c25be4d9181b5b62a24730d18beb2bf5a6cd324beeaf2ac98b",
+      "source_sha256": "28a6521987eb2526f5e76d4b66f375bca9c267b880c15b56688f292defbba6a5",
+      "clone_sha256": "28a6521987eb2526f5e76d4b66f375bca9c267b880c15b56688f292defbba6a5",
+      "reason": "P2最終（macOS標準python3からの3.11+再実行）へ限定同期。原copy hashは保持"
+    },
+    {
+      "path": "tests/test_crew_launcher.py",
+      "original_copy_sha256": "98295b6adaffea2f589dd4031a25c0a478c0d8f035fd819ce9a6545b613b09fd",
+      "source_sha256": "5b9729b607c944b76247702466ab9a1c5ed808e4380159756017ad37f179f814",
+      "clone_sha256": "5b9729b607c944b76247702466ab9a1c5ed808e4380159756017ad37f179f814",
+      "reason": "P2最終（macOS標準python3からの3.11+再実行。直接起動testはclaude分岐で検証し、公開しないhook state依存を除去）へ限定同期。原copy hashは保持"
+    },
+    {
+      "path": "docs/plans/2026-09-21-p2-instructions.md",
+      "original_copy_sha256": "2ad66a6a2982adb22aad6ce223fb4695220c0803d44610372deb99cc4ea83003",
+      "source_sha256": "0db7923d381b3eb172def92b2db755c7c4639c147eb6abb271052e499d550abf",
+      "clone_sha256": "0db7923d381b3eb172def92b2db755c7c4639c147eb6abb271052e499d550abf",
+      "reason": "P2最終（macOS標準python3からの3.11+再実行。直接起動testはclaude分岐で検証し、公開しないhook state依存を除去）へ限定同期。原copy hashは保持"
+    }
+  ]
+}
