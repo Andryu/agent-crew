@@ -1156,6 +1156,9 @@ _DIAGNOSTIC_RUNTIME_KEYS = frozenset(("CODEX_CI", "CODEX_PERMISSION_PROFILE", "C
     "CODEX_SANDBOX_NETWORK_DISABLED", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "CODEX_VERSION",
     "COLORTERM", "GH_PAGER", "GIT_PAGER", "LC_CTYPE", "LOGNAME", "NO_COLOR", "OLDPWD",
     "PAGER", "PWD", "SHLVL", "TERM", "_"))
+# Exported by Codex 0.163.0 (#52119) for the originating exec_command; may be absent. Never required,
+# value neither stored nor validated. Any other unlisted key still makes the diagnostic inconclusive.
+_DIAGNOSTIC_OPTIONAL_KEYS = frozenset(("CODEX_TOOL_CALL_ID",))
 _PATH_PROFILE_HASHES = {
     "normal_shell_login": "22c1cd8ce1b055b6ff63df7ffd1e6b9d3999216e4d10c48b02d26bcef77b8efc",
     "normal_shell_codex_host_projection": "8005165d1cd846fa8cb1971a0b8ecbbd066c2d6fb465bb8e4b4906fd9f48887c",
@@ -1170,7 +1173,7 @@ def _diagnostic_canary_source():
     # This source writes only the schema allowlist. It never prints env values, names, or digests.
     return r'''import hashlib,json,os,pwd,re,sys
 with open(".p5-v20-expected.json",encoding="utf-8") as f: expected=json.load(f)
-env=dict(os.environ); req=expected["required_keys"]; allowed=set(req)|set(expected["runtime_keys"])
+env=dict(os.environ); req=expected["required_keys"]; allowed=set(req)|set(expected["runtime_keys"])|set(expected.get("optional_keys",[]))
 home=expected["home"]
 fixed={home+suffix for suffix in ("/.volta/bin","/.pyenv/shims","/.antigravity/antigravity/bin","/.local/bin")}
 fixed.update(("/opt/homebrew/bin","/opt/homebrew/sbin","/usr/local/bin","/System/Cryptexes/App/usr/bin","/usr/bin","/bin","/usr/sbin","/sbin","/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin","/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin","/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin","/pkg/env/global/bin"))
@@ -1336,7 +1339,7 @@ def _invoke_diagnostic_cli(argv, *, deadline_epoch, attempt_id, binding, sandbox
         "/usr/bin", "/bin", "/usr/sbin", "/sbin", "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin",
         "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin", "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin", "/pkg/env/global/bin"))
     expected = {"attempt_id": attempt_id, "fingerprint": binding["fingerprint"], "env": env,
-        "required_keys": list(_DIAGNOSTIC_REQUIRED_KEYS), "runtime_keys": sorted(_DIAGNOSTIC_RUNTIME_KEYS),
+        "required_keys": list(_DIAGNOSTIC_REQUIRED_KEYS), "runtime_keys": sorted(_DIAGNOSTIC_RUNTIME_KEYS), "optional_keys": sorted(_DIAGNOSTIC_OPTIONAL_KEYS),
         "path_profiles": _PATH_PROFILE_HASHES, "home": home,
         "locale_sha256": sha256(b"C.UTF-8"), "cli_version": "0.163.0",
         "uuid7_pattern": r"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",

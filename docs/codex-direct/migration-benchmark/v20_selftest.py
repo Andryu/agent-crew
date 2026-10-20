@@ -1369,13 +1369,17 @@ def spawn_once_and_wiring_tests():
                     patch.object(v20, "_fixed_ledger", lambda _c: ledger), \
                     patch.object(v20, "_production_residual_scanner", lambda *_: True), \
                     popen_patch as popen, patch("v20_diagnostic.subprocess.run", side_effect=fake_probe):
+                first_sandbox = sandbox_dir()
                 try:
-                    invoke(adapter, record, binding, sandbox_dir())
+                    invoke(adapter, record, binding, first_sandbox)
                 except v20.LedgerError:
                     pass
                 else:
                     raise AssertionError("first invocation produced a report from a mock")
                 assert popen.call_count == 1
+                # The production boundary hands the canary the optional-key allowance (M-1).
+                handed = v20.strict_json((first_sandbox / ".p5-v20-expected.json").read_bytes())
+                assert handed["optional_keys"] == ["CODEX_TOOL_CALL_ID"]
                 assert ledger._read_local()["records"][-1]["state"] == "running"
                 pushes = remote.pushes
                 for _ in range(2):
@@ -1657,6 +1661,7 @@ def canary_classification_tests():
             expected = {"attempt_id": TRUSTED_ID.replace("a", "b"), "fingerprint": TRUSTED_FP,
                         "env": dict(required), "required_keys": list(v20._DIAGNOSTIC_REQUIRED_KEYS),
                         "runtime_keys": sorted(v20._DIAGNOSTIC_RUNTIME_KEYS),
+                        "optional_keys": sorted(v20._DIAGNOSTIC_OPTIONAL_KEYS),
                         "path_profiles": {"normal_shell_login": path_hash}, "home": home,
                         "locale_sha256": v20.sha256(b"C.UTF-8"), "cli_version": "0.163.0",
                         "uuid7_pattern": r"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
@@ -1677,6 +1682,24 @@ def canary_classification_tests():
                                      fingerprint=expected["fingerprint"])
         assert report["environment_fit"] == "pass" and report["determination"] == "resolved"
         cases += 1
+        # M-1: Codex 0.163.0 exports CODEX_TOOL_CALL_ID (may be absent, empty or opaque). Optional, never required,
+        # value ignored and never stored; a genuinely unknown key still stops the diagnostic as inconclusive.
+        assert v20._DIAGNOSTIC_OPTIONAL_KEYS == frozenset({"CODEX_TOOL_CALL_ID"})
+        assert not (v20._DIAGNOSTIC_OPTIONAL_KEYS & (v20._DIAGNOSTIC_RUNTIME_KEYS | set(v20._DIAGNOSTIC_REQUIRED_KEYS)))
+        for label, value in (("tool-call-id", "call_0123456789abcdef"), ("tool-call-id-empty", "")):
+            outcome, expected = run_case(label, env_changes={"CODEX_TOOL_CALL_ID": value})
+            assert outcome.returncode == 0, (label, outcome.stderr)
+            report = v20.validate_report(v20.strict_json(outcome.stdout), attempt_id=expected["attempt_id"],
+                                         fingerprint=expected["fingerprint"])
+            assert report["environment_fit"] == "pass" and report["determination"] == "resolved"
+            assert report["unknown_keys"]["unknown_count"] == 0
+            assert b"CODEX_TOOL_CALL_ID" not in outcome.stdout and (not value or value.encode() not in outcome.stdout)
+            cases += 1
+        outcome, _ = run_case("unknown-other-key", env_changes={"CODEX_UNLISTED_NEW_KEY": "x"})
+        assert outcome.returncode == 2 and outcome.stdout == b""
+        outcome, _ = run_case("unknown-with-optional", env_changes={"CODEX_TOOL_CALL_ID": "call_1", "CODEX_UNLISTED_NEW_KEY": "x"})
+        assert outcome.returncode == 2 and outcome.stdout == b""
+        cases += 2
         outcome, expected = run_case("path-only", env_changes={"PATH": "/usr/bin:/bin:/opt/not-approved"})
         assert outcome.returncode == 0, outcome.stderr
         report = v20.validate_report(v20.strict_json(outcome.stdout), attempt_id=expected["attempt_id"],
