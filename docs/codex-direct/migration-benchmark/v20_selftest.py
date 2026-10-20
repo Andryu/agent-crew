@@ -825,7 +825,7 @@ def diagnostic_lifecycle_tests():
         else:
             assert outcome["timed_out"] and outcome["child_reaped"] and outcome["residual_verified"]
         cases += 1
-    argv = ("/opt/homebrew/Caskroom/codex/0.162.1/bin/codex", *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments)
+    argv = ("/opt/homebrew/Caskroom/codex/0.163.0/bin/codex", *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments)
     production_binding = _binding()
     production_binding["command_sha256"] = v20.runner_command_sha256(argv[0])
     production = v20.FixedOpenAIDirectCodexAdapter(argv, command_sha256=production_binding["command_sha256"],
@@ -838,7 +838,7 @@ def diagnostic_lifecycle_tests():
     else:
         raise AssertionError("production Codex adapter invoked while disabled")
     for forbidden in (("/usr/bin/env", "vercel"),
-        ("/opt/homebrew/Caskroom/codex/0.162.1/bin/codex", "exec", "--json", "--retry")):
+        ("/opt/homebrew/Caskroom/codex/0.163.0/bin/codex", "exec", "--json", "--retry")):
         try:
             v20.FixedOpenAIDirectCodexAdapter(forbidden,
                 command_sha256=v20.sha256(v20.canonical_bytes(list(forbidden))),
@@ -870,7 +870,7 @@ def diagnostic_lifecycle_tests():
             assert remote.ls_remote() == before_head
             assert not list(root.rglob("*sentinel*"))
     def adapter_for(binding, counter):
-        command = ("/opt/homebrew/Caskroom/codex/0.162.1/bin/codex", *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments)
+        command = ("/opt/homebrew/Caskroom/codex/0.163.0/bin/codex", *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments)
         cmdhash = v20.runner_command_sha256(command[0])
         binding["command_sha256"] = cmdhash
         obj = v20.FixedOpenAIDirectCodexAdapter(command, command_sha256=cmdhash, binding=binding,
@@ -1137,7 +1137,7 @@ def production_runner_tests():
     # the command binding, alongside Codex's independent read-only sandbox flag.
     with tempfile.TemporaryDirectory(prefix="p5-v20-fixed-profile-argv-") as td:
         sandbox = Path(td) / "sandbox"; sandbox.mkdir(mode=0o700)
-        codex = "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex"
+        codex = "/opt/homebrew/Caskroom/codex/0.163.0/bin/codex"
         profile = v20.SANDBOX_PROFILE_TEMPLATE.format(directory=str(sandbox.resolve(strict=True)))
         expected = [v20.SANDBOX_EXEC, "-p", profile, "/usr/bin/true"]
         with patch("v20_diagnostic.subprocess.run", return_value=subprocess.CompletedProcess(expected, 0, b"", b"")) as probe:
@@ -1651,14 +1651,14 @@ def canary_classification_tests():
             uuid7 = "01234567-89ab-7cde-8f01-23456789abcd"
             runtime = {"CODEX_CI": "1", "CODEX_PERMISSION_PROFILE": "p5_fixture", "CODEX_SANDBOX": "seatbelt",
                        "CODEX_SANDBOX_NETWORK_DISABLED": "1", "CODEX_SESSION_ID": uuid7, "CODEX_THREAD_ID": uuid7,
-                       "CODEX_VERSION": "0.162.1", "COLORTERM": "", "GH_PAGER": "cat", "GIT_PAGER": "cat",
+                       "CODEX_VERSION": "0.163.0", "COLORTERM": "", "GH_PAGER": "cat", "GIT_PAGER": "cat",
                        "LC_CTYPE": "C.UTF-8", "LOGNAME": uid_name, "NO_COLOR": "1", "OLDPWD": expected_cwd,
                        "PAGER": "cat", "PWD": expected_cwd, "SHLVL": "0", "TERM": "dumb", "_": _sys.executable}
             expected = {"attempt_id": TRUSTED_ID.replace("a", "b"), "fingerprint": TRUSTED_FP,
                         "env": dict(required), "required_keys": list(v20._DIAGNOSTIC_REQUIRED_KEYS),
                         "runtime_keys": sorted(v20._DIAGNOSTIC_RUNTIME_KEYS),
                         "path_profiles": {"normal_shell_login": path_hash}, "home": home,
-                        "locale_sha256": v20.sha256(b"C.UTF-8"), "cli_version": "0.162.1",
+                        "locale_sha256": v20.sha256(b"C.UTF-8"), "cli_version": "0.163.0",
                         "uuid7_pattern": r"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
                         "python_executable": _sys.executable, "cwd": expected_cwd, "known_path_components": []}
             expected.update(expected_changes or {})

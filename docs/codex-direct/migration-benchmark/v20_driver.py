@@ -87,7 +87,7 @@ def load_manifest(*, verify_cli=True):
             or type(config["version"]) is not int or config["version"] != 20
             or config["remote_budget_ref"] != "refs/heads/codex/runtime-migration-p5-ledger"
             or config["model_transport"] != "OpenAI direct" or config["allowed_driver_modes"] != ["verify", "preflight", "sandbox-preflight", "bootstrap-seed", "diagnostic-once"]
-            or config["cli_version"] != "codex-cli 0.162.1"
+            or config["cli_version"] != "codex-cli 0.163.0"
             or config["actual_invocations_enabled"] is not True or config["hard_cap"] != 28
             or config["prior_consumed"] != 2 or config["diagnostic_limit"] != 1 or config["final_probe_limit"] != 1
             or config["formal_run_count"] != 24 or config["retry"] is not False

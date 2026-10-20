@@ -72,7 +72,7 @@ def build():
                                                     "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
                                                     "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8"})
     cli_version = version_result.stdout.strip()
-    if version_result.returncode != 0 or version_result.stderr or cli_version != "codex-cli 0.162.1":
+    if version_result.returncode != 0 or version_result.stderr or cli_version != "codex-cli 0.163.0":
         raise RuntimeError("fixed Codex CLI version verification failed")
     plan_bytes = PLAN_PATH.read_bytes()
     plan_text = plan_bytes.decode("utf-8", "strict")

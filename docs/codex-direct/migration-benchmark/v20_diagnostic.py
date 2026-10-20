@@ -1338,7 +1338,7 @@ def _invoke_diagnostic_cli(argv, *, deadline_epoch, attempt_id, binding, sandbox
     expected = {"attempt_id": attempt_id, "fingerprint": binding["fingerprint"], "env": env,
         "required_keys": list(_DIAGNOSTIC_REQUIRED_KEYS), "runtime_keys": sorted(_DIAGNOSTIC_RUNTIME_KEYS),
         "path_profiles": _PATH_PROFILE_HASHES, "home": home,
-        "locale_sha256": sha256(b"C.UTF-8"), "cli_version": "0.162.1",
+        "locale_sha256": sha256(b"C.UTF-8"), "cli_version": "0.163.0",
         "uuid7_pattern": r"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
         "python_executable": python_executable, "cwd": str(sandbox_directory.resolve(strict=True)),
         "known_path_components": sorted(allowed_known)}
