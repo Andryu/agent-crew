@@ -48,7 +48,11 @@ def _child(artifact, home):
 
 
 def _make_removable(root):
+    """chmod only real files/directories inside the temporary home. Codex's `--version` leaves symlinks
+    (arg0 aliases) to the real Codex executable there; chmod would follow them and alter that binary."""
     for path in [root, *root.rglob("*")]:
+        if path.is_symlink():
+            continue
         try:
             path.chmod(0o700)
         except OSError:
@@ -79,6 +83,19 @@ def main():
         print("usage: v20_source_selftest.py", file=sys.stderr)
         return 2
     sys.dont_write_bytecode = True
+    sys.path.insert(0, str(HERE))
+    import harness_fingerprint
+    codex = harness_fingerprint.CODEX_REAL_PATH
+    before = (codex.stat().st_ctime_ns, codex.stat().st_mode)
+    status = _run_in_temporary_home()
+    after = (codex.stat().st_ctime_ns, codex.stat().st_mode)
+    if after != before:
+        print("v20_source_selftest_changed_codex_executable", file=sys.stderr)
+        return 3
+    return status
+
+
+def _run_in_temporary_home():
     # /private/tmp is rejected by the artifact layout checks, so use the system-wide /var/tmp.
     parent = Path("/var/tmp").resolve(strict=True)
     home = Path(tempfile.mkdtemp(prefix="p5-v20-source-selftest-", dir=parent)).resolve(strict=True)

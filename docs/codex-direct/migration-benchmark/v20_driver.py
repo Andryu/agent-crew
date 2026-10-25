@@ -88,8 +88,8 @@ def load_manifest(*, verify_cli=True):
             or config["remote_budget_ref"] != "refs/heads/codex/runtime-migration-p5-ledger"
             or config["model_transport"] != "OpenAI direct" or config["allowed_driver_modes"] != ["verify", "preflight", "sandbox-preflight", "bootstrap-seed", "diagnostic-once"]
             or config["cli_version"] != "codex-cli 0.163.0"
-            or config["actual_invocations_enabled"] is not True or config["hard_cap"] != 28
-            or config["prior_consumed"] != 2 or config["diagnostic_limit"] != 1 or config["final_probe_limit"] != 1
+            or config["actual_invocations_enabled"] is not True or config["hard_cap"] != 29
+            or config["prior_consumed"] != 3 or config["diagnostic_limit"] != 2 or config["final_probe_limit"] != 1
             or config["formal_run_count"] != 24 or config["retry"] is not False
             or config["python_executable"] != str(Path(sys.executable).resolve(strict=True))
             or config["python_version"] != list(sys.version_info[:3])
@@ -119,6 +119,7 @@ def load_manifest(*, verify_cli=True):
     expected_preflight = expected_cache / "logs" / f"p5-v20-diagnostic-{manifest['fingerprint'][:20]}-preflight.json"
     expected_codex_home = expected_cache / "probe-v20-diagnostic" / "version-home"
     codex_home_info = Path(config["codex_home"]).lstat()
+    diagnostic_root_info = Path(config["diagnostic_root"]).lstat()
     if (base != expected_artifact or manifest["preflight_path"] != str(expected_preflight)
             or not re.fullmatch(r"[0-9a-f]{40}", config["source_head"])
             or config["source_hashes"] != {"v20_diagnostic.py": manifest["files"]["v20_diagnostic.py"]["sha256"],
@@ -132,6 +133,8 @@ def load_manifest(*, verify_cli=True):
             or config["codex_home"] != str(expected_codex_home)
             or not stat.S_ISDIR(codex_home_info.st_mode) or codex_home_info.st_uid != os.getuid()
             or stat.S_IMODE(codex_home_info.st_mode) != 0o700
+            or not stat.S_ISDIR(diagnostic_root_info.st_mode) or diagnostic_root_info.st_uid != os.getuid()
+            or stat.S_IMODE(diagnostic_root_info.st_mode) != 0o700
             or any(Path(config[key]).is_relative_to("/private/tmp") for key in ("global_ledger_directory", "diagnostic_root", "codex_home"))):
         raise ValueError
     if verify_cli:
@@ -371,16 +374,48 @@ def run_diagnostic_once(base, manifest, config):
     remote = v20.GitRemote(Path(config["repository_path"]), seed_commit_pin=config["seed_commit_pin"])
     ledger = v20.GlobalLedger(Path(config["global_ledger_directory"]), remote)
     local = ledger._read_local()
-    _, records = ledger._verify_remote(local)
-    if len(records) != 2:
+    head_before, records = ledger._verify_remote(local)
+    # Fresh ledger (2 records) or the single owner-approved second diagnostic after the pinned failed one.
+    if len(records) != v20.failed_diagnostic_offset(records):
         raise v20.LedgerError("prior_attempt_not_final")
     root_parent = Path(config["diagnostic_root"])
     parent_info = root_parent.lstat()
     if (not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_uid != os.getuid()
             or stat.S_IMODE(parent_info.st_mode) != 0o700):
         raise ValueError
-    root = root_parent / "diagnostic-once"
+    # The first diagnostic's directory (`diagnostic-once`) remains; the second attempt gets its own.
+    root = root_parent / diagnostic_directory_name(len(records))
     root.mkdir(mode=0o700, exist_ok=False)
+    try:
+        return _run_diagnostic_in_root(base, manifest, config, ledger, remote, head_before, records, root_parent, root)
+    except BaseException:
+        _remove_unreserved_root(remote, head_before, root)
+        raise
+
+
+def diagnostic_directory_name(record_count):
+    """`diagnostic-once` (first attempt, kept from the failed run) vs `diagnostic-once-2` (the single retry)."""
+    return "diagnostic-once-2" if record_count == 3 else "diagnostic-once"
+
+
+def _remove_unreserved_root(remote, head_before, root):
+    """A failure before any reservation reached the remote must not strand the attempt directory.
+    If the remote head moved (or cannot be read), keep the directory as evidence."""
+    try:
+        if remote.ls_remote() != head_before:
+            return
+        for path in sorted(root.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+            if path.is_symlink() or not path.is_dir():
+                path.unlink()
+            else:
+                path.rmdir()
+        root.rmdir()
+    except Exception:
+        pass
+
+
+def _run_diagnostic_in_root(base, manifest, config, ledger, remote, head_before, records, root_parent, root):
+    import v20_diagnostic as v20
     binding = _binding_for_root(base, manifest, config, root)
     argv = (config["codex_binding"]["realpath"], *v20.FixedOpenAIDirectCodexAdapter.fixed_arguments)
     adapter = v20.FixedOpenAIDirectCodexAdapter(argv, command_sha256=config["command_sha256"],
@@ -417,19 +452,39 @@ def main(argv=None):
             print(json.dumps(result, sort_keys=True, separators=(",", ":")))
             return
         counts = run_tests(base)
+        if args[0] in {"preflight", "sandbox-preflight"}:
+            # Real Codex `--version`/`exec --help` under the fixed profile and production env (no prompt, no model).
+            sys.path.insert(0, str(base))
+            import v20_diagnostic as v20
+            boundary = v20.codex_boundary_preflight(strict_json(base / "config.json")["codex_binding"]["realpath"],
+                                                    strict_json(base / "config.json")["cli_version"])
         if args[0] == "sandbox-preflight":
             module_path = base / "v20_diagnostic.py"
             sys.path.insert(0, str(base))
             import v20_diagnostic as v20
             outcome = v20.sandbox_boundary_preflight()
-            print(f"v20 sandbox model-free preflight PASS: {outcome['profile_sha256']}")
+            print(f"v20 sandbox model-free preflight PASS: {outcome['profile_sha256']} codex-boundary={','.join(boundary['stderr'])}")
         elif args[0] == "preflight":
             report = write_preflight(base, manifest, counts)
             print(f"v20 model-free preflight PASS: {report}")
         else:
             print("v20 model-free verify PASS")
-    except Exception:
+    except Exception as exc:
+        # Allow-listed fixed codes only (never exception text); the first token stays the fixed string.
+        code = getattr(exc, "args", ("",))[0] if type(exc).__name__ == "LedgerError" else ""
+        try:
+            import v20_diagnostic as _v20
+            known = code in _v20.FIXED_ERROR_CODES
+        except Exception:
+            known = False
+        if known and mode_is_actual(args):
+            print(f"{ERROR} code={code}", file=sys.stderr)
+            raise SystemExit(2)
         fail()
+
+
+def mode_is_actual(args):
+    return len(args) == 1 and args[0] in {"preflight", "sandbox-preflight", "diagnostic-once"}
 
 
 if __name__ == "__main__":

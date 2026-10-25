@@ -314,6 +314,19 @@ def _seed_local(ledger, remote):
     ledger._write_local(records, remote.head_hash)
 
 
+def _failed_fixture():
+    """A stand-in for the pinned failed first diagnostic (the real record is pinned by canonical SHA-256)."""
+    binding = _binding("failed-first-diagnostic")
+    record = {"sequence": 3, "id": "8e861a843972411c95465e8c1c59830f", "role": "diagnostic", "state": "unknown",
+              "fingerprint": binding["fingerprint"], "root_identity": binding["root_identity"],
+              "spec_sha256": binding["spec_sha256"], "command_sha256": binding["command_sha256"],
+              "preflight_sha256": binding["preflight_sha256"], "manifest_sha256": binding["manifest_sha256"],
+              "binding": binding, "binding_sha256": v20.binding_digest(binding), "pid": 43145, "pgid": 43145,
+              "owner_uid": os.getuid(), "started_epoch": 1792930530.0273228, "deadline_epoch": 1792931130.0273228,
+              "ended_epoch": 1792930578.600805}
+    return record, {"id": record["id"], "sha256": v20.sha256(v20.canonical_bytes(record))}
+
+
 def ledger_tests():
     cases = 0
     with tempfile.TemporaryDirectory() as td:
@@ -486,10 +499,12 @@ def ledger_tests():
         else:
             raise AssertionError("remote-consumed slot was retried")
     cases += 1
-    # Exactly 28 records exhaust the immutable ceiling; no 29th reservation.
-    with tempfile.TemporaryDirectory() as td:
+    # Exactly 29 records (2 history + the pinned failed diagnostic + 26 phases) exhaust the ceiling.
+    failed_record, failed_pin = _failed_fixture()
+    with tempfile.TemporaryDirectory() as td, patch.object(v20, "FAILED_DIAGNOSTIC", failed_pin):
+        assert v20.HARD_CAP == 29
         remote = FakeRemote(); ledger = v20.GlobalLedger(Path(td) / "state", remote); _seed_local(ledger, remote)
-        filler = [dict(x) for x in remote.records]
+        filler = [dict(x) for x in remote.records] + [dict(failed_record)]
         run_ids = [f"C{c}-{side}-{n}" for c in range(1, 7) for side in ("A", "B") for n in (1, 2)]
         formal_binding = _binding("2"*64)
         for i in range(26):
@@ -529,7 +544,7 @@ def ledger_tests():
         except v20.LedgerError as exc:
             assert str(exc) == "global_budget_exhausted"
         else:
-            raise AssertionError("29th invocation accepted")
+            raise AssertionError("30th invocation accepted")
     cases += 1
     # Simultaneous callers serialize under flock; only one can claim diagnostic role.
     with tempfile.TemporaryDirectory() as td:
@@ -1537,6 +1552,11 @@ def spawn_once_and_wiring_tests():
                 else:
                     raise AssertionError("second spawn through the real fixed ledger accepted")
                 assert len(sandbox_spawns(popen)) == 1
+            # The failure code travels through the real GitRemote (ordinary FF push) into the remote chain.
+            fixed.complete(record["id"], "unknown", binding=binding, failure_code="diagnostic_cli_spawn_failed")
+            remote_view = v20.GitRemote(repo, seed_commit_pin=first)
+            tail = remote_view.chain(remote_view.ls_remote())[-1]
+            assert tail["state"] == "unknown" and tail["failure_code"] == "diagnostic_cli_spawn_failed"
             cases += 1
     return cases
 
@@ -1783,13 +1803,356 @@ def canary_classification_tests():
     return cases
 
 
+def second_diagnostic_tests():
+    """Ceiling 29 and the single owner-approved second diagnostic, bound to the pinned failed record."""
+    cases = 0
+    failed_record, pin = _failed_fixture()
+    with patch.object(v20, "FAILED_DIAGNOSTIC", pin):
+        def ledger_with(td, records):
+            remote = FakeRemote(); ledger = v20.GlobalLedger(Path(td) / "state", remote)
+            remote.records = records; ledger._write_local(records, remote.head_hash)
+            return remote, ledger
+        history = [dict(x, type="historical_attempt") for x in v20.HISTORICAL]
+        # offset helper: pinned record -> 3, no failed record -> 2, altered or non-unknown pinned record -> refused
+        assert v20.failed_diagnostic_offset(history) == 2 and v20.failed_diagnostic_offset(history + [failed_record]) == 3
+        for label, bad in (("altered", dict(failed_record, ended_epoch=failed_record["ended_epoch"] + 1)),
+                           ("state", dict(failed_record, state="completed_diagnostic"))):
+            patch_pin = {"id": pin["id"], "sha256": v20.sha256(v20.canonical_bytes(bad))} if label == "state" else pin
+            with patch.object(v20, "FAILED_DIAGNOSTIC", patch_pin):
+                try:
+                    v20.failed_diagnostic_offset(history + [bad])
+                except v20.LedgerError as exc:
+                    assert str(exc) == "historical_reference_mismatch"
+                else:
+                    raise AssertionError(f"failed diagnostic accepted: {label}")
+            cases += 1
+        with tempfile.TemporaryDirectory() as td:
+            remote, ledger = ledger_with(td, history + [dict(failed_record)])
+            assert v20.HARD_CAP == 29
+            # the failed first attempt itself can never be reused or advanced
+            for call in (lambda: ledger.mark_running(failed_record["id"], binding=failed_record["binding"]),
+                         lambda: ledger.complete(failed_record["id"], "unknown", binding=failed_record["binding"])):
+                try:
+                    call()
+                except v20.LedgerError as exc:
+                    assert str(exc) == "attempt_transition_invalid"
+                else:
+                    raise AssertionError("failed diagnostic record was transitioned")
+            cases += 1
+            # exactly one further diagnostic: it ends unknown -> no third (retry stays closed)
+            second = ledger.reserve(role="diagnostic", binding=_binding("retry-2"))
+            assert second["sequence"] == 4 and len(ledger._read_local()["records"]) == 4
+            try:
+                ledger.reserve(role="diagnostic", binding=_binding("retry-3"))
+            except v20.LedgerError as exc:
+                assert str(exc) == "prior_attempt_not_final"
+            else:
+                raise AssertionError("diagnostic reserved while the second was still open")
+            ledger.mark_running(second["id"], binding=_binding("retry-2"))
+            ledger.complete(second["id"], "unknown", binding=_binding("retry-2"),
+                            failure_code="diagnostic_cli_stderr_unexpected")
+            stored = ledger._read_local()["records"][-1]
+            assert stored["state"] == "unknown" and stored["failure_code"] == "diagnostic_cli_stderr_unexpected"
+            for role in ("diagnostic", "final_probe"):
+                try:
+                    ledger.reserve(role=role, binding=_binding("retry-3"))
+                except v20.LedgerError as exc:
+                    assert str(exc) == "prior_attempt_not_final"
+                else:
+                    raise AssertionError(f"{role} reserved after the second diagnostic ended unknown")
+            cases += 3
+        with tempfile.TemporaryDirectory() as td:
+            remote, ledger = ledger_with(td, history + [dict(failed_record)])
+            second = ledger.reserve(role="diagnostic", binding=_binding("retry-ok"))
+            _complete_from_saved(ledger, second, "completed_diagnostic", _binding("retry-ok"), next_binding=_binding("e" * 64))
+            try:
+                ledger.reserve(role="diagnostic", binding=_binding("retry-again"))
+            except v20.LedgerError as exc:
+                assert str(exc) == "duplicate_diagnostic_role"
+            else:
+                raise AssertionError("third diagnostic accepted")
+            final = ledger.reserve(role="final_probe", binding=_binding("e" * 64))
+            _complete_from_saved(ledger, final, "final_pass", _binding("e" * 64), next_binding=_binding("2" * 64))
+            records = ledger._read_local()["records"]
+            assert len(records) == 5 and v20.formal_start_eligible(records) and not v20.formal_start_eligible(records[:2] + records[3:])
+            assert ledger.formal_gate(_binding("2" * 64))
+            first = ledger.reserve(role="formal_run", run_id="C1-A-1", binding=_binding("2" * 64))
+            assert first["sequence"] == 6
+            cases += 3
+        # not a general retry: an unpinned unknown diagnostic (no failed record) stays final
+        with tempfile.TemporaryDirectory() as td:
+            remote, ledger = ledger_with(td, list(history))
+            record = ledger.reserve(role="diagnostic", binding=_binding("unpinned-1"))
+            ledger.mark_running(record["id"], binding=_binding("unpinned-1"))
+            ledger.complete(record["id"], "unknown", binding=_binding("unpinned-1"))
+            try:
+                ledger.reserve(role="diagnostic", binding=_binding("unpinned-2"))
+            except v20.LedgerError as exc:
+                assert str(exc) == "prior_attempt_not_final"
+            else:
+                raise AssertionError("generic diagnostic retry accepted")
+            cases += 1
+        # a record that merely reuses the pinned id but differs in content breaks the chain
+        with tempfile.TemporaryDirectory() as td:
+            tampered = dict(failed_record, pid=failed_record["pid"] + 1)
+            remote, ledger = ledger_with(td, history + [tampered])
+            try:
+                ledger.reserve(role="diagnostic", binding=_binding("retry-t"))
+            except v20.LedgerError as exc:
+                assert str(exc) == "historical_reference_mismatch"
+            else:
+                raise AssertionError("tampered failed diagnostic accepted")
+            cases += 1
+    # failure_code / fixed error allowlist
+    for code in ("diagnostic_cli_failed", "diagnostic_cli_spawn_failed", "diagnostic_cli_stderr_unexpected",
+                 "diagnostic_cli_exit_nonzero", "diagnostic_cli_tree_changed", "diagnostic_event_audit_failed",
+                 "spawn_reservation_invalid", "fixed_cli_binding_invalid", "host_containment_unavailable"):
+        assert code in v20.FIXED_ERROR_CODES and v20.fixed_error(v20.LedgerError(code)) == code
+    assert v20.fixed_error(v20.LedgerError("secret-looking-text")) == "internal_error"
+    assert v20.fixed_error(OSError("secret")) == "internal_error"
+    cases += 1
+    with tempfile.TemporaryDirectory() as td:
+        remote = FakeRemote(); ledger = v20.GlobalLedger(Path(td) / "state", remote); _seed_local(ledger, remote)
+        record = ledger.reserve(role="diagnostic", binding=_binding("fc-1"))
+        for kwargs in ({"failure_code": "not-an-allowlisted-code"}, {"failure_code": "internal_error", "state_override": "completed"}):
+            try:
+                if "state_override" in kwargs:
+                    ledger.complete(record["id"], "completed_diagnostic", binding=_binding("fc-1"), failure_code="internal_error")
+                else:
+                    ledger.complete(record["id"], "unknown", binding=_binding("fc-1"), **kwargs)
+            except v20.LedgerError as exc:
+                assert str(exc) == "attempt_state_invalid"
+            else:
+                raise AssertionError("invalid failure_code accepted")
+        cases += 1
+        ledger.complete(record["id"], "unknown", binding=_binding("fc-1"), failure_code="diagnostic_cli_exit_nonzero")
+        stored = ledger._read_local()["records"][-1]
+        assert stored["failure_code"] == "diagnostic_cli_exit_nonzero"
+        stored_bad = dict(stored, failure_code="free-form text")
+        try:
+            v20.validate_record_chain(ledger._read_local()["records"][:-1] + [stored_bad])
+        except v20.LedgerError as exc:
+            assert str(exc) == "ledger_record_value_invalid"
+        else:
+            raise AssertionError("free-form failure_code accepted in chain")
+        cases += 1
+    # stderr policy: empty or exactly the one known warning
+    known = b"WARNING: proceeding, even though we could not create PATH aliases: Operation not permitted (os error 1)\n"
+    assert v20._stderr_acceptable(b"") and v20._stderr_acceptable(known)
+    for bad in (known + b"x\n", known[:-1], b"error\n", known + known, "str", None, b"WARNING: other\n"):
+        assert not v20._stderr_acceptable(bad)
+    cases += 1
+    return cases
+
+
+def spawn_result_policy_tests():
+    """After spawn: stderr / exit code / tree-change / known-warning handling, each with a distinct fixed code."""
+    from unittest.mock import MagicMock
+    cases = 0
+    real_run, real_popen = subprocess.run, subprocess.Popen
+    known = b"WARNING: proceeding, even though we could not create PATH aliases: Operation not permitted (os error 1)\n"
+    def fake_probe(args, **kwargs):
+        if args and args[0] == v20.SANDBOX_EXEC:
+            return subprocess.CompletedProcess(args, 0, b"", b"")
+        return real_run(args, **kwargs)
+    with tempfile.TemporaryDirectory(prefix="p5-v20-result-policy-") as td:
+        root = Path(td)
+        for label, stdout, stderr, returncode, writes, expected in (
+                ("unexpected-stderr", b"", b"boom\n", 0, False, "diagnostic_cli_stderr_unexpected"),
+                ("warning-plus-more", b"", known + b"extra\n", 0, False, "diagnostic_cli_stderr_unexpected"),
+                ("exit-nonzero", b"", b"", 3, False, "diagnostic_cli_exit_nonzero"),
+                ("tree-changed", b"", b"", 0, True, "diagnostic_cli_tree_changed"),
+                # the one known warning passes the stderr gate and reaches the event audit (empty stdout -> audit failure)
+                ("known-warning", b"", known, 0, False, "diagnostic_event_audit_failed")):
+            config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "policy-" + label)
+            record = ledger.reserve(role="diagnostic", binding=binding)
+            sandbox = root / f"sandbox-{label}"; sandbox.mkdir(mode=0o700)
+            child = MagicMock(); child.poll.return_value = returncode; child.returncode = returncode; child.pid = 4242
+            def communicate(*args, writes=writes, sandbox=sandbox, stdout=stdout, stderr=stderr, **kwargs):
+                if writes:
+                    (sandbox / "created-by-cli.txt").write_text("x")
+                return stdout, stderr
+            child.communicate.side_effect = communicate
+            with patch.object(v20, "_fixed_config", lambda _b, config=config: config), \
+                    patch.object(v20, "_fixed_ledger", lambda _c, ledger=ledger: ledger), \
+                    patch.object(v20, "_production_residual_scanner", lambda *_: True), \
+                    patch("v20_diagnostic.subprocess.Popen", return_value=child), \
+                    patch("v20_diagnostic.subprocess.run", side_effect=fake_probe):
+                try:
+                    adapter.invoke(record["deadline_epoch"], attempt_id=record["id"], binding=binding,
+                                   sandbox_directory=sandbox, actual_enabled=True)
+                except v20.LedgerError as exc:
+                    assert str(exc) == expected, (label, str(exc))
+                else:
+                    raise AssertionError(f"result policy accepted: {label}")
+            cases += 1
+
+        # Through the lifecycle the distinct code lands in the ledger record (not internal_error).
+        config, codex, argv, binding, adapter, remote, ledger = _spawn_context(root, "policy-lifecycle")
+        out = root / "lifecycle-out"; out.mkdir(mode=0o700)
+        child = MagicMock(); child.poll.return_value = 0; child.returncode = 0; child.pid = 4243
+        child.communicate.return_value = (b"", b"unexpected\n")
+        with patch.object(v20, "_fixed_config", lambda _b: config), patch.object(v20, "_fixed_ledger", lambda _c: ledger), \
+                patch.object(v20, "_production_residual_scanner", lambda *_: True), \
+                patch("v20_diagnostic.subprocess.Popen", return_value=child), \
+                patch("v20_diagnostic.subprocess.run", side_effect=fake_probe):
+            try:
+                v20.run_diagnostic_once(ledger, binding=binding, adapter=adapter, artifact_directory=out / "result",
+                    next_binding_factory=lambda _: _binding("e" * 64), actual_enabled=True)
+            except v20.LedgerError as exc:
+                assert str(exc) == "diagnostic_cli_stderr_unexpected"
+            else:
+                raise AssertionError("lifecycle accepted unexpected stderr")
+        last = ledger._read_local()["records"][-1]
+        assert last["state"] == "unknown" and last["failure_code"] == "diagnostic_cli_stderr_unexpected"
+        cases += 1
+    return cases
+
+
+def codex_boundary_tests():
+    """The pre-run check runs the Codex executable (here: stubs) under the fixed profile and production env."""
+    cases = 0
+    known = "WARNING: proceeding, even though we could not create PATH aliases: Operation not permitted (os error 1)"
+    flags = " ".join(v20._FIXED_HELP_FLAGS)
+    def stub(root, name, *, version="codex-cli 0.163.0", stderr="", exit_code=0, help_flags=flags, touch=False):
+        path = Path(root) / name
+        lines = ["#!/bin/sh"]
+        if stderr:
+            lines.append(f"printf '%s\\n' '{stderr}' >&2")
+        if touch:
+            lines.append("echo changed > created-by-cli.txt")
+        lines += ['if [ "$1" = "--version" ]; then', f"  echo '{version}'", "else", f"  echo 'Usage: codex exec {help_flags}'", "fi",
+                  f"exit {exit_code}"]
+        path.write_text("\n".join(lines) + "\n"); path.chmod(0o755)
+        return str(path)
+    unavailable = False
+    with tempfile.TemporaryDirectory(prefix="p5-v20-codex-boundary-test-") as td:
+        root = Path(td).resolve(strict=True)
+        good = stub(root, "good")
+        try:
+            outcome = v20.codex_boundary_preflight(good, "codex-cli 0.163.0")
+            assert outcome == {"stderr": ["empty", "empty"], "version": "codex-cli 0.163.0"}
+        except v20.LedgerError as exc:
+            # The outer host disables sandbox-exec (same tolerance as the other containment tests).
+            assert str(exc) == "host_containment_unavailable", str(exc)
+            unavailable = True
+        cases += 1
+        if not unavailable:
+            warned = v20.codex_boundary_preflight(stub(root, "warned", stderr=known), "codex-cli 0.163.0")
+            assert warned["stderr"] == ["known_warning", "known_warning"]
+            cases += 1
+            for label, kwargs, expected in (
+                    ("other stderr", dict(stderr="something else"), "diagnostic_cli_stderr_unexpected"),
+                    ("known plus more", dict(stderr=known + " extra"), "diagnostic_cli_stderr_unexpected"),
+                    ("exit code", dict(exit_code=1), "diagnostic_cli_exit_nonzero"),
+                    ("wrong version", dict(version="codex-cli 0.164.0"), "fixed_cli_binding_invalid"),
+                    ("flag missing from help", dict(help_flags="--json"), "fixed_cli_binding_invalid"),
+                    ("writes into the attempt root", dict(touch=True), "diagnostic_cli_tree_changed")):
+                try:
+                    v20.codex_boundary_preflight(stub(root, "bad-" + label.replace(" ", "-"), **kwargs), "codex-cli 0.163.0")
+                except v20.LedgerError as exc:
+                    assert str(exc) == expected, (label, str(exc))
+                else:
+                    raise AssertionError(f"codex boundary preflight accepted: {label}")
+                cases += 1
+    # argument validation does not need the host sandbox
+    for bad in ("codex", None, 3):
+        try:
+            v20.codex_boundary_preflight(bad, "codex-cli 0.163.0")
+        except v20.LedgerError as exc:
+            assert str(exc) == "fixed_cli_binding_invalid"
+        else:
+            raise AssertionError("relative/invalid codex path accepted")
+    cases += 1
+    return cases
+
+
+def driver_round8_tests():
+    import contextlib
+    import io
+    cases = 0
+    base = Path(v20.__file__).resolve().parent
+    config = v20_driver.strict_json(base / "config.json")
+    assert (config["hard_cap"], config["prior_consumed"], config["diagnostic_limit"]) == (29, 3, 2)
+    assert v20_driver.diagnostic_directory_name(2) == "diagnostic-once" and v20_driver.diagnostic_directory_name(3) == "diagnostic-once-2"
+    cases += 1
+    class Remote:
+        def __init__(self, head): self.head = head
+        def ls_remote(self):
+            if self.head == "boom":
+                raise v20.LedgerError("remote_ls_remote_invalid")
+            return self.head
+    with tempfile.TemporaryDirectory(prefix="p5-v20-unreserved-root-") as td:
+        for label, remote_head, kept in (("unchanged remote", "a" * 40, False), ("moved remote", "b" * 40, True),
+                                         ("unreadable remote", "boom", True)):
+            root = Path(td) / label.replace(" ", "-"); (root / "nested").mkdir(parents=True, mode=0o700)
+            evidence = root / "preflight.json"; evidence.write_text("{}"); evidence.chmod(0o400)
+            v20_driver._remove_unreserved_root(Remote(remote_head), "a" * 40, root)
+            assert root.exists() == kept, label
+            cases += 1
+    # preflight/sandbox-preflight run the Codex boundary check first: a failing check stops them with its code and
+    # no preflight evidence is written (the defect of the first diagnostic would be caught here).
+    base_manifest = v20_driver.load_manifest(verify_cli=False)
+    for mode in ("preflight", "sandbox-preflight"):
+        stderr = io.StringIO()
+        with patch.object(v20_driver, "load_manifest", return_value=base_manifest), \
+                patch.object(v20_driver, "run_tests", return_value={"fixture": 1}), \
+                patch.object(v20_driver, "write_preflight") as wrote, \
+                patch.object(v20, "sandbox_boundary_preflight", return_value={"profile_sha256": "x"}) as sandbox_ran, \
+                patch.object(v20, "codex_boundary_preflight",
+                             side_effect=v20.LedgerError("diagnostic_cli_stderr_unexpected")) as boundary, \
+                contextlib.redirect_stderr(stderr):
+            try:
+                v20_driver.main([mode])
+            except SystemExit as exc:
+                assert exc.code == 2
+            else:
+                raise AssertionError("preflight passed despite a failing Codex boundary check")
+        assert boundary.call_count == 1 and wrote.call_count == 0 and sandbox_ran.call_count == 0
+        assert stderr.getvalue().strip() == "v20_fixed_artifact_invalid code=diagnostic_cli_stderr_unexpected"
+        cases += 1
+    # actual-mode failures print the fixed string plus an allow-listed code only
+    for args, error, expected in (
+            (["diagnostic-once"], v20.LedgerError("diagnostic_cli_stderr_unexpected"), "v20_fixed_artifact_invalid code=diagnostic_cli_stderr_unexpected"),
+            (["diagnostic-once"], v20.LedgerError("free-form text with secret"), "v20_fixed_artifact_invalid"),
+            (["diagnostic-once"], ValueError("secret"), "v20_fixed_artifact_invalid"),
+            (["verify"], v20.LedgerError("diagnostic_cli_stderr_unexpected"), "v20_fixed_artifact_invalid")):
+        stderr = io.StringIO()
+        with patch.object(v20_driver, "load_manifest", side_effect=error), contextlib.redirect_stderr(stderr):
+            try:
+                v20_driver.main(args)
+            except SystemExit as exc:
+                assert exc.code == 2
+            else:
+                raise AssertionError("driver did not exit")
+        assert stderr.getvalue().strip() == expected, (args, stderr.getvalue())
+        cases += 1
+    # diagnostic_root must be an owner-only directory (only exercised on the throw-away source-selftest home)
+    root = Path(config["diagnostic_root"])
+    if str(root).startswith("/private/var/tmp/p5-v20-source-selftest-"):
+        os.chmod(root, 0o755)
+        try:
+            v20_driver.load_manifest(verify_cli=False)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("verify accepted a 0755 diagnostic_root")
+        finally:
+            os.chmod(root, 0o700)
+        v20_driver.load_manifest(verify_cli=False)
+        cases += 1
+    return cases
+
+
 def run_all():
     counts = {"schema": schema_tests(), "privacy": privacy_tests(), "path_unknown": path_and_unknown_tests(),
               "ledger": ledger_tests(), "phase_binding": phase_binding_tests(), "artifact_attribution": artifact_attribution_tests(),
               "formal_gate": gate_tests(), "remote_fixture": git_remote_fixture_tests(),
               "seed_canonical": seed_canonical_tests(), "diagnostic_lifecycle": diagnostic_lifecycle_tests(),
               "production_runner": production_runner_tests(), "spawn_boundary": spawn_boundary_tests(),
-              "spawn_once_wiring": spawn_once_and_wiring_tests(), "profile_negative": profile_negative_tests(), "canary_classification": canary_classification_tests()}
+              "spawn_once_wiring": spawn_once_and_wiring_tests(), "profile_negative": profile_negative_tests(), "canary_classification": canary_classification_tests(),
+              "second_diagnostic": second_diagnostic_tests(), "spawn_result_policy": spawn_result_policy_tests(),
+              "codex_boundary": codex_boundary_tests(), "driver_round8": driver_round8_tests()}
     return counts
 
 

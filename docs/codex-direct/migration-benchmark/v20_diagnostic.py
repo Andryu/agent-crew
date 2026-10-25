@@ -25,7 +25,12 @@ import pwd
 import sys
 
 VERSION = 20
-HARD_CAP = 28
+HARD_CAP = 29
+# Owner decision 2026-10-25: the first diagnostic (attempt id below) ended `unknown` and consumed a slot,
+# so the ceiling is 29 and exactly ONE further diagnostic is allowed, bound to this exact remote record
+# (canonical-JSON SHA-256 of the record as it stands in the remote chain). It is not a general retry.
+FAILED_DIAGNOSTIC = {"id": "8e861a843972411c95465e8c1c59830f",
+                     "sha256": "0923a369abb4495b39d1a751c470eb1ae4ebc844123bbdeb274a7400cbeeccf5"}
 FORMAL_SECONDS = 120 * 60
 def _hex(*chunks):
     return "".join(chunks)
@@ -82,6 +87,17 @@ def canonical_bytes(value) -> bytes:
 
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def failed_diagnostic_offset(records):
+    """Index of the first phase record: 3 when records[2] is exactly the pinned failed diagnostic, else 2."""
+    if (type(records) is list and len(records) > 2 and type(records[2]) is dict
+            and records[2].get("id") == FAILED_DIAGNOSTIC["id"]):
+        if (sha256(canonical_bytes(records[2])) != FAILED_DIAGNOSTIC["sha256"]
+                or records[2].get("state") != "unknown" or records[2].get("role") != "diagnostic"):
+            raise LedgerError("historical_reference_mismatch")
+        return 3
+    return 2
 
 
 # The profile grants broad reads/process execution, but file writes only below the
@@ -428,17 +444,20 @@ def verify_saved_result(result_path: Path, sidecar_path: Path, *, record: dict, 
 
 def formal_start_eligible(records: list[dict]) -> bool:
     """Gate formal start on fixed history, exactly one resolved diagnostic and one PASS final."""
-    if type(records) is not list or len(records) != 4 or any(type(r) is not dict for r in records):
+    if type(records) is not list or any(type(r) is not dict for r in records):
         return False
     try:
         validate_record_chain(records)
+        offset = failed_diagnostic_offset(records)
     except LedgerError:
+        return False
+    if len(records) != offset + 2:
         return False
     expected_history = [dict(x, type="historical_attempt") for x in HISTORICAL]
     if records[:2] != expected_history:
         return False
-    diagnostic = [r for r in records[2:] if r.get("role") == "diagnostic"]
-    final = [r for r in records[2:] if r.get("role") == "final_probe"]
+    diagnostic = [r for r in records[offset:] if r.get("role") == "diagnostic"]
+    final = [r for r in records[offset:] if r.get("role") == "final_probe"]
     if len(diagnostic) != 1 or len(final) != 1:
         return False
     try:
@@ -459,21 +478,26 @@ def formal_start_eligible(records: list[dict]) -> bool:
             and re.fullmatch(r"[0-9a-f]{64}", diagnostic[0].get("report_sha256", ""))
             and final[0].get("state") == "final_pass"
             and re.fullmatch(r"[0-9a-f]{64}", final[0].get("gate_evidence_sha256", ""))
-            and all(r.get("role") in {"diagnostic", "final_probe", "formal_run"} for r in records[2:]))
+            and all(r.get("role") in {"diagnostic", "final_probe", "formal_run"} for r in records[offset:]))
 
 
 def formal_complete(records: list[dict]) -> bool:
-    if (type(records) is not list or len(records) != HARD_CAP or any(type(r) is not dict for r in records)
-            or not formal_start_eligible(records[:4])):
+    if type(records) is not list or any(type(r) is not dict for r in records):
+        return False
+    try:
+        offset = failed_diagnostic_offset(records)
+    except LedgerError:
+        return False
+    if len(records) != offset + 26 or not formal_start_eligible(records[:offset + 2]):
         return False
     try:
         validate_record_chain(records)
     except LedgerError:
         return False
-    formal = records[4:]
+    formal = records[offset + 2:]
     expected_runs = [f"C{case}-{side}-{repeat}" for case in range(1, 7) for side in ("A", "B") for repeat in (1, 2)]
     return (len(formal) == 24 and [r.get("run_id") for r in formal] == expected_runs
-            and len({r.get("id") for r in records[2:]}) == 26
+            and len({r.get("id") for r in records[offset:]}) == 26
             and all(r.get("role") == "formal_run" and r.get("state") == "formal_run_pass"
                     and re.fullmatch(r"[0-9a-f]{64}", r.get("gate_evidence_sha256", "")) for r in formal))
 
@@ -606,15 +630,16 @@ def validate_record_chain(records):
     expected_history = [dict(x, type="historical_attempt") for x in HISTORICAL]
     if type(records) is not list or len(records) > HARD_CAP or records[:2] != expected_history:
         raise LedgerError("historical_reference_mismatch")
-    seen = set()
-    for index, record in enumerate(records[2:], 3):
+    offset = failed_diagnostic_offset(records)
+    seen = {FAILED_DIAGNOSTIC["id"]} if offset == 3 else set()
+    for index, record in enumerate(records[offset:], offset + 1):
         required = {"sequence", "id", "role", "fingerprint", "root_identity", "spec_sha256", "command_sha256",
                     "preflight_sha256", "manifest_sha256", "binding", "binding_sha256",
                     "pid", "pgid", "owner_uid", "started_epoch", "deadline_epoch", "state"}
         optional = {"run_id", "determination", "report_sha256", "gate_evidence_sha256", "ended_epoch",
                     "result_artifact_sha256", "gate_schema", "run_set_sha256", "gate_evidence",
                     "expected_next_role", "expected_next_binding", "expected_next_binding_sha256",
-                    "expected_next_run_set_sha256"}
+                    "expected_next_run_set_sha256", "failure_code"}
         if type(record) is not dict or not required <= set(record) or not set(record) <= required | optional:
             raise LedgerError("ledger_record_schema_invalid")
         if (type(record["sequence"]) is not int or record["sequence"] != index
@@ -656,6 +681,10 @@ def validate_record_chain(records):
                                         or record["ended_epoch"] < record["started_epoch"]):
             raise LedgerError("ledger_record_value_invalid")
         if "determination" in record and (type(record["determination"]) is not str or record["determination"] not in DETERMINATIONS):
+            raise LedgerError("ledger_record_value_invalid")
+        if "failure_code" in record and (type(record["failure_code"]) is not str
+                or record["failure_code"] not in FIXED_ERROR_CODES
+                or record["state"] not in {"unknown", "timeout", "crash", "diagnostic_inconclusive", "final_fail", "formal_run_fail"}):
             raise LedgerError("ledger_record_value_invalid")
         if record["role"] == "diagnostic":
             if "run_id" in record or (record["state"] == "completed_diagnostic" and
@@ -710,7 +739,7 @@ def validate_record_chain(records):
                 raise LedgerError("ledger_expected_binding_invalid")
         elif expected_next:
             raise LedgerError("ledger_expected_binding_invalid")
-    phases = records[2:]
+    phases = records[offset:]
     diagnostics = [r for r in phases if r["role"] == "diagnostic"]
     finals = [r for r in phases if r["role"] == "final_probe"]
     formals = [r for r in phases if r["role"] == "formal_run"]
@@ -875,11 +904,13 @@ class GlobalLedger:
             head, records = self._verify_remote(ledger)
             if len(records) >= self.cap:
                 raise LedgerError("global_budget_exhausted")
-            if any(r.get("state") in {"reserved", "running", "unknown", "timeout", "crash", "diagnostic_inconclusive", "final_fail", "formal_run_fail"} for r in records[2:]):
+            offset = failed_diagnostic_offset(records)
+            # The pinned failed diagnostic is consumed history; every later record must be final-state clean.
+            if any(r.get("state") in {"reserved", "running", "unknown", "timeout", "crash", "diagnostic_inconclusive", "final_fail", "formal_run_fail"} for r in records[offset:]):
                 raise LedgerError("prior_attempt_not_final")
             if records[:2] != [dict(x, type="historical_attempt") for x in HISTORICAL]:
                 raise LedgerError("historical_reference_mismatch")
-            phase_records = records[2:]
+            phase_records = records[offset:]
             if role == "diagnostic" and any(r.get("role") == "diagnostic" for r in phase_records):
                 raise LedgerError("duplicate_diagnostic_role")
             if role == "final_probe" and (not any(r.get("role") == "diagnostic" and r.get("state") == "completed_diagnostic"
@@ -894,7 +925,7 @@ class GlobalLedger:
                 existing_runs = {r.get("run_id") for r in phase_records if r.get("role") == "formal_run"}
                 run_order = [f"C{c}-{s}-{n}" for c in range(1, 7) for s in ("A", "B") for n in (1, 2)]
                 prior_formal = [r for r in phase_records if r.get("role") == "formal_run"]
-                if (run_id not in valid_ids or not formal_start_eligible(records[:4])
+                if (run_id not in valid_ids or not formal_start_eligible(records[:offset + 2])
                         or any(r.get("role") == "final_probe" and r.get("binding_sha256") == digest for r in phase_records)
                         or not any(r.get("role") == "final_probe" and r.get("state") == "final_pass"
                                    and r.get("expected_next_binding") == binding
@@ -907,7 +938,7 @@ class GlobalLedger:
             elif run_id is not None:
                 raise LedgerError("reservation_binding_invalid")
             now = self.clock()
-            formal_entries = [r for r in records[2:] if r.get("role") == "formal_run"]
+            formal_entries = [r for r in records[offset:] if r.get("role") == "formal_run"]
             if role == "formal_run" and formal_entries and now - formal_entries[0].get("started_epoch", now) >= FORMAL_SECONDS:
                 raise LedgerError("formal_wall_budget_exhausted")
             record = {"sequence": len(records) + 1, "id": uuid.uuid4().hex, "role": role,
@@ -952,8 +983,11 @@ class GlobalLedger:
                  run_id: str | None = None, result_artifact_path: Path | None = None,
                  evidence_sidecar_path: Path | None = None, next_binding: dict | None = None,
                  diagnostic_report: bytes | None = None, gate_evidence: dict | None = None,
-                 result_artifact_sha256: str | None = None):
+                 result_artifact_sha256: str | None = None, failure_code: str | None = None):
         if state not in STATES - {"reserved", "running"}:
+            raise LedgerError("attempt_state_invalid")
+        if failure_code is not None and (failure_code not in FIXED_ERROR_CODES or state not in {
+                "unknown", "timeout", "crash", "diagnostic_inconclusive", "final_fail", "formal_run_fail"}):
             raise LedgerError("attempt_state_invalid")
         binding = validate_binding(binding)
         if next_binding is not None:
@@ -1036,6 +1070,8 @@ class GlobalLedger:
             if ended > record["deadline_epoch"]:
                 state = "timeout"
             record["state"] = state
+            if failure_code is not None:
+                record["failure_code"] = failure_code
             record["ended_epoch"] = ended
             payload = canonical_bytes({"schema": 1, "version": VERSION, "records": records})
             commit = self.remote.push_ff(head, payload)
@@ -1050,9 +1086,10 @@ class GlobalLedger:
         expected_binding = validate_binding(expected_binding)
         ledger = self._read_local()
         self._verify_remote(ledger)
+        offset = failed_diagnostic_offset(ledger["records"])
         if (not formal_start_eligible(ledger["records"])
-                or ledger["records"][3].get("expected_next_binding") != expected_binding
-                or ledger["records"][3].get("expected_next_binding_sha256") != binding_digest(expected_binding)):
+                or ledger["records"][offset + 1].get("expected_next_binding") != expected_binding
+                or ledger["records"][offset + 1].get("expected_next_binding_sha256") != binding_digest(expected_binding)):
             raise LedgerError("formal_gate_not_satisfied")
         return True
 
@@ -1284,7 +1321,7 @@ def _authorize_spawn(argv, *, deadline_epoch, attempt_id, binding):
         if type(attempt_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", attempt_id):
             raise LedgerError("spawn_reservation_invalid")
         matches = [r for r in records[2:] if r.get("id") == attempt_id]
-        if len(matches) != 1 or len(records) != 3:
+        if len(matches) != 1 or len(records) != failed_diagnostic_offset(records) + 1:
             raise LedgerError("spawn_reservation_invalid")
         record, now = matches[0], time.time()
         if (record.get("role") != "diagnostic" or record.get("state") != "reserved" or "ended_epoch" in record
@@ -1309,6 +1346,77 @@ def _write_private_new(path: Path, data: bytes, mode=0o600):
         stream.write(data); stream.flush(); os.fsync(stream.fileno())
 
 
+# Under the fixed OS profile Codex 0.163.0 cannot create its PATH aliases below CODEX_HOME/tmp (writes are
+# confined to the per-attempt root) and prints exactly this one warning, then proceeds. No codex setting
+# suppresses it, and a writable per-attempt CODEX_HOME would need a copy of the user's credentials, so this
+# single known line is tolerated by exact match; any other stderr stays a failure.
+_KNOWN_CLI_STDERR = (b"WARNING: proceeding, even though we could not create PATH aliases: "
+                     b"Operation not permitted (os error 1)\n")
+
+
+def _stderr_acceptable(data):
+    return type(data) is bytes and (data == b"" or data == _KNOWN_CLI_STDERR)
+
+
+def _codex_process_env(sandbox_directory):
+    """Production process environment for the fixed Codex CLI inside a dedicated attempt root."""
+    home = pwd.getpwuid(os.getuid()).pw_dir
+    scratch = Path(sandbox_directory) / ".benchmark-tmp"
+    (scratch / "home").mkdir(parents=True, mode=0o700)
+    python_executable = sys.executable
+    fixed_path = os.pathsep.join(dict.fromkeys((str(Path(python_executable).parent),
+        "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin")))
+    env = {"PATH": fixed_path, "LANG": "en_US.UTF-8", "LC_ALL": "en_US.UTF-8",
+           "HOME": str(scratch / "home"), "TMPDIR": str(scratch), "TMP": str(scratch), "TEMP": str(scratch),
+           "PYTHONDONTWRITEBYTECODE": "1", "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
+           "GIT_OPTIONAL_LOCKS": "0", "P5_RUN_TOKEN": uuid.uuid4().hex}
+    if sys.platform == "darwin":
+        env["__CF_USER_TEXT_ENCODING"] = f"0x{os.getuid():X}:0x0:0x0"
+    process_env = {**env, "CODEX_HOME": str(Path(home) / ".codex")}
+    return home, scratch, python_executable, env, process_env
+
+
+_FIXED_HELP_FLAGS = ("--ephemeral", "--ignore-user-config", "--ignore-rules", "--skip-git-repo-check", "--json",
+                     "--sandbox", "--model", "--config")
+
+
+def codex_boundary_preflight(codex_executable, expected_version):
+    """Model-free: run the real Codex executable's `--version` and `exec --help` under the fixed sandbox
+    profile and the production environment (never `exec` with a prompt). The CLI must exit 0, print the
+    fixed version / the fixed argv flags, write nothing into the attempt root and emit no stderr other
+    than the single known warning. This is the check that would have caught the first diagnostic failure."""
+    if type(codex_executable) is not str or not os.path.isabs(codex_executable):
+        raise LedgerError("fixed_cli_binding_invalid")
+    with tempfile.TemporaryDirectory(prefix="p5-v20-codex-boundary-") as td:
+        sandbox = Path(td).resolve(strict=True)
+        os.chmod(sandbox, 0o700)
+        home, scratch, python_executable, env, process_env = _codex_process_env(sandbox)
+        before = _tree_fingerprint(sandbox)
+        outcomes = []
+        for args in (("--version",), ("exec", "--help")):
+            contained = sandboxed_argv((codex_executable, *args), sandbox)
+            try:
+                result = subprocess.run(contained, cwd=sandbox, env=process_env, stdin=subprocess.DEVNULL,
+                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30, close_fds=True)
+            except (OSError, subprocess.TimeoutExpired):
+                raise LedgerError("diagnostic_cli_spawn_failed") from None
+            if result.returncode != 0:
+                raise LedgerError("diagnostic_cli_exit_nonzero")
+            if not _stderr_acceptable(result.stderr):
+                raise LedgerError("diagnostic_cli_stderr_unexpected")
+            if args == ("--version",):
+                if result.stdout.decode("utf-8", "replace").strip() != expected_version:
+                    raise LedgerError("fixed_cli_binding_invalid")
+            else:
+                text = result.stdout.decode("utf-8", "replace")
+                if any(flag not in text for flag in _FIXED_HELP_FLAGS):
+                    raise LedgerError("fixed_cli_binding_invalid")
+            outcomes.append("known_warning" if result.stderr else "empty")
+        if _tree_fingerprint(sandbox) != before:
+            raise LedgerError("diagnostic_cli_tree_changed")
+        return {"stderr": outcomes, "version": expected_version}
+
+
 def _invoke_diagnostic_cli(argv, *, deadline_epoch, attempt_id, binding, sandbox_directory):
     if type(argv) is not tuple or argv[1:] != _FIXED_ARGUMENTS:
         raise LedgerError("fixed_cli_binding_invalid")
@@ -1322,18 +1430,7 @@ def _invoke_diagnostic_cli(argv, *, deadline_epoch, attempt_id, binding, sandbox
         raise LedgerError("host_containment_unavailable")
     if any(sandbox_directory.iterdir()):
         raise LedgerError("diagnostic_fixture_not_empty")
-    home = pwd.getpwuid(os.getuid()).pw_dir
-    scratch = sandbox_directory / ".benchmark-tmp"
-    (scratch / "home").mkdir(parents=True, mode=0o700)
-    python_executable = sys.executable
-    fixed_path = os.pathsep.join(dict.fromkeys((str(Path(python_executable).parent),
-        "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin")))
-    env = {"PATH": fixed_path, "LANG": "en_US.UTF-8", "LC_ALL": "en_US.UTF-8",
-           "HOME": str(scratch / "home"), "TMPDIR": str(scratch), "TMP": str(scratch), "TEMP": str(scratch),
-           "PYTHONDONTWRITEBYTECODE": "1", "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
-           "GIT_OPTIONAL_LOCKS": "0", "P5_RUN_TOKEN": uuid.uuid4().hex}
-    if sys.platform == "darwin":
-        env["__CF_USER_TEXT_ENCODING"] = f"0x{os.getuid():X}:0x0:0x0"
+    home, scratch, python_executable, env, process_env = _codex_process_env(sandbox_directory)
     allowed_known = {home + suffix for suffix in ("/.volta/bin", "/.pyenv/shims", "/.antigravity/antigravity/bin", "/.local/bin")}
     allowed_known.update(("/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin", "/System/Cryptexes/App/usr/bin",
         "/usr/bin", "/bin", "/usr/sbin", "/sbin", "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin",
@@ -1350,16 +1447,21 @@ def _invoke_diagnostic_cli(argv, *, deadline_epoch, attempt_id, binding, sandbox
     _write_private_new(expected_path, canonical_bytes(expected), 0o400)
     _write_private_new(script_path, _diagnostic_canary_source().encode("utf-8"), 0o400)
     canary_command = shlex.join(("/bin/zsh", "-lc", shlex.join((python_executable, "-I", "-B", script_path.name))))
-    process_env = {**env, "CODEX_HOME": str(Path(home) / ".codex")}
     before_tree = _tree_fingerprint(sandbox_directory)
     result = run_process_group(argv, deadline_epoch=deadline_epoch,
         residual_scanner=_production_residual_scanner, cwd=sandbox_directory,
         sandbox_directory=sandbox_directory,
         stdin_data=(_DIAGNOSTIC_PROMPT + canary_command + "\n").encode("utf-8"), env=process_env,
         _spawn_token=_SPAWN_TOKEN, _pre_spawn=mark_spawned)
-    if (result["timed_out"] or not result["child_reaped"] or not result["residual_verified"]
-            or result["returncode"] != 0 or result["stderr"] or _tree_fingerprint(sandbox_directory) != before_tree):
+    # Distinct fixed codes (stored in the ledger record) tell the failure classes apart.
+    if result["timed_out"] or not result["child_reaped"] or not result["residual_verified"]:
         raise LedgerError("diagnostic_cli_failed")
+    if result["returncode"] != 0:
+        raise LedgerError("diagnostic_cli_exit_nonzero")
+    if not _stderr_acceptable(result["stderr"]):
+        raise LedgerError("diagnostic_cli_stderr_unexpected")
+    if _tree_fingerprint(sandbox_directory) != before_tree:
+        raise LedgerError("diagnostic_cli_tree_changed")
     report = _audit_diagnostic_events(result["stdout"], canary_command=canary_command,
         attempt_id=attempt_id, fingerprint=binding["fingerprint"])
     script_path.unlink(); expected_path.unlink(); shutil.rmtree(scratch)
@@ -1666,7 +1768,8 @@ def run_diagnostic_once(ledger: GlobalLedger, *, binding: dict, adapter, artifac
         terminal = ("timeout" if code == "invocation_timeout" else
                     "diagnostic_inconclusive" if code == "diagnostic_inconclusive" else "unknown")
         ledger.complete(attempt_id, terminal, binding=binding,
-                        determination="inconclusive" if terminal == "diagnostic_inconclusive" else None)
+                        determination="inconclusive" if terminal == "diagnostic_inconclusive" else None,
+                        failure_code=code)
         raise LedgerError(code) from None
 
 
@@ -1780,7 +1883,8 @@ class GitRemote:
             index = changed[0]; old = parent_records[index]; new = child_records[index]
             mutable = {"state", "ended_epoch", "determination", "report_sha256", "result_artifact_sha256",
                        "gate_evidence_sha256", "gate_evidence", "gate_schema", "expected_next_role",
-                       "expected_next_binding", "expected_next_binding_sha256", "expected_next_run_set_sha256"}
+                       "expected_next_binding", "expected_next_binding_sha256", "expected_next_run_set_sha256",
+                       "failure_code"}
             if ({k: v for k, v in old.items() if k not in mutable} !=
                     {k: v for k, v in new.items() if k not in mutable}
                     or (old["state"], new["state"]) not in {
@@ -1812,10 +1916,7 @@ class GitRemote:
         return commit
 
 
-def fixed_error(error: Exception) -> str:
-    """Map any exception to an allowlisted code; never persist exception text."""
-    code = str(error) if isinstance(error, LedgerError) else "internal_error"
-    allowed = {"duplicate_json_key", "invalid_json_number", "invalid_json", "seed_digest_mismatch",
+FIXED_ERROR_CODES = frozenset({"duplicate_json_key", "invalid_json_number", "invalid_json", "seed_digest_mismatch",
                "seed_schema_invalid", "seed_history_mismatch", "diagnostic_schema_invalid", "diagnostic_binding_mismatch",
                "diagnostic_enum_invalid", "diagnostic_path_schema_invalid", "diagnostic_path_value_invalid",
                "diagnostic_unknown_schema_invalid", "diagnostic_unknown_value_invalid", "diagnostic_unknown_count_inconsistent",
@@ -1837,5 +1938,10 @@ def fixed_error(error: Exception) -> str:
                "invocation_timeout", "artifact_bundle_input_invalid", "artifact_bundle_schema_invalid",
                "artifact_directory_identity_invalid", "ledger_record_schema_invalid", "ledger_record_value_invalid",
                "diagnostic_environment_fit_inconsistent", "spawn_reservation_invalid",
-               "fixed_cli_binding_invalid", "host_containment_unavailable"}
-    return code if code in allowed else "internal_error"
+               "fixed_cli_binding_invalid", "host_containment_unavailable", "diagnostic_cli_failed", "diagnostic_cli_spawn_failed", "diagnostic_cli_stderr_unexpected", "diagnostic_cli_exit_nonzero", "diagnostic_cli_tree_changed", "diagnostic_event_audit_failed", "diagnostic_residual_unverified", "diagnostic_adapter_result_invalid", "diagnostic_direct_artifact_present", "diagnostic_fixture_not_empty", "host_containment_profile_mismatch", "host_containment_escape_detected", "host_containment_external_write_detected", "host_containment_inventory_unknown", "host_containment_timeout_cleanup_failed", "actual_invocation_disabled", "internal_error"})
+
+
+def fixed_error(error: Exception) -> str:
+    """Map any exception to an allowlisted code; never persist exception text."""
+    code = str(error) if isinstance(error, LedgerError) else "internal_error"
+    return code if code in FIXED_ERROR_CODES else "internal_error"

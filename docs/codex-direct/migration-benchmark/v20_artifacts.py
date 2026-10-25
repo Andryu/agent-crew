@@ -62,8 +62,15 @@ def build():
     codex_binding = harness_fingerprint.compute_codex_executable_binding()
     command_sha256 = v20.runner_command_sha256(codex_binding["realpath"])
     sandbox_binding = bind(Path(v20.SANDBOX_EXEC).resolve(strict=True), trusted_system=True)
-    codex_home = CACHE / "probe-v20-diagnostic" / "version-home"
-    codex_home.mkdir(parents=True, mode=0o700, exist_ok=True)
+    diagnostic_root = CACHE / "probe-v20-diagnostic"
+    diagnostic_root.mkdir(mode=0o700, exist_ok=True)
+    root_info = diagnostic_root.lstat()
+    if not stat.S_ISDIR(root_info.st_mode) or root_info.st_uid != os.getuid():
+        raise RuntimeError("diagnostic root identity invalid")
+    if stat.S_IMODE(root_info.st_mode) != 0o700:
+        diagnostic_root.chmod(0o700)  # mkdir(parents=...) leaves intermediate parents at the umask default
+    codex_home = diagnostic_root / "version-home"
+    codex_home.mkdir(mode=0o700, exist_ok=True)
     codex_home_stat = codex_home.lstat()
     if not stat.S_ISDIR(codex_home_stat.st_mode) or codex_home_stat.st_uid != os.getuid() or stat.S_IMODE(codex_home_stat.st_mode) != 0o700:
         raise RuntimeError("dedicated Codex version-check home identity invalid")
@@ -96,7 +103,7 @@ def build():
               "remote_budget_ref": REMOTE_REF, "model_transport": "OpenAI direct",
               "allowed_driver_modes": ["verify", "preflight", "sandbox-preflight", "bootstrap-seed", "diagnostic-once"],
               "actual_invocations_enabled": True,
-              "hard_cap": 28, "prior_consumed": 2, "diagnostic_limit": 1, "final_probe_limit": 1,
+              "hard_cap": 29, "prior_consumed": 3, "diagnostic_limit": 2, "final_probe_limit": 1,
               "formal_run_count": 24, "retry": False,
               "global_ledger_directory": str(CACHE / "logs" / "v20-global-ledger"),
               "diagnostic_root": str(CACHE / "probe-v20-diagnostic"),
@@ -108,7 +115,7 @@ def build():
                      f"base=${{0:A:h}}\nexec {py} -B \"$base/driver.py\" \"$1\"\n").encode()
     fp_input = {"source": config["source_hashes"], "driver": config["driver_sha256"],
                 "config": hashlib.sha256(config_data).hexdigest(), "launcher_template_sha256": hashlib.sha256(launcher_data).hexdigest(),
-                "remote_ref": REMOTE_REF, "hard_cap": 28,
+                "remote_ref": REMOTE_REF, "hard_cap": 29,
                 "modes": {"driver.py": 0o500, "v20_driver.py": 0o400, "config.json": 0o400, "launcher.sh": 0o500,
                           "v20_diagnostic.py": 0o400, "v20_selftest.py": 0o400, "v20_seed_fixture.json": 0o400,
                           "p5-v20-plan.md": 0o400}}
