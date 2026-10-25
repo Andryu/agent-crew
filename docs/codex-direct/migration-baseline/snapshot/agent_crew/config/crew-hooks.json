@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "runtimes": {
+    "claude": {
+      "events": ["SessionStart", "UserPromptSubmit", "Stop", "SubagentStop", "TaskCompleted"]
+    },
+    "codex": {
+      "events": ["SessionStart", "UserPromptSubmit", "Stop", "SubagentStop"]
+    }
+  },
+  "checks": {
+    "privacy": true,
+    "lesson_candidates": true
+  }
+}
